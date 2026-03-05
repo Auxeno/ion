@@ -12,9 +12,7 @@
 
 ---
 
-Ion is a neural network library for JAX designed to be minimal and easy to use. Models are pytrees, parameters are explicit, and layers follow familiar conventions.
-
-It ships with layers for convolution, attention, recurrence, normalization, and pooling, along with filtered transforms for working with models directly. Users can write their own if they so wish.
+Ion is a neural network library for JAX. Models are pytrees, parameters are explicit, and everything works natively with `jax.jit`, `jax.grad`, and `jax.vmap`. It ships with common layers out of the box, but defining your own is simple — just subclass `Module`.
 
 ## Installation
 
@@ -22,10 +20,125 @@ It ships with layers for convolution, attention, recurrence, normalization, and 
 pip install git+https://github.com/auxeno/ion
 ```
 
+## Package Contents
+
+### Module
+
+Inherit from `nn.Module` to define a model. Subclasses are automatically registered as JAX pytrees and frozen after `__init__`.
+
+```python
+class MLP(nn.Module):
+    layer_1: nn.Linear
+    layer_2: nn.Linear
+
+    def __init__(self, *, key):
+        keys = jax.random.split(key, 2)
+        self.layer_1 = nn.Linear(784, 128, key=keys[0])
+        self.layer_2 = nn.Linear(128, 10, key=keys[1])
+
+    def __call__(self, x):
+        return self.layer_2(jax.nn.relu(self.layer_1(x)))
+```
+
+Modules are immutable after construction. Use `replace` to create a modified copy.
+
+```python
+layer = layer.replace(b=None)  # remove bias
+```
+
+Non-array fields (ints, floats, strings, callables) are automatically treated as static metadata — they're preserved through flatten/unflatten but invisible to JAX tracing, so storing config like `eps`, `num_heads`, or activation functions just works.
+
+### Param
+
+`Param` wraps an array and marks it as a model parameter. It controls whether the array is trainable or frozen.
+
+```python
+self.w = nn.Param(w_init(key=key, shape=(3, 16)))  # trainable
+self.b = nn.Param(jnp.zeros(16), trainable=False)  # frozen
+```
+
+`Param` implements `__jax_array__` and forwards arithmetic, so it works as a drop-in for plain arrays — `x @ self.w` works without unwrapping.
+
+Access all parameters in a model with the `params` property, which returns a matching pytree with only `Param` leaves (everything else becomes `None`):
+
+```python
+model.params  # pytree of Param leaves — can pass to an Optax optimizer
+```
+
+Freeze or unfreeze entire models or individual layers:
+
+```python
+frozen_model = model.freeze()                          # freeze everything
+model = model.replace(encoder=model.encoder.freeze())  # freeze one layer
+unfrozen_model = model.unfreeze()                      # unfreeze everything
+```
+
+### Transforms
+
+`ion.grad` and `ion.value_and_grad` work like their JAX counterparts, but differentiate only trainable `Param` leaves. Everything else is held constant.
+
+```python
+@ion.grad
+def loss_fn(model, x, y):
+    logits = model(x)
+    return optax.softmax_cross_entropy_with_integer_labels(logits, y).mean()
+
+grads = loss_fn(model, x, y)  # grads has same structure as model
+```
+
+The gradient tree matches the model structure — trainable `Param` positions have gradients, everything else is `None`.
+
+No `ion.jit` wrapper is needed. `jax.jit` works natively with all modules.
+
+### Layers
+
+| Category        | Layers                                                                    |
+|-----------------|---------------------------------------------------------------------------|
+| Linear          | `Linear`, `Identity`, `LoRALinear`                                        |
+| Convolution     | `Conv1d`, `Conv2d`, `Conv`, `ConvTranspose1d`, `ConvTranspose2d`, `ConvTranspose` |
+| Attention       | `SelfAttention`, `CrossAttention`                                         |
+| Normalization   | `LayerNorm`, `RMSNorm`, `GroupNorm`, `BatchNorm`, `InstanceNorm`          |
+| Recurrent       | `LSTMCell`, `GRUCell`, `LSTM`, `GRU`                                     |
+| Pooling         | `MaxPool1d`, `MaxPool2d`, `AvgPool1d`, `AvgPool2d`                       |
+| Upsampling      | `Upsample1d`, `Upsample2d`                                               |
+| Embedding       | `Embedding`, `LearnedPositionalEmbedding`                                 |
+| Positional      | `sinusoidal`, `rope`, `apply_rope`, `alibi`                               |
+| Regularization  | `Dropout`                                                                 |
+| Blocks          | `Sequential`, `MLP`, `TransformerBlock`, `CrossTransformerBlock`          |
+
+### Pretty Printing
+
+Modules have a built-in text formatter for clean `repr` output in the terminal. In notebooks, Ion uses [Treescope](https://github.com/google-deepmind/treescope) for interactive, color-coded visualization.
+
+```python
+>>> model = MLP(key=jax.random.key(0))
+>>> model
+MLP(
+  layer_1=Linear(
+    w=Param(f32[784, 128], trainable=True),
+    b=Param(f32[128], trainable=True),
+  ),
+  layer_2=Linear(
+    w=Param(f32[128, 10], trainable=True),
+    b=Param(f32[10], trainable=True),
+  ),
+)
+```
+
+Treescope is enabled by default. Toggle it with `ion.enable_treescope()` / `ion.disable_treescope()`.
+
+### Serialization
+
+```python
+ion.save("model.npz", model)
+model = ion.load("model.npz", model)
+```
+
 ## Example
 
 ```python
-import jax, optax
+import jax
+import optax
 
 import ion
 from ion import nn
@@ -34,19 +147,18 @@ from ion import nn
 class MLP(nn.Module):
     layer_1: nn.Linear
     layer_2: nn.Linear
-    activation: Callable
 
     def __init__(self, *, key):
         keys = jax.random.split(key, 2)
         self.layer_1 = nn.Linear(784, 128, key=keys[0])
         self.layer_2 = nn.Linear(128, 10, key=keys[1])
-        self.activation = jax.nn.relu
 
     def __call__(self, x):
-        x = self.activation(self.layer_1(x))
+        x = jax.nn.relu(self.layer_1(x))
         return self.layer_2(x)
 
-@ion.grad
+
+@ion.value_and_grad
 def loss_fn(model, x, y):
     logits = model(x)
     return optax.softmax_cross_entropy_with_integer_labels(logits, y).mean()
@@ -54,24 +166,35 @@ def loss_fn(model, x, y):
 
 @jax.jit
 def train_step(model, opt_state, x, y):
-    grads = loss_fn(model, x, y)
+    loss, grads = loss_fn(model, x, y)
     updates, opt_state = optimizer.update(grads, opt_state)
     model = ion.apply_updates(model, updates)
-    return model, opt_state
+    return model, opt_state, loss
 
 
 model = MLP(key=jax.random.key(0))
+
 optimizer = optax.adam(3e-4)
 opt_state = optimizer.init(model.params)
 
 for x, y in data:
-    model, opt_state = train_step(model, opt_state, x, y)
+    model, opt_state, loss = train_step(model, opt_state, x, y)
 ```
-
-> Ion models are JAX [pytrees](https://docs.jax.dev/en/latest/pytrees.html), meaning native compatibility with `jax.jit`, `jax.grad`, and `jax.vmap`.
->
-> The `ion.grad` transformation extends JAX's autograd with a filtering layer. It automatically identifies and differentiates only the `ion.nn.Param` leaves where `trainable=True`.
 
 ## License
 
 Released under the Apache License 2.0.
+
+<details>
+<summary>Citation</summary>
+
+```bibtex
+@software{ion,
+  title  = {Ion: A Minimal JAX Neural Network Library},
+  author = {Alex Goddard},
+  url    = {https://github.com/auxeno/ion},
+  year   = {2025}
+}
+```
+
+</details>
