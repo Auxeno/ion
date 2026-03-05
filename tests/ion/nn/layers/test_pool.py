@@ -37,6 +37,14 @@ class TestAvgPool1d:
         y = layer(x)
         assert y.shape == (4, 3)
 
+    def test_padding_averages_only_real_elements(self):
+        """Padding should not count padded zeros in the average."""
+        layer = nn.AvgPool1d(kernel_size=3, stride=1, padding=1)
+        x = jnp.array([[6.0], [6.0], [6.0], [6.0]])
+        y = layer(x)
+        expected = jnp.array([[6.0], [6.0], [6.0], [6.0]])
+        npt.assert_allclose(y, expected)
+
 
 class TestMaxPool2d:
     def test_picks_max(self):
@@ -94,3 +102,11 @@ class TestAvgPool2d:
         x = jnp.ones((8, 8, 3))
         y = layer(x)
         assert y.shape == (4, 4, 3)
+
+    def test_padding_averages_only_real_elements(self):
+        """Padding should not count padded zeros in the average."""
+        layer = nn.AvgPool2d(kernel_size=3, stride=1, padding=1)
+        x = jnp.full((4, 4, 1), 10.0)
+        y = layer(x)
+        expected = jnp.full((4, 4, 1), 10.0)
+        npt.assert_allclose(y, expected)

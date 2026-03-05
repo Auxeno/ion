@@ -97,16 +97,30 @@ class AvgPool1d(Module):
 
         padding = self.padding if isinstance(self.padding, str) else ((0, 0), *self.padding, (0, 0))
 
+        window_dims = (1, self.kernel_size, 1)
+        window_strides = (1, self.stride, 1)
+
+        ones = jnp.ones_like(x)
+
         x = lax.reduce_window(
             operand=x,
             init_value=0.0,
             computation=lax.add,
-            window_dimensions=(1, self.kernel_size, 1),
-            window_strides=(1, self.stride, 1),
+            window_dimensions=window_dims,
+            window_strides=window_strides,
             padding=padding,
         )
 
-        x = x / self.kernel_size
+        window_counts = lax.reduce_window(
+            operand=ones,
+            init_value=0.0,
+            computation=lax.add,
+            window_dimensions=window_dims,
+            window_strides=window_strides,
+            padding=padding,
+        )
+
+        x = x / window_counts
 
         x = x.reshape(*batch_shape, *x.shape[-2:])
 
@@ -218,18 +232,30 @@ class AvgPool2d(Module):
 
         padding = self.padding if isinstance(self.padding, str) else ((0, 0), *self.padding, (0, 0))
 
-        # Sum reduction
+        window_dims = (1, *self.kernel_size, 1)
+        window_strides = (1, *self.stride, 1)
+
+        ones = jnp.ones_like(x)
+
         x = lax.reduce_window(
             operand=x,
             init_value=0.0,
             computation=lax.add,
-            window_dimensions=(1, *self.kernel_size, 1),
-            window_strides=(1, *self.stride, 1),
+            window_dimensions=window_dims,
+            window_strides=window_strides,
             padding=padding,
         )
 
-        # Average by dividing by the number of elements in the window
-        x = x / (self.kernel_size[0] * self.kernel_size[1])
+        window_counts = lax.reduce_window(
+            operand=ones,
+            init_value=0.0,
+            computation=lax.add,
+            window_dimensions=window_dims,
+            window_strides=window_strides,
+            padding=padding,
+        )
+
+        x = x / window_counts
 
         x = x.reshape(*batch_shape, *x.shape[-3:])
 
