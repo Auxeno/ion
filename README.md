@@ -2,7 +2,7 @@
 
   <h1><img src="assets/logo.png" alt="Ion" width="96"><br>Ion</h1>
 
-  <h3>A minimal JAX neural network library</h3>
+  <h3>Simple neural networks in JAX</h3>
 
   [![Python](https://img.shields.io/badge/Python-≥3.11-636EFA.svg)](https://www.python.org/)
   [![JAX](https://img.shields.io/badge/JAX-≥0.5-AB63FA.svg)](https://github.com/google/jax)
@@ -12,7 +12,7 @@
 
 ---
 
-Ion is a neural network library for JAX. Models are pytrees, parameters are explicit, and everything works natively with `jax.jit`, `jax.grad`, and `jax.vmap`. It ships with common layers out of the box, but defining your own is simple — just subclass `Module`.
+Ion is a neural network library for JAX. Models are represented as [pytrees](https://docs.jax.dev/en/latest/pytrees.html) with explicit parameters and native compatibility with JAX transformations (`jax.jit`, `jax.grad`, `jax.vmap`). It ships with most standard neural network layers and supports custom layer definition via `nn.Module` subclassing.
 
 ## Installation
 
@@ -24,7 +24,7 @@ pip install git+https://github.com/auxeno/ion
 
 ### Module
 
-Inherit from `nn.Module` to define a model. Subclasses are automatically registered as JAX pytrees and frozen after `__init__`.
+Inherit from `nn.Module` to define a model. Subclasses are automatically registered as JAX pytrees and become immutable after initialization (`__init__`).
 
 ```python
 class MLP(nn.Module):
@@ -40,13 +40,13 @@ class MLP(nn.Module):
         return self.layer_2(jax.nn.relu(self.layer_1(x)))
 ```
 
-Modules are immutable after construction. Use `replace` to create a modified copy.
+Because modules are immutable after construction, use the `replace` method to create a modified copy.
 
 ```python
-layer = layer.replace(b=None)  # remove bias
+model = model.replace(activation=jax.nn.gelu)  # swap activation function
 ```
 
-Non-array fields (ints, floats, strings, callables) are automatically treated as static metadata — they're preserved through flatten/unflatten but invisible to JAX tracing, so storing config like `eps`, `num_heads`, or activation functions just works.
+Non-array fields (ints, floats, strings, callables) are automatically treated as static metadata. They are preserved during pytree flattening and unflattening but remain invisible to JAX tracing. This prevents `jax.jit` tracing errors, allowing config settings (e.g., `num_heads`, `use_bias`) and activation functions to be stored directly on the module with no issues.
 
 ### Param
 
@@ -57,15 +57,15 @@ self.w = nn.Param(w_init(key=key, shape=(3, 16)))  # trainable
 self.b = nn.Param(jnp.zeros(16), trainable=False)  # frozen
 ```
 
-`Param` implements `__jax_array__` and forwards arithmetic, so it works as a drop-in for plain arrays — `x @ self.w` works without unwrapping.
+`Param` implements `__jax_array__` and forwards arithmetic operations, allowing it to function as a drop-in replacement for standard arrays (e.g., `x @ self.w` evaluates without explicit unwrapping).
 
-Access all parameters in a model with the `params` property, which returns a matching pytree with only `Param` leaves (everything else becomes `None`):
+Access all parameters via the `params` property. This returns a pytree with identical structure, containing only `Param` leaves (non-parameter leaves are replaced with `None`):
 
 ```python
-model.params  # pytree of Param leaves — can pass to an Optax optimizer
+model.params  # pytree of Param leaves — can be passed to an Optax optimizer
 ```
 
-Freeze or unfreeze entire models or individual layers:
+Freeze the parameters of entire models or specific sub-modules:
 
 ```python
 frozen_model = model.freeze()                          # freeze everything
@@ -75,7 +75,7 @@ unfrozen_model = model.unfreeze()                      # unfreeze everything
 
 ### Transforms
 
-`ion.grad` and `ion.value_and_grad` work like their JAX counterparts, but differentiate only trainable `Param` leaves. Everything else is held constant.
+`ion.grad` and `ion.value_and_grad` replicate `jax.grad`, but differentiate strictly with respect to trainable `Param` leaves. All other fields are treated as constants.
 
 ```python
 @ion.grad
@@ -86,9 +86,9 @@ def loss_fn(model, x, y):
 grads = loss_fn(model, x, y)  # grads has same structure as model
 ```
 
-The gradient tree matches the model structure — trainable `Param` positions have gradients, everything else is `None`.
+The gradient tree matches the model structure — trainable `Param` positions have gradients, while everything else is `None`. Standard `jax.grad` also works natively with Ion modules, but it will compute gradients with respect to all JAX arrays in the tree rather than isolating the trainable parameters.
 
-No `ion.jit` wrapper is needed. `jax.jit` works natively with all modules.
+There are no custom wrappers like `ion.jit`, `ion.vmap`, or `ion.scan`. Because Ion models are standard pytrees, all native JAX transformations work directly out of the box.
 
 ### Layers
 
@@ -108,7 +108,7 @@ No `ion.jit` wrapper is needed. `jax.jit` works natively with all modules.
 
 ### Pretty Printing
 
-Modules have a built-in text formatter for clean `repr` output in the terminal. In notebooks, Ion uses [Treescope](https://github.com/google-deepmind/treescope) for interactive, color-coded visualization.
+Modules have a built-in text formatter for standard terminal `repr` output. In notebook environments, Ion utilizes [Treescope](https://github.com/google-deepmind/treescope) for interactive, color-coded visualization.
 
 ```python
 >>> model = MLP(key=jax.random.key(0))
@@ -125,7 +125,7 @@ MLP(
 )
 ```
 
-Treescope is enabled by default. Toggle it with `ion.enable_treescope()` / `ion.disable_treescope()`.
+Treescope integration is enabled by default and can be toggled via `ion.enable_treescope()` / `ion.disable_treescope()`.
 
 ### Serialization
 
@@ -185,16 +185,13 @@ for x, y in data:
 
 Released under the Apache License 2.0.
 
-<details>
-<summary>Citation</summary>
+## Citation
 
 ```bibtex
 @software{ion,
-  title  = {Ion: A Minimal JAX Neural Network Library},
+  title  = {Ion: Simple Neural Networks in JAX},
   author = {Alex Goddard},
   url    = {https://github.com/auxeno/ion},
   year   = {2025}
 }
 ```
-
-</details>
