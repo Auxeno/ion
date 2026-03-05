@@ -11,6 +11,7 @@ See docs/internals.md for implementation details.
 """
 
 import functools
+from collections.abc import Sequence
 from typing import Any, Callable
 
 import jax
@@ -63,68 +64,95 @@ def _merge_leaves(
     return reconstructed_leaves
 
 
-def grad(fn: Callable[..., Any], *, has_aux: bool = False) -> Callable[..., Any]:
+def grad(
+    fn: Callable[..., Any],
+    argnums: int | Sequence[int] = 0,
+    *,
+    has_aux: bool = False,
+) -> Callable[..., Any]:
     """Like `jax.grad`, but differentiates only trainable `Param` leaves.
 
     >>> grads = ion.grad(loss_fn)(model, x, y)
+    >>> grads_a, grads_b = ion.grad(loss_fn, argnums=(0, 1))(model_a, model_b, x)
     >>> grads, aux = ion.grad(loss_fn, has_aux=True)(model, x, y)
     """
+    argnums_tup = (argnums,) if isinstance(argnums, int) else tuple(argnums)
 
     @functools.wraps(fn)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        target_pytree, *remaining_args = args
+        # Split each target into (trainable, static, mask, tree_def)
+        splits = []
+        for i in argnums_tup:
+            flat, tree_def = jtu.tree_flatten(args[i], is_leaf=is_param)
+            trainable, static, mask = _split_leaves(flat, is_trainable_param)
+            splits.append((trainable, static, mask, tree_def))
 
-        flat_leaves, tree_def = jtu.tree_flatten(target_pytree, is_leaf=is_param)
-        trainable_params, static_leaves, is_match_mask = _split_leaves(
-            flat_leaves, is_trainable_param
-        )
+        all_trainable = tuple(s[0] for s in splits)
 
-        def inner(diff_leaves: tuple[Any, ...]) -> Any:
-            """Rebuild the original object and execute the function."""
-            all_leaves = _merge_leaves(diff_leaves, static_leaves, is_match_mask)
-            reconstructed_pytree = tree_def.unflatten(all_leaves)
-            return fn(reconstructed_pytree, *remaining_args, **kwargs)
-
-        empty_padding = tuple(None for _ in static_leaves)
+        def inner(diff: tuple[tuple[Any, ...], ...]) -> Any:
+            rebuilt = list(args)
+            for i, (_, static, mask, tree_def) in zip(argnums_tup, splits):
+                rebuilt[i] = tree_def.unflatten(
+                    _merge_leaves(diff[argnums_tup.index(i)], static, mask)
+                )
+            return fn(*rebuilt, **kwargs)
 
         if has_aux:
-            computed_gradients, aux = jax.grad(inner, has_aux=True)(trainable_params)
-            flat_gradient_leaves = _merge_leaves(computed_gradients, empty_padding, is_match_mask)
-            return tree_def.unflatten(flat_gradient_leaves), aux
+            grads_raw, aux = jax.grad(inner, has_aux=True)(all_trainable)
+        else:
+            grads_raw = jax.grad(inner)(all_trainable)
 
-        computed_gradients = jax.grad(inner)(trainable_params)
-        flat_gradient_leaves = _merge_leaves(computed_gradients, empty_padding, is_match_mask)
-        return tree_def.unflatten(flat_gradient_leaves)
+        grad_trees = tuple(
+            td.unflatten(_merge_leaves(g, tuple(None for _ in s), m))
+            for g, (_, s, m, td) in zip(grads_raw, splits)
+        )
+
+        result = grad_trees if not isinstance(argnums, int) else grad_trees[0]
+        return (result, aux) if has_aux else result
 
     return wrapper
 
 
-def value_and_grad(fn: Callable[..., Any], *, has_aux: bool = False) -> Callable[..., Any]:
+def value_and_grad(
+    fn: Callable[..., Any],
+    argnums: int | Sequence[int] = 0,
+    *,
+    has_aux: bool = False,
+) -> Callable[..., Any]:
     """Like `jax.value_and_grad`, but differentiates only trainable `Param` leaves.
 
     >>> loss, grads = ion.value_and_grad(loss_fn)(model, x, y)
+    >>> loss, (grads_a, grads_b) = ion.value_and_grad(loss_fn, argnums=(0, 1))(a, b, x)
     >>> (loss, aux), grads = ion.value_and_grad(loss_fn, has_aux=True)(model, x, y)
     """
+    argnums_tup = (argnums,) if isinstance(argnums, int) else tuple(argnums)
 
     @functools.wraps(fn)
     def wrapper(*args: Any, **kwargs: Any) -> tuple[Any, Any]:
-        target_pytree, *remaining_args = args
+        splits = []
+        for i in argnums_tup:
+            flat, tree_def = jtu.tree_flatten(args[i], is_leaf=is_param)
+            trainable, static, mask = _split_leaves(flat, is_trainable_param)
+            splits.append((trainable, static, mask, tree_def))
 
-        flat_leaves, tree_def = jtu.tree_flatten(target_pytree, is_leaf=is_param)
-        trainable_params, static_leaves, is_match_mask = _split_leaves(
-            flat_leaves, is_trainable_param
+        all_trainable = tuple(s[0] for s in splits)
+
+        def inner(diff: tuple[tuple[Any, ...], ...]) -> Any:
+            rebuilt = list(args)
+            for i, (_, static, mask, tree_def) in zip(argnums_tup, splits):
+                rebuilt[i] = tree_def.unflatten(
+                    _merge_leaves(diff[argnums_tup.index(i)], static, mask)
+                )
+            return fn(*rebuilt, **kwargs)
+
+        value, grads_raw = jax.value_and_grad(inner, has_aux=has_aux)(all_trainable)
+
+        grad_trees = tuple(
+            td.unflatten(_merge_leaves(g, tuple(None for _ in s), m))
+            for g, (_, s, m, td) in zip(grads_raw, splits)
         )
 
-        def inner(diff_leaves: tuple[Any, ...]) -> Any:
-            all_leaves = _merge_leaves(diff_leaves, static_leaves, is_match_mask)
-            reconstructed_pytree = tree_def.unflatten(all_leaves)
-            return fn(reconstructed_pytree, *remaining_args, **kwargs)
-
-        value, computed_gradients = jax.value_and_grad(inner, has_aux=has_aux)(trainable_params)
-
-        empty_padding = tuple(None for _ in static_leaves)
-        flat_gradient_leaves = _merge_leaves(computed_gradients, empty_padding, is_match_mask)
-
-        return value, tree_def.unflatten(flat_gradient_leaves)
+        result = grad_trees if not isinstance(argnums, int) else grad_trees[0]
+        return value, result
 
     return wrapper

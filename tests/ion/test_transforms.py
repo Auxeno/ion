@@ -370,7 +370,7 @@ class TestGradEdgeCases:
         def loss(model):
             return jnp.sum(model.w)
 
-        with pytest.raises((TypeError, ValueError)):
+        with pytest.raises((TypeError, ValueError, IndexError)):
             ion.grad(loss)()
 
     def test_grad_with_non_pytree_first_arg(self):
@@ -405,7 +405,7 @@ class TestGradEdgeCases:
         def loss(model):
             return jnp.sum(model.w.value)
 
-        with pytest.raises((TypeError, ValueError)):
+        with pytest.raises((TypeError, ValueError, IndexError)):
             ion.grad(loss)(model=Model())
 
 
@@ -635,6 +635,104 @@ class TestValueAndGradHasAux:
         (value, aux), grads = ion.value_and_grad(loss, has_aux=True)(model)
         npt.assert_allclose(value, aux["loss"])
         npt.assert_allclose(aux["w_norm"], jnp.sqrt(value))
+
+
+class TestGradArgnums:
+    def test_argnums_non_zero(self):
+        """Differentiate w.r.t. second positional argument."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0, 3.0]))
+
+        def loss(x, model):
+            return jnp.sum(model.w * x)
+
+        x = jnp.array([4.0, 5.0, 6.0])
+        grads = ion.grad(loss, argnums=1)(x, Model())
+        npt.assert_allclose(grads.w.value, x)
+
+    def test_argnums_tuple(self):
+        """Differentiate w.r.t. multiple arguments returns a tuple of grads."""
+
+        class ModelA(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0]))
+
+        class ModelB(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([3.0, 4.0]))
+
+        def loss(a, b):
+            return jnp.sum(a.w * b.w)
+
+        ga, gb = ion.grad(loss, argnums=(0, 1))(ModelA(), ModelB())
+        npt.assert_allclose(ga.w.value, jnp.array([3.0, 4.0]))
+        npt.assert_allclose(gb.w.value, jnp.array([1.0, 2.0]))
+
+    def test_value_and_grad_argnums(self):
+        """value_and_grad with argnums=1."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0]))
+
+        def loss(x, model):
+            return jnp.sum(model.w * x)
+
+        x = jnp.array([3.0, 4.0])
+        value, grads = ion.value_and_grad(loss, argnums=1)(x, Model())
+        npt.assert_allclose(value, 11.0)
+        npt.assert_allclose(grads.w.value, x)
+
+    def test_value_and_grad_argnums_tuple(self):
+        """value_and_grad with tuple argnums returns tuple of grads."""
+
+        class ModelA(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0]))
+
+        class ModelB(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([3.0, 4.0]))
+
+        def loss(a, b):
+            return jnp.sum(a.w * b.w)
+
+        value, (ga, gb) = ion.value_and_grad(loss, argnums=(0, 1))(ModelA(), ModelB())
+        npt.assert_allclose(value, 11.0)
+        npt.assert_allclose(ga.w.value, jnp.array([3.0, 4.0]))
+        npt.assert_allclose(gb.w.value, jnp.array([1.0, 2.0]))
+
+    def test_argnums_with_has_aux(self):
+        """argnums works with has_aux=True."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0]))
+
+        def loss(x, model):
+            s = jnp.sum(model.w * x)
+            return s, {"loss": s}
+
+        x = jnp.array([3.0, 4.0])
+        grads, aux = ion.grad(loss, argnums=1, has_aux=True)(x, Model())
+        npt.assert_allclose(grads.w.value, x)
+        npt.assert_allclose(aux["loss"], 11.0)
 
 
 class TestStaticEdgeCases:
