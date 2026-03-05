@@ -110,7 +110,7 @@ class Static:
 
 
 def save(path: str, pytree: PyTree) -> None:
-    """Serialize a PyTree's array leaves to a `.npz` file.
+    """Serialize a PyTree's array leaves to a `.npz` file, stripping device metadata.
 
     >>> ion.tree.save("model.npz", model)
     """
