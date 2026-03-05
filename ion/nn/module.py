@@ -261,3 +261,12 @@ class Module:
             is_leaf=tree.is_param,
         )
         return params
+
+    @property
+    def num_params(self) -> int:
+        """Total number of parameters (trainable and frozen).
+
+        >>> model.num_params  # e.g. 101770
+        """
+        leaves = jtu.tree_leaves(self, is_leaf=tree.is_param)
+        return sum(p.value.size for p in leaves if tree.is_param(p))

@@ -314,6 +314,39 @@ class TestParams:
             assert isinstance(leaf, jnp.ndarray)
 
 
+class TestNumParams:
+    def test_linear(self):
+        """Linear(4, 8) has 4*8 + 8 = 40 parameters."""
+        model = nn.Linear(4, 8, key=jax.random.key(0))
+        assert model.num_params == 40
+
+    def test_no_bias(self):
+        """Linear without bias only counts weights."""
+        model = nn.Linear(4, 8, bias=False, key=jax.random.key(0))
+        assert model.num_params == 32
+
+    def test_nested(self):
+        """Nested modules sum all Param leaves."""
+
+        class Net(nn.Module):
+            a: nn.Linear
+            b: nn.Linear
+
+            def __init__(self, key):
+                k1, k2 = jax.random.split(key)
+                self.a = nn.Linear(4, 8, key=k1)
+                self.b = nn.Linear(8, 2, key=k2)
+
+        model = Net(key=jax.random.key(0))
+        # a: 4*8+8=40, b: 8*2+2=18
+        assert model.num_params == 58
+
+    def test_no_params(self):
+        """Module with no Param fields has 0 parameters."""
+        model = nn.Identity()
+        assert model.num_params == 0
+
+
 class TestRepr:
     def test_param_field(self):
         """repr contains Param wrapper for Param fields."""
