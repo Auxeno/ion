@@ -3,9 +3,6 @@
 Functions:
     is_param            Check if a leaf is a Param.
     is_trainable_param  Check if a leaf is a trainable Param.
-    is_array            Check if a leaf is a JAX or NumPy array.
-    is_float_array      Check if a leaf is a floating-point array.
-    filter              Keep leaves matching a predicate, rest becomes None.
     freeze              Set all Params to trainable=False.
     unfreeze            Set all Params to trainable=True.
     apply_updates       Add optimizer deltas to trainable parameters.
@@ -22,7 +19,7 @@ provide selective filtering by type and trainability.
 See docs/internals.md for implementation details.
 """
 
-from typing import Any, Callable
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -33,20 +30,6 @@ from jaxtyping import PyTree
 from .nn.param import Param
 
 
-def is_array(x: Any) -> bool:
-    """Check if an object is a JAX or NumPy array."""
-    return isinstance(x, (jax.Array, np.ndarray))
-
-
-def is_float_array(x: Any) -> bool:
-    """Check if an object is a floating-point or complex array."""
-    if isinstance(x, jax.Array):
-        return jnp.issubdtype(x.dtype, jnp.inexact)
-    if isinstance(x, np.ndarray):
-        return bool(np.issubdtype(x.dtype, np.inexact))
-    return False
-
-
 def is_param(x: Any) -> bool:
     """Check if an object is a `Param`."""
     return isinstance(x, Param)
@@ -55,14 +38,6 @@ def is_param(x: Any) -> bool:
 def is_trainable_param(x: Any) -> bool:
     """Check if an object is a trainable `Param`."""
     return isinstance(x, Param) and x.trainable
-
-
-def filter(pytree: PyTree, predicate: Callable[[Any], bool]) -> PyTree:
-    """Keep leaves matching a predicate, replacing the rest with `None`.
-
-    >>> params = ion.tree.filter(model, ion.tree.is_param)
-    """
-    return jax.tree.map(lambda leaf: leaf if predicate(leaf) else None, pytree)
 
 
 def freeze(pytree: PyTree) -> PyTree:
@@ -141,7 +116,9 @@ def save(path: str, pytree: PyTree) -> None:
     """
     flat_leaves, _ = jtu.tree_flatten(pytree)
 
-    array_leaves = [np.asarray(leaf) for leaf in flat_leaves if is_array(leaf)]
+    array_leaves = [
+        np.asarray(leaf) for leaf in flat_leaves if isinstance(leaf, (jax.Array, np.ndarray))
+    ]
     arrays_to_save = {str(i): arr for i, arr in enumerate(array_leaves)}
 
     np.savez(path, **arrays_to_save)  # type: ignore[call-overload]
@@ -159,7 +136,7 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
     array_index = 0
 
     for leaf in flat_leaves:
-        if is_array(leaf):
+        if isinstance(leaf, (jax.Array, np.ndarray)):
             loaded_leaves.append(jnp.array(saved_data[str(array_index)]))
             array_index += 1
         else:

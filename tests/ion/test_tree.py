@@ -2,83 +2,9 @@ import tempfile
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 import numpy.testing as npt
 
 from ion import nn, tree
-
-
-class TestIsArray:
-    def test_jax_array(self):
-        assert tree.is_array(jnp.ones(3)) is True
-
-    def test_numpy_array(self):
-        assert tree.is_array(np.ones(3)) is True
-
-    def test_param_is_not_array(self):
-        assert tree.is_array(nn.Param(jnp.ones(3))) is False
-
-    def test_scalar(self):
-        assert tree.is_array(42) is False
-
-    def test_none(self):
-        assert tree.is_array(None) is False
-
-
-class TestIsFloatArray:
-    def test_float32(self):
-        assert tree.is_float_array(jnp.array(1.0, dtype=jnp.float32)) is True
-
-    def test_complex(self):
-        assert tree.is_float_array(jnp.array(1 + 2j)) is True
-
-    def test_int_array(self):
-        assert tree.is_float_array(jnp.array(1)) is False
-
-    def test_bool_array(self):
-        assert tree.is_float_array(jnp.array(True)) is False
-
-    def test_numpy_float(self):
-        assert tree.is_float_array(np.array(1.0)) is True
-
-    def test_numpy_int(self):
-        assert tree.is_float_array(np.array(1)) is False
-
-    def test_non_array(self):
-        assert tree.is_float_array(1.0) is False
-
-
-class TestFilter:
-    def test_keeps_matching_replaces_rest(self):
-        pytree = {"w": nn.Param(jnp.ones(2)), "s": 1.0}
-        result = tree.filter(pytree, tree.is_param)
-        assert isinstance(result["w"], nn.Param)
-        assert result["s"] is None
-
-    def test_nothing_matches(self):
-        pytree = {"a": 1, "b": "hello"}
-        result = tree.filter(pytree, tree.is_param)
-        assert result["a"] is None
-        assert result["b"] is None
-
-    def test_on_module(self):
-        class Model(nn.Module):
-            w: nn.Param
-            scale: float
-
-            def __init__(self):
-                self.w = nn.Param(jnp.ones(3))
-                self.scale = 2.0
-
-        result = tree.filter(Model(), tree.is_param)
-        assert isinstance(result.w, nn.Param)
-        assert result.scale == 2.0
-
-    def test_nested_dict(self):
-        pytree = {"outer": {"w": nn.Param(jnp.ones(2)), "x": 5}}
-        result = tree.filter(pytree, tree.is_param)
-        assert isinstance(result["outer"]["w"], nn.Param)
-        assert result["outer"]["x"] is None
 
 
 class TestApplyUpdates:
@@ -132,6 +58,118 @@ class TestApplyUpdates:
         result = tree.apply_updates(model, updates)
         npt.assert_allclose(result.w.value, jnp.array([2.0, 2.0]))
         npt.assert_allclose(result.b.value, jnp.zeros(2))
+
+
+class TestFreeze:
+    def test_freeze_sets_trainable_false(self):
+        data = {"w": nn.Param(jnp.ones(2)), "b": nn.Param(jnp.zeros(2))}
+        frozen = tree.freeze(data)
+        assert frozen["w"].trainable is False
+        assert frozen["b"].trainable is False
+
+    def test_freeze_preserves_values(self):
+        data = {"w": nn.Param(jnp.array([1.0, 2.0]))}
+        frozen = tree.freeze(data)
+        npt.assert_array_equal(frozen["w"].value, jnp.array([1.0, 2.0]))
+
+    def test_freeze_idempotent(self):
+        data = {"w": nn.Param(jnp.ones(2), trainable=False)}
+        frozen = tree.freeze(data)
+        assert frozen["w"].trainable is False
+        npt.assert_array_equal(frozen["w"].value, jnp.ones(2))
+
+    def test_freeze_on_module(self):
+        class Model(nn.Module):
+            w: nn.Param
+            b: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.b = nn.Param(jnp.zeros(3))
+
+        m = Model()
+        frozen = tree.freeze(m)
+        assert frozen.w.trainable is False
+        assert frozen.b.trainable is False
+
+    def test_freeze_nested_module(self):
+        class Inner(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(2))
+
+        class Outer(nn.Module):
+            inner: Inner
+            b: nn.Param
+
+            def __init__(self):
+                self.inner = Inner()
+                self.b = nn.Param(jnp.zeros(2))
+
+        m = Outer()
+        frozen = tree.freeze(m)
+        assert frozen.inner.w.trainable is False
+        assert frozen.b.trainable is False
+
+    def test_freeze_does_not_affect_non_params(self):
+        class Model(nn.Module):
+            w: nn.Param
+            scale: float
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(2))
+                self.scale = 2.0
+
+        m = Model()
+        frozen = tree.freeze(m)
+        assert frozen.scale == 2.0
+
+
+class TestUnfreeze:
+    def test_unfreeze_sets_trainable_true(self):
+        data = {"w": nn.Param(jnp.ones(2), trainable=False)}
+        unfrozen = tree.unfreeze(data)
+        assert unfrozen["w"].trainable is True
+
+    def test_unfreeze_preserves_values(self):
+        data = {"w": nn.Param(jnp.array([3.0, 4.0]), trainable=False)}
+        unfrozen = tree.unfreeze(data)
+        npt.assert_array_equal(unfrozen["w"].value, jnp.array([3.0, 4.0]))
+
+    def test_unfreeze_idempotent(self):
+        data = {"w": nn.Param(jnp.ones(2), trainable=True)}
+        unfrozen = tree.unfreeze(data)
+        assert unfrozen["w"].trainable is True
+
+    def test_freeze_then_unfreeze_roundtrip(self):
+        data = {"w": nn.Param(jnp.array([1.0, 2.0]))}
+        roundtripped = tree.unfreeze(tree.freeze(data))
+        assert roundtripped["w"].trainable is True
+        npt.assert_array_equal(roundtripped["w"].value, jnp.array([1.0, 2.0]))
+
+
+
+class TestApplyUpdatesExtended:
+    def test_apply_updates_preserves_trainable_flag(self):
+        """After apply_updates, Param stays trainable."""
+        data = {"w": nn.Param(jnp.array([1.0]), trainable=True)}
+        updates = {"w": jnp.array([0.5])}
+        result = tree.apply_updates(data, updates)
+        assert result["w"].trainable is True
+
+    def test_apply_updates_mixed_trainable_frozen(self):
+        data = {
+            "w": nn.Param(jnp.array([1.0, 2.0])),
+            "b": nn.Param(jnp.array([0.0]), trainable=False),
+        }
+        updates = {
+            "w": jnp.array([0.1, 0.2]),
+            "b": jnp.array([9.0]),
+        }
+        result = tree.apply_updates(data, updates)
+        npt.assert_allclose(result["w"].value, jnp.array([1.1, 2.2]))
+        npt.assert_allclose(result["b"].value, jnp.array([0.0]))  # unchanged
 
 
 class TestSaveLoad:

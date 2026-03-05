@@ -9,6 +9,8 @@ from ion import nn
 from ion.transforms import _merge_leaves, _split_leaves
 from ion.tree import Static
 
+_is_array = lambda x: isinstance(x, jax.Array)
+
 
 class Linear(nn.Module):
     w: nn.Param
@@ -53,26 +55,26 @@ class TestSplitLeaves:
     def test_separates_by_predicate(self):
         a, b = jnp.array(1.0), jnp.array(2.0)
         leaves = [a, 1, b, "x"]
-        matching, non_matching, mask = _split_leaves(leaves, ion.is_array)
+        matching, non_matching, mask = _split_leaves(leaves, _is_array)
         assert matching == (a, b)
         assert non_matching == (1, "x")
         assert mask == (True, False, True, False)
 
     def test_empty_list(self):
-        matching, non_matching, mask = _split_leaves([], ion.is_array)
+        matching, non_matching, mask = _split_leaves([], _is_array)
         assert matching == ()
         assert non_matching == ()
         assert mask == ()
 
     def test_all_match(self):
         a, b = jnp.array(1.0), jnp.array(2.0)
-        matching, non_matching, mask = _split_leaves([a, b], ion.is_array)
+        matching, non_matching, mask = _split_leaves([a, b], _is_array)
         assert len(matching) == 2
         assert non_matching == ()
         assert mask == (True, True)
 
     def test_none_match(self):
-        matching, non_matching, mask = _split_leaves([1, "x", None], ion.is_array)
+        matching, non_matching, mask = _split_leaves([1, "x", None], _is_array)
         assert matching == ()
         assert len(non_matching) == 3
         assert mask == (False, False, False)
@@ -82,11 +84,11 @@ class TestMergeLeaves:
     def test_roundtrip_with_split(self):
         a, b = jnp.array(1.0), jnp.array(2.0)
         original = [a, 1, b, "x"]
-        matching, non_matching, mask = _split_leaves(original, ion.is_array)
+        matching, non_matching, mask = _split_leaves(original, _is_array)
         recovered = _merge_leaves(matching, non_matching, mask)
         assert len(recovered) == len(original)
         for orig, rec in zip(original, recovered):
-            if ion.is_array(orig):
+            if _is_array(orig):
                 npt.assert_array_equal(orig, rec)
             else:
                 assert orig == rec
@@ -238,6 +240,130 @@ class TestGrad:
         assert grads.extra.value.shape == model.extra.value.shape
 
 
+class TestGradEdgeCases:
+    def test_grad_all_frozen(self):
+        """ion.grad on a model where all params are frozen."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0]), trainable=False)
+
+        def loss(model):
+            return jnp.sum(model.w.value)
+
+        grads = ion.grad(loss)(Model())
+        assert grads.w is None
+
+    def test_grad_no_params(self):
+        """ion.grad on a model with no Param fields at all."""
+
+        class Model(nn.Module):
+            scale: float
+
+            def __init__(self):
+                self.scale = 2.0
+
+        def loss(model):
+            return jnp.array(1.0)
+
+        grads = ion.grad(loss)(Model())
+        assert grads.scale == 2.0
+
+    def test_grad_as_decorator(self):
+        """ion.grad used as a decorator."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0]))
+
+        @ion.grad
+        def loss(model, x):
+            return jnp.sum(model.w * x)
+
+        grads = loss(Model(), jnp.array([3.0, 4.0]))
+        npt.assert_allclose(grads.w.value, jnp.array([3.0, 4.0]))
+
+    def test_grad_inside_jit(self):
+        """ion.grad composed with jax.jit."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0]))
+
+        def loss(model, x):
+            return jnp.sum(model.w * x)
+
+        model = Model()
+        x = jnp.array([3.0, 4.0])
+        grads_eager = ion.grad(loss)(model, x)
+        grads_jit = jax.jit(ion.grad(loss))(model, x)
+        npt.assert_allclose(grads_jit.w.value, grads_eager.w.value)
+
+    def test_grad_output_structure_matches_model(self):
+        """Gradient tree has the exact same pytree structure as the model."""
+        model = Nested(key=jax.random.key(0))
+        x = jnp.ones((1, 2))
+
+        def loss(m, x):
+            h = x @ m.linear.w + m.linear.b
+            return jnp.sum(h + m.extra)
+
+        grads = ion.grad(loss)(model, x)
+        model_leaves, model_def = jax.tree.flatten(model, is_leaf=lambda x: x is None)
+        grad_leaves, grad_def = jax.tree.flatten(grads, is_leaf=lambda x: x is None)
+        assert len(model_leaves) == len(grad_leaves)
+
+    def test_grad_multiple_calls_consistent(self):
+        """Calling ion.grad multiple times gives the same result."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0, 3.0]))
+
+        def loss(model):
+            return jnp.sum(model.w ** 2)
+
+        model = Model()
+        g1 = ion.grad(loss)(model)
+        g2 = ion.grad(loss)(model)
+        npt.assert_array_equal(g1.w.value, g2.w.value)
+
+    def test_grad_partial_freeze_nested(self):
+        """Gradient correctly handles partially frozen nested modules."""
+
+        class Model(nn.Module):
+            encoder: Linear
+            decoder: Linear
+
+            def __init__(self, key):
+                k1, k2 = jax.random.split(key)
+                self.encoder = Linear(2, 3, key=k1)
+                self.decoder = Linear(3, 1, key=k2)
+
+        model = Model(key=jax.random.key(0))
+        model = model.replace(encoder=model.encoder.freeze())
+
+        def loss(model, x):
+            h = x @ model.encoder.w + model.encoder.b
+            return jnp.sum(h @ model.decoder.w + model.decoder.b)
+
+        grads = ion.grad(loss)(model, jnp.ones((1, 2)))
+        # Frozen encoder params get None
+        assert grads.encoder.w is None
+        assert grads.encoder.b is None
+        # Trainable decoder params get gradients
+        assert grads.decoder.w is not None
+        assert grads.decoder.b is not None
+
+
 class TestValueAndGrad:
     def test_value_matches_direct_call(self):
         class Model(nn.Module):
@@ -277,3 +403,50 @@ class TestValueAndGrad:
         npt.assert_allclose(value, loss(model))
         assert grads.w is not None
         assert grads.frozen is None
+
+    def test_extra_args_forwarded(self):
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0]))
+
+        def loss(model, x):
+            return jnp.sum(model.w * x)
+
+        model = Model()
+        x = jnp.array([3.0, 4.0])
+        value, grads = ion.value_and_grad(loss)(model, x)
+        npt.assert_allclose(value, jnp.sum(model.w.value * x))
+        npt.assert_allclose(grads.w.value, x)
+
+    def test_kwargs_forwarded(self):
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0]))
+
+        def loss(model, *, scale):
+            return jnp.sum(model.w) * scale
+
+        model = Model()
+        value, grads = ion.value_and_grad(loss)(model, scale=3.0)
+        npt.assert_allclose(value, jnp.sum(model.w.value) * 3.0)
+        npt.assert_allclose(grads.w.value, jnp.array([3.0, 3.0]))
+
+    def test_inside_jit(self):
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0]))
+
+        def loss(model):
+            return jnp.sum(model.w ** 2)
+
+        model = Model()
+        val_eager, grad_eager = ion.value_and_grad(loss)(model)
+        val_jit, grad_jit = jax.jit(ion.value_and_grad(loss))(model)
+        npt.assert_allclose(val_jit, val_eager)
+        npt.assert_allclose(grad_jit.w.value, grad_eager.w.value)

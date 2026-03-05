@@ -373,6 +373,288 @@ class TestRepr:
         assert repr(Empty()) == "Empty()"
 
 
+class TestFreezeUnfreeze:
+    def test_freeze_sets_all_params_to_non_trainable(self):
+        class Model(nn.Module):
+            w: nn.Param
+            b: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.b = nn.Param(jnp.zeros(3))
+
+        m = Model().freeze()
+        assert m.w.trainable is False
+        assert m.b.trainable is False
+
+    def test_unfreeze_sets_all_params_to_trainable(self):
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3), trainable=False)
+
+        m = Model().unfreeze()
+        assert m.w.trainable is True
+
+    def test_freeze_unfreeze_roundtrip(self):
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+
+        m = Model()
+        npt.assert_array_equal(m.freeze().unfreeze().w.value, m.w.value)
+        assert m.freeze().unfreeze().w.trainable is True
+
+    def test_freeze_preserves_values(self):
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (4,)))
+
+        m = Model(key=jax.random.key(0))
+        frozen = m.freeze()
+        npt.assert_array_equal(frozen.w.value, m.w.value)
+
+    def test_freeze_nested_module(self):
+        class Inner(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(2))
+
+        class Outer(nn.Module):
+            inner: Inner
+            b: nn.Param
+
+            def __init__(self):
+                self.inner = Inner()
+                self.b = nn.Param(jnp.zeros(2))
+
+        m = Outer().freeze()
+        assert m.inner.w.trainable is False
+        assert m.b.trainable is False
+
+    def test_partial_freeze_via_replace(self):
+        """Freeze one sub-module, keep the other trainable."""
+
+        class Model(nn.Module):
+            encoder: nn.Linear
+            decoder: nn.Linear
+
+            def __init__(self, key):
+                k1, k2 = jax.random.split(key)
+                self.encoder = nn.Linear(4, 8, key=k1)
+                self.decoder = nn.Linear(8, 4, key=k2)
+
+        m = Model(key=jax.random.key(0))
+        m = m.replace(encoder=m.encoder.freeze())
+        assert m.encoder.w.trainable is False
+        assert m.decoder.w.trainable is True
+
+    def test_freeze_idempotent(self):
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(2), trainable=False)
+
+        m = Model().freeze()
+        assert m.w.trainable is False
+
+
+class TestNoneField:
+    def test_module_with_none_field(self):
+        """Module can store None as a field value (e.g., optional bias)."""
+        linear = nn.Linear(4, 8, bias=False, key=jax.random.key(0))
+        assert linear.b is None
+
+    def test_none_field_survives_pytree_roundtrip(self):
+        linear = nn.Linear(4, 8, bias=False, key=jax.random.key(0))
+        leaves, treedef = jtu.tree_flatten(linear)
+        reconstructed = treedef.unflatten(leaves)
+        assert reconstructed.b is None
+        npt.assert_array_equal(reconstructed.w.value, linear.w.value)
+
+    def test_none_field_works_under_jit(self):
+        linear = nn.Linear(4, 8, bias=False, key=jax.random.key(0))
+        x = jnp.ones((1, 4))
+        eager = linear(x)
+        jitted = jax.jit(linear)(x)
+        npt.assert_allclose(jitted, eager)
+
+
+class TestContainerFields:
+    def test_tuple_of_modules(self):
+        """Module with a tuple of sub-modules."""
+        k1, k2 = jax.random.split(jax.random.key(0))
+        seq = nn.Sequential(nn.Linear(4, 8, key=k1), nn.Linear(8, 2, key=k2))
+        x = jnp.ones((1, 4))
+        result = jax.jit(seq)(x)
+        assert result.shape == (1, 2)
+
+    def test_tuple_of_mixed_callables(self):
+        """Sequential with Modules and plain functions."""
+        k1, k2 = jax.random.split(jax.random.key(0))
+        seq = nn.Sequential(
+            nn.Linear(4, 8, key=k1),
+            jax.nn.relu,
+            nn.Linear(8, 2, key=k2),
+        )
+        x = jnp.ones((1, 4))
+        eager = seq(x)
+        jitted = jax.jit(seq)(x)
+        npt.assert_allclose(jitted, eager, rtol=1e-5, atol=1e-5)
+
+    def test_list_field(self):
+        """Module with a list of sub-modules."""
+
+        class Container(nn.Module):
+            layers: list
+
+            def __init__(self, key):
+                k1, k2 = jax.random.split(key)
+                self.layers = [nn.Linear(4, 4, key=k1), nn.Linear(4, 4, key=k2)]
+
+            def __call__(self, x):
+                for layer in self.layers:
+                    x = layer(x)
+                return x
+
+        m = Container(key=jax.random.key(0))
+        x = jnp.ones((1, 4))
+        eager = m(x)
+        jitted = jax.jit(m)(x)
+        npt.assert_allclose(jitted, eager)
+
+
+class TestReplaceEdgeCases:
+    def test_replace_unknown_field_silently_ignored(self):
+        """replace silently ignores unknown field names (potential gotcha)."""
+
+        class Model(nn.Module):
+            x: int
+
+            def __init__(self, x: int):
+                self.x = x
+
+        m = Model(x=1)
+        m2 = m.replace(nonexistent=42)
+        assert m2.x == 1
+        assert not hasattr(m2, "nonexistent")
+
+    def test_replace_with_param(self):
+        """replace can swap a Param value."""
+        linear = nn.Linear(4, 8, key=jax.random.key(0))
+        new_w = nn.Param(jnp.zeros_like(linear.w.value))
+        replaced = linear.replace(w=new_w)
+        npt.assert_array_equal(replaced.w.value, jnp.zeros_like(linear.w.value))
+        # Original unchanged
+        assert not jnp.array_equal(linear.w.value, replaced.w.value)
+
+
+class TestInheritance:
+    def test_module_subclass_chain(self):
+        """Subclass of a subclass works correctly."""
+
+        class Base(nn.Module):
+            x: int
+
+            def __init__(self, x: int):
+                self.x = x
+
+        class Child(Base):
+            y: int
+
+            def __init__(self, x: int, y: int):
+                self.x = x
+                self.y = y
+
+        c = Child(x=1, y=2)
+        assert c.x == 1
+        assert c.y == 2
+        # Immutable
+        with pytest.raises(AttributeError, match="frozen"):
+            c.x = 3
+        # Pytree roundtrip
+        leaves, treedef = jtu.tree_flatten(c)
+        reconstructed = treedef.unflatten(leaves)
+        assert reconstructed.x == 1
+        assert reconstructed.y == 2
+
+
+class TestParamsWithFrozen:
+    def test_params_includes_frozen_params(self):
+        """params property returns both trainable and frozen Params."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            b: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.b = nn.Param(jnp.zeros(3), trainable=False)
+
+        m = Model()
+        params = m.params
+        assert isinstance(params.w, nn.Param)
+        assert isinstance(params.b, nn.Param)
+        assert params.w.trainable is True
+        assert params.b.trainable is False
+
+    def test_params_on_plain_array_field(self):
+        """Plain array (non-Param) fields become None in params."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            buf: jax.Array
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.buf = jnp.array([1.0, 2.0, 3.0])
+
+        m = Model()
+        params = m.params
+        assert isinstance(params.w, nn.Param)
+        assert params.buf is None
+
+
+class TestDeepNesting:
+    def test_three_level_nesting(self):
+        """Three levels of module nesting work correctly."""
+
+        class Inner(nn.Module):
+            w: nn.Param
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (2,)))
+
+        class Middle(nn.Module):
+            inner: Inner
+
+            def __init__(self, key):
+                self.inner = Inner(key)
+
+        class Outer(nn.Module):
+            middle: Middle
+
+            def __init__(self, key):
+                self.middle = Middle(key)
+
+        m = Outer(key=jax.random.key(0))
+        leaves = jax.tree.leaves(m)
+        assert len(leaves) == 1
+        # Roundtrip
+        reconstructed = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        npt.assert_array_equal(reconstructed.middle.inner.w.value, m.middle.inner.w.value)
+        # jit
+        result = jax.jit(lambda m: jnp.sum(m.middle.inner.w.value))(m)
+        npt.assert_allclose(result, jnp.sum(m.middle.inner.w.value))
+
+
 class TestStaticWrapping:
     def test_jax_jit_with_callable_field(self):
         """Module with a callable field works under jax.jit."""

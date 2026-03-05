@@ -92,6 +92,92 @@ class TestArithmetic:
         assert not isinstance(result, nn.Param)
         npt.assert_array_equal(result, jnp.array([3.0]))
 
+    def test_rsub(self):
+        p = nn.Param(jnp.array([1.0, 2.0]))
+        result = jnp.array([10.0, 10.0]) - p
+        npt.assert_array_equal(result, jnp.array([9.0, 8.0]))
+
+    def test_rmul(self):
+        p = nn.Param(jnp.array([2.0, 3.0]))
+        result = jnp.array([4.0, 5.0]) * p
+        npt.assert_array_equal(result, jnp.array([8.0, 15.0]))
+
+    def test_truediv(self):
+        p = nn.Param(jnp.array([6.0, 8.0]))
+        result = p / jnp.array([2.0, 4.0])
+        npt.assert_array_equal(result, jnp.array([3.0, 2.0]))
+
+    def test_rtruediv(self):
+        p = nn.Param(jnp.array([2.0, 4.0]))
+        result = jnp.array([6.0, 8.0]) / p
+        npt.assert_array_equal(result, jnp.array([3.0, 2.0]))
+
+    def test_floordiv(self):
+        p = nn.Param(jnp.array([7.0, 9.0]))
+        result = p // jnp.array([2.0, 4.0])
+        npt.assert_array_equal(result, jnp.array([3.0, 2.0]))
+
+    def test_rfloordiv(self):
+        p = nn.Param(jnp.array([2.0, 4.0]))
+        result = jnp.array([7.0, 9.0]) // p
+        npt.assert_array_equal(result, jnp.array([3.0, 2.0]))
+
+    def test_mod(self):
+        p = nn.Param(jnp.array([7.0, 9.0]))
+        result = p % jnp.array([3.0, 4.0])
+        npt.assert_array_equal(result, jnp.array([1.0, 1.0]))
+
+    def test_rmod(self):
+        p = nn.Param(jnp.array([3.0, 4.0]))
+        result = jnp.array([7.0, 9.0]) % p
+        npt.assert_array_equal(result, jnp.array([1.0, 1.0]))
+
+    def test_pow(self):
+        p = nn.Param(jnp.array([2.0, 3.0]))
+        result = p ** jnp.array([3.0, 2.0])
+        npt.assert_array_equal(result, jnp.array([8.0, 9.0]))
+
+    def test_rpow(self):
+        p = nn.Param(jnp.array([3.0, 2.0]))
+        result = jnp.array([2.0, 3.0]) ** p
+        npt.assert_array_equal(result, jnp.array([8.0, 9.0]))
+
+    def test_rmatmul(self):
+        p = nn.Param(jnp.eye(2))
+        x = jnp.array([[1.0, 2.0]])
+        npt.assert_array_equal(x @ p, x)
+
+    def test_pos(self):
+        p = nn.Param(jnp.array([-1.0, 2.0]))
+        result = +p
+        npt.assert_array_equal(result, jnp.array([-1.0, 2.0]))
+
+    def test_abs(self):
+        p = nn.Param(jnp.array([-3.0, 2.0]))
+        result = abs(p)
+        npt.assert_array_equal(result, jnp.array([3.0, 2.0]))
+
+    def test_param_to_param_sub(self):
+        a = nn.Param(jnp.array([5.0]))
+        b = nn.Param(jnp.array([2.0]))
+        result = a - b
+        assert not isinstance(result, nn.Param)
+        npt.assert_array_equal(result, jnp.array([3.0]))
+
+    def test_param_to_param_mul(self):
+        a = nn.Param(jnp.array([3.0]))
+        b = nn.Param(jnp.array([4.0]))
+        result = a * b
+        assert not isinstance(result, nn.Param)
+        npt.assert_array_equal(result, jnp.array([12.0]))
+
+    def test_param_to_param_matmul(self):
+        a = nn.Param(jnp.eye(2))
+        b = nn.Param(jnp.array([[1.0], [2.0]]))
+        result = a @ b
+        assert not isinstance(result, nn.Param)
+        npt.assert_array_equal(result, jnp.array([[1.0], [2.0]]))
+
 
 class TestAttributeForwarding:
     def test_shape(self):
@@ -278,6 +364,97 @@ class TestSaveLoad:
         assert loaded.w.trainable is True
 
 
+class TestComparisons:
+    def test_eq(self):
+        p = nn.Param(jnp.array([1.0, 2.0]))
+        result = p == jnp.array([1.0, 3.0])
+        npt.assert_array_equal(result, jnp.array([True, False]))
+
+    def test_ne(self):
+        p = nn.Param(jnp.array([1.0, 2.0]))
+        result = p != jnp.array([1.0, 3.0])
+        npt.assert_array_equal(result, jnp.array([False, True]))
+
+    def test_lt(self):
+        p = nn.Param(jnp.array([1.0, 3.0]))
+        result = p < jnp.array([2.0, 2.0])
+        npt.assert_array_equal(result, jnp.array([True, False]))
+
+    def test_le(self):
+        p = nn.Param(jnp.array([1.0, 2.0]))
+        result = p <= jnp.array([1.0, 1.0])
+        npt.assert_array_equal(result, jnp.array([True, False]))
+
+    def test_gt(self):
+        p = nn.Param(jnp.array([3.0, 1.0]))
+        result = p > jnp.array([2.0, 2.0])
+        npt.assert_array_equal(result, jnp.array([True, False]))
+
+    def test_ge(self):
+        p = nn.Param(jnp.array([2.0, 1.0]))
+        result = p >= jnp.array([2.0, 2.0])
+        npt.assert_array_equal(result, jnp.array([True, False]))
+
+    def test_eq_param_to_param(self):
+        a = nn.Param(jnp.array([1.0, 2.0]))
+        b = nn.Param(jnp.array([1.0, 3.0]))
+        result = a == b
+        assert not isinstance(result, nn.Param)
+        npt.assert_array_equal(result, jnp.array([True, False]))
+
+    def test_comparison_returns_array_not_param(self):
+        p = nn.Param(jnp.array([1.0]))
+        result = p < jnp.array([2.0])
+        assert not isinstance(result, nn.Param)
+        assert isinstance(result, jax.Array)
+
+
+class TestProtocols:
+    def test_bool_scalar(self):
+        p = nn.Param(jnp.array(1.0))
+        assert bool(p) is True
+
+    def test_bool_zero(self):
+        p = nn.Param(jnp.array(0.0))
+        assert bool(p) is False
+
+    def test_len(self):
+        p = nn.Param(jnp.array([1.0, 2.0, 3.0]))
+        assert len(p) == 3
+
+    def test_iter(self):
+        p = nn.Param(jnp.array([10.0, 20.0, 30.0]))
+        values = list(p)
+        assert len(values) == 3
+        npt.assert_allclose(float(values[0]), 10.0)
+        npt.assert_allclose(float(values[1]), 20.0)
+        npt.assert_allclose(float(values[2]), 30.0)
+
+    def test_getitem_slice(self):
+        p = nn.Param(jnp.array([10.0, 20.0, 30.0, 40.0]))
+        result = p[1:3]
+        npt.assert_array_equal(result, jnp.array([20.0, 30.0]))
+
+    def test_getitem_2d(self):
+        p = nn.Param(jnp.array([[1.0, 2.0], [3.0, 4.0]]))
+        npt.assert_array_equal(p[0], jnp.array([1.0, 2.0]))
+        npt.assert_allclose(float(p[1, 1]), 4.0)
+
+
+class TestAttributeForwardingExtended:
+    def test_ndim(self):
+        p = nn.Param(jnp.zeros((2, 3, 4)))
+        assert p.ndim == 3
+
+    def test_size(self):
+        p = nn.Param(jnp.zeros((2, 3)))
+        assert p.size == 6
+
+    def test_T(self):
+        p = nn.Param(jnp.array([[1.0, 2.0], [3.0, 4.0]]))
+        npt.assert_array_equal(p.T, jnp.array([[1.0, 3.0], [2.0, 4.0]]))
+
+
 class TestRepr:
     def test_param_repr(self):
         p = nn.Param(jnp.zeros((3, 4), dtype=jnp.float32))
@@ -286,6 +463,23 @@ class TestRepr:
     def test_frozen_param_repr(self):
         p = nn.Param(jnp.zeros(5), trainable=False)
         assert "trainable=False" in repr(p)
+
+    def test_abbreviated_dtypes(self):
+        cases = [
+            (jnp.float16, "f16"),
+            (jnp.float32, "f32"),
+            (jnp.bfloat16, "bf16"),
+            (jnp.int8, "i8"),
+            (jnp.int32, "i32"),
+            (jnp.uint8, "u8"),
+        ]
+        for dtype, abbrev in cases:
+            p = nn.Param(jnp.zeros(2, dtype=dtype))
+            assert abbrev in repr(p), f"Expected {abbrev} in repr for {dtype}"
+
+    def test_scalar_param_repr(self):
+        p = nn.Param(jnp.array(1.0))
+        assert "f32[]" in repr(p)
 
     def test_module_repr_with_param(self):
         """Module __repr__ displays Param wrapper."""

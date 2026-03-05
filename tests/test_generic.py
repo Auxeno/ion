@@ -55,9 +55,9 @@ def test_param_grad(layer_and_input):
         return model(x).sum()
 
     grads = loss_grad(layer, x)
-    leaves = jax.tree.leaves(ion.filter(grads, ion.is_float_array))
-    for leaf in leaves:
-        assert jnp.all(jnp.isfinite(leaf))
+    for leaf in jax.tree.leaves(grads):
+        if hasattr(leaf, 'dtype') and jnp.issubdtype(leaf.dtype, jnp.inexact):
+            assert jnp.all(jnp.isfinite(leaf))
 
 
 def test_jit_grad(layer_and_input):
@@ -134,7 +134,7 @@ def test_params_property(layer_and_input):
     leaves = jax.tree.leaves(params)
     assert len(leaves) > 0
     for leaf in leaves:
-        assert ion.is_float_array(leaf)
+        assert hasattr(leaf, 'dtype') and jnp.issubdtype(leaf.dtype, jnp.inexact)
 
 
 def test_serialization(layer_and_input):

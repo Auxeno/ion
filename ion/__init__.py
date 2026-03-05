@@ -9,10 +9,7 @@ from .transforms import (
 )
 from .tree import (
     apply_updates,
-    filter,
     freeze,
-    is_array,
-    is_float_array,
     is_param,
     is_trainable_param,
     load,
@@ -56,11 +53,8 @@ __all__ = [
     "apply_updates",
     "disable_treescope",
     "enable_treescope",
-    "filter",
     "freeze",
     "grad",
-    "is_array",
-    "is_float_array",
     "is_param",
     "is_trainable_param",
     "load",

@@ -19,6 +19,7 @@ from typing import Any, Self
 
 import jax
 import jax.tree_util as jtu
+import numpy as np
 import treescope
 from jaxtyping import PyTree
 
@@ -33,7 +34,7 @@ def _wrap_non_arrays(value: Any) -> Any:
         return value
     return jax.tree.map(
         lambda leaf: (
-            leaf if isinstance(leaf, (Module, Param)) or tree.is_array(leaf) else Static(leaf)
+            leaf if isinstance(leaf, (Module, Param, jax.Array, np.ndarray)) else Static(leaf)
         ),
         value,
         is_leaf=lambda x: isinstance(x, (Module, Param, Static)),
