@@ -45,7 +45,8 @@ class MLP(Module):
         key: PRNGKeyArray,
     ) -> None:
 
-        assert num_hidden_layers >= 0, "MLP `num_hidden_layers` must be >= 0."
+        if num_hidden_layers < 0:
+            raise ValueError(f"num_hidden_layers ({num_hidden_layers}) must be >= 0")
 
         if num_hidden_layers == 0:
             keys = jax.random.split(key, 1)
