@@ -281,7 +281,7 @@ class TestSaveLoad:
 class TestRepr:
     def test_param_repr(self):
         p = nn.Param(jnp.zeros((3, 4), dtype=jnp.float32))
-        assert repr(p) == "Param(float32[3, 4], trainable=True)"
+        assert repr(p) == "Param(f32[3, 4], trainable=True)"
 
     def test_frozen_param_repr(self):
         p = nn.Param(jnp.zeros(5), trainable=False)
