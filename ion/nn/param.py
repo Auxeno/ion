@@ -14,7 +14,6 @@ from functools import partial
 from typing import Any, Generic, TypeVar
 
 import jax.tree_util as jtu
-import treescope
 from jaxtyping import Array
 
 T = TypeVar("T", bound=Array)
@@ -155,12 +154,10 @@ class Param(Generic[T]):
             return f"Param({dtype}{list(self.value.shape)}{trainable_str})"
         return f"Param({self.value!r}{trainable_str})"
 
-    def __treescope_repr__(
-        self,
-        path: str | None,
-        subtree_renderer: treescope.renderers.TreescopeSubtreeRenderer,
-    ) -> treescope.rendering_parts.Rendering:
+    def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
         """Hook to make `Param`s colored in grey in Treescope."""
+        import treescope
+
         attributes = {"value": self.value, "trainable": self.trainable}
 
         # Grey for trainable, ice blue for non-trainable/frozen

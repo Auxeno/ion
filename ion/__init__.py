@@ -19,8 +19,13 @@ from .tree import (
 
 
 def enable_treescope() -> None:
-    """Activate treescope as the default interactive renderer."""
+    """Activate treescope as the default interactive renderer when inside an IPython env."""
     try:
+        import IPython  # type: ignore[reportMissingImports]
+
+        if IPython.get_ipython() is None:  # type: ignore[reportPrivateImportUsage]
+            return
+
         from treescope import basic_interactive_setup
 
         basic_interactive_setup()

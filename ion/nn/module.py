@@ -20,7 +20,6 @@ from typing import Any, Self
 import jax
 import jax.tree_util as jtu
 import numpy as np
-import treescope
 from jaxtyping import PyTree
 
 from .. import tree
@@ -170,12 +169,9 @@ class Module:
         parts.append(")")
         return "\n".join(parts)
 
-    def __treescope_repr__(
-        self,
-        path: str | None,
-        subtree_renderer: treescope.renderers.TreescopeSubtreeRenderer,
-    ) -> treescope.rendering_parts.Rendering:
+    def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
         """Hook to add color to Modules with Treescope."""
+        import treescope
 
         child_attributes = {
             field.name: getattr(self, field.name)
