@@ -121,7 +121,7 @@ def save(path: str, pytree: PyTree) -> None:
     ]
     arrays_to_save = {str(i): arr for i, arr in enumerate(array_leaves)}
 
-    np.savez(path, **arrays_to_save)  # type: ignore[call-overload]
+    np.savez(path, **arrays_to_save)  # type: ignore[reportArgumentType]
 
 
 def load(path: str, reference_pytree: PyTree) -> PyTree:

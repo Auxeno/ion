@@ -125,7 +125,7 @@ class Module:
     def __repr__(self) -> str:
         """Minimal textual pretty printing for pytrees."""
 
-        fields = dataclasses.fields(self)
+        fields = dataclasses.fields(self)  # type: ignore[reportArgumentType]
         if not fields:
             return f"{type(self).__name__}()"
 
@@ -178,7 +178,8 @@ class Module:
         """Hook to add color to Modules with Treescope."""
 
         child_attributes = {
-            field.name: getattr(self, field.name) for field in dataclasses.fields(self)
+            field.name: getattr(self, field.name)
+            for field in dataclasses.fields(self)  # type: ignore[reportArgumentType]
         }
 
         # Generate color for module
@@ -225,7 +226,7 @@ class Module:
         """
 
         # Ensure field exists in self
-        valid_names = {field.name for field in dataclasses.fields(self)}
+        valid_names = {field.name for field in dataclasses.fields(self)}  # type: ignore[reportArgumentType]
         unknown = field_updates.keys() - valid_names
         if unknown:
             raise ValueError(
@@ -235,7 +236,7 @@ class Module:
         # Allocate a blank instance to avoid running initialization logic again
         new_instance = object.__new__(type(self))
 
-        for field in dataclasses.fields(self):
+        for field in dataclasses.fields(self):  # type: ignore[reportArgumentType]
             # Apply provided updates or fall back to the existing attribute values
             new_value = field_updates.get(field.name, getattr(self, field.name))
             object.__setattr__(new_instance, field.name, new_value)

@@ -103,10 +103,10 @@ class Param(Generic[T]):
     def __abs__(self) -> Array:
         return abs(self.value)
 
-    def __eq__(self, other: Any) -> Array:  # type: ignore[override]
+    def __eq__(self, other: Any) -> Array:
         return self.value == _unwrap(other)
 
-    def __ne__(self, other: Any) -> Array:  # type: ignore[override]
+    def __ne__(self, other: Any) -> Array:
         return self.value != _unwrap(other)
 
     def __lt__(self, other: Any) -> Array:

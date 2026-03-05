@@ -85,18 +85,16 @@ def grad(fn: Callable[..., Any], *, has_aux: bool = False) -> Callable[..., Any]
             reconstructed_pytree = tree_def.unflatten(all_leaves)
             return fn(reconstructed_pytree, *remaining_args, **kwargs)
 
-        result = jax.grad(inner, has_aux=has_aux)(trainable_params)
+        empty_padding = tuple(None for _ in static_leaves)
 
         if has_aux:
-            computed_gradients, aux = result
-        else:
-            computed_gradients = result
+            computed_gradients, aux = jax.grad(inner, has_aux=True)(trainable_params)
+            flat_gradient_leaves = _merge_leaves(computed_gradients, empty_padding, is_match_mask)
+            return tree_def.unflatten(flat_gradient_leaves), aux
 
-        empty_padding = tuple(None for _ in static_leaves)
+        computed_gradients = jax.grad(inner)(trainable_params)
         flat_gradient_leaves = _merge_leaves(computed_gradients, empty_padding, is_match_mask)
-
-        grad_tree = tree_def.unflatten(flat_gradient_leaves)
-        return (grad_tree, aux) if has_aux else grad_tree
+        return tree_def.unflatten(flat_gradient_leaves)
 
     return wrapper
 

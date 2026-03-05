@@ -41,5 +41,9 @@ extend-include = ["*.ipynb"]
 [tool.ruff.lint]
 ignore = ["F722", "E731"]
 
+[tool.pyright]
+typeCheckingMode = "standard"
+reportIncompatibleMethodOverride = false
+
 [tool.pytest.ini_options]
 pythonpath = ["."]

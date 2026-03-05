@@ -31,12 +31,12 @@ def enable_treescope() -> None:
 def disable_treescope() -> None:
     """Deactivate treescope as the default interactive renderer."""
     try:
-        import IPython  # type: ignore[import-not-found]
+        import IPython  # type: ignore[reportMissingImports]
         import treescope
 
-        ip = IPython.get_ipython()  # type: ignore
+        ip = IPython.get_ipython()  # type: ignore[reportPrivateImportUsage]
         if ip is not None:
-            html_fmt = ip.display_formatter.formatters["text/html"]  # type: ignore
+            html_fmt = ip.display_formatter.formatters["text/html"]  # type: ignore[reportAttributeAccessIssue,reportOptionalMemberAccess]
             html_fmt.type_printers.pop(object, None)
 
         treescope.active_autovisualizer.set_globally(None)
