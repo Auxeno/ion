@@ -67,8 +67,8 @@ def _merge_leaves(
 def grad(
     fn: Callable[..., Any],
     argnums: int | Sequence[int] = 0,
-    *,
     has_aux: bool = False,
+    holomorphic: bool = False,
 ) -> Callable[..., Any]:
     """Like `jax.grad`, but differentiates only trainable `Param` leaves.
 
@@ -98,9 +98,9 @@ def grad(
             return fn(*rebuilt, **kwargs)
 
         if has_aux:
-            grads_raw, aux = jax.grad(inner, has_aux=True)(all_trainable)
+            grads_raw, aux = jax.grad(inner, has_aux=True, holomorphic=holomorphic)(all_trainable)
         else:
-            grads_raw = jax.grad(inner)(all_trainable)
+            grads_raw = jax.grad(inner, holomorphic=holomorphic)(all_trainable)
 
         grad_trees = tuple(
             td.unflatten(_merge_leaves(g, tuple(None for _ in s), m))
@@ -116,8 +116,8 @@ def grad(
 def value_and_grad(
     fn: Callable[..., Any],
     argnums: int | Sequence[int] = 0,
-    *,
     has_aux: bool = False,
+    holomorphic: bool = False,
 ) -> Callable[..., Any]:
     """Like `jax.value_and_grad`, but differentiates only trainable `Param` leaves.
 
@@ -145,7 +145,9 @@ def value_and_grad(
                 )
             return fn(*rebuilt, **kwargs)
 
-        value, grads_raw = jax.value_and_grad(inner, has_aux=has_aux)(all_trainable)
+        value, grads_raw = jax.value_and_grad(inner, has_aux=has_aux, holomorphic=holomorphic)(
+            all_trainable
+        )
 
         grad_trees = tuple(
             td.unflatten(_merge_leaves(g, tuple(None for _ in s), m))
