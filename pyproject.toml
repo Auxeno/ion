@@ -1,0 +1,45 @@
+[project]
+name = "ion"
+version = "0.0.1"
+description = "A minimal JAX neural network library."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{name = "Alex Goddard"}]
+dependencies = [
+    "jax>=0.5.0",
+    "jaxtyping>=0.3.9",
+    "treescope>=0.1.10",
+]
+
+[project.urls]
+Homepage = "https://github.com/auxeno/ion"
+Repository = "https://github.com/auxeno/ion"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pyright>=1.1.408",
+    "ruff>=0.15.2",
+    "ipykernel>=7.2.0",
+    "pip>=26.0.1",
+]
+examples = [
+    "optax",
+    "tqdm",
+]
+
+[tool.ruff]
+src = ["."]
+line-length=100
+extend-include = ["*.ipynb"]
+
+[tool.ruff.lint]
+ignore = ["F722", "E731"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

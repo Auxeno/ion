@@ -1,0 +1,8 @@
+*.ipynb
+*pycache*
+*.pytest_cache*
+.DS_Store
+uv.lock
+.ruff_cache
+.venv
+.python-version
