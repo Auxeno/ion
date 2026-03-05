@@ -1,6 +1,6 @@
 <div align="center">
 
-  <h1><img src="assets/logo.png" alt="Ion" width="96"><br>Ion</h1>
+  <h1><img src="assets/logo.png" alt="Ion" width="72"><br>Ion</h1>
 
   <h3>Simple neural networks in JAX</h3>
 
@@ -113,6 +113,7 @@ Modules have a built-in text formatter for standard terminal `repr` output. In n
 ```python
 >>> model = MLP(key=jax.random.key(0))
 >>> model
+
 MLP(
   layer_1=Linear(
     w=Param(f32[784, 128], trainable=True),
