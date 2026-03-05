@@ -3,6 +3,7 @@ from typing import Callable
 import jax
 import jax.numpy as jnp
 import numpy.testing as npt
+import pytest
 
 import ion
 from ion import nn
@@ -329,7 +330,7 @@ class TestGradEdgeCases:
                 self.w = nn.Param(jnp.array([1.0, 2.0, 3.0]))
 
         def loss(model):
-            return jnp.sum(model.w ** 2)
+            return jnp.sum(model.w**2)
 
         model = Model()
         g1 = ion.grad(loss)(model)
@@ -362,6 +363,50 @@ class TestGradEdgeCases:
         # Trainable decoder params get gradients
         assert grads.decoder.w is not None
         assert grads.decoder.b is not None
+
+    def test_grad_called_with_no_args(self):
+        """ion.grad wrapper called with no arguments gives a clear error."""
+
+        def loss(model):
+            return jnp.sum(model.w)
+
+        with pytest.raises((TypeError, ValueError)):
+            ion.grad(loss)()
+
+    def test_grad_with_non_pytree_first_arg(self):
+        """ion.grad with a plain array (no Params) returns None."""
+
+        def loss(x):
+            return x * 2.0
+
+        grads = ion.grad(loss)(jnp.array(1.0))
+        assert grads is None
+
+    def test_value_and_grad_with_dict_pytree(self):
+        """ion.value_and_grad works on dict pytrees, not just Modules."""
+        data = {"w": nn.Param(jnp.array([1.0, 2.0, 3.0]))}
+
+        def loss(d):
+            return jnp.sum(d["w"].value ** 2)
+
+        value, grads = ion.value_and_grad(loss)(data)
+        npt.assert_allclose(value, 14.0)
+        npt.assert_allclose(grads["w"].value, 2.0 * data["w"].value)
+
+    def test_grad_with_only_kwargs(self):
+        """ion.grad fails if model is passed as keyword argument."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0]))
+
+        def loss(model):
+            return jnp.sum(model.w.value)
+
+        with pytest.raises((TypeError, ValueError)):
+            ion.grad(loss)(model=Model())
 
 
 class TestValueAndGrad:
@@ -443,7 +488,7 @@ class TestValueAndGrad:
                 self.w = nn.Param(jnp.array([1.0, 2.0]))
 
         def loss(model):
-            return jnp.sum(model.w ** 2)
+            return jnp.sum(model.w**2)
 
         model = Model()
         val_eager, grad_eager = ion.value_and_grad(loss)(model)
@@ -494,12 +539,12 @@ class TestGradHasAux:
                 self.w = nn.Param(jnp.array([1.0, 2.0]))
 
         def loss(model):
-            return jnp.sum(model.w ** 2), {"squared": model.w.value ** 2}
+            return jnp.sum(model.w**2), {"squared": model.w.value**2}
 
         model = Model()
         grads, aux = ion.grad(loss, has_aux=True)(model)
         npt.assert_allclose(grads.w.value, 2.0 * model.w.value)
-        npt.assert_allclose(aux["squared"], model.w.value ** 2)
+        npt.assert_allclose(aux["squared"], model.w.value**2)
 
     def test_grad_has_aux_inside_jit(self):
         """ion.grad with has_aux composed with jax.jit."""
@@ -511,7 +556,7 @@ class TestGradHasAux:
                 self.w = nn.Param(jnp.array([1.0, 2.0]))
 
         def loss(model):
-            return jnp.sum(model.w ** 2), jnp.sum(model.w.value)
+            return jnp.sum(model.w**2), jnp.sum(model.w.value)
 
         model = Model()
         grads_eager, aux_eager = ion.grad(loss, has_aux=True)(model)
@@ -564,7 +609,7 @@ class TestValueAndGradHasAux:
                 self.w = nn.Param(jnp.array([1.0, 2.0]))
 
         def loss(model):
-            return jnp.sum(model.w ** 2), jnp.sum(model.w.value)
+            return jnp.sum(model.w**2), jnp.sum(model.w.value)
 
         model = Model()
         (v_e, a_e), g_e = ion.value_and_grad(loss, has_aux=True)(model)
@@ -583,10 +628,51 @@ class TestValueAndGradHasAux:
                 self.w = nn.Param(jnp.array([1.0, 2.0]))
 
         def loss(model):
-            s = jnp.sum(model.w ** 2)
+            s = jnp.sum(model.w**2)
             return s, {"loss": s, "w_norm": jnp.sqrt(s)}
 
         model = Model()
         (value, aux), grads = ion.value_and_grad(loss, has_aux=True)(model)
         npt.assert_allclose(value, aux["loss"])
         npt.assert_allclose(aux["w_norm"], jnp.sqrt(value))
+
+
+class TestStaticEdgeCases:
+    def test_static_equality_is_identity_based(self):
+        """Static doesn't define __eq__, so equal values aren't equal."""
+        s1 = Static(42)
+        s2 = Static(42)
+        assert s1 is not s2
+        assert not (s1 == s2)
+
+    def test_static_with_mutable_value(self):
+        """Static holds a reference, so mutating the original mutates the wrapper."""
+        data = {"key": "value"}
+        s = Static(data)
+        data["key"] = "mutated"
+        assert s.value["key"] == "mutated"
+
+    def test_static_in_jit_recompiles_on_value_change(self):
+        """Changing a Static value triggers JIT recompilation."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            scale: int
+
+            def __init__(self, scale):
+                self.w = nn.Param(jnp.ones(2))
+                self.scale = scale
+
+        @jax.jit
+        def f(model):
+            return jnp.sum(model.w.value) * model.scale
+
+        m1 = Model(scale=2)
+        m2 = Model(scale=3)
+
+        r1 = f(m1)
+        r2 = f(m2)
+
+        assert float(r1) != float(r2)
+        npt.assert_allclose(r1, 4.0)
+        npt.assert_allclose(r2, 6.0)

@@ -1,3 +1,4 @@
+import copy
 import dataclasses
 import tempfile
 
@@ -5,6 +6,7 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy.testing as npt
+import pytest
 
 import ion
 from ion import nn, tree
@@ -493,3 +495,65 @@ class TestRepr:
         m = Model()
         r = repr(m)
         assert "Param(" in r
+
+
+class TestParamGetattr:
+    def test_getattr_bare_new_still_recurses_for_non_dunder(self):
+        """Param created via object.__new__ without __init__ still causes RecursionError
+        for non-dunder attrs, because self.value doesn't exist and __getattr__ loops."""
+        p = object.__new__(nn.Param)
+        with pytest.raises(RecursionError):
+            _ = p.shape
+
+    def test_getattr_dunder_raises_attribute_error(self):
+        """Dunder methods not defined on Param raise AttributeError instead of forwarding."""
+        p = nn.Param(jnp.array([1.0, 2.0]))
+        with pytest.raises(AttributeError):
+            _ = p.__deepcopy__
+
+    def test_deepcopy_preserves_param(self):
+        """copy.deepcopy preserves the Param wrapper and value."""
+        p = nn.Param(jnp.array([1.0, 2.0]))
+        p2 = copy.deepcopy(p)
+        assert isinstance(p2, nn.Param)
+        npt.assert_array_equal(p2.value, p.value)
+        assert p2.trainable == p.trainable
+
+    def test_copy_preserves_param(self):
+        """copy.copy on Param works and preserves the wrapper."""
+        p = nn.Param(jnp.array([1.0, 2.0]))
+        p2 = copy.copy(p)
+        assert isinstance(p2, nn.Param)
+        npt.assert_array_equal(p2.value, p.value)
+        assert p2.trainable == p.trainable
+
+
+class TestParamInOperator:
+    def test_param_in_list_identity(self):
+        """Param `in` list works when it's the same object (identity check)."""
+        p = nn.Param(jnp.array([1.0, 2.0]))
+        assert p in [p]
+
+    def test_param_in_list_different_object_multi_element(self):
+        """Param `in` list with different Param of same multi-element value
+        crashes because __eq__ returns an array and bool() on multi-element array raises."""
+        p1 = nn.Param(jnp.array([1.0, 2.0]))
+        p2 = nn.Param(jnp.array([1.0, 2.0]))
+        # Identity check passes, but p1 == p2 returns an array;
+        # bool() on a multi-element array raises ValueError
+        with pytest.raises(ValueError, match="ambiguous"):
+            p1 in [p2]  # pyright: ignore[reportUnusedExpression]
+
+    def test_param_in_list_scalar(self):
+        """Param `in` works for scalar params (bool on 0-d array is fine)."""
+        p1 = nn.Param(jnp.array(1.0))
+        p2 = nn.Param(jnp.array(1.0))
+        assert p1 in [p2]
+
+    def test_param_equality_is_not_python_equality(self):
+        """== returns a JAX array, not a Python bool."""
+        p1 = nn.Param(jnp.array([1.0, 2.0]))
+        p2 = nn.Param(jnp.array([1.0, 2.0]))
+        result = p1 == p2
+        assert isinstance(result, jax.Array)
+        assert result.shape == (2,)

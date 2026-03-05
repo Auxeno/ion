@@ -3,6 +3,7 @@ import tempfile
 import jax
 import jax.numpy as jnp
 import numpy.testing as npt
+import pytest
 
 from ion import nn, tree
 
@@ -149,7 +150,6 @@ class TestUnfreeze:
         npt.assert_array_equal(roundtripped["w"].value, jnp.array([1.0, 2.0]))
 
 
-
 class TestApplyUpdatesExtended:
     def test_apply_updates_preserves_trainable_flag(self):
         """After apply_updates, Param stays trainable."""
@@ -224,3 +224,113 @@ class TestSaveLoad:
             loaded = tree.load(f.name, model)
         npt.assert_array_equal(loaded.w.value, model.w.value)
         npt.assert_array_equal(loaded.buf, model.buf)
+
+
+class TestSaveLoadStructureMismatch:
+    def test_load_fewer_saved_than_reference_raises(self):
+        """Saving a smaller model and loading into a larger reference raises ValueError."""
+
+        class SmallModel(nn.Module):
+            w: nn.Param
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (4,)))
+
+        class BigModel(nn.Module):
+            w: nn.Param
+            b: nn.Param
+
+            def __init__(self, key):
+                k1, k2 = jax.random.split(key)
+                self.w = nn.Param(jax.random.normal(k1, (4,)))
+                self.b = nn.Param(jax.random.normal(k2, (4,)))
+
+        small = SmallModel(key=jax.random.key(0))
+        big = BigModel(key=jax.random.key(1))
+
+        with tempfile.NamedTemporaryFile(suffix=".npz") as f:
+            tree.save(f.name, small)
+            with pytest.raises(ValueError, match="Structure mismatch"):
+                tree.load(f.name, big)
+
+    def test_load_more_saved_than_reference_raises(self):
+        """Saving a larger model and loading into smaller reference raises ValueError."""
+
+        class SmallModel(nn.Module):
+            w: nn.Param
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (4,)))
+
+        class BigModel(nn.Module):
+            w: nn.Param
+            b: nn.Param
+
+            def __init__(self, key):
+                k1, k2 = jax.random.split(key)
+                self.w = nn.Param(jax.random.normal(k1, (4,)))
+                self.b = nn.Param(jax.random.normal(k2, (4,)))
+
+        big = BigModel(key=jax.random.key(0))
+        small = SmallModel(key=jax.random.key(1))
+
+        with tempfile.NamedTemporaryFile(suffix=".npz") as f:
+            tree.save(f.name, big)
+            with pytest.raises(ValueError, match="Structure mismatch"):
+                tree.load(f.name, small)
+
+    def test_load_shape_mismatch_no_validation(self):
+        """Loading arrays with mismatched shapes succeeds silently."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self, key, dim):
+                self.w = nn.Param(jax.random.normal(key, (dim,)))
+
+        saved_model = Model(key=jax.random.key(0), dim=8)
+        reference = Model(key=jax.random.key(1), dim=4)
+
+        with tempfile.NamedTemporaryFile(suffix=".npz") as f:
+            tree.save(f.name, saved_model)
+            loaded = tree.load(f.name, reference)
+            assert loaded.w.shape == (8,)
+            assert loaded.w.shape != reference.w.shape
+
+    def test_save_load_trainable_flag_comes_from_reference(self):
+        """The trainable flag is NOT saved — it comes from the reference tree."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self, key, trainable=True):
+                self.w = nn.Param(jax.random.normal(key, (4,)), trainable=trainable)
+
+        frozen_model = Model(key=jax.random.key(0), trainable=False)
+        assert frozen_model.w.trainable is False
+        trainable_ref = Model(key=jax.random.key(1), trainable=True)
+
+        with tempfile.NamedTemporaryFile(suffix=".npz") as f:
+            tree.save(f.name, frozen_model)
+            loaded = tree.load(f.name, trainable_ref)
+
+        npt.assert_array_equal(loaded.w.value, frozen_model.w.value)
+        # trainable comes from reference, not the file
+        assert loaded.w.trainable is True
+
+
+class TestApplyUpdatesEdgeCases:
+    def test_apply_updates_frozen_param_with_large_update_silently_ignored(self):
+        """A large update to a frozen param is silently dropped — no warning."""
+        data = {"w": nn.Param(jnp.array([1.0]), trainable=False)}
+        updates = {"w": nn.Param(jnp.array([999999.0]))}
+        result = tree.apply_updates(data, updates)
+        npt.assert_allclose(result["w"].value, jnp.array([1.0]))
+
+    def test_apply_updates_update_trainable_flag_ignored(self):
+        """The trainable flag on the update Param is ignored; the model's flag wins."""
+        data = {"w": nn.Param(jnp.array([1.0]), trainable=True)}
+        updates = {"w": nn.Param(jnp.array([0.5]), trainable=False)}
+        result = tree.apply_updates(data, updates)
+        npt.assert_allclose(result["w"].value, jnp.array([1.5]))
+        assert result["w"].trainable is True

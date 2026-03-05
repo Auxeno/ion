@@ -41,6 +41,9 @@ class Param(Generic[T]):
         return self.value
 
     def __getattr__(self, name: str) -> Any:
+        # Do not forward explicit dunder retrieval
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(name)
         return getattr(self.value, name)
 
     def __getitem__(self, key: Any) -> Array:

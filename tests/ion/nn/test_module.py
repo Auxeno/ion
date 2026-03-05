@@ -1,9 +1,11 @@
+import copy
 import dataclasses
 from collections.abc import Callable
 
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
+import numpy as np
 import numpy.testing as npt
 import pytest
 
@@ -554,6 +556,42 @@ class TestReplaceEdgeCases:
         # Original unchanged
         assert not jnp.array_equal(linear.w.value, replaced.w.value)
 
+    def test_replace_param_with_non_param_breaks_tree_ops(self):
+        """Replacing a Param field with a plain value creates a structurally different pytree."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+
+        m = Model()
+        original_def = jtu.tree_flatten(m)[1]
+
+        # Replace Param with plain array
+        m2 = m.replace(w=jnp.ones(3))
+        new_def = jtu.tree_flatten(m2)[1]
+
+        # The tree structures are different!
+        assert original_def != new_def
+
+    def test_replace_with_none_changes_structure(self):
+        """Replacing a Param with None changes pytree structure (loses a leaf)."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            b: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.b = nn.Param(jnp.zeros(3))
+
+        m = Model()
+        m2 = m.replace(b=None)
+        # Original has 2 leaves (w.value, b.value), replacement has 1
+        assert len(jax.tree.leaves(m)) == 2
+        assert len(jax.tree.leaves(m2)) == 1
+
 
 class TestInheritance:
     def test_module_subclass_chain(self):
@@ -813,3 +851,260 @@ class TestStaticWrapping:
 
         grads = jax.grad(loss)(Model())
         npt.assert_allclose(grads.w.value, jnp.array([4.0, 5.0, 6.0]))
+
+
+class TestModuleMutableFields:
+    def test_list_field_can_be_mutated_in_place(self):
+        """Module freezing doesn't prevent in-place mutation of mutable containers."""
+
+        class Model(nn.Module):
+            layers: list
+
+            def __init__(self, key):
+                self.layers = [nn.Linear(4, 4, key=key)]
+
+        model = Model(key=jax.random.key(0))
+
+        with pytest.raises(AttributeError, match="frozen"):
+            model.layers = []
+
+        # But in-place mutation bypasses the freeze
+        original_len = len(model.layers)
+        model.layers.append(nn.Linear(4, 4, key=jax.random.key(1)))
+        assert len(model.layers) == original_len + 1
+
+    def test_numpy_array_field_can_be_mutated(self):
+        """numpy arrays in Module fields can be mutated in-place."""
+
+        class Model(nn.Module):
+            mask: np.ndarray
+            w: nn.Param
+
+            def __init__(self, key):
+                self.mask = np.array([1.0, 0.0, 1.0])
+                self.w = nn.Param(jax.random.normal(key, (3,)))
+
+        model = Model(key=jax.random.key(0))
+
+        original_val = model.mask[0]
+        model.mask[0] = 999.0
+        assert model.mask[0] == 999.0
+        assert model.mask[0] != original_val
+
+
+class TestModuleInheritanceEdgeCases:
+    def test_module_with_no_fields(self):
+        """Module subclass with no fields at all."""
+
+        class Empty(nn.Module):
+            def __init__(self):
+                pass
+
+        m = Empty()
+        assert jax.tree.leaves(m) == []
+        reconstructed = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        assert isinstance(reconstructed, Empty)
+
+    def test_abstract_base_then_concrete(self):
+        """Abstract base Module with no fields, concrete child with fields."""
+
+        class BaseLayer(nn.Module):
+            def forward(self, x):
+                raise NotImplementedError
+
+        class ConcreteLayer(BaseLayer):
+            w: nn.Param
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (4,)))
+
+            def forward(self, x):
+                return x @ self.w
+
+        m = ConcreteLayer(key=jax.random.key(0))
+        assert m.w.shape == (4,)
+        leaves, treedef = jtu.tree_flatten(m)
+        m2 = treedef.unflatten(leaves)
+        npt.assert_array_equal(m2.w.value, m.w.value)
+
+    def test_sibling_classes_dont_interfere(self):
+        """Two sibling Module subclasses with same field names don't interfere."""
+
+        class A(nn.Module):
+            x: int
+
+            def __init__(self, x):
+                self.x = x
+
+        class B(nn.Module):
+            x: int
+
+            def __init__(self, x):
+                self.x = x
+
+        a = A(x=1)
+        b = B(x=2)
+        assert a.x == 1
+        assert b.x == 2
+        assert type(a) is not type(b)
+
+
+class TestModuleCopy:
+    def test_deepcopy_module_preserves_param_wrappers(self):
+        """copy.deepcopy on Module preserves Param wrappers."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+
+        m = Model()
+        m2 = copy.deepcopy(m)
+        assert isinstance(m2, Model)
+        assert isinstance(m2.w, nn.Param)
+        npt.assert_array_equal(m2.w.value, m.w.value)
+        assert m2.w.trainable == m.w.trainable
+
+    def test_copy_module_works(self):
+        """copy.copy on Module works and preserves Param wrappers."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+
+        m = Model()
+        m2 = copy.copy(m)
+        assert isinstance(m2.w, nn.Param)
+        npt.assert_array_equal(m2.w.value, m.w.value)
+
+
+class TestModuleWrappingEdgeCases:
+    def test_numpy_scalar_treated_as_dynamic_leaf(self):
+        """np.ndarray (even 0-d) is a dynamic leaf, not static metadata."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            buf: np.ndarray
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(2))
+                self.buf = np.array(42.0)
+
+        m = Model()
+        leaves = jax.tree.leaves(m)
+        assert len(leaves) == 2
+
+    def test_python_int_is_static_metadata(self):
+        """Plain Python int is wrapped in Static (no dynamic leaf)."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            count: int
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(2))
+                self.count = 42
+
+        m = Model()
+        leaves = jax.tree.leaves(m)
+        assert len(leaves) == 1
+
+    def test_custom_class_field_becomes_static(self):
+        """A custom (non-Module) class instance is wrapped in Static."""
+
+        class Config:
+            def __init__(self, lr):
+                self.lr = lr
+
+        class Model(nn.Module):
+            w: nn.Param
+            config: Config
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (2,)))
+                self.config = Config(lr=0.001)
+
+        m = Model(key=jax.random.key(0))
+        leaves = jax.tree.leaves(m)
+        assert len(leaves) == 1
+        reconstructed = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        assert reconstructed.config.lr == 0.001
+
+    def test_dict_field_with_arrays_are_dynamic(self):
+        """Arrays inside a dict field are dynamic leaves, not static."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            buffers: dict
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (2,)))
+                self.buffers = {"mask": jnp.array([1.0, 0.0]), "scale": jnp.array(2.0)}
+
+        m = Model(key=jax.random.key(0))
+        leaves = jax.tree.leaves(m)
+        assert len(leaves) == 3
+
+    def test_dict_field_mixed_static_dynamic(self):
+        """Dict with mixed array and non-array values: arrays are dynamic, others are static."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            config: dict
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (2,)))
+                self.config = {"lr": 0.001, "buf": jnp.array(1.0)}
+
+        m = Model(key=jax.random.key(0))
+        leaves = jax.tree.leaves(m)
+        assert len(leaves) == 2
+
+        reconstructed = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        assert reconstructed.config["lr"] == 0.001
+
+
+class TestParamsPropertyEdgeCases:
+    def test_params_replaces_plain_array_with_none_but_keeps_static(self):
+        """Plain arrays become None but static fields are preserved (by design)."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            buf: jax.Array
+            scale: float
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.buf = jnp.ones(3)
+                self.scale = 2.0
+
+        m = Model()
+        p = m.params
+        assert isinstance(p.w, nn.Param)
+        assert p.buf is None
+        assert p.scale == 2.0
+
+    def test_params_with_nested_module_plain_array(self):
+        """Nested module's plain array fields also become None."""
+
+        class Inner(nn.Module):
+            w: nn.Param
+            buf: jax.Array
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (2,)))
+                self.buf = jnp.ones(2)
+
+        class Outer(nn.Module):
+            inner: Inner
+
+            def __init__(self, key):
+                self.inner = Inner(key)
+
+        m = Outer(key=jax.random.key(0))
+        p = m.params
+        assert isinstance(p.inner.w, nn.Param)
+        assert p.inner.buf is None

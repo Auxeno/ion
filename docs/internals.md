@@ -63,3 +63,15 @@ Adds optimizer deltas to a model's trainable parameters. Walks the model and upd
 The caller gets a gradient tree matching the model structure, where only trainable `Param` positions have values and everything else is `None`. `value_and_grad` works identically but also returns the output.
 
 Note: `jax.jit` works natively with all modules because `Module` pytree registration wraps non-array leaves in `Static` automatically. No `ion.jit` wrapper is needed.
+
+## Sharp Edges
+
+Known gotchas to be aware of when using Ion:
+
+- **`save`/`load` only stores array data** — `trainable` flags and non-array fields (ints, strings, callables) come from the reference tree, not the file. If you save a frozen model and load into a trainable reference, the loaded model will be trainable.
+
+- **Module immutability is shallow** — `_frozen` prevents field reassignment, but mutable containers (lists, dicts, numpy arrays) in fields can still be mutated in-place. For example, `model.layers.append(...)` bypasses the freeze.
+
+- **`Param.__eq__` returns a JAX array, not a bool** — `param in list` can raise `ValueError` for multi-element params because Python calls `bool()` on the array result, which is ambiguous for arrays with more than one element.
+
+- **`Module.params` preserves static fields alongside `Param` leaves** — plain arrays become `None`, while non-array fields (ints, floats, strings, callables) remain unchanged. This is by design: static fields are structural metadata stored in the treedef, not pytree leaves, so they are naturally unaffected when `params` replaces non-`Param` leaves with `None`.

@@ -126,20 +126,34 @@ def save(path: str, pytree: PyTree) -> None:
 
 def load(path: str, reference_pytree: PyTree) -> PyTree:
     """Load array leaves from a `.npz` file into a reference PyTree.
+    Metadata is not restored and should be provided by the reference tree.
 
     >>> model = ion.tree.load("model.npz", model)
     """
     flat_leaves, tree_def = jtu.tree_flatten(reference_pytree)
     saved_data = np.load(path)
+    saved_array_count = len(saved_data)
 
     loaded_leaves: list[Any] = []
     array_index = 0
 
+    # Load leaves validating structure is as expected
     for leaf in flat_leaves:
         if isinstance(leaf, (jax.Array, np.ndarray)):
+            if str(array_index) not in saved_data:
+                raise ValueError(
+                    f"Structure mismatch: reference tree expects at least {array_index + 1} "
+                    f"arrays, but the file contains {saved_array_count}."
+                )
             loaded_leaves.append(jnp.array(saved_data[str(array_index)]))
             array_index += 1
         else:
             loaded_leaves.append(leaf)
+
+    if array_index != saved_array_count:
+        raise ValueError(
+            f"Structure mismatch: file contains {saved_array_count} arrays, "
+            f"but reference tree only has {array_index}."
+        )
 
     return tree_def.unflatten(loaded_leaves)
