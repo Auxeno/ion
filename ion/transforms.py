@@ -63,10 +63,11 @@ def _merge_leaves(
     return reconstructed_leaves
 
 
-def grad(fn: Callable[..., Any]) -> Callable[..., Any]:
+def grad(fn: Callable[..., Any], *, has_aux: bool = False) -> Callable[..., Any]:
     """Like `jax.grad`, but differentiates only trainable `Param` leaves.
 
     >>> grads = ion.grad(loss_fn)(model, x, y)
+    >>> grads, aux = ion.grad(loss_fn, has_aux=True)(model, x, y)
     """
 
     @functools.wraps(fn)
@@ -84,20 +85,27 @@ def grad(fn: Callable[..., Any]) -> Callable[..., Any]:
             reconstructed_pytree = tree_def.unflatten(all_leaves)
             return fn(reconstructed_pytree, *remaining_args, **kwargs)
 
-        computed_gradients = jax.grad(inner)(trainable_params)
+        result = jax.grad(inner, has_aux=has_aux)(trainable_params)
+
+        if has_aux:
+            computed_gradients, aux = result
+        else:
+            computed_gradients = result
 
         empty_padding = tuple(None for _ in static_leaves)
         flat_gradient_leaves = _merge_leaves(computed_gradients, empty_padding, is_match_mask)
 
-        return tree_def.unflatten(flat_gradient_leaves)
+        grad_tree = tree_def.unflatten(flat_gradient_leaves)
+        return (grad_tree, aux) if has_aux else grad_tree
 
     return wrapper
 
 
-def value_and_grad(fn: Callable[..., Any]) -> Callable[..., Any]:
+def value_and_grad(fn: Callable[..., Any], *, has_aux: bool = False) -> Callable[..., Any]:
     """Like `jax.value_and_grad`, but differentiates only trainable `Param` leaves.
 
     >>> loss, grads = ion.value_and_grad(loss_fn)(model, x, y)
+    >>> (loss, aux), grads = ion.value_and_grad(loss_fn, has_aux=True)(model, x, y)
     """
 
     @functools.wraps(fn)
@@ -114,7 +122,7 @@ def value_and_grad(fn: Callable[..., Any]) -> Callable[..., Any]:
             reconstructed_pytree = tree_def.unflatten(all_leaves)
             return fn(reconstructed_pytree, *remaining_args, **kwargs)
 
-        value, computed_gradients = jax.value_and_grad(inner)(trainable_params)
+        value, computed_gradients = jax.value_and_grad(inner, has_aux=has_aux)(trainable_params)
 
         empty_padding = tuple(None for _ in static_leaves)
         flat_gradient_leaves = _merge_leaves(computed_gradients, empty_padding, is_match_mask)

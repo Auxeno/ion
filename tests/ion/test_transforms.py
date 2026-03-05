@@ -450,3 +450,143 @@ class TestValueAndGrad:
         val_jit, grad_jit = jax.jit(ion.value_and_grad(loss))(model)
         npt.assert_allclose(val_jit, val_eager)
         npt.assert_allclose(grad_jit.w.value, grad_eager.w.value)
+
+
+class TestGradHasAux:
+    def test_grad_has_aux(self):
+        """ion.grad with has_aux=True returns (grads, aux)."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0, 3.0]))
+
+        def loss(model, x):
+            out = model.w * x
+            return jnp.sum(out), out
+
+        model = Model()
+        x = jnp.array([4.0, 5.0, 6.0])
+        grads, aux = ion.grad(loss, has_aux=True)(model, x)
+        npt.assert_allclose(grads.w.value, x)
+        npt.assert_allclose(aux, model.w.value * x)
+
+    def test_grad_has_aux_frozen(self):
+        """has_aux with frozen params: frozen positions get None, aux is returned."""
+
+        def loss(model):
+            return jnp.sum(model.w.value) + jnp.sum(model.frozen.value), model.frozen.value
+
+        model = WithFrozen(key=jax.random.key(0))
+        grads, aux = ion.grad(loss, has_aux=True)(model)
+        assert grads.w is not None
+        assert grads.frozen is None
+        npt.assert_array_equal(aux, model.frozen.value)
+
+    def test_grad_has_aux_as_decorator(self):
+        """ion.grad(fn, has_aux=True) used via explicit call."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0]))
+
+        def loss(model):
+            return jnp.sum(model.w ** 2), {"squared": model.w.value ** 2}
+
+        model = Model()
+        grads, aux = ion.grad(loss, has_aux=True)(model)
+        npt.assert_allclose(grads.w.value, 2.0 * model.w.value)
+        npt.assert_allclose(aux["squared"], model.w.value ** 2)
+
+    def test_grad_has_aux_inside_jit(self):
+        """ion.grad with has_aux composed with jax.jit."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0]))
+
+        def loss(model):
+            return jnp.sum(model.w ** 2), jnp.sum(model.w.value)
+
+        model = Model()
+        grads_eager, aux_eager = ion.grad(loss, has_aux=True)(model)
+        grads_jit, aux_jit = jax.jit(ion.grad(loss, has_aux=True))(model)
+        npt.assert_allclose(grads_jit.w.value, grads_eager.w.value)
+        npt.assert_allclose(aux_jit, aux_eager)
+
+
+class TestValueAndGradHasAux:
+    def test_value_and_grad_has_aux(self):
+        """ion.value_and_grad with has_aux=True returns ((scalar, aux), grads)."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0, 3.0]))
+
+        def loss(model, x):
+            out = model.w * x
+            return jnp.sum(out), out
+
+        model = Model()
+        x = jnp.array([4.0, 5.0, 6.0])
+        (value, aux), grads = ion.value_and_grad(loss, has_aux=True)(model, x)
+        npt.assert_allclose(value, jnp.sum(model.w.value * x))
+        npt.assert_allclose(aux, model.w.value * x)
+        npt.assert_allclose(grads.w.value, x)
+
+    def test_value_and_grad_has_aux_frozen(self):
+        """has_aux with frozen params."""
+
+        def loss(model):
+            return jnp.sum(model.w.value), model.frozen.value
+
+        model = WithFrozen(key=jax.random.key(0))
+        (value, aux), grads = ion.value_and_grad(loss, has_aux=True)(model)
+        npt.assert_allclose(value, jnp.sum(model.w.value))
+        npt.assert_array_equal(aux, model.frozen.value)
+        assert grads.w is not None
+        assert grads.frozen is None
+
+    def test_value_and_grad_has_aux_inside_jit(self):
+        """ion.value_and_grad with has_aux composed with jax.jit."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0]))
+
+        def loss(model):
+            return jnp.sum(model.w ** 2), jnp.sum(model.w.value)
+
+        model = Model()
+        (v_e, a_e), g_e = ion.value_and_grad(loss, has_aux=True)(model)
+        (v_j, a_j), g_j = jax.jit(ion.value_and_grad(loss, has_aux=True))(model)
+        npt.assert_allclose(v_j, v_e)
+        npt.assert_allclose(a_j, a_e)
+        npt.assert_allclose(g_j.w.value, g_e.w.value)
+
+    def test_value_and_grad_has_aux_dict(self):
+        """Auxiliary output can be a dict of arrays."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0]))
+
+        def loss(model):
+            s = jnp.sum(model.w ** 2)
+            return s, {"loss": s, "w_norm": jnp.sqrt(s)}
+
+        model = Model()
+        (value, aux), grads = ion.value_and_grad(loss, has_aux=True)(model)
+        npt.assert_allclose(value, aux["loss"])
+        npt.assert_allclose(aux["w_norm"], jnp.sqrt(value))

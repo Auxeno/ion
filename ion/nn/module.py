@@ -54,7 +54,7 @@ def _unwrap_non_arrays(value: Any) -> Any:
 
 def _register_pytree(cls: type) -> None:
     """Register a class as a JAX pytree, wrapping non-array leaves as static metadata."""
-    field_names = tuple(field.name for field in dataclasses.fields(cls))  # type: ignore[arg-type]
+    field_names = tuple(field.name for field in dataclasses.fields(cls))
 
     def flatten_with_keys(obj: Any) -> tuple[list[tuple[Any, Any]], None]:
         children = [
@@ -93,11 +93,18 @@ class Module:
         @functools.wraps(original_constructor)
         def _constructor_with_freeze(self: Any, *args: Any, **kwargs: Any) -> None:
             """Temporarily unfreeze, run subclass constructor and refreeze."""
-            object.__setattr__(self, "_frozen", False)
-            original_constructor(self, *args, **kwargs)
-            object.__setattr__(self, "_frozen", True)
 
-        cls.__init__ = _constructor_with_freeze  # type: ignore[method-assign]
+            # A nesting depth counter ensures we only freeze at the outermost level
+            depth = getattr(self, "_init_depth", 0)
+            if depth == 0:
+                object.__setattr__(self, "_frozen", False)
+            object.__setattr__(self, "_init_depth", depth + 1)
+            original_constructor(self, *args, **kwargs)
+            object.__setattr__(self, "_init_depth", depth)
+            if depth == 0:
+                object.__setattr__(self, "_frozen", True)
+
+        cls.__init__ = _constructor_with_freeze
 
         _register_pytree(cls)
 
@@ -118,7 +125,7 @@ class Module:
     def __repr__(self) -> str:
         """Minimal textual pretty printing for pytrees."""
 
-        fields = dataclasses.fields(self)  # type: ignore[arg-type]
+        fields = dataclasses.fields(self)
         if not fields:
             return f"{type(self).__name__}()"
 
@@ -171,8 +178,7 @@ class Module:
         """Hook to add color to Modules with Treescope."""
 
         child_attributes = {
-            field.name: getattr(self, field.name)
-            for field in dataclasses.fields(self)  # type: ignore[arg-type]
+            field.name: getattr(self, field.name) for field in dataclasses.fields(self)
         }
 
         # Generate color for module
@@ -217,10 +223,19 @@ class Module:
 
         >>> new_model = model.replace(b=None)  # remove bias
         """
+
+        # Ensure field exists in self
+        valid_names = {field.name for field in dataclasses.fields(self)}
+        unknown = field_updates.keys() - valid_names
+        if unknown:
+            raise ValueError(
+                f"Unknown field(s) {unknown} for {type(self).__name__}. Valid fields: {valid_names}"
+            )
+
         # Allocate a blank instance to avoid running initialization logic again
         new_instance = object.__new__(type(self))
 
-        for field in dataclasses.fields(self):  # type: ignore[arg-type]
+        for field in dataclasses.fields(self):
             # Apply provided updates or fall back to the existing attribute values
             new_value = field_updates.get(field.name, getattr(self, field.name))
             object.__setattr__(new_instance, field.name, new_value)

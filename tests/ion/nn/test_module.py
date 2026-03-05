@@ -532,8 +532,8 @@ class TestContainerFields:
 
 
 class TestReplaceEdgeCases:
-    def test_replace_unknown_field_silently_ignored(self):
-        """replace silently ignores unknown field names (potential gotcha)."""
+    def test_replace_unknown_field_raises(self):
+        """replace raises ValueError for unknown field names."""
 
         class Model(nn.Module):
             x: int
@@ -542,9 +542,8 @@ class TestReplaceEdgeCases:
                 self.x = x
 
         m = Model(x=1)
-        m2 = m.replace(nonexistent=42)
-        assert m2.x == 1
-        assert not hasattr(m2, "nonexistent")
+        with pytest.raises(ValueError, match="Unknown field"):
+            m.replace(nonexistent=42)
 
     def test_replace_with_param(self):
         """replace can swap a Param value."""
@@ -584,6 +583,111 @@ class TestInheritance:
         reconstructed = treedef.unflatten(leaves)
         assert reconstructed.x == 1
         assert reconstructed.y == 2
+
+    def test_super_init_does_not_freeze_early(self):
+        """Child calling super().__init__() can still set its own fields."""
+
+        class Base(nn.Module):
+            w: nn.Param
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (4,)))
+
+        class Child(Base):
+            b: nn.Param
+
+            def __init__(self, key):
+                super().__init__(key)
+                self.b = nn.Param(jnp.zeros(4))
+
+        c = Child(jax.random.key(0))
+        assert c.w.shape == (4,)
+        assert c.b.shape == (4,)
+        # Frozen after construction
+        with pytest.raises(AttributeError, match="frozen"):
+            c.b = nn.Param(jnp.ones(4))
+
+    def test_three_level_inheritance_with_super(self):
+        """Three levels of inheritance using super().__init__()."""
+
+        class Base(nn.Module):
+            w: nn.Param
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (4,)))
+
+        class Mid(Base):
+            b: nn.Param
+
+            def __init__(self, key):
+                super().__init__(key)
+                self.b = nn.Param(jnp.zeros(4))
+
+        class Top(Mid):
+            scale: float
+
+            def __init__(self, key):
+                super().__init__(key)
+                self.scale = 2.0
+
+            def __call__(self, x):
+                return (x @ self.w + self.b) * self.scale
+
+        m = Top(jax.random.key(0))
+        assert m.w.shape == (4,)
+        assert m.b.shape == (4,)
+        assert m.scale == 2.0
+        # Works in jit
+        result = jax.jit(m)(jnp.ones(4))
+        assert result.shape == (4,)
+        # Frozen after construction
+        with pytest.raises(AttributeError, match="frozen"):
+            m.scale = 3.0
+
+    def test_inherited_module_pytree_roundtrip(self):
+        """Inherited module survives flatten/unflatten correctly."""
+
+        class Base(nn.Module):
+            w: nn.Param
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (4,)))
+
+        class Child(Base):
+            b: nn.Param
+
+            def __init__(self, key):
+                super().__init__(key)
+                self.b = nn.Param(jnp.zeros(4))
+
+        m = Child(jax.random.key(0))
+        leaves, treedef = jtu.tree_flatten(m)
+        m2 = treedef.unflatten(leaves)
+        npt.assert_array_equal(m2.w.value, m.w.value)
+        npt.assert_array_equal(m2.b.value, m.b.value)
+
+    def test_inherited_module_grad(self):
+        """ion.grad works on an inherited module."""
+
+        class Base(nn.Module):
+            w: nn.Param
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (4,)))
+
+        class Child(Base):
+            b: nn.Param
+
+            def __init__(self, key):
+                super().__init__(key)
+                self.b = nn.Param(jnp.zeros(4))
+
+        import ion
+
+        m = Child(jax.random.key(0))
+        grads = ion.grad(lambda m: (m.w.value + m.b.value).sum())(m)
+        npt.assert_allclose(grads.w.value, jnp.ones(4))
+        npt.assert_allclose(grads.b.value, jnp.ones(4))
 
 
 class TestParamsWithFrozen:
