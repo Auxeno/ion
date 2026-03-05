@@ -62,7 +62,8 @@ self.b = nn.Param(jnp.zeros(16), trainable=False)  # frozen
 Access all parameters via the `params` property. This returns a pytree with identical structure, containing only `Param` leaves (non-parameter leaves are replaced with `None`):
 
 ```python
-model.params  # pytree of Param leaves — can be passed to an Optax optimizer
+model.params       # pytree of Param leaves — can be passed to an Optax optimizer
+model.num_params   # total number of parameters (trainable and frozen)
 ```
 
 Freeze the parameters of entire models or specific sub-modules:
