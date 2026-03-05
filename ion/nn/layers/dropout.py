@@ -31,13 +31,16 @@ class Dropout(Module):
         x: Float[Array, "..."],
         deterministic: bool | None = None,
         *,
-        key: PRNGKeyArray,
+        key: PRNGKeyArray | None = None,
     ) -> Float[Array, "..."]:
 
         is_deterministic = self.deterministic if deterministic is None else deterministic
 
         if is_deterministic or self.p == 0.0:
             return x
+
+        if key is None:
+            raise ValueError("key is required when not in deterministic mode")
 
         keep_prob = 1.0 - self.p
         mask = jax.random.bernoulli(key, p=keep_prob, shape=x.shape)
