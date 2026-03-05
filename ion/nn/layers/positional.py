@@ -64,11 +64,7 @@ def sinusoidal(
     angles = positions * divisor
 
     # Interleave sin and cos into alternating columns (s, d)
-    embeddings = jnp.zeros((seq_len, dim), dtype=dtype)
-    embeddings = embeddings.at[:, 0::2].set(jnp.sin(angles))
-    embeddings = embeddings.at[:, 1::2].set(jnp.cos(angles))
-
-    return embeddings
+    return jnp.stack([jnp.sin(angles), jnp.cos(angles)], axis=-1).reshape(seq_len, dim).astype(dtype)
 
 
 def alibi(
