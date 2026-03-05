@@ -32,7 +32,9 @@ def _wrap_non_arrays(value: Any) -> Any:
     if isinstance(value, (Module, Param)):
         return value
     return jax.tree.map(
-        lambda leaf: leaf if isinstance(leaf, (Module, Param)) or tree.is_array(leaf) else Static(leaf),
+        lambda leaf: (
+            leaf if isinstance(leaf, (Module, Param)) or tree.is_array(leaf) else Static(leaf)
+        ),
         value,
         is_leaf=lambda x: isinstance(x, (Module, Param, Static)),
     )
@@ -55,8 +57,7 @@ def _register_pytree(cls: type) -> None:
 
     def flatten_with_keys(obj: Any) -> tuple[list[tuple[Any, Any]], None]:
         children = [
-            (jtu.GetAttrKey(name), _wrap_non_arrays(getattr(obj, name)))
-            for name in field_names
+            (jtu.GetAttrKey(name), _wrap_non_arrays(getattr(obj, name))) for name in field_names
         ]
         return children, None
 
@@ -126,7 +127,23 @@ class Module:
             if isinstance(value, Param):
                 parts.append(f"  {field.name}={value!r},")
             elif hasattr(value, "shape") and hasattr(value, "dtype"):
-                parts.append(f"  {field.name}={value.dtype.name}{list(value.shape)},")
+                dtype = {
+                    "float16": "f16",
+                    "float32": "f32",
+                    "float64": "f64",
+                    "bfloat16": "bf16",
+                    "int8": "i8",
+                    "int16": "i16",
+                    "int32": "i32",
+                    "int64": "i64",
+                    "uint8": "u8",
+                    "uint16": "u16",
+                    "uint32": "u32",
+                    "uint64": "u64",
+                    "complex64": "c64",
+                    "complex128": "c128",
+                }.get(value.dtype.name, value.dtype.name)
+                parts.append(f"  {field.name}={dtype}{list(value.shape)},")
             elif (
                 isinstance(value, (tuple, list))
                 and value
