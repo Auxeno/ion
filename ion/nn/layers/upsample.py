@@ -29,7 +29,7 @@ class Upsample1d(Module):
         self.scale_factor = scale_factor
         self.mode = mode
 
-    def __call__(self, x: Float[Array, "... t c"]) -> Float[Array, "... t c"]:
+    def __call__(self, x: Float[Array, "... l c"]) -> Float[Array, "... l c"]:
 
         batch_shape = x.shape[:-2]
         x = x.reshape(-1, *x.shape[-2:])

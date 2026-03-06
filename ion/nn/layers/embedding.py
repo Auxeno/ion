@@ -22,7 +22,7 @@ class Embedding(Module):
     >>> embed(ids)  # (*,) -> (*, 64)
     """
 
-    w: Param[Float[Array, "n d"]]
+    w: Param[Float[Array, "v d"]]
 
     def __init__(
         self,
