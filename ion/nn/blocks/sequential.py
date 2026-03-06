@@ -7,7 +7,8 @@ Accepts any callable (modules, functions like jax.nn.relu, lambdas).
 Supports indexing, slicing, and iteration.
 """
 
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
+from typing import Callable
 
 from jaxtyping import Array
 
@@ -30,8 +31,10 @@ class Sequential(Module):
         self.layers = layers
 
     def __call__(self, x: Array) -> Array:
+
         for layer in self.layers:
             x = layer(x)
+
         return x
 
     def __getitem__(self, i: int | slice) -> Callable | "Sequential":

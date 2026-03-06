@@ -10,7 +10,7 @@ See docs/internals.md for implementation details.
 """
 
 import dataclasses
-from functools import partial
+import functools
 from typing import Any, Generic, TypeVar
 
 import jax.tree_util as jtu
@@ -24,7 +24,7 @@ def _unwrap(x: Any) -> Any:
     return x.value if isinstance(x, Param) else x
 
 
-@partial(jtu.register_dataclass, data_fields=["value"], meta_fields=["trainable"])
+@functools.partial(jtu.register_dataclass, data_fields=["value"], meta_fields=["trainable"])
 @dataclasses.dataclass(frozen=True, eq=False)
 class Param(Generic[T]):
     """Marks a JAX array as a model parameter.

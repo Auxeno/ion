@@ -11,8 +11,8 @@ See docs/internals.md for implementation details.
 """
 
 import functools
-from collections.abc import Callable, Sequence
-from typing import Any
+from collections.abc import Callable
+from typing import Any, Sequence
 
 import jax
 import jax.tree_util as jtu
@@ -101,6 +101,7 @@ def grad(
             grads_raw, aux = jax.grad(inner, has_aux=True, holomorphic=holomorphic)(all_trainable)
         else:
             grads_raw = jax.grad(inner, holomorphic=holomorphic)(all_trainable)
+            aux = None
 
         grad_trees = tuple(
             td.unflatten(_merge_leaves(g, tuple(None for _ in s), m))

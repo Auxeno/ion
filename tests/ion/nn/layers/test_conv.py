@@ -10,7 +10,7 @@ class TestConv:
     def test_int_kernel_shape_raises(self):
         """Passing an int kernel_shape raises TypeError."""
         with pytest.raises(TypeError, match="kernel_shape"):
-            nn.Conv(3, 8, kernel_shape=3, key=jax.random.key(0))
+            nn.Conv(3, 8, kernel_shape=3, key=jax.random.key(0))  # type: ignore[reportArgumentType]
 
     def test_empty_kernel_shape_raises(self):
         """Empty kernel_shape raises ValueError."""
@@ -194,7 +194,7 @@ class TestConvTranspose:
     def test_int_kernel_shape_raises(self):
         """Passing an int kernel_shape raises TypeError."""
         with pytest.raises(TypeError, match="kernel_shape"):
-            nn.ConvTranspose(3, 8, kernel_shape=3, key=jax.random.key(0))
+            nn.ConvTranspose(3, 8, kernel_shape=3, key=jax.random.key(0))  # type: ignore[reportArgumentType]
 
     def test_empty_kernel_shape_raises(self):
         """Empty kernel_shape raises ValueError."""
