@@ -52,6 +52,8 @@ class Conv(Module):
         key: PRNGKeyArray,
     ) -> None:
 
+        if num_spatial_dims < 1:
+            raise ValueError(f"num_spatial_dims ({num_spatial_dims}) must be >= 1")
         if in_channels % groups != 0:
             raise ValueError(f"in_channels ({in_channels}) must be divisible by groups ({groups})")
         if out_channels % groups != 0:
@@ -146,6 +148,8 @@ class ConvTranspose(Module):
         key: PRNGKeyArray,
     ) -> None:
 
+        if num_spatial_dims < 1:
+            raise ValueError(f"num_spatial_dims ({num_spatial_dims}) must be >= 1")
         if in_channels % groups != 0:
             raise ValueError(f"in_channels ({in_channels}) must be divisible by groups ({groups})")
         if out_channels % groups != 0:

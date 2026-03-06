@@ -1,6 +1,6 @@
 # Internals
 
-Everything behind the scenes in Ion. Four files and ~400 lines of code — that's the whole engine. This document explains the design, but readers are encouraged to check out the source code as it's fairly straightforward:
+Everything behind the scenes in Ion. Four files and ~400 lines of code — that's the whole engine. This document explains the design. Readers are also encouraged to check out the source code as it's fairly straightforward:
 
 - [`ion/nn/module.py`](../ion/nn/module.py) — Module base class, pytree registration
 - [`ion/nn/param.py`](../ion/nn/param.py) — Param wrapper, trainable/frozen distinction
@@ -69,11 +69,40 @@ The caller gets a gradient tree matching the model structure, where only trainab
 
 Note: `jax.jit` works natively with all modules because `Module` pytree registration wraps non-array leaves in `Static` automatically. No `ion.jit` wrapper is needed.
 
-## Sharp Edges
+## 🔪 Sharp Edges
 
 Known gotchas to be aware of when using Ion. Some are limitations of JAX:
 
-- **`save`/`load` only stores array data** — `trainable` flags and non-array fields (ints, strings, callables) come from the reference tree, not the file. If you save a frozen model and load into a trainable reference, the loaded model will be trainable.
+- **Python ints, floats, and strings are static, not dynamic** — when stored as module fields, plain Python scalars are wrapped in `Static` and baked into the compiled program. JAX cannot trace through them, so they are invisible to `jax.grad` and fixed at `jax.jit` compile time. Changing a static value (including `Param.trainable`) triggers JIT recompilation — every unique combination compiles a separate trace. If you need a value to be dynamic at runtime (e.g. a temperature parameter, a step counter), store it as a `jnp.array` or `Param` instead. Similarly, avoid calling `freeze()`/`unfreeze()` inside a training loop as it recompiles on every step — set trainability once and keep it fixed.
+
+  ```python
+  # Static — recompiles if temperature changes
+  self.temperature = 0.5
+
+  # Dynamic — traced by JAX, no recompilation:
+  self.temperature = jnp.array(0.5)
+  ```
+
+- **Pytrees cannot share references to the same object** — JAX pytrees are trees, not graphs. If two fields point to the same `Module` or `Param`, JAX duplicates the object during flatten/unflatten — updates to one copy won't affect the other. For weight tying (e.g. shared embedding and output projection), reference the underlying array directly instead of storing the same module twice:
+
+  ```python
+  # Don't do this — the two fields become independent copies:
+  self.embed = Embedding(vocab, dim, key=key)
+  self.output_proj = self.embed  # silent duplication
+
+  # Do this instead — reference the weight explicitly:
+  self.embed = Embedding(vocab, dim, key=key)
+  # In __call__:
+  logits = x @ self.embed.w.T  # shared weight, no duplication
+  ```
+
+- **`save`/`load` only stores array data** — `trainable` flags and non-array fields (ints, strings, callables) come from the reference tree, not the file. If you save a frozen model and load into a trainable reference, the loaded model will be trainable. Array shape and dtype are also not validated against the reference — loading a `(8,)` weight into a `(4,)` reference silently gives you `(8,)`.
+
+- **`replace()` can change pytree structure** — replacing a `Param` field with a plain array or `None` changes the treedef. This is useful for model surgery, but subsequent `jax.tree.map` between the original and modified model will crash with a structure mismatch.
+
+- **`apply_updates` silently drops updates to frozen params** — there is no warning when optimizer updates target frozen parameters. The updates are simply ignored and the frozen values are preserved.
+
+- **`ion.grad` on plain arrays returns `None`** — if the first argument has no trainable `Param` leaves (e.g. a plain `jnp.array`), all gradient positions will be `None`. Use `jax.grad` directly for non-`Param` differentiation.
 
 - **Module immutability is shallow** — `_frozen` prevents field reassignment, but mutable containers (lists, dicts, numpy arrays) in fields can still be mutated in-place. For example, `model.layers.append(...)` bypasses the freeze.
 

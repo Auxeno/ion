@@ -1,10 +1,16 @@
 import jax.numpy as jnp
 import numpy.testing as npt
+import pytest
 
 from ion import nn
 
 
 class TestMaxPool:
+    def test_zero_spatial_dims_raises(self):
+        """num_spatial_dims=0 raises ValueError."""
+        with pytest.raises(ValueError, match="num_spatial_dims"):
+            nn.MaxPool(0, kernel_size=2)
+
     def test_1d_picks_max(self):
         """Each output element is the maximum of its window."""
         layer = nn.MaxPool(1, kernel_size=2)
@@ -49,6 +55,11 @@ class TestMaxPool:
 
 
 class TestAvgPool:
+    def test_zero_spatial_dims_raises(self):
+        """num_spatial_dims=0 raises ValueError."""
+        with pytest.raises(ValueError, match="num_spatial_dims"):
+            nn.AvgPool(0, kernel_size=2)
+
     def test_1d_computes_mean(self):
         """Each output element is the mean of its window."""
         layer = nn.AvgPool(1, kernel_size=2)

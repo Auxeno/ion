@@ -180,6 +180,11 @@ class TestBatchNorm:
 
 
 class TestInstanceNorm:
+    def test_zero_spatial_dims_raises(self):
+        """num_spatial_dims=0 raises ValueError."""
+        with pytest.raises(ValueError, match="num_spatial_dims"):
+            nn.InstanceNorm(4, num_spatial_dims=0)
+
     def test_zero_mean_per_channel_1d(self):
         """Output has approximately zero mean over the temporal axis for each channel."""
         layer = nn.InstanceNorm(4)

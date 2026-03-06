@@ -7,6 +7,7 @@ Modules:
 Pre-norm architecture: LayerNorm before each sublayer, residual add after.
 FFN uses 4x hidden dimension with GELU activation by default.
 Truncated normal weight init (std=0.02), zeros for bias.
+No dropout is included to match modern conventions, apply externally if needed.
 """
 
 from collections.abc import Callable

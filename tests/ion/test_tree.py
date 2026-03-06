@@ -347,6 +347,24 @@ class TestSaveLoadStructureMismatch:
             assert loaded.w.shape == (8,)
             assert loaded.w.shape != reference.w.shape
 
+    def test_load_dtype_mismatch_no_validation(self):
+        """Loading arrays with mismatched dtypes succeeds silently."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self, key, dtype):
+                self.w = nn.Param(jax.random.normal(key, (4,)).astype(dtype))
+
+        saved_model = Model(key=jax.random.key(0), dtype=jnp.float32)
+        reference = Model(key=jax.random.key(1), dtype=jnp.float16)
+
+        with tempfile.NamedTemporaryFile(suffix=".npz") as f:
+            tree.save(f.name, saved_model)
+            loaded = tree.load(f.name, reference)
+            assert loaded.w.dtype == jnp.float32
+            assert loaded.w.dtype != reference.w.dtype
+
     def test_save_load_trainable_flag_comes_from_reference(self):
         """The trainable flag is NOT saved — it comes from the reference tree."""
 

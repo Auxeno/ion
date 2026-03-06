@@ -35,6 +35,9 @@ class MaxPool(Module):
         padding: str | int | tuple[int, ...] = 0,
     ) -> None:
 
+        if num_spatial_dims < 1:
+            raise ValueError(f"num_spatial_dims ({num_spatial_dims}) must be >= 1")
+
         self.num_spatial_dims = num_spatial_dims
 
         if isinstance(kernel_size, int):
@@ -96,6 +99,9 @@ class AvgPool(Module):
         stride: int | tuple[int, ...] | None = None,
         padding: str | int | tuple[int, ...] = 0,
     ) -> None:
+
+        if num_spatial_dims < 1:
+            raise ValueError(f"num_spatial_dims ({num_spatial_dims}) must be >= 1")
 
         self.num_spatial_dims = num_spatial_dims
 

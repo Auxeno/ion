@@ -1,10 +1,16 @@
 import jax.numpy as jnp
 import numpy.testing as npt
+import pytest
 
 from ion import nn
 
 
 class TestUpsample:
+    def test_zero_spatial_dims_raises(self):
+        """num_spatial_dims=0 raises ValueError."""
+        with pytest.raises(ValueError, match="num_spatial_dims"):
+            nn.Upsample(0, scale_factor=2)
+
     def test_1d_output_shape(self):
         """Scale factor 2 doubles the temporal dimension."""
         layer = nn.Upsample(1, scale_factor=2)

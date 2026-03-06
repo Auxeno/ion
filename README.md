@@ -113,7 +113,7 @@ See [Layer Conventions](docs/layers.md) for data format, weight init, and spatia
 
 ### Pretty Printing
 
-Modules have a built-in text formatter for standard terminal `repr` output. In notebook environments, Ion utilizes [Treescope](https://github.com/google-deepmind/treescope) for interactive, color-coded visualization.
+In notebook environments, Ion utilizes [Treescope](https://github.com/google-deepmind/treescope) for interactive, color-coded visualization. Modules also have a built-in text formatter for standard terminal `repr` output.
 
 ```python
 >>> model = MLP(key=jax.random.key(0))
@@ -193,11 +193,13 @@ Released under the Apache License 2.0.
 
 ## Citation
 
+To cite this repository:
+
 ```bibtex
 @software{ion,
   title  = {Ion: Simple Neural Networks in JAX},
   author = {Alex Goddard},
   url    = {https://github.com/auxeno/ion},
-  year   = {2025}
+  year   = {2026}
 }
 ```

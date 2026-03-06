@@ -42,6 +42,15 @@ class TestLearnedPositionalEmbedding:
         pos = nn.LearnedPositionalEmbedding(128, 64, dtype=jnp.float32, key=jax.random.key(0))
         assert pos.w.dtype == jnp.float32
 
+    def test_sequence_exceeds_max_len_raises(self):
+        """Input longer than max_len raises ValueError."""
+        import pytest
+
+        pos = nn.LearnedPositionalEmbedding(10, 64, key=jax.random.key(0))
+        x = jnp.ones((20, 64))
+        with pytest.raises(ValueError, match="exceeds max_len"):
+            pos(x)
+
     def test_different_keys(self):
         """Different PRNG keys produce different weights."""
         p1 = nn.LearnedPositionalEmbedding(128, 64, key=jax.random.key(0))
@@ -50,6 +59,13 @@ class TestLearnedPositionalEmbedding:
 
 
 class TestSinusoidal:
+    def test_odd_dim_raises(self):
+        """Odd dim raises ValueError."""
+        import pytest
+
+        with pytest.raises(ValueError, match="even"):
+            nn.sinusoidal(128, 63)
+
     def test_output_shape(self):
         """Output shape is (seq_len, dim)."""
         assert nn.sinusoidal(128, 64).shape == (128, 64)

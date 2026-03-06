@@ -7,6 +7,11 @@ from ion import nn
 
 
 class TestConv:
+    def test_zero_spatial_dims_raises(self):
+        """num_spatial_dims=0 raises ValueError."""
+        with pytest.raises(ValueError, match="num_spatial_dims"):
+            nn.Conv(0, 3, 8, kernel_size=3, key=jax.random.key(0))
+
     def test_1d_output_shape_no_padding(self):
         """No padding shrinks spatial dim by kernel_size - 1."""
         layer = nn.Conv(1, 3, 8, kernel_size=3, padding=0, key=jax.random.key(0))
@@ -181,6 +186,11 @@ class TestConv:
 
 
 class TestConvTranspose:
+    def test_zero_spatial_dims_raises(self):
+        """num_spatial_dims=0 raises ValueError."""
+        with pytest.raises(ValueError, match="num_spatial_dims"):
+            nn.ConvTranspose(0, 3, 8, kernel_size=3, key=jax.random.key(0))
+
     def test_1d_output_shape_no_padding(self):
         """No padding expands spatial dim by kernel_size - 1."""
         layer = nn.ConvTranspose(1, 3, 8, kernel_size=3, padding=0, key=jax.random.key(0))

@@ -40,8 +40,12 @@ class LearnedPositionalEmbedding(Module):
 
     def __call__(self, x: Float[Array, "... s d"]) -> Float[Array, "... s d"]:
 
-        # Slice to input sequence length and broadcast-add
-        x = x + self.w[: x.shape[-2]]
+        seq_len = x.shape[-2]
+        max_len = self.w.shape[0]
+        if seq_len > max_len:
+            raise ValueError(f"Input sequence length ({seq_len}) exceeds max_len ({max_len})")
+
+        x = x + self.w[:seq_len]
 
         return x
 
@@ -56,6 +60,9 @@ def sinusoidal(
     >>> sinusoidal(128, 64)  # (128, 64)
     """
 
+    if dim % 2 != 0:
+        raise ValueError(f"dim ({dim}) must be even")
+
     # Relative positions (s, 1) and frequency scales (d / 2,)
     positions = jnp.arange(seq_len, dtype=jnp.float32)[:, None]
     divisor = jnp.exp(jnp.arange(0, dim, 2, dtype=jnp.float32) * (-jnp.log(10_000.0) / dim))
@@ -64,7 +71,9 @@ def sinusoidal(
     angles = positions * divisor
 
     # Interleave sin and cos into alternating columns (s, d)
-    return jnp.stack([jnp.sin(angles), jnp.cos(angles)], axis=-1).reshape(seq_len, dim).astype(dtype)
+    return (
+        jnp.stack([jnp.sin(angles), jnp.cos(angles)], axis=-1).reshape(seq_len, dim).astype(dtype)
+    )
 
 
 def alibi(

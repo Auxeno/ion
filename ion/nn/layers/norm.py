@@ -218,6 +218,9 @@ class InstanceNorm(Module):
         dtype: jnp.dtype = jnp.float32,
     ) -> None:
 
+        if num_spatial_dims < 1:
+            raise ValueError(f"num_spatial_dims ({num_spatial_dims}) must be >= 1")
+
         self.scale = Param(jnp.ones(dim, dtype=dtype))
         self.b = Param(jnp.zeros(dim, dtype=dtype))
 
