@@ -2,18 +2,45 @@
 
 Conventions and design decisions across Ion's layer library.
 
-## Data Format
+## Input Format
 
-All layers use **channels-last** ordering to match JAX and image data conventions:
+All layers use **channels-last** ordering. 
 
 | Domain | Format | Example |
 |--------|--------|---------|
+| Vector data | `(..., features)` | `(batch, 256)` |
 | 1D (sequences) | `(..., length, channels)` | `(batch, 128, 64)` |
 | 2D (images) | `(..., height, width, channels)` | `(batch, 32, 32, 3)` |
 | Attention | `(..., seq, dim)` | `(batch, 128, 512)` |
 | Recurrent | `(..., time, features)` | `(batch, 50, 64)` |
 
-Batch dimensions are always leading and handled via `...` (ellipsis) in type hints, so all layers support arbitrary batch shapes without explicit batch logic.
+Channels-last is the most typical format for image data and is followed by Flax and TensorFlow. PyTorch and Equinox use the channels-first convention.
+
+### Flexible Batch Dimensions
+
+All layers accept arbitrary leading batch dimensions — zero, one, or many. The same layer works on a single example, a batch, or nested batches with no code changes.
+
+```python
+linear = nn.Linear(4, 8, key=key)
+
+linear(x)          # (4,)       ->  (8,)       no batch
+linear(x_batched)  # (3, 4)     ->  (3, 8)     one batch dim
+linear(x_multi)    # (5, 3, 4)  ->  (5, 3, 8)  multiple batch dims
+```
+
+This works the same way for spatial (and all other) layers:
+
+```python
+conv = nn.Conv(2, 3, 16, kernel_size=3, padding=1, key=key)
+
+conv(x)          # (32, 32, 3)        ->  (32, 32, 16)        no batch
+conv(x_batched)  # (8, 32, 32, 3)     ->  (8, 32, 32, 16)     one batch dim
+conv(x_multi)    # (2, 8, 32, 32, 3)  ->  (2, 8, 32, 32, 16)  multiple batch dims
+```
+
+This is a deliberate design choice favouring ease of use. PyTorch is inconsistent here as some layers (e.g. `nn.Linear`) support arbitrary batch dims while others (e.g. `nn.Conv2d`) only accept unbatched or single-batch input. Equinox requires `jax.vmap` over a model call to add a batch dimension, which is the most explicit approach and best for debugging. Flax and Ion let the user call any layer with or without batch dims freely.
+
+The trade-off for the Flax/Ion approach is users won't catch an accidentally wrong number of dimensions since an extra or missing dim will silently produce wrong-shaped outputs rather than an error, so manage your array shapes carefully.
 
 ## Shape Annotations
 
@@ -46,10 +73,10 @@ The same letter can mean different things in different layers — meaning is det
 Einsum patterns:
 
 ```
-QKV projection:       ...d, dihk -> ...ihk
-Attention logits:     ...shk, ...thk -> ...hst
-Attention output:     ...hst, ...thk -> ...shk
-Output projection:    ...hk, hkd -> ...d
+QKV projection:     ...d, dihk -> ...ihk
+Attention logits:   ...shk, ...thk -> ...hst
+Attention output:   ...hst, ...thk -> ...shk
+Output projection:  ...hk, hkd -> ...d
 ```
 
 ### Recurrent
