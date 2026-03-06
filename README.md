@@ -20,7 +20,9 @@ Ion is a neural network library for JAX. Models are represented as [pytrees](htt
 pip install git+https://github.com/auxeno/ion
 ```
 
-## Package Contents
+## Contents
+
+Ion is designed to be minimal. The core has four concepts for new users to learn: `Module`, `Param`, transforms (`ion.grad` / `ion.value_and_grad`), and `apply_updates`. Everything else is just JAX.
 
 ### Module
 
@@ -76,7 +78,7 @@ unfrozen_model = model.unfreeze()                      # unfreeze everything
 
 ### Transforms
 
-`ion.grad` and `ion.value_and_grad` replicate `jax.grad`, but differentiate strictly with respect to trainable `Param` leaves. All other fields are treated as constants.
+`ion.grad` and `ion.value_and_grad` replicate `jax.grad`, but differentiate only with respect to trainable `Param` leaves. All other fields are treated as constants.
 
 ```python
 @ion.grad
@@ -93,7 +95,20 @@ There are no custom wrappers like `ion.jit`, `ion.vmap`, or `ion.scan`. Because 
 
 See [Internals](docs/internals.md) for how the module system, pytree registration, and transforms work under the hood.
 
+### Apply Updates
+
+Applies optimizer updates to the trainable parameters of a model, returning a new model with updated parameters.
+
+```python
+updates, opt_state = optimizer.update(grads, opt_state)
+model = ion.apply_updates(model, updates) 
+```
+
+That's the entire core.
+
 ### Layers
+
+Ion ships with standard neural network layers built on the core. Each is a `Module` with trainable `Param` leaves. Under the hood these are just a JAX pytrees.
 
 | Category        | Layers                                                                    |
 |-----------------|---------------------------------------------------------------------------|
