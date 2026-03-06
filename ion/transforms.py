@@ -64,18 +64,14 @@ def _merge_leaves(
     return reconstructed_leaves
 
 
-def grad(
+def _grad_transform(
     fn: Callable[..., Any],
-    argnums: int | Sequence[int] = 0,
-    has_aux: bool = False,
-    holomorphic: bool = False,
+    argnums: int | Sequence[int],
+    has_aux: bool,
+    holomorphic: bool,
+    return_value: bool,
 ) -> Callable[..., Any]:
-    """Like `jax.grad`, but differentiates only trainable `Param` leaves.
-
-    >>> grads = ion.grad(loss_fn)(model, x, y)
-    >>> grads_a, grads_b = ion.grad(loss_fn, argnums=(0, 1))(model_a, model_b, x)
-    >>> grads, aux = ion.grad(loss_fn, has_aux=True)(model, x, y)
-    """
+    """Differentiate only trainable `Param` leaves, holding everything else constant."""
     argnums_tup = (argnums,) if isinstance(argnums, int) else tuple(argnums)
 
     @functools.wraps(fn)
@@ -97,11 +93,15 @@ def grad(
                 )
             return fn(*rebuilt, **kwargs)
 
-        if has_aux:
+        value = aux = None
+        if return_value:
+            value, grads_raw = jax.value_and_grad(inner, has_aux=has_aux, holomorphic=holomorphic)(
+                all_trainable
+            )
+        elif has_aux:
             grads_raw, aux = jax.grad(inner, has_aux=True, holomorphic=holomorphic)(all_trainable)
         else:
             grads_raw = jax.grad(inner, holomorphic=holomorphic)(all_trainable)
-            aux = None
 
         grad_trees = tuple(
             td.unflatten(_merge_leaves(g, tuple(None for _ in s), m))
@@ -109,9 +109,27 @@ def grad(
         )
 
         result = grad_trees if not isinstance(argnums, int) else grad_trees[0]
+
+        if return_value:
+            return value, result
         return (result, aux) if has_aux else result
 
     return wrapper
+
+
+def grad(
+    fn: Callable[..., Any],
+    argnums: int | Sequence[int] = 0,
+    has_aux: bool = False,
+    holomorphic: bool = False,
+) -> Callable[..., Any]:
+    """Like `jax.grad`, but differentiates only trainable `Param` leaves.
+
+    >>> grads = ion.grad(loss_fn)(model, x, y)
+    >>> grads_a, grads_b = ion.grad(loss_fn, argnums=(0, 1))(model_a, model_b, x)
+    >>> grads, aux = ion.grad(loss_fn, has_aux=True)(model, x, y)
+    """
+    return _grad_transform(fn, argnums, has_aux, holomorphic, return_value=False)
 
 
 def value_and_grad(
@@ -126,36 +144,4 @@ def value_and_grad(
     >>> loss, (grads_a, grads_b) = ion.value_and_grad(loss_fn, argnums=(0, 1))(a, b, x)
     >>> (loss, aux), grads = ion.value_and_grad(loss_fn, has_aux=True)(model, x, y)
     """
-    argnums_tup = (argnums,) if isinstance(argnums, int) else tuple(argnums)
-
-    @functools.wraps(fn)
-    def wrapper(*args: Any, **kwargs: Any) -> tuple[Any, Any]:
-        splits = []
-        for i in argnums_tup:
-            flat, tree_def = jtu.tree_flatten(args[i], is_leaf=is_param)
-            trainable, static, mask = _split_leaves(flat, is_trainable_param)
-            splits.append((trainable, static, mask, tree_def))
-
-        all_trainable = tuple(s[0] for s in splits)
-
-        def inner(diff: tuple[tuple[Any, ...], ...]) -> Any:
-            rebuilt = list(args)
-            for i, (_, static, mask, tree_def) in zip(argnums_tup, splits):
-                rebuilt[i] = tree_def.unflatten(
-                    _merge_leaves(diff[argnums_tup.index(i)], static, mask)
-                )
-            return fn(*rebuilt, **kwargs)
-
-        value, grads_raw = jax.value_and_grad(inner, has_aux=has_aux, holomorphic=holomorphic)(
-            all_trainable
-        )
-
-        grad_trees = tuple(
-            td.unflatten(_merge_leaves(g, tuple(None for _ in s), m))
-            for g, (_, s, m, td) in zip(grads_raw, splits)
-        )
-
-        result = grad_trees if not isinstance(argnums, int) else grad_trees[0]
-        return value, result
-
-    return wrapper
+    return _grad_transform(fn, argnums, has_aux, holomorphic, return_value=True)
