@@ -17,6 +17,7 @@ from ..module import Module
 
 class Sequential(Module):
     """Container that chains layers, calling each in order.
+    Each layer must be a callable that accepts a single positional argument only.
 
     >>> model = Sequential(Linear(3, 16, key=k1), jax.nn.relu, Linear(16, 1, key=k2))
     >>> model(x)  # (*, 3) -> (*, 1)
