@@ -14,7 +14,7 @@ from collections.abc import Callable
 import jax
 import jax.numpy as jnp
 from jax.nn.initializers import Initializer
-from jaxtyping import Array, Float, PRNGKeyArray
+from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
 from ..layers.attention import CrossAttention, SelfAttention
 from ..layers.linear import Linear
@@ -63,11 +63,15 @@ class TransformerBlock(Module):
 
         self.activation = activation
 
-    def __call__(self, x: Float[Array, "... s d"]) -> Float[Array, "... s d"]:
+    def __call__(
+        self,
+        x: Float[Array, "... s d"],
+        mask: Bool[Array, "... s s"] | Bool[Array, "... 1 s s"] | None = None,
+    ) -> Float[Array, "... s d"]:
 
         residual = x
         x = self.norm_att(x)
-        x = self.att(x)
+        x = self.att(x, mask=mask)
         x = x + residual
 
         residual = x
@@ -85,6 +89,7 @@ class CrossTransformerBlock(Module):
 
     >>> block = CrossTransformerBlock(64, num_heads=8, key=key)
     >>> block(x, context)  # (*, s, 64), (*, t, 64) -> (*, s, 64)
+    >>> block(x, context, mask=mask)  # mask: bool (*, s, t) or (*, 1, s, t)
     """
 
     att: CrossAttention
@@ -124,11 +129,12 @@ class CrossTransformerBlock(Module):
         self,
         x: Float[Array, "... s d"],
         context: Float[Array, "... t d"],
+        mask: Bool[Array, "... s t"] | Bool[Array, "... 1 s t"] | None = None,
     ) -> Float[Array, "... s d"]:
 
         residual = x
         x = self.norm_att(x)
-        x = self.att(x, context)
+        x = self.att(x, context, mask=mask)
         x = x + residual
 
         residual = x

@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 import numpy.testing as npt
+
 from ion import nn
 
 
@@ -86,7 +87,6 @@ class TestTransformerBlock:
         y_causal = enc_causal(x)
         assert not jnp.allclose(y, y_causal)
 
-
     def test_custom_w_init(self):
         """Custom w_init is threaded to attention and ff layers."""
         default = nn.TransformerBlock(32, num_heads=4, key=jax.random.key(0))
@@ -96,6 +96,24 @@ class TestTransformerBlock:
         assert not jnp.allclose(default.att.w_qkv, custom.att.w_qkv)
         assert not jnp.allclose(default.ff_1.w, custom.ff_1.w)
         assert not jnp.allclose(default.ff_2.w, custom.ff_2.w)
+
+    def test_mask_output_shape(self):
+        """Mask is threaded through; output shape is preserved."""
+        block = nn.TransformerBlock(32, num_heads=4, key=jax.random.key(0))
+        x = jnp.ones((5, 32))
+        mask = jnp.ones((5, 5), dtype=bool)
+        y = block(x, mask=mask)
+        assert y.shape == (5, 32)
+
+    def test_mask_affects_output(self):
+        """Different masks produce different outputs."""
+        block = nn.TransformerBlock(32, num_heads=4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (5, 32))
+        mask_full = jnp.ones((5, 5), dtype=bool)
+        mask_partial = jnp.ones((5, 5), dtype=bool).at[0, 1].set(False)
+        y1 = block(x, mask=mask_full)
+        y2 = block(x, mask=mask_partial)
+        assert not jnp.allclose(y1, y2)
 
 
 class TestCrossTransformerBlock:
@@ -189,3 +207,23 @@ class TestCrossTransformerBlock:
         assert not jnp.allclose(default.att.w_q, custom.att.w_q)
         assert not jnp.allclose(default.ff_1.w, custom.ff_1.w)
         assert not jnp.allclose(default.ff_2.w, custom.ff_2.w)
+
+    def test_mask_output_shape(self):
+        """Mask is threaded through; output shape is preserved."""
+        block = nn.CrossTransformerBlock(32, num_heads=4, key=jax.random.key(0))
+        x = jnp.ones((5, 32))
+        ctx = jnp.ones((8, 32))
+        mask = jnp.ones((5, 8), dtype=bool)
+        y = block(x, ctx, mask=mask)
+        assert y.shape == (5, 32)
+
+    def test_mask_affects_output(self):
+        """Different masks produce different outputs."""
+        block = nn.CrossTransformerBlock(32, num_heads=4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (5, 32))
+        ctx = jax.random.normal(jax.random.key(2), (8, 32))
+        mask_full = jnp.ones((5, 8), dtype=bool)
+        mask_partial = jnp.ones((5, 8), dtype=bool).at[0, 0].set(False)
+        y1 = block(x, ctx, mask=mask_full)
+        y2 = block(x, ctx, mask=mask_partial)
+        assert not jnp.allclose(y1, y2)

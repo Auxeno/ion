@@ -6,12 +6,13 @@ Modules:
 
 Truncated normal weight init (std=0.02), zeros for bias.
 QKV fused into a single weight matrix for self-attention.
+Optional boolean mask: True = attend, False = ignore.
 """
 
 import jax
 import jax.numpy as jnp
 from jax.nn.initializers import Initializer
-from jaxtyping import Array, Float, PRNGKeyArray
+from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
 from ..module import Module
 from ..param import Param
@@ -22,6 +23,7 @@ class SelfAttention(Module):
 
     >>> attn = SelfAttention(64, num_heads=8, key=key)
     >>> attn(x)  # (*, seq, 64) -> (*, seq, 64)
+    >>> attn(x, mask=mask)  # mask: bool (*, s, s) or (*, 1, s, s)
     """
 
     w_qkv: Param[Float[Array, "d 3 n h"]]
@@ -53,7 +55,11 @@ class SelfAttention(Module):
 
         self.causal = causal
 
-    def __call__(self, x: Float[Array, "... s d"]) -> Float[Array, "... s d"]:
+    def __call__(
+        self,
+        x: Float[Array, "... s d"],
+        mask: Bool[Array, "... s s"] | Bool[Array, "... 1 s s"] | None = None,
+    ) -> Float[Array, "... s d"]:
 
         qkv = jnp.einsum("...d, dinh -> ...inh", x, self.w_qkv)
         q, k, v = jnp.moveaxis(qkv, -3, 0)
@@ -61,7 +67,10 @@ class SelfAttention(Module):
         logits = jnp.einsum("...snh, ...tnh -> ...nst", q, k) / jnp.sqrt(self.w_qkv.shape[-1])
 
         if self.causal:
-            mask = jnp.tril(jnp.ones(logits.shape[-2:], dtype=bool))
+            causal_mask = jnp.tril(jnp.ones(logits.shape[-2:], dtype=bool))
+            logits = jnp.where(causal_mask, logits, -jnp.inf)
+
+        if mask is not None:
             logits = jnp.where(mask, logits, -jnp.inf)
 
         attention = jax.nn.softmax(logits, axis=-1)
@@ -80,6 +89,7 @@ class CrossAttention(Module):
 
     >>> attn = CrossAttention(64, num_heads=8, key=key)
     >>> attn(x, context)  # (*, s, 64), (*, t, 64) -> (*, s, 64)
+    >>> attn(x, context, mask=mask)  # mask: bool (*, s, t) or (*, 1, s, t)
     """
 
     w_q: Param[Float[Array, "d n h"]]
@@ -113,6 +123,7 @@ class CrossAttention(Module):
         self,
         x: Float[Array, "... s d"],
         context: Float[Array, "... t d"],
+        mask: Bool[Array, "... s t"] | Bool[Array, "... 1 s t"] | None = None,
     ) -> Float[Array, "... s d"]:
 
         q = jnp.einsum("...d, dnh -> ...nh", x, self.w_q)
@@ -120,6 +131,9 @@ class CrossAttention(Module):
         k, v = jnp.moveaxis(kv, -3, 0)
 
         logits = jnp.einsum("...snh, ...tnh -> ...nst", q, k) / jnp.sqrt(self.w_q.shape[-1])
+
+        if mask is not None:
+            logits = jnp.where(mask, logits, -jnp.inf)
 
         attention = jax.nn.softmax(logits, axis=-1)
         x = jnp.einsum("...nst, ...tnh -> ...snh", attention, v)
