@@ -1,4 +1,4 @@
-"""Predicate-based utilities for filtering and serializing JAX pytrees.
+"""Predicate-based utilities for filtering JAX pytrees.
 
 Functions:
     is_param            Check if a leaf is a Param.
@@ -6,8 +6,6 @@ Functions:
     freeze              Set all Params to trainable=False.
     unfreeze            Set all Params to trainable=True.
     apply_updates       Add optimizer deltas to trainable parameters.
-    save                Serialize array leaves to .npz.
-    load                Load array leaves from .npz into a reference tree.
 
 Classes:
     Static              Wraps a value so JAX treats it as static metadata.
@@ -22,9 +20,7 @@ See docs/internals.md for implementation details.
 from typing import Any
 
 import jax
-import jax.numpy as jnp
 import jax.tree_util as jtu
-import numpy as np
 from jaxtyping import PyTree
 
 from .nn.param import Param
@@ -107,53 +103,3 @@ class Static:
     @classmethod
     def tree_unflatten(cls, aux, children):
         return cls(aux)
-
-
-def save(path: str, pytree: PyTree) -> None:
-    """Serialize a PyTree's array leaves to a `.npz` file, stripping device metadata.
-
-    >>> ion.tree.save("model.npz", model)
-    """
-    leaves_with_paths = jtu.tree_flatten_with_path(pytree)[0]
-
-    arrays_to_save = {
-        "".join(str(k) for k in key_path).lstrip("."): np.asarray(leaf)
-        for key_path, leaf in leaves_with_paths
-        if isinstance(leaf, (jax.Array, np.ndarray))
-    }
-
-    np.savez(path, **arrays_to_save)  # type: ignore[reportArgumentType]
-
-
-def load(path: str, reference_pytree: PyTree) -> PyTree:
-    """Load array leaves from a `.npz` file into a reference PyTree.
-    Metadata is not restored and should be provided by the reference tree.
-
-    >>> model = ion.tree.load("model.npz", model)
-    """
-    leaves_with_paths, tree_def = jtu.tree_flatten_with_path(reference_pytree)
-    saved_data = np.load(path)
-
-    expected_keys: set[str] = set()
-    loaded_leaves: list[Any] = []
-    for key_path, leaf in leaves_with_paths:
-        if isinstance(leaf, (jax.Array, np.ndarray)):
-            key = "".join(str(k) for k in key_path).lstrip(".")
-            expected_keys.add(key)
-            if key not in saved_data:
-                raise ValueError(
-                    f"Structure mismatch: reference tree expects key '{key}', "
-                    f"but it was not found in the file. "
-                    f"Available keys: {sorted(saved_data.files)}"
-                )
-            loaded_leaves.append(jnp.array(saved_data[key]))
-        else:
-            loaded_leaves.append(leaf)
-
-    extra_keys = set(saved_data.files) - expected_keys
-    if extra_keys:
-        raise ValueError(
-            f"Structure mismatch: file contains keys not in reference tree: {sorted(extra_keys)}"
-        )
-
-    return tree_def.unflatten(loaded_leaves)

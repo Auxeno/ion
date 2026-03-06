@@ -1,8 +1,13 @@
 """Neural networks in JAX with immutable pytrees and explicit parameters."""
 
+from . import checkpoint as checkpoint
 from . import nn as nn
 from . import transforms as transforms
 from . import tree as tree
+from .checkpoint import (
+    load,
+    save,
+)
 from .transforms import (
     grad,
     value_and_grad,
@@ -12,8 +17,6 @@ from .tree import (
     freeze,
     is_param,
     is_trainable_param,
-    load,
-    save,
     unfreeze,
 )
 
@@ -53,6 +56,7 @@ def disable_treescope() -> None:
 enable_treescope()
 
 __all__ = [
+    "checkpoint",
     "nn",
     "tree",
     "apply_updates",

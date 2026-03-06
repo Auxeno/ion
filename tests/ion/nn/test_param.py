@@ -9,7 +9,7 @@ import numpy.testing as npt
 import pytest
 
 import ion
-from ion import nn, tree
+from ion import checkpoint, nn, tree
 
 
 class TestPytreeRegistration:
@@ -358,8 +358,8 @@ class TestSaveLoad:
         model = Model(key=jax.random.key(42))
 
         with tempfile.NamedTemporaryFile(suffix=".npz") as f:
-            tree.save(f.name, model)
-            loaded = tree.load(f.name, model)
+            checkpoint.save(f.name, model)
+            loaded = checkpoint.load(f.name, model)
 
         assert isinstance(loaded.w, nn.Param)
         npt.assert_array_equal(loaded.w.value, model.w.value)

@@ -4,7 +4,7 @@ Everything behind the scenes in Ion. Four files and ~400 lines of code make up t
 
 - [`ion/nn/module.py`](../ion/nn/module.py): Module base class, pytree registration
 - [`ion/nn/param.py`](../ion/nn/param.py): Param wrapper, trainable/frozen distinction
-- [`ion/tree.py`](../ion/tree.py): Static wrapper, apply_updates, save/load
+- [`ion/tree.py`](../ion/tree.py): Static wrapper, apply_updates, freeze/unfreeze
 - [`ion/transforms.py`](../ion/transforms.py): grad/value_and_grad for trainable params only
 
 ## Module (`ion/nn/module.py`)
@@ -46,12 +46,6 @@ A pytree node with no children. JAX treats its value as static metadata. Used by
 ### apply_updates
 
 Adds optimizer deltas to a model's trainable parameters. Walks the model and update trees in parallel, skipping positions where the update is `None` or the parameter is frozen (`Param(trainable=False)`). The `Param` wrapper is preserved on updated values so trainability metadata survives the step.
-
-### save / load
-
-`save` flattens the tree and writes only array leaves to a `.npz` file, keyed by position index.
-
-`load` reads them back into a reference tree that supplies the original structure. Non-array leaves are left untouched, so static config (layer sizes, activation functions) comes from the reference model, not the file.
 
 ## Transforms (`ion/transforms.py`)
 
@@ -96,7 +90,7 @@ Known gotchas to be aware of when using Ion. Some are limitations of JAX:
   logits = x @ self.embed.w.T  # shared weight, no duplication
   ```
 
-- **`save`/`load` only stores array data.** `trainable` flags and non-array fields (ints, strings, callables) come from the reference tree, not the file. If you save a frozen model and load into a trainable reference, the loaded model will be trainable. Array shape and dtype are also not validated against the reference, so loading a `(8,)` weight into a `(4,)` reference silently gives you `(8,)`.
+- **`save`/`load` doesn't store callables or static config.** Non-array fields (ints, strings, callables like activation functions) come from the reference tree, not the file. Array data and `trainable` flags are saved and restored. Shape mismatches between saved and reference arrays raise `ValueError`.
 
 - **`replace()` can change pytree structure.** Replacing a `Param` field with a plain array or `None` changes the treedef. This is useful for model surgery, but subsequent `jax.tree.map` between the original and modified model will crash with a structure mismatch.
 
