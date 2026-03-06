@@ -19,9 +19,10 @@ from ..param import Param
 
 
 class Conv(Module):
-    """General N-dimensional convolution.
+    """N-dimensional convolution layer.
 
-    >>> conv = Conv(2, 3, 16, kernel_size=3, key=key)
+    >>> Conv(1, 3, 16, kernel_size=5, padding="SAME", key=key)  # Conv1d
+    >>> Conv(2, 3, 16, kernel_size=3, padding=1, key=key)       # Conv2d
     >>> conv(x)  # (*, h, w, 3) -> (*, h, w, 16)
     """
 
@@ -111,9 +112,10 @@ class Conv(Module):
 
 
 class ConvTranspose(Module):
-    """General N-dimensional transposed convolution.
+    """N-dimensional transposed convolution layer.
 
-    >>> conv_t = ConvTranspose(2, 3, 16, kernel_size=3, key=key)
+    >>> ConvTranspose(1, 3, 16, kernel_size=5, padding=2, key=key)        # ConvTranspose1d
+    >>> ConvTranspose(2, 3, 16, kernel_size=3, padding="VALID", key=key)  # ConvTranspose2d
     >>> conv_t(x)  # (*, h, w, 3) -> (*, h, w, 16)
     """
 

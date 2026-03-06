@@ -78,6 +78,21 @@ Output projection:    ...hk, hkd -> ...d
 | `d` | feature dimension | sinusoidal, learned, rope |
 | `h` | number of heads | alibi |
 
+## Spatial Layers
+
+Convolution, pooling, and upsampling layers are N-dimensional — the first argument `num_spatial_dims` controls dimensionality. This keeps the API surface small while supporting 1D, 2D, 3D, and beyond with the same class.
+
+```python
+Conv(1, 3, 16, kernel_size=5, key=key)           # Conv1d
+Conv(2, 3, 16, kernel_size=3, key=key)           # Conv2d
+ConvTranspose(2, 16, 3, kernel_size=3, key=key)  # ConvTranspose2d
+MaxPool(2, kernel_size=2)                        # MaxPool2d
+AvgPool(1, kernel_size=3, padding=1)             # AvgPool1d
+Upsample(2, scale_factor=2)                      # Upsample2d
+```
+
+Scalar values for `kernel_size`, `stride`, `padding`, etc. are broadcast across all spatial dimensions. Tuples give per-dimension control.
+
 ## Weight Initialization
 
 Each layer family uses init schemes suited to its typical activation:
