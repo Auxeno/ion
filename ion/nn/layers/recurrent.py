@@ -29,9 +29,9 @@ class LSTMCell(Module):
     >>> h, c = cell(x, (h, c))  # (*, 3), ((*, 16), (*, 16)) -> ((*, 16), (*, 16))
     """
 
-    w_i: Param[Float[Array, "id gd"]]
-    w_h: Param[Float[Array, "hd gd"]]
-    b: Param[Float[Array, " gd"]] | None
+    w_i: Param[Float[Array, "i g"]]
+    w_h: Param[Float[Array, "h g"]]
+    b: Param[Float[Array, " g"]] | None
 
     def __init__(
         self,
@@ -61,9 +61,9 @@ class LSTMCell(Module):
 
     def __call__(
         self,
-        x: Float[Array, "... id"],
-        hx: tuple[Float[Array, "... hd"], Float[Array, "... hd"]],
-    ) -> tuple[Float[Array, "... hd"], Float[Array, "... hd"]]:
+        x: Float[Array, "... i"],
+        hx: tuple[Float[Array, "... h"], Float[Array, "... h"]],
+    ) -> tuple[Float[Array, "... h"], Float[Array, "... h"]]:
 
         h, c = hx
 
@@ -83,7 +83,7 @@ class LSTMCell(Module):
         return (h, c)
 
     @property
-    def initial_state(self) -> tuple[Float[Array, " hd"], Float[Array, " hd"]]:
+    def initial_state(self) -> tuple[Float[Array, " h"], Float[Array, " h"]]:
         hd = self.w_h.shape[0]
         return (jnp.zeros(hd), jnp.zeros(hd))
 
@@ -95,10 +95,10 @@ class GRUCell(Module):
     >>> h = cell(x, h)  # (*, 3), (*, 16) -> (*, 16)
     """
 
-    w_i: Param[Float[Array, "id gd"]]
-    w_h: Param[Float[Array, "hd gd"]]
-    b: Param[Float[Array, " gd"]] | None
-    b_h: Param[Float[Array, " gd"]] | None
+    w_i: Param[Float[Array, "i g"]]
+    w_h: Param[Float[Array, "h g"]]
+    b: Param[Float[Array, " g"]] | None
+    b_h: Param[Float[Array, " g"]] | None
 
     def __init__(
         self,
@@ -122,9 +122,9 @@ class GRUCell(Module):
 
     def __call__(
         self,
-        x: Float[Array, "... id"],
-        h: Float[Array, "... hd"],
-    ) -> Float[Array, "... hd"]:
+        x: Float[Array, "... i"],
+        h: Float[Array, "... h"],
+    ) -> Float[Array, "... h"]:
 
         gate_x = x @ self.w_i
         gate_h = h @ self.w_h
@@ -146,7 +146,7 @@ class GRUCell(Module):
         return h
 
     @property
-    def initial_state(self) -> Float[Array, " hd"]:
+    def initial_state(self) -> Float[Array, " h"]:
         return jnp.zeros(self.w_h.shape[0])
 
 
@@ -176,9 +176,9 @@ class LSTM(Module):
 
     def __call__(
         self,
-        x: Float[Array, "... t id"],
-        hx: tuple[Float[Array, "... hd"], Float[Array, "... hd"]] | None = None,
-    ) -> tuple[Float[Array, "... t hd"], tuple[Float[Array, "... hd"], Float[Array, "... hd"]]]:
+        x: Float[Array, "... t i"],
+        hx: tuple[Float[Array, "... h"], Float[Array, "... h"]] | None = None,
+    ) -> tuple[Float[Array, "... t h"], tuple[Float[Array, "... h"], Float[Array, "... h"]]]:
 
         batch_shape = x.shape[:-2]
         t = x.shape[-2]
@@ -235,9 +235,9 @@ class GRU(Module):
 
     def __call__(
         self,
-        x: Float[Array, "... t id"],
-        hx: Float[Array, "... hd"] | None = None,
-    ) -> tuple[Float[Array, "... t hd"], Float[Array, "... hd"]]:
+        x: Float[Array, "... t i"],
+        hx: Float[Array, "... h"] | None = None,
+    ) -> tuple[Float[Array, "... t h"], Float[Array, "... h"]]:
 
         batch_shape = x.shape[:-2]
         t = x.shape[-2]

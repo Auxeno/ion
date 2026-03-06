@@ -26,8 +26,8 @@ class LoRALinear(Module):
     """
 
     linear: Linear
-    a: Param[Float[Array, "id r"]]
-    b: Param[Float[Array, "r od"]]
+    a: Param[Float[Array, "i r"]]
+    b: Param[Float[Array, "r o"]]
     alpha: float
     rank: int
 
@@ -53,7 +53,7 @@ class LoRALinear(Module):
         self.alpha = float(rank) if alpha is None else float(alpha)
         self.rank = rank
 
-    def __call__(self, x: Float[Array, "... id"]) -> Float[Array, "... od"]:
+    def __call__(self, x: Float[Array, "... i"]) -> Float[Array, "... o"]:
 
         x = self.linear(x) + (x @ self.a @ self.b) * (self.alpha / self.rank)
 

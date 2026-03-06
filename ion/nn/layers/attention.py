@@ -26,8 +26,8 @@ class SelfAttention(Module):
     >>> attn(x, mask=mask)  # mask: bool (*, s, s) or (*, 1, s, s)
     """
 
-    w_qkv: Param[Float[Array, "d 3 n h"]]
-    w_out: Param[Float[Array, "n h d"]]
+    w_qkv: Param[Float[Array, "d 3 h k"]]
+    w_out: Param[Float[Array, "h k d"]]
     b_out: Param[Float[Array, " d"]] | None
     causal: bool
 
@@ -61,10 +61,10 @@ class SelfAttention(Module):
         mask: Bool[Array, "... s s"] | Bool[Array, "... 1 s s"] | None = None,
     ) -> Float[Array, "... s d"]:
 
-        qkv = jnp.einsum("...d, dinh -> ...inh", x, self.w_qkv)
+        qkv = jnp.einsum("...d, dihk -> ...ihk", x, self.w_qkv)
         q, k, v = jnp.moveaxis(qkv, -3, 0)
 
-        logits = jnp.einsum("...snh, ...tnh -> ...nst", q, k) / jnp.sqrt(self.w_qkv.shape[-1])
+        logits = jnp.einsum("...shk, ...thk -> ...hst", q, k) / jnp.sqrt(self.w_qkv.shape[-1])
 
         if self.causal:
             causal_mask = jnp.tril(jnp.ones(logits.shape[-2:], dtype=bool))
@@ -74,9 +74,9 @@ class SelfAttention(Module):
             logits = jnp.where(mask, logits, -jnp.inf)
 
         attention = jax.nn.softmax(logits, axis=-1)
-        x = jnp.einsum("...nst, ...tnh -> ...snh", attention, v)
+        x = jnp.einsum("...hst, ...thk -> ...shk", attention, v)
 
-        x = jnp.einsum("...nh, nhd -> ...d", x, self.w_out)
+        x = jnp.einsum("...hk, hkd -> ...d", x, self.w_out)
 
         if self.b_out is not None:
             x = x + self.b_out
@@ -92,9 +92,9 @@ class CrossAttention(Module):
     >>> attn(x, context, mask=mask)  # mask: bool (*, s, t) or (*, 1, s, t)
     """
 
-    w_q: Param[Float[Array, "d n h"]]
-    w_kv: Param[Float[Array, "d 2 n h"]]
-    w_out: Param[Float[Array, "n h d"]]
+    w_q: Param[Float[Array, "d h k"]]
+    w_kv: Param[Float[Array, "d 2 h k"]]
+    w_out: Param[Float[Array, "h k d"]]
     b_out: Param[Float[Array, " d"]] | None
 
     def __init__(
@@ -126,19 +126,19 @@ class CrossAttention(Module):
         mask: Bool[Array, "... s t"] | Bool[Array, "... 1 s t"] | None = None,
     ) -> Float[Array, "... s d"]:
 
-        q = jnp.einsum("...d, dnh -> ...nh", x, self.w_q)
-        kv = jnp.einsum("...d, dinh -> ...inh", context, self.w_kv)
+        q = jnp.einsum("...d, dhk -> ...hk", x, self.w_q)
+        kv = jnp.einsum("...d, dihk -> ...ihk", context, self.w_kv)
         k, v = jnp.moveaxis(kv, -3, 0)
 
-        logits = jnp.einsum("...snh, ...tnh -> ...nst", q, k) / jnp.sqrt(self.w_q.shape[-1])
+        logits = jnp.einsum("...shk, ...thk -> ...hst", q, k) / jnp.sqrt(self.w_q.shape[-1])
 
         if mask is not None:
             logits = jnp.where(mask, logits, -jnp.inf)
 
         attention = jax.nn.softmax(logits, axis=-1)
-        x = jnp.einsum("...nst, ...tnh -> ...snh", attention, v)
+        x = jnp.einsum("...hst, ...thk -> ...shk", attention, v)
 
-        x = jnp.einsum("...nh, nhd -> ...d", x, self.w_out)
+        x = jnp.einsum("...hk, hkd -> ...d", x, self.w_out)
 
         if self.b_out is not None:
             x = x + self.b_out

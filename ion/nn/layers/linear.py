@@ -25,8 +25,8 @@ class Linear(Module):
     >>> linear(x)  # (*, 3) -> (*, 16)
     """
 
-    w: Param[Float[Array, "id od"]]
-    b: Param[Float[Array, " od"]] | None
+    w: Param[Float[Array, "i o"]]
+    b: Param[Float[Array, " o"]] | None
 
     def __init__(
         self,
@@ -44,7 +44,7 @@ class Linear(Module):
         self.w = Param(w_init(shape=(in_dim, out_dim), dtype=dtype, key=key_w))
         self.b = Param(b_init(shape=(out_dim,), dtype=dtype, key=key_b)) if bias else None
 
-    def __call__(self, x: Float[Array, "... id"]) -> Float[Array, "... od"]:
+    def __call__(self, x: Float[Array, "... i"]) -> Float[Array, "... o"]:
 
         x = x @ self.w
 

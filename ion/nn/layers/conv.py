@@ -30,7 +30,7 @@ class Conv(Module):
     """
 
     w: Param[Float[Array, "..."]]
-    b: Param[Float[Array, " oc"]] | None
+    b: Param[Float[Array, " c"]] | None
     num_spatial_dims: int
     stride: tuple[int, ...]
     padding: str | tuple[tuple[int, int], ...]
@@ -202,7 +202,7 @@ class ConvTranspose(Module):
     """
 
     w: Param[Float[Array, "..."]]
-    b: Param[Float[Array, " oc"]] | None
+    b: Param[Float[Array, " c"]] | None
     num_spatial_dims: int
     stride: tuple[int, ...]
     padding: tuple[tuple[int, int], ...]
