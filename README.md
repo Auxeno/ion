@@ -89,7 +89,14 @@ def loss_fn(model, x, y):
 grads = loss_fn(model, x, y)  # grads has same structure as model
 ```
 
-The gradient tree matches the model structure. Trainable `Param` positions have gradients, while everything else is `None`. Standard `jax.grad` also works natively with Ion modules, but it will compute gradients with respect to all JAX arrays in the tree rather than isolating the trainable parameters.
+The gradient tree matches the model structure. Trainable `Param` positions contain gradient values, while frozen `Param` positions and non-parameter leaves are `None`:
+
+```python
+grads.decoder.w   # Param(value=gradient_array), trainable
+grads.encoder.w   # None, frozen (Param wrapper removed, not just the value)
+```
+
+Standard `jax.grad` also works natively with Ion modules, but it will compute gradients with respect to all JAX arrays in the tree rather than isolating the trainable parameters.
 
 There are no custom wrappers like `ion.jit`, `ion.vmap`, or `ion.scan`. Because Ion models are standard pytrees, all native JAX transformations work directly out of the box.
 

@@ -134,22 +134,7 @@ class Module:
             if isinstance(value, Param):
                 parts.append(f"  {field.name}={value!r},")
             elif hasattr(value, "shape") and hasattr(value, "dtype"):
-                dtype = {
-                    "float16": "f16",
-                    "float32": "f32",
-                    "float64": "f64",
-                    "bfloat16": "bf16",
-                    "int8": "i8",
-                    "int16": "i16",
-                    "int32": "i32",
-                    "int64": "i64",
-                    "uint8": "u8",
-                    "uint16": "u16",
-                    "uint32": "u32",
-                    "uint64": "u64",
-                    "complex64": "c64",
-                    "complex128": "c128",
-                }.get(value.dtype.name, value.dtype.name)
+                dtype = Param.short_dtype(value.dtype.name)
                 parts.append(f"  {field.name}={dtype}{list(value.shape)},")
             elif (
                 isinstance(value, (tuple, list))

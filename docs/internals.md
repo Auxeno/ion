@@ -59,7 +59,7 @@ Adds optimizer deltas to a model's trainable parameters. Walks the model and upd
 2. Pass only trainable leaves to `jax.grad`, holding everything else constant
 3. Pad non-trainable positions with `None` and unflatten back to the original pytree shape
 
-The caller gets a gradient tree matching the model structure, where only trainable `Param` positions have values and everything else is `None`. `value_and_grad` works identically but also returns the output.
+The caller gets a gradient tree matching the model structure. Trainable `Param` positions contain gradient values wrapped in `Param`. Everything else, frozen `Param`s and non-parameter leaves are replaced with `None`. Frozen params become bare `None`, not `Param(value=None)`, so the `Param` wrapper is removed entirely. This follows the JAX convention where `None` signals "no gradient at this position." `value_and_grad` works identically but also returns the output.
 
 Note: `jax.jit` works natively with all modules because `Module` pytree registration wraps non-array leaves in `Static` automatically. No `ion.jit` wrapper is needed.
 
