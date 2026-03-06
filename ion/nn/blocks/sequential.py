@@ -7,7 +7,7 @@ Accepts any callable (modules, functions like jax.nn.relu, lambdas).
 Supports indexing, slicing, and iteration.
 """
 
-from typing import Callable, Iterator
+from collections.abc import Callable, Iterator
 
 from jaxtyping import Array
 

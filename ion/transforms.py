@@ -11,8 +11,8 @@ See docs/internals.md for implementation details.
 """
 
 import functools
-from collections.abc import Sequence
-from typing import Any, Callable
+from collections.abc import Callable, Sequence
+from typing import Any
 
 import jax
 import jax.tree_util as jtu
