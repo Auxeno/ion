@@ -29,7 +29,7 @@ def enable_treescope() -> None:
         from treescope import basic_interactive_setup
 
         basic_interactive_setup()
-    except Exception:
+    except ImportError:
         pass
 
 
@@ -45,7 +45,7 @@ def disable_treescope() -> None:
             html_fmt.type_printers.pop(object, None)
 
         treescope.active_autovisualizer.set_globally(None)
-    except Exception:
+    except ImportError:
         pass
 
 
