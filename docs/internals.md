@@ -104,7 +104,7 @@ Known gotchas to be aware of when using Ion. Some are limitations of JAX:
 
 - **`ion.grad` on plain arrays returns `None`** — if the first argument has no trainable `Param` leaves (e.g. a plain `jnp.array`), all gradient positions will be `None`. Use `jax.grad` directly for non-`Param` differentiation.
 
-- **Module immutability is shallow** — `_frozen` prevents field reassignment, but mutable containers (lists, dicts, numpy arrays) in fields can still be mutated in-place. For example, `model.layers.append(...)` bypasses the freeze.
+- **Module immutability is shallow** — `_frozen` prevents field reassignment, but mutable containers (lists, dicts, numpy arrays) in fields can still be mutated in-place. For example, `model.layers.append(...)` bypasses the freeze. Worse, in-place mutation of a `Static`-wrapped field (like a list of ints) will **not** trigger JIT recompilation — JAX identifies the pytree aux data by object identity, so the same mutated list still hits the stale cached trace with the old value baked in. Use `replace()` to create a new module with the updated field instead.
 
 - **`Param.__eq__` returns a JAX array, not a bool** — `param in list` can raise `ValueError` for multi-element params because Python calls `bool()` on the array result, which is ambiguous for arrays with more than one element.
 

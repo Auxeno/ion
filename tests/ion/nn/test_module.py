@@ -1100,6 +1100,155 @@ class TestModuleWrappingEdgeCases:
         assert reconstructed.config["lr"] == 0.001
 
 
+class TestReprInsideTransformations:
+    """Test that __repr__ doesn't crash inside JAX transformations."""
+
+    def test_repr_inside_jit(self):
+        """Calling repr() on a module inside jit doesn't crash."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            scale: float
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.scale = 2.0
+
+        m = Model()
+
+        @jax.jit
+        def f(m):
+            _ = repr(m)
+            return jnp.sum(m.w.value)
+
+        result = f(m)
+        npt.assert_allclose(result, 3.0)
+
+    def test_repr_inside_vmap(self):
+        """Calling repr() on a module inside vmap doesn't crash."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+
+        m = Model()
+
+        def f(m):
+            _ = repr(m)
+            return jnp.sum(m.w.value)
+
+        # vmap over a batch dim added to the param
+        batched_m = jax.tree.map(lambda x: jnp.stack([x, x]), m)
+        results = jax.vmap(f)(batched_m)
+        npt.assert_allclose(results, jnp.array([3.0, 3.0]))
+
+
+class TestStaticFieldTypes:
+    """Test that various field types (list, dict, tuple, callable) work through jit."""
+
+    def test_list_of_ints_through_jit(self):
+        class Model(nn.Module):
+            w: nn.Param
+            dims: list
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.dims = [1, 2, 3]
+
+            def __call__(self, x):
+                return x * self.dims[0]
+
+        m = Model()
+        x = jnp.array(5.0)
+        npt.assert_allclose(jax.jit(m)(x), 5.0)
+
+    def test_dict_of_scalars_through_jit(self):
+        class Model(nn.Module):
+            w: nn.Param
+            config: dict
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.config = {"scale": 2.0, "offset": 1.0}
+
+            def __call__(self, x):
+                return x * self.config["scale"] + self.config["offset"]
+
+        m = Model()
+        x = jnp.array(3.0)
+        npt.assert_allclose(jax.jit(m)(x), 7.0)
+
+    def test_tuple_of_callables_through_jit(self):
+        class Model(nn.Module):
+            w: nn.Param
+            activations: tuple
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.activations = (jax.nn.relu, jax.nn.sigmoid)
+
+            def __call__(self, x):
+                for act in self.activations:
+                    x = act(x)
+                return x
+
+        m = Model()
+        x = jnp.array([-1.0, 0.0, 1.0])
+        eager = m(x)
+        jitted = jax.jit(m)(x)
+        npt.assert_allclose(jitted, eager)
+
+    def test_nested_dict_with_arrays_through_jit(self):
+        """Dict mixing arrays and scalars: arrays are dynamic, scalars are static."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            meta: dict
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.meta = {"scale": 2.0, "mask": jnp.array([1.0, 0.0, 1.0])}
+
+            def __call__(self, x):
+                return x * self.meta["mask"] * self.meta["scale"]
+
+        m = Model()
+        x = jnp.array([1.0, 2.0, 3.0])
+        eager = m(x)
+        jitted = jax.jit(m)(x)
+        npt.assert_allclose(jitted, eager)
+
+    def test_mutating_static_list_uses_stale_cache(self):
+        """Sharp edge: mutating a mutable field in-place does NOT trigger retrace.
+        JAX caches by object identity, so the same list object (now mutated)
+        still hits the cached trace with the old value baked in."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            dims: list
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.dims = [1]
+
+            def __call__(self, x):
+                return x * len(self.dims)
+
+        m = Model()
+        x = jnp.array(1.0)
+
+        result1 = jax.jit(m)(x)
+        npt.assert_allclose(result1, 1.0)
+
+        # Mutate the list in-place — JAX does NOT retrace
+        m.dims.append(2)
+        result2 = jax.jit(m)(x)
+        # Stale! Still returns 1.0, not 2.0, because the old trace is cached
+        npt.assert_allclose(result2, 1.0)
+
+
 class TestParamsPropertyEdgeCases:
     def test_params_replaces_plain_array_with_none_but_keeps_static(self):
         """Plain arrays become None but static fields are preserved (by design)."""
