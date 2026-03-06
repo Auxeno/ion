@@ -62,7 +62,7 @@ self.b = nn.Param(jnp.zeros(16), trainable=False)  # frozen
 Access all parameters via the `params` property. This returns a pytree with identical structure, containing only `Param` leaves (non-parameter leaves are replaced with `None`):
 
 ```python
-model.params       # pytree of Param leaves — can be passed to an Optax optimizer
+model.params       # pytree of Param leaves, passable to an Optax optimizer
 model.num_params   # total number of parameters (trainable and frozen)
 ```
 
@@ -87,7 +87,7 @@ def loss_fn(model, x, y):
 grads = loss_fn(model, x, y)  # grads has same structure as model
 ```
 
-The gradient tree matches the model structure — trainable `Param` positions have gradients, while everything else is `None`. Standard `jax.grad` also works natively with Ion modules, but it will compute gradients with respect to all JAX arrays in the tree rather than isolating the trainable parameters.
+The gradient tree matches the model structure. Trainable `Param` positions have gradients, while everything else is `None`. Standard `jax.grad` also works natively with Ion modules, but it will compute gradients with respect to all JAX arrays in the tree rather than isolating the trainable parameters.
 
 There are no custom wrappers like `ion.jit`, `ion.vmap`, or `ion.scan`. Because Ion models are standard pytrees, all native JAX transformations work directly out of the box.
 

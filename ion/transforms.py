@@ -47,7 +47,7 @@ def _merge_leaves(
     non_matching_leaves: tuple[Any, ...],
     is_match_mask: tuple[bool, ...],
 ) -> list[Any]:
-    """Inverse of `_split_leaves` — reconstruct the original leaf order."""
+    """Inverse of `_split_leaves`. Reconstructs the original leaf order."""
     reconstructed_leaves: list[Any] = []
 
     # Walk the mask to pick from the correct group at each position

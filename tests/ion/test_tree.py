@@ -366,7 +366,7 @@ class TestSaveLoadStructureMismatch:
             assert loaded.w.dtype != reference.w.dtype
 
     def test_save_load_trainable_flag_comes_from_reference(self):
-        """The trainable flag is NOT saved — it comes from the reference tree."""
+        """The trainable flag is NOT saved. It comes from the reference tree."""
 
         class Model(nn.Module):
             w: nn.Param
@@ -389,7 +389,7 @@ class TestSaveLoadStructureMismatch:
 
 class TestApplyUpdatesEdgeCases:
     def test_apply_updates_frozen_param_with_large_update_silently_ignored(self):
-        """A large update to a frozen param is silently dropped — no warning."""
+        """A large update to a frozen param is silently dropped with no warning."""
         data = {"w": nn.Param(jnp.array([1.0]), trainable=False)}
         updates = {"w": nn.Param(jnp.array([999999.0]))}
         result = tree.apply_updates(data, updates)

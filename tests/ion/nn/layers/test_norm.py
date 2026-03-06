@@ -172,7 +172,7 @@ class TestBatchNorm:
         _, state = layer(x, layer.initial_state, training=True)
         # Store state on module
         layer = layer.replace(state=state)
-        # Call without explicit state — should use self.state
+        # Call without explicit state, should use self.state
         y, returned_state = layer(x)
         assert y.shape == x.shape
         npt.assert_allclose(returned_state[0], state[0])

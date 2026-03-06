@@ -1242,7 +1242,7 @@ class TestStaticFieldTypes:
         result1 = jax.jit(m)(x)
         npt.assert_allclose(result1, 1.0)
 
-        # Mutate the list in-place — JAX does NOT retrace
+        # Mutate the list in-place, JAX does NOT retrace
         m.dims.append(2)
         result2 = jax.jit(m)(x)
         # Stale! Still returns 1.0, not 2.0, because the old trace is cached

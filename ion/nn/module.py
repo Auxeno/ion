@@ -41,7 +41,7 @@ def _wrap_non_arrays(value: Any) -> Any:
 
 
 def _unwrap_non_arrays(value: Any) -> Any:
-    """Inverse of `_wrap_non_arrays` — strip Static wrappers back to plain values."""
+    """Inverse of `_wrap_non_arrays`. Strips Static wrappers back to plain values."""
     if isinstance(value, (Module, Param)):
         return value
     return jax.tree.map(

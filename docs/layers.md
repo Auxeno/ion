@@ -18,7 +18,7 @@ Channels-last is the most typical format for image data and is followed by Flax 
 
 ### Flexible Batch Dimensions
 
-All layers accept arbitrary leading batch dimensions — zero, one, or many. The same layer works on a single example, a batch, or nested batches with no code changes.
+All layers accept arbitrary leading batch dimensions (zero, one, or many). The same layer works on a single example, a batch, or nested batches with no code changes.
 
 ```python
 linear = nn.Linear(4, 8, key=key)
@@ -46,7 +46,7 @@ The trade-off for the Flax/Ion approach is users won't catch an accidentally wro
 
 Single-letter dimension labels are used in `jaxtyping` annotations and einsum strings. These follow conventions from the JAX ecosystem.
 
-The same letter can mean different things in different layers — meaning is determined by context, not globally.
+The same letter can mean different things in different layers. Meaning is determined by context, not globally.
 
 ### General
 
@@ -84,7 +84,7 @@ Output projection:  ...hk, hkd -> ...d
 | Label | Meaning | Notes |
 |-------|---------|-------|
 | `i` | input features | |
-| `h` | hidden dimension | same letter as attention heads — context resolves it |
+| `h` | hidden dimension | same letter as attention heads; context resolves it |
 | `g` | gate dimension | `4h` for LSTM, `3h` for GRU |
 | `t` | time steps | sequence dimension |
 
@@ -107,7 +107,7 @@ Output projection:  ...hk, hkd -> ...d
 
 ## Spatial Layers
 
-Convolution, pooling, and upsampling layers are N-dimensional — the first argument `num_spatial_dims` controls dimensionality. This keeps the API surface small while supporting 1D, 2D, 3D, and beyond with the same class.
+Convolution, pooling, and upsampling layers are N-dimensional. The first argument `num_spatial_dims` controls dimensionality. This keeps the API surface small while supporting 1D, 2D, 3D, and beyond with the same class.
 
 ```python
 Conv(1, 3, 16, kernel_size=5, key=key)           # Conv1d
@@ -129,10 +129,10 @@ Each layer family uses init schemes suited to its typical activation:
 | Linear, Conv, MLP | He normal | zeros |
 | Attention, Embedding, Positional | Truncated normal (std=0.02) | zeros |
 | Recurrent (input) | Glorot uniform | zeros (LSTM forget gate: ones) |
-| Recurrent (hidden) | Orthogonal | — |
-| Norm | scale=1, bias=0 | — |
+| Recurrent (hidden) | Orthogonal | - |
+| Norm | scale=1, bias=0 | - |
 
-**Linear, Conv, and MLP** default to He normal, which assumes ReLU activation. If using a different activation (tanh, GELU, sigmoid, etc.), pass a different `w_init` — for example `jax.nn.initializers.glorot_uniform()` for tanh/sigmoid or `jax.nn.initializers.lecun_normal()` for SELU. Using He normal with non-ReLU activations can cause vanishing signals.
+**Linear, Conv, and MLP** default to He normal, which assumes ReLU activation. If using a different activation (tanh, GELU, sigmoid, etc.), pass a different `w_init` like `jax.nn.initializers.glorot_uniform()` for tanh/sigmoid or `jax.nn.initializers.lecun_normal()` for SELU. Using He normal with non-ReLU activations can cause vanishing signals.
 
 **Attention and Embedding** use truncated normal with a small std (0.02), standard practice from GPT-2 and BERT. This is activation-agnostic since attention weights are followed by softmax, not a pointwise activation.
 
