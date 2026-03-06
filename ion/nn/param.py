@@ -132,25 +132,24 @@ class Param(Generic[T]):
     def __iter__(self):
         return iter(self.value)
 
+    @staticmethod
+    def short_dtype(name: str) -> str:
+        """Abbreviate dtype names: float32 to f32, bfloat16 to bf16, etc."""
+        for prefix, abbr in (
+            ("bfloat", "bf"),
+            ("float", "f"),
+            ("uint", "u"),
+            ("int", "i"),
+            ("complex", "c"),
+        ):
+            if name.startswith(prefix):
+                return abbr + name[len(prefix) :]
+        return name
+
     def __repr__(self) -> str:
         trainable_str = f", trainable={self.trainable}"
         if hasattr(self.value, "shape") and hasattr(self.value, "dtype"):
-            dtype = {
-                "float16": "f16",
-                "float32": "f32",
-                "float64": "f64",
-                "bfloat16": "bf16",
-                "int8": "i8",
-                "int16": "i16",
-                "int32": "i32",
-                "int64": "i64",
-                "uint8": "u8",
-                "uint16": "u16",
-                "uint32": "u32",
-                "uint64": "u64",
-                "complex64": "c64",
-                "complex128": "c128",
-            }.get(self.value.dtype.name, self.value.dtype.name)
+            dtype = self.short_dtype(self.value.dtype.name)
             return f"Param({dtype}{list(self.value.shape)}{trainable_str})"
         return f"Param({self.value!r}{trainable_str})"
 
