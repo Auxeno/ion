@@ -114,12 +114,13 @@ def save(path: str, pytree: PyTree) -> None:
 
     >>> ion.tree.save("model.npz", model)
     """
-    flat_leaves, _ = jtu.tree_flatten(pytree)
+    leaves_with_paths = jtu.tree_flatten_with_path(pytree)[0]
 
-    array_leaves = [
-        np.asarray(leaf) for leaf in flat_leaves if isinstance(leaf, (jax.Array, np.ndarray))
-    ]
-    arrays_to_save = {str(i): arr for i, arr in enumerate(array_leaves)}
+    arrays_to_save = {
+        "".join(str(k) for k in key_path).lstrip("."): np.asarray(leaf)
+        for key_path, leaf in leaves_with_paths
+        if isinstance(leaf, (jax.Array, np.ndarray))
+    }
 
     np.savez(path, **arrays_to_save)  # type: ignore[reportArgumentType]
 
@@ -130,30 +131,29 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
 
     >>> model = ion.tree.load("model.npz", model)
     """
-    flat_leaves, tree_def = jtu.tree_flatten(reference_pytree)
+    leaves_with_paths, tree_def = jtu.tree_flatten_with_path(reference_pytree)
     saved_data = np.load(path)
-    saved_array_count = len(saved_data)
 
+    expected_keys: set[str] = set()
     loaded_leaves: list[Any] = []
-    array_index = 0
-
-    # Load leaves validating structure is as expected
-    for leaf in flat_leaves:
+    for key_path, leaf in leaves_with_paths:
         if isinstance(leaf, (jax.Array, np.ndarray)):
-            if str(array_index) not in saved_data:
+            key = "".join(str(k) for k in key_path).lstrip(".")
+            expected_keys.add(key)
+            if key not in saved_data:
                 raise ValueError(
-                    f"Structure mismatch: reference tree expects at least {array_index + 1} "
-                    f"arrays, but the file contains {saved_array_count}."
+                    f"Structure mismatch: reference tree expects key '{key}', "
+                    f"but it was not found in the file. "
+                    f"Available keys: {sorted(saved_data.files)}"
                 )
-            loaded_leaves.append(jnp.array(saved_data[str(array_index)]))
-            array_index += 1
+            loaded_leaves.append(jnp.array(saved_data[key]))
         else:
             loaded_leaves.append(leaf)
 
-    if array_index != saved_array_count:
+    extra_keys = set(saved_data.files) - expected_keys
+    if extra_keys:
         raise ValueError(
-            f"Structure mismatch: file contains {saved_array_count} arrays, "
-            f"but reference tree only has {array_index}."
+            f"Structure mismatch: file contains keys not in reference tree: {sorted(extra_keys)}"
         )
 
     return tree_def.unflatten(loaded_leaves)

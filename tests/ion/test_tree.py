@@ -2,6 +2,7 @@ import tempfile
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import numpy.testing as npt
 import pytest
 
@@ -208,6 +209,55 @@ class TestSaveLoad:
         npt.assert_array_equal(loaded.w.value, original.w.value)
         # Static int comes from the reference tree
         assert loaded.count == 99
+
+    def test_saved_keys_are_named(self):
+        """Saved .npz keys use path names, not positional indices."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            b: nn.Param
+
+            def __init__(self, key):
+                k1, k2 = jax.random.split(key)
+                self.w = nn.Param(jax.random.normal(k1, (4,)))
+                self.b = nn.Param(jax.random.normal(k2, (2,)))
+
+        model = Model(key=jax.random.key(0))
+        with tempfile.NamedTemporaryFile(suffix=".npz") as f:
+            tree.save(f.name, model)
+            saved = np.load(f.name)
+            assert sorted(saved.files) == ["b.value", "w.value"]
+
+    def test_field_reorder_loads_correctly(self):
+        """Reordering fields in the reference model still loads correctly."""
+
+        class ModelV1(nn.Module):
+            w: nn.Param
+            b: nn.Param
+
+            def __init__(self, key):
+                k1, k2 = jax.random.split(key)
+                self.w = nn.Param(jax.random.normal(k1, (4,)))
+                self.b = nn.Param(jax.random.normal(k2, (2,)))
+
+        class ModelV2(nn.Module):
+            b: nn.Param
+            w: nn.Param
+
+            def __init__(self, key):
+                k1, k2 = jax.random.split(key)
+                self.b = nn.Param(jax.random.normal(k2, (2,)))
+                self.w = nn.Param(jax.random.normal(k1, (4,)))
+
+        original = ModelV1(key=jax.random.key(0))
+        reference = ModelV2(key=jax.random.key(1))
+
+        with tempfile.NamedTemporaryFile(suffix=".npz") as f:
+            tree.save(f.name, original)
+            loaded = tree.load(f.name, reference)
+
+        npt.assert_array_equal(loaded.w.value, original.w.value)
+        npt.assert_array_equal(loaded.b.value, original.b.value)
 
     def test_param_and_plain_array_mix(self):
         class Model(nn.Module):
