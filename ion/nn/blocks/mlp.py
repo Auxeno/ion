@@ -27,7 +27,7 @@ class MLP(Module):
 
     layers: tuple[Linear, ...]
     activation: Callable[[Array], Array]
-    final_activation: Callable[[Array], Array]
+    final_activation: Callable[[Array], Array] | None
 
     def __init__(
         self,
@@ -36,7 +36,7 @@ class MLP(Module):
         hidden_dim: int,
         num_hidden_layers: int,
         activation: Callable[[Array], Array] = jax.nn.relu,
-        final_activation: Callable[[Array], Array] = lambda x: x,
+        final_activation: Callable[[Array], Array] | None = None,
         bias: bool = True,
         dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.he_normal(),
@@ -72,6 +72,8 @@ class MLP(Module):
             x = self.activation(x)
 
         x = self.layers[-1](x)
-        x = self.final_activation(x)
+
+        if self.final_activation is not None:
+            x = self.final_activation(x)
 
         return x
