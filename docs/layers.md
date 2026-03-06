@@ -31,7 +31,7 @@ linear(x_multi)    # (5, 3, 4)  ->  (5, 3, 8)  multiple batch dims
 This works the same way for spatial (and all other) layers:
 
 ```python
-conv = nn.Conv(2, 3, 16, kernel_size=3, padding=1, key=key)
+conv = nn.Conv(3, 16, kernel_shape=(3, 3), padding=1, key=key)
 
 conv(x)          # (32, 32, 3)        ->  (32, 32, 16)        no batch
 conv(x_batched)  # (8, 32, 32, 3)     ->  (8, 32, 32, 16)     one batch dim
@@ -107,18 +107,20 @@ Output projection:  ...hk, hkd -> ...d
 
 ## Spatial Layers
 
-Convolution, pooling, and upsampling layers are N-dimensional. The first argument `num_spatial_dims` controls dimensionality. This keeps the API surface small while supporting 1D, 2D, 3D, and beyond with the same class.
+Convolution, pooling, and upsampling layers are N-dimensional. This keeps the API surface small while supporting 1D, 2D, 3D, and beyond with the same class.
+
+`Conv` and `ConvTranspose` infer the spatial rank from `kernel_shape`, which must be a tuple. Pooling and upsampling layers take `num_spatial_dims` as their first argument.
 
 ```python
-Conv(1, 3, 16, kernel_size=5, key=key)           # Conv1d
-Conv(2, 3, 16, kernel_size=3, key=key)           # Conv2d
-ConvTranspose(2, 16, 3, kernel_size=3, key=key)  # ConvTranspose2d
-MaxPool(2, kernel_size=2)                        # MaxPool2d
-AvgPool(1, kernel_size=3, padding=1)             # AvgPool1d
-Upsample(2, scale_factor=2)                      # Upsample2d
+Conv(3, 16, kernel_shape=(5,), key=key)           # Conv1d
+Conv(3, 16, kernel_shape=(3, 3), key=key)         # Conv2d
+ConvTranspose(16, 3, kernel_shape=(3, 3), key=key)  # ConvTranspose2d
+MaxPool(2, kernel_size=2)                          # MaxPool2d
+AvgPool(1, kernel_size=3, padding=1)               # AvgPool1d
+Upsample(2, scale_factor=2)                        # Upsample2d
 ```
 
-Scalar values for `kernel_size`, `stride`, `padding`, etc. are broadcast across all spatial dimensions. Tuples give per-dimension control.
+Scalar values for `stride`, `padding`, `dilation`, etc. are broadcast across all spatial dimensions. Tuples give per-dimension control.
 
 ## Weight Initialization
 
