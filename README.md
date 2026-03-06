@@ -91,6 +91,8 @@ The gradient tree matches the model structure — trainable `Param` positions ha
 
 There are no custom wrappers like `ion.jit`, `ion.vmap`, or `ion.scan`. Because Ion models are standard pytrees, all native JAX transformations work directly out of the box.
 
+See [Internals](docs/internals.md) for how the module system, pytree registration, and transforms work under the hood.
+
 ### Layers
 
 | Category        | Layers                                                                    |
@@ -106,6 +108,8 @@ There are no custom wrappers like `ion.jit`, `ion.vmap`, or `ion.scan`. Because 
 | Positional      | `sinusoidal`, `rope`, `apply_rope`, `alibi`                               |
 | Regularization  | `Dropout`                                                                 |
 | Blocks          | `Sequential`, `MLP`, `TransformerBlock`, `CrossTransformerBlock`          |
+
+See [Layer Conventions](docs/layers.md) for data format, weight init, and spatial layer usage.
 
 ### Pretty Printing
 

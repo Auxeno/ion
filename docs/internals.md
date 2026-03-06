@@ -1,6 +1,11 @@
 # Internals
 
-Everything behind the scenes in Ion. Four files and ~400 lines of code — that's the whole engine.
+Everything behind the scenes in Ion. Four files and ~400 lines of code — that's the whole engine. This document explains the design, but readers are encouraged to check out the source code as it's fairly straightforward:
+
+- [`ion/nn/module.py`](../ion/nn/module.py) — Module base class, pytree registration
+- [`ion/nn/param.py`](../ion/nn/param.py) — Param wrapper, trainable/frozen distinction
+- [`ion/tree.py`](../ion/tree.py) — Static wrapper, apply_updates, save/load
+- [`ion/transforms.py`](../ion/transforms.py) — grad/value_and_grad for trainable params only
 
 ## Module (`ion/nn/module.py`)
 
@@ -66,7 +71,7 @@ Note: `jax.jit` works natively with all modules because `Module` pytree registra
 
 ## Sharp Edges
 
-Known gotchas to be aware of when using Ion:
+Known gotchas to be aware of when using Ion. Some are limitations of JAX:
 
 - **`save`/`load` only stores array data** — `trainable` flags and non-array fields (ints, strings, callables) come from the reference tree, not the file. If you save a frozen model and load into a trainable reference, the loaded model will be trainable.
 
