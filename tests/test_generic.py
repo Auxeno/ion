@@ -56,7 +56,7 @@ def test_param_grad(layer_and_input):
 
     grads = loss_grad(layer, x)
     for leaf in jax.tree.leaves(grads):
-        if hasattr(leaf, 'dtype') and jnp.issubdtype(leaf.dtype, jnp.inexact):
+        if hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact):
             assert jnp.all(jnp.isfinite(leaf))
 
 
@@ -122,10 +122,9 @@ def test_params_property(layer_and_input):
         layer,
         (
             nn.Identity,
-            nn.MaxPool1d,
-            nn.MaxPool2d,
-            nn.AvgPool1d,
-            nn.AvgPool2d,
+            nn.MaxPool,
+            nn.AvgPool,
+            nn.Upsample,
             nn.Dropout,
         ),
     ):
@@ -134,7 +133,7 @@ def test_params_property(layer_and_input):
     leaves = jax.tree.leaves(params)
     assert len(leaves) > 0
     for leaf in leaves:
-        assert hasattr(leaf, 'dtype') and jnp.issubdtype(leaf.dtype, jnp.inexact)
+        assert hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact)
 
 
 def test_serialization(layer_and_input):

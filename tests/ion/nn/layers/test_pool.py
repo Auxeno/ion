@@ -4,52 +4,25 @@ import numpy.testing as npt
 from ion import nn
 
 
-class TestMaxPool1d:
-    def test_picks_max(self):
+class TestMaxPool:
+    def test_1d_picks_max(self):
         """Each output element is the maximum of its window."""
-        layer = nn.MaxPool1d(kernel_size=2)
+        layer = nn.MaxPool(1, kernel_size=2)
         x = jnp.array([[1.0], [3.0], [2.0], [5.0], [4.0], [6.0]])
         y = layer(x)
         expected = jnp.array([[3.0], [5.0], [6.0]])
         npt.assert_allclose(y, expected)
 
-    def test_stride_reduces_spatial(self):
+    def test_1d_stride_reduces_spatial(self):
         """Stride 2 halves spatial dimension."""
-        layer = nn.MaxPool1d(kernel_size=2, stride=2)
+        layer = nn.MaxPool(1, kernel_size=2, stride=2)
         x = jnp.ones((8, 3))
         y = layer(x)
         assert y.shape == (4, 3)
 
-
-class TestAvgPool1d:
-    def test_computes_mean(self):
-        """Each output element is the mean of its window."""
-        layer = nn.AvgPool1d(kernel_size=2)
-        x = jnp.array([[1.0], [3.0], [2.0], [6.0], [4.0], [8.0]])
-        y = layer(x)
-        expected = jnp.array([[2.0], [4.0], [6.0]])
-        npt.assert_allclose(y, expected)
-
-    def test_stride_reduces_spatial(self):
-        """Stride 2 halves spatial dimension."""
-        layer = nn.AvgPool1d(kernel_size=2, stride=2)
-        x = jnp.ones((8, 3))
-        y = layer(x)
-        assert y.shape == (4, 3)
-
-    def test_padding_averages_only_real_elements(self):
-        """Padding should not count padded zeros in the average."""
-        layer = nn.AvgPool1d(kernel_size=3, stride=1, padding=1)
-        x = jnp.array([[6.0], [6.0], [6.0], [6.0]])
-        y = layer(x)
-        expected = jnp.array([[6.0], [6.0], [6.0], [6.0]])
-        npt.assert_allclose(y, expected)
-
-
-class TestMaxPool2d:
-    def test_picks_max(self):
+    def test_2d_picks_max(self):
         """Each output element is the maximum of its 2x2 window."""
-        layer = nn.MaxPool2d(kernel_size=2)
+        layer = nn.MaxPool(2, kernel_size=2)
         x = jnp.array(
             [
                 [[1.0], [2.0], [3.0], [4.0]],
@@ -67,18 +40,41 @@ class TestMaxPool2d:
         )
         npt.assert_allclose(y, expected)
 
-    def test_stride_reduces_spatial(self):
+    def test_2d_stride_reduces_spatial(self):
         """Stride 2 halves spatial dimensions."""
-        layer = nn.MaxPool2d(kernel_size=2, stride=2)
+        layer = nn.MaxPool(2, kernel_size=2, stride=2)
         x = jnp.ones((8, 8, 3))
         y = layer(x)
         assert y.shape == (4, 4, 3)
 
 
-class TestAvgPool2d:
-    def test_computes_mean(self):
+class TestAvgPool:
+    def test_1d_computes_mean(self):
+        """Each output element is the mean of its window."""
+        layer = nn.AvgPool(1, kernel_size=2)
+        x = jnp.array([[1.0], [3.0], [2.0], [6.0], [4.0], [8.0]])
+        y = layer(x)
+        expected = jnp.array([[2.0], [4.0], [6.0]])
+        npt.assert_allclose(y, expected)
+
+    def test_1d_stride_reduces_spatial(self):
+        """Stride 2 halves spatial dimension."""
+        layer = nn.AvgPool(1, kernel_size=2, stride=2)
+        x = jnp.ones((8, 3))
+        y = layer(x)
+        assert y.shape == (4, 3)
+
+    def test_1d_padding_averages_only_real_elements(self):
+        """Padding should not count padded zeros in the average."""
+        layer = nn.AvgPool(1, kernel_size=3, stride=1, padding=1)
+        x = jnp.array([[6.0], [6.0], [6.0], [6.0]])
+        y = layer(x)
+        expected = jnp.array([[6.0], [6.0], [6.0], [6.0]])
+        npt.assert_allclose(y, expected)
+
+    def test_2d_computes_mean(self):
         """Each output element is the mean of its 2x2 window."""
-        layer = nn.AvgPool2d(kernel_size=2)
+        layer = nn.AvgPool(2, kernel_size=2)
         x = jnp.array(
             [
                 [[1.0], [2.0], [3.0], [4.0]],
@@ -96,16 +92,16 @@ class TestAvgPool2d:
         )
         npt.assert_allclose(y, expected)
 
-    def test_stride_reduces_spatial(self):
+    def test_2d_stride_reduces_spatial(self):
         """Stride 2 halves spatial dimensions."""
-        layer = nn.AvgPool2d(kernel_size=2, stride=2)
+        layer = nn.AvgPool(2, kernel_size=2, stride=2)
         x = jnp.ones((8, 8, 3))
         y = layer(x)
         assert y.shape == (4, 4, 3)
 
-    def test_padding_averages_only_real_elements(self):
+    def test_2d_padding_averages_only_real_elements(self):
         """Padding should not count padded zeros in the average."""
-        layer = nn.AvgPool2d(kernel_size=3, stride=1, padding=1)
+        layer = nn.AvgPool(2, kernel_size=3, stride=1, padding=1)
         x = jnp.full((4, 4, 1), 10.0)
         y = layer(x)
         expected = jnp.full((4, 4, 1), 10.0)

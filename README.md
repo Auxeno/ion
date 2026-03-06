@@ -96,12 +96,12 @@ There are no custom wrappers like `ion.jit`, `ion.vmap`, or `ion.scan`. Because 
 | Category        | Layers                                                                    |
 |-----------------|---------------------------------------------------------------------------|
 | Linear          | `Linear`, `Identity`, `LoRALinear`                                        |
-| Convolution     | `Conv1d`, `Conv2d`, `Conv`, `ConvTranspose1d`, `ConvTranspose2d`, `ConvTranspose` |
+| Convolution     | `Conv`, `ConvTranspose`                                                   |
 | Attention       | `SelfAttention`, `CrossAttention`                                         |
 | Normalization   | `LayerNorm`, `RMSNorm`, `GroupNorm`, `BatchNorm`, `InstanceNorm`          |
 | Recurrent       | `LSTMCell`, `GRUCell`, `LSTM`, `GRU`                                     |
-| Pooling         | `MaxPool1d`, `MaxPool2d`, `AvgPool1d`, `AvgPool2d`                       |
-| Upsampling      | `Upsample1d`, `Upsample2d`                                               |
+| Pooling         | `MaxPool`, `AvgPool`                                                      |
+| Upsampling      | `Upsample`                                                                |
 | Embedding       | `Embedding`, `LearnedPositionalEmbedding`                                 |
 | Positional      | `sinusoidal`, `rope`, `apply_rope`, `alibi`                               |
 | Regularization  | `Dropout`                                                                 |

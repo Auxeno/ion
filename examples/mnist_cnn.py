@@ -54,17 +54,17 @@ def load_mnist() -> tuple[
 
 
 class CNN(nn.Module):
-    conv_1: nn.Conv2d
-    conv_2: nn.Conv2d
-    pool: nn.MaxPool2d
+    conv_1: nn.Conv
+    conv_2: nn.Conv
+    pool: nn.MaxPool
     fc_1: nn.Linear
     fc_2: nn.Linear
 
     def __init__(self, *, key: jax.Array) -> None:
         keys = jax.random.split(key, 4)
-        self.conv_1 = nn.Conv2d(1, 16, kernel_size=3, padding=1, key=keys[0])
-        self.conv_2 = nn.Conv2d(16, 32, kernel_size=3, padding=1, key=keys[1])
-        self.pool = nn.MaxPool2d(kernel_size=2)
+        self.conv_1 = nn.Conv(2, 1, 16, kernel_size=3, padding=1, key=keys[0])
+        self.conv_2 = nn.Conv(2, 16, 32, kernel_size=3, padding=1, key=keys[1])
+        self.pool = nn.MaxPool(2, kernel_size=2)
         self.fc_1 = nn.Linear(32 * 7 * 7, 128, key=keys[2])
         self.fc_2 = nn.Linear(128, 10, key=keys[3])
 

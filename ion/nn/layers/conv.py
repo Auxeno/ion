@@ -1,12 +1,8 @@
 """Convolutional layers.
 
 Modules:
-    Conv             General N-dimensional convolution.
-    Conv1d           1D convolution layer.
-    Conv2d           2D convolution layer.
-    ConvTranspose    General N-dimensional transposed convolution.
-    ConvTranspose1d  1D transposed convolution layer.
-    ConvTranspose2d  2D transposed convolution layer.
+    Conv           N-dimensional convolution.
+    ConvTranspose  N-dimensional transposed convolution.
 
 Channels-last format to match image data conventions: (..., spatial, channels).
 He normal weight init for ReLU activation, zeros for bias.
@@ -112,86 +108,6 @@ class Conv(Module):
             x = x + self.b
 
         return x
-
-
-class Conv1d(Conv):
-    """1D convolution over sequences.
-
-    >>> conv = Conv1d(3, 16, kernel_size=5, key=key)
-    >>> conv(x)  # (*, length, 3) -> (*, length, 16)
-    """
-
-    def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        kernel_size: int,
-        stride: int = 1,
-        padding: str | int = 0,
-        dilation: int = 1,
-        groups: int = 1,
-        bias: bool = True,
-        dtype: jnp.dtype = jnp.float32,
-        w_init: Initializer = jax.nn.initializers.he_normal(),
-        b_init: Initializer = jax.nn.initializers.zeros,
-        *,
-        key: PRNGKeyArray,
-    ) -> None:
-        super().__init__(
-            num_spatial_dims=1,
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            padding=padding,
-            dilation=dilation,
-            groups=groups,
-            bias=bias,
-            dtype=dtype,
-            w_init=w_init,
-            b_init=b_init,
-            key=key,
-        )
-
-
-class Conv2d(Conv):
-    """2D convolution over images.
-
-    >>> conv = Conv2d(3, 16, kernel_size=3, key=key)
-    >>> conv(x)  # (*, h, w, 3) -> (*, h, w, 16)
-    """
-
-    def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        kernel_size: int | tuple[int, int],
-        stride: int | tuple[int, int] = 1,
-        padding: str | int | tuple[int, int] = 0,
-        dilation: int | tuple[int, int] = 1,
-        groups: int = 1,
-        bias: bool = True,
-        dtype: jnp.dtype = jnp.float32,
-        w_init: Initializer = jax.nn.initializers.he_normal(),
-        b_init: Initializer = jax.nn.initializers.zeros,
-        *,
-        key: PRNGKeyArray,
-    ) -> None:
-        super().__init__(
-            num_spatial_dims=2,
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            padding=padding,
-            dilation=dilation,
-            groups=groups,
-            bias=bias,
-            dtype=dtype,
-            w_init=w_init,
-            b_init=b_init,
-            key=key,
-        )
 
 
 class ConvTranspose(Module):
@@ -315,87 +231,3 @@ class ConvTranspose(Module):
             x = x + self.b
 
         return x
-
-
-class ConvTranspose1d(ConvTranspose):
-    """1D transposed convolution over sequences.
-
-    >>> conv_t = ConvTranspose1d(3, 16, kernel_size=5, key=key)
-    >>> conv_t(x)  # (*, length, 3) -> (*, length, 16)
-    """
-
-    def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        kernel_size: int,
-        stride: int = 1,
-        padding: str | int = 0,
-        output_padding: int = 0,
-        dilation: int = 1,
-        groups: int = 1,
-        bias: bool = True,
-        dtype: jnp.dtype = jnp.float32,
-        w_init: Initializer = jax.nn.initializers.he_normal(),
-        b_init: Initializer = jax.nn.initializers.zeros,
-        *,
-        key: PRNGKeyArray,
-    ) -> None:
-        super().__init__(
-            num_spatial_dims=1,
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            padding=padding,
-            output_padding=output_padding,
-            dilation=dilation,
-            groups=groups,
-            bias=bias,
-            dtype=dtype,
-            w_init=w_init,
-            b_init=b_init,
-            key=key,
-        )
-
-
-class ConvTranspose2d(ConvTranspose):
-    """2D transposed convolution over images.
-
-    >>> conv_t = ConvTranspose2d(3, 16, kernel_size=3, key=key)
-    >>> conv_t(x)  # (*, h, w, 3) -> (*, h, w, 16)
-    """
-
-    def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        kernel_size: int | tuple[int, int],
-        stride: int | tuple[int, int] = 1,
-        padding: str | int | tuple[int, int] = 0,
-        output_padding: int | tuple[int, int] = 0,
-        dilation: int | tuple[int, int] = 1,
-        groups: int = 1,
-        bias: bool = True,
-        dtype: jnp.dtype = jnp.float32,
-        w_init: Initializer = jax.nn.initializers.he_normal(),
-        b_init: Initializer = jax.nn.initializers.zeros,
-        *,
-        key: PRNGKeyArray,
-    ) -> None:
-        super().__init__(
-            num_spatial_dims=2,
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            padding=padding,
-            output_padding=output_padding,
-            dilation=dilation,
-            groups=groups,
-            bias=bias,
-            dtype=dtype,
-            w_init=w_init,
-            b_init=b_init,
-            key=key,
-        )
