@@ -160,7 +160,7 @@ class Param(Generic[T]):
         attributes = {"value": self.value, "trainable": self.trainable}
 
         # Grey for trainable, ice blue for non-trainable/frozen
-        color = "oklch(0.9 0.03 260.0)" if not self.trainable else "oklch(0.925 0.0 0.0)"
+        color = "oklch(0.92 0.06 260.0)" if not self.trainable else "oklch(0.925 0.0 0.0)"
 
         return treescope.repr_lib.render_object_constructor(
             object_type=type(self),
