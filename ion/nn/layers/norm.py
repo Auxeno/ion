@@ -10,6 +10,8 @@ Modules:
 Scale initialized to 1, bias to 0. Normalizes over the last dimension by default.
 """
 
+from typing import Self
+
 import jax.numpy as jnp
 from jax import lax
 from jaxtyping import Array, Float
@@ -123,15 +125,21 @@ class RMSNorm(Module):
 class BatchNorm(Module):
     """Batch normalization with running statistics.
 
-    >>> bn = BatchNorm(64)
-    >>> y, state = bn(x, state=bn.initial_state, training=True)  # (*, 64) -> (*, 64)
+    Running statistics don't fit neatly into a functional model. Prefer
+    LayerNorm or GroupNorm when possible.
+
+    >>> bn = BatchNorm(64, training=True)
+    >>> y = bn(x)          # (*, 64) -> (*, 64), normalize with batch stats
+    >>> bn = bn.update(x)  # step running statistics
     """
 
     scale: Param[Float[Array, " d"]]
     b: Param[Float[Array, " d"]] | None
-    state: tuple[Float[Array, " d"], Float[Array, " d"]] | None
+    running_mean: Float[Array, " d"]
+    running_var: Float[Array, " d"]
     momentum: float
     eps: float
+    training: bool
 
     def __init__(
         self,
@@ -139,50 +147,30 @@ class BatchNorm(Module):
         momentum: float = 0.1,
         eps: float = 1e-5,
         bias: bool = True,
+        training: bool = False,
         dtype: jnp.dtype = jnp.float32,
     ) -> None:
 
         self.scale = Param(jnp.ones(dim, dtype=dtype))
         self.b = Param(jnp.zeros(dim, dtype=dtype)) if bias else None
 
-        self.state = None
+        self.running_mean = jnp.zeros(dim, dtype=dtype)
+        self.running_var = jnp.ones(dim, dtype=dtype)
+
         self.momentum = momentum
         self.eps = eps
+        self.training = training
 
-    def __call__(
-        self,
-        x: Float[Array, "... d"],
-        state: tuple[Float[Array, " d"], Float[Array, " d"]] | None = None,
-        training: bool = False,
-    ) -> tuple[Float[Array, "... d"], tuple[Float[Array, " d"], Float[Array, " d"]]]:
+    def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
 
-        if state is None:
-            state = self.state
-        if state is None:
-            raise ValueError(
-                "No state provided and self.state is None. "
-                "Pass state explicitly or call replace(state=initial_state) first."
-            )
-
-        running_mean, running_var = state
         reduce_axes = tuple(range(x.ndim - 1))
 
-        if training:
+        if self.training:
             mean = jnp.mean(x, axis=reduce_axes)
             var = jnp.mean(jnp.square(x - mean), axis=reduce_axes)
-
-            new_running_mean = lax.stop_gradient(
-                (1 - self.momentum) * running_mean + self.momentum * mean
-            )
-            new_running_var = lax.stop_gradient(
-                (1 - self.momentum) * running_var + self.momentum * var
-            )
-
-            new_state = (new_running_mean, new_running_var)
         else:
-            mean = running_mean
-            var = running_var
-            new_state = state
+            mean = self.running_mean
+            var = self.running_var
 
         y = (x - mean) * lax.rsqrt(var + self.eps)
         y = y * self.scale
@@ -190,12 +178,23 @@ class BatchNorm(Module):
         if self.b is not None:
             y = y + self.b
 
-        return y, new_state
+        return y
 
-    @property
-    def initial_state(self) -> tuple[Float[Array, " d"], Float[Array, " d"]]:
-        d = self.scale.shape[0]
-        return (jnp.zeros(d, dtype=self.scale.dtype), jnp.ones(d, dtype=self.scale.dtype))
+    def update(self, x: Float[Array, "... d"]) -> Self:
+        """Return a new BatchNorm with running statistics updated from batch statistics."""
+
+        reduce_axes = tuple(range(x.ndim - 1))
+        mean = jnp.mean(x, axis=reduce_axes)
+        var = jnp.mean(jnp.square(x - mean), axis=reduce_axes)
+
+        new_running_mean = lax.stop_gradient(
+            (1 - self.momentum) * self.running_mean + self.momentum * mean
+        )
+        new_running_var = lax.stop_gradient(
+            (1 - self.momentum) * self.running_var + self.momentum * var
+        )
+
+        return self.replace(running_mean=new_running_mean, running_var=new_running_var)
 
 
 class InstanceNorm(Module):

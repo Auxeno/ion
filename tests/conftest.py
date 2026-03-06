@@ -19,11 +19,6 @@ def _build_layers(key):
     dropout = nn.Dropout(p=0.5, deterministic=True)
     dropout_wrapper = functools.partial(dropout, key=next(keys))
 
-    # Wrap BatchNorm so it matches the layer(x) calling convention (extract output from tuple).
-    bn = nn.BatchNorm(8)
-    bn = bn.replace(state=bn.initial_state)
-    bn_wrapper = lambda x: bn(x, training=False)[0]
-
     # Wrap cells so they match the layer(x) calling convention.
     lstm_cell = nn.LSTMCell(8, 16, key=next(keys))
     lstm_cell_wrapper = lambda x: lstm_cell(x, lstm_cell.initial_state)[0]
@@ -48,7 +43,7 @@ def _build_layers(key):
         (nn.MLP(8, 16, 32, num_hidden_layers=2, key=next(keys)), jnp.ones((8,))),
         (dropout_wrapper, jnp.ones((8,))),
         (nn.Embedding(16, 8, key=next(keys)), jnp.array([0, 3, 7, 15])),
-        (bn_wrapper, jnp.ones((4, 8))),
+        (nn.BatchNorm(8), jnp.ones((4, 8))),
         (lstm_cell_wrapper, jnp.ones((8,))),
         (gru_cell_wrapper, jnp.ones((8,))),
         (lambda x, _l=nn.LSTM(8, 16, key=next(keys)): _l(x)[0], jnp.ones((5, 8))),

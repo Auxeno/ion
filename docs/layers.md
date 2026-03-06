@@ -145,4 +145,4 @@ Each layer family uses init schemes suited to its typical activation:
 All layers are stateless and frozen after `__init__`. Two patterns handle state:
 
 - **Dropout** takes a `key` argument at call time for stochastic masking.
-- **BatchNorm** takes a `state` argument (running mean/var) and returns updated state alongside the output. The caller manages state explicitly.
+- **BatchNorm** stores running statistics on the module. A `training` flag controls whether batch or running stats are used. The `update` method returns a new module with updated running statistics.
