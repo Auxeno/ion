@@ -14,24 +14,6 @@ from tqdm import tqdm
 import ion
 from ion import nn
 
-TOTAL_STEPS = 1_000_000
-ROLLOUT_STEPS = 64
-NUM_ENVS = 16
-LR = 3e-4
-GAMMA = 0.99
-GAE_LAMBDA = 0.95
-NUM_EPOCHS = 8
-NUM_MINIBATCHES = 4
-PPO_CLIP = 0.2
-ENTROPY_BETA = 0.01
-GRAD_NORM_CLIP = 0.5
-HIDDEN_DIM = 64
-NUM_HIDDEN_LAYERS = 2
-SEED = 42
-
-BATCH_SIZE = ROLLOUT_STEPS * NUM_ENVS
-TOTAL_ROLLOUTS = TOTAL_STEPS // BATCH_SIZE
-
 
 class ActorCritic(nn.Module):
     """Actor-critic network for discrete action spaces."""
@@ -91,6 +73,61 @@ class ActorCritic(nn.Module):
         return log_prob, entropy, value
 
 
+class Transition(NamedTuple):
+    observations: Float[Array, "... d"]
+    next_observations: Float[Array, "... d"]
+    rewards: Float[Array, "..."]
+    terminations: Bool[Array, "..."]
+    truncations: Bool[Array, "..."]
+    actions: Int[Array, "..."]
+    log_probs: Float[Array, "..."]
+    values: Float[Array, "..."]
+
+
+RolloutCarry = tuple[PRNGKeyArray, gymnax.EnvState, Float[Array, "n d"]]
+
+
+@jax.jit
+def rollout(
+    network: ActorCritic,
+    carry: RolloutCarry,
+) -> tuple[RolloutCarry, Transition]:
+    """Collect transitions from vectorized environments via scan."""
+
+    def step_fn(carry: RolloutCarry, _: None) -> tuple[RolloutCarry, Transition]:
+        rng, env_states, observations = carry
+        rng, key_action, key_step = jax.random.split(rng, 3)
+
+        # Select actions from policy
+        actions, log_probs, values = network.get_action_and_value(observations, key=key_action)
+
+        # Step vectorized environments
+        next_observations, next_states, rewards, terminations, info = jax.vmap(
+            env.step, in_axes=(0, 0, 0, None)
+        )(
+            jax.random.split(key_step, NUM_ENVS),
+            env_states,
+            actions,
+            env_params,
+        )
+        truncations = jnp.zeros_like(terminations)
+
+        transition = Transition(
+            observations,
+            next_observations,
+            rewards,
+            terminations,
+            truncations,
+            actions,
+            log_probs,
+            values,
+        )
+        return (rng, next_states, next_observations), transition
+
+    new_carry, transitions = jax.lax.scan(f=step_fn, init=carry, xs=None, length=ROLLOUT_STEPS)
+    return new_carry, transitions
+
+
 def calculate_gae(
     rewards: Float[Array, "t n"],
     values: Float[Array, "t n"],
@@ -145,61 +182,6 @@ def ppo_loss(
     entropy_loss = -entropies.mean()
 
     return policy_loss + value_loss + entropy_loss * ENTROPY_BETA
-
-
-class Transition(NamedTuple):
-    observations: Float[Array, "... d"]
-    next_observations: Float[Array, "... d"]
-    rewards: Float[Array, "..."]
-    terminations: Bool[Array, "..."]
-    truncations: Bool[Array, "..."]
-    actions: Int[Array, "..."]
-    log_probs: Float[Array, "..."]
-    values: Float[Array, "..."]
-
-
-RolloutCarry = tuple[PRNGKeyArray, gymnax.EnvState, Float[Array, "n d"]]
-
-
-@jax.jit
-def rollout(
-    network: ActorCritic,
-    carry: RolloutCarry,
-) -> tuple[RolloutCarry, Transition]:
-    """Collect transitions from vectorized environments via scan."""
-
-    def step_fn(carry: RolloutCarry, _: None) -> tuple[RolloutCarry, Transition]:
-        rng, env_states, observations = carry
-        rng, key_action, key_step = jax.random.split(rng, 3)
-
-        # Select actions from policy
-        actions, log_probs, values = network.get_action_and_value(observations, key=key_action)
-
-        # Step vectorized environments
-        next_observations, next_states, rewards, terminations, info = jax.vmap(
-            env.step, in_axes=(0, 0, 0, None)
-        )(
-            jax.random.split(key_step, NUM_ENVS),
-            env_states,
-            actions,
-            env_params,
-        )
-        truncations = jnp.zeros_like(terminations)  # dummy truncations
-
-        transition = Transition(
-            observations,
-            next_observations,
-            rewards,
-            terminations,
-            truncations,
-            actions,
-            log_probs,
-            values,
-        )
-        return (rng, next_states, next_observations), transition
-
-    new_carry, transitions = jax.lax.scan(f=step_fn, init=carry, xs=None, length=ROLLOUT_STEPS)
-    return new_carry, transitions
 
 
 @jax.jit
@@ -259,8 +241,27 @@ def learn(
 
 
 if __name__ == "__main__":
-    # Create CartPole Gymnax environment
-    env, env_params = gymnax.make("CartPole-v1")
+    GYMNAX_ENV_NAME = "CartPole-v1"
+    TOTAL_STEPS = 1_000_000
+    ROLLOUT_STEPS = 64
+    NUM_ENVS = 16
+    LR = 3e-4
+    GAMMA = 0.99
+    GAE_LAMBDA = 0.95
+    NUM_EPOCHS = 8
+    NUM_MINIBATCHES = 4
+    PPO_CLIP = 0.2
+    ENTROPY_BETA = 0.01
+    GRAD_NORM_CLIP = 0.5
+    HIDDEN_DIM = 64
+    NUM_HIDDEN_LAYERS = 2
+    SEED = 42
+
+    BATCH_SIZE = ROLLOUT_STEPS * NUM_ENVS
+    TOTAL_ROLLOUTS = TOTAL_STEPS // BATCH_SIZE
+
+    # Create Gymnax environment
+    env, env_params = gymnax.make(GYMNAX_ENV_NAME)
     obs_dim = env.observation_space(env_params).shape[0]  # type: ignore[reportArgumentType]
     action_dim = int(env.action_space(env_params).n)  # type: ignore[reportArgumentType]
 
