@@ -34,20 +34,6 @@ BATCH_SIZE = ROLLOUT_STEPS * NUM_ENVS
 TOTAL_ROLLOUTS = TOTAL_STEPS // BATCH_SIZE
 
 
-def categorical_sample(logits: jax.Array, *, key: PRNGKeyArray) -> jax.Array:
-    return jax.random.categorical(key, logits, axis=-1)
-
-
-def categorical_log_prob(logits: jax.Array, actions: jax.Array) -> jax.Array:
-    log_probs = jax.nn.log_softmax(logits, axis=-1)
-    return jnp.take_along_axis(log_probs, actions[..., None], axis=-1).squeeze(-1)
-
-
-def categorical_entropy(logits: jax.Array) -> jax.Array:
-    log_probs = jax.nn.log_softmax(logits, axis=-1)
-    return -jnp.sum(jnp.exp(log_probs) * log_probs, axis=-1)
-
-
 class ActorCritic(nn.Module):
     """Actor-critic network for discrete action spaces."""
 
@@ -79,35 +65,31 @@ class ActorCritic(nn.Module):
         return self.critic(obs).squeeze(-1)
 
     def get_action_and_value(
-        self, obs: Float[Array, " O"], *, key: PRNGKeyArray
+        self,
+        obs: Float[Array, " O"],
+        *,
+        key: PRNGKeyArray,
     ) -> tuple[Int[Array, ""], Float[Array, ""], Float[Array, ""]]:
         """Sample action, compute its log-prob and value estimate."""
         logits = self.actor(obs)
-        action = categorical_sample(logits, key=key)
-        log_prob = categorical_log_prob(logits, action)
+        action = jax.random.categorical(key, logits, axis=-1)
+        log_probs = jax.nn.log_softmax(logits, axis=-1)
+        log_prob = jnp.take_along_axis(log_probs, action[..., None], axis=-1).squeeze(-1)
         value = self.critic(obs).squeeze(-1)
         return action, log_prob, value
 
     def get_log_prob_entropy_value(
-        self, obs: Float[Array, " O"], action: Int[Array, ""]
+        self,
+        obs: Float[Array, " O"],
+        action: Int[Array, ""],
     ) -> tuple[Float[Array, ""], Float[Array, ""], Float[Array, ""]]:
         """Compute action log-prob, entropy, and value estimate."""
         logits = self.actor(obs)
-        log_prob = categorical_log_prob(logits, action)
-        entropy = categorical_entropy(logits)
+        log_probs = jax.nn.log_softmax(logits, axis=-1)
+        log_prob = jnp.take_along_axis(log_probs, action[..., None], axis=-1).squeeze(-1)
+        entropy = -jnp.sum(jnp.exp(log_probs) * log_probs, axis=-1)
         value = self.critic(obs).squeeze(-1)
         return log_prob, entropy, value
-
-
-class Transition(NamedTuple):
-    observations: jax.Array
-    next_observations: jax.Array
-    rewards: jax.Array
-    terminations: jax.Array
-    truncations: jax.Array
-    actions: jax.Array
-    log_probs: jax.Array
-    values: jax.Array
 
 
 def calculate_gae(
@@ -168,31 +150,28 @@ def ppo_loss(
     return policy_loss + value_loss + entropy_loss * ENTROPY_BETA
 
 
-def make_minibatch_indices(
-    batch_size: int,
-    num_epochs: int,
-    num_minibatches: int,
-    *,
-    key: PRNGKeyArray,
-) -> Int[Array, "N B"]:
-    """Generate shuffled minibatch indices for multiple epochs."""
-    minibatch_size = batch_size // num_minibatches
-    indices = jnp.tile(jnp.arange(batch_size, dtype=jnp.int32), (num_epochs, 1))
-    shuffled = jax.vmap(jax.random.permutation)(jax.random.split(key, num_epochs), indices)
-    return shuffled.reshape(num_epochs * num_minibatches, minibatch_size)
+class Transition(NamedTuple):
+    observations: jax.Array
+    next_observations: jax.Array
+    rewards: jax.Array
+    terminations: jax.Array
+    truncations: jax.Array
+    actions: jax.Array
+    log_probs: jax.Array
+    values: jax.Array
 
 
-Carry = tuple[PRNGKeyArray, gymnax.EnvState, Float[Array, "N O"]]
+RolloutCarry = tuple[PRNGKeyArray, gymnax.EnvState, Float[Array, "N O"]]
 
 
 @jax.jit
 def rollout(
     network: ActorCritic,
-    carry: Carry,
-) -> tuple[Carry, Transition]:
+    carry: RolloutCarry,
+) -> tuple[RolloutCarry, Transition]:
     """Collect transitions from vectorized environments via scan."""
 
-    def step_fn(carry: Carry, _: None) -> tuple[Carry, Transition]:
+    def step_fn(carry: RolloutCarry, _: None) -> tuple[RolloutCarry, Transition]:
         rng, env_states, obs = carry
         rng, key_action, key_step = jax.random.split(rng, 3)
 
@@ -210,7 +189,7 @@ def rollout(
             actions,
             env_params,
         )
-        truncations = jnp.zeros_like(terminations)
+        truncations = jnp.zeros_like(terminations)  # dummy truncations
 
         transition = Transition(
             obs,
@@ -256,7 +235,10 @@ def learn(
     advantages, returns = advantages.flatten(), returns.flatten()
 
     # Generate shuffled minibatch indices
-    mb_indices = make_minibatch_indices(BATCH_SIZE, NUM_EPOCHS, NUM_MINIBATCHES, key=key)
+    minibatch_size = BATCH_SIZE // NUM_MINIBATCHES
+    indices = jnp.tile(jnp.arange(BATCH_SIZE, dtype=jnp.int32), (NUM_EPOCHS, 1))
+    mb_indices = jax.vmap(jax.random.permutation)(jax.random.split(key, NUM_EPOCHS), indices)
+    mb_indices = mb_indices.reshape(NUM_EPOCHS * NUM_MINIBATCHES, minibatch_size)
 
     def minibatch_update(carry, indices):
         network, opt_state = carry
@@ -280,23 +262,8 @@ def learn(
     return network, opt_state
 
 
-def track_episodes(
-    transitions: Transition,
-    current_returns: np.ndarray,
-    recent_returns: deque[float],
-) -> None:
-    """Update running episode return statistics from a rollout batch."""
-    rewards = np.asarray(transitions.rewards)
-    dones = np.asarray(transitions.terminations | transitions.truncations)
-    for step_r, step_d in zip(rewards, dones):
-        current_returns += step_r
-        for ret in current_returns[step_d]:
-            recent_returns.append(float(ret))
-        current_returns[step_d] = 0.0
-
-
 if __name__ == "__main__":
-    # Create environment
+    # Create Gymnax environment
     env, env_params = gymnax.make("CartPole-v1")
     obs_dim = env.observation_space(env_params).shape[0]  # type: ignore[reportArgumentType]
     act_dim = int(env.action_space(env_params).n)  # type: ignore[reportArgumentType]
@@ -333,8 +300,16 @@ if __name__ == "__main__":
         carry, transitions = rollout(network, carry)
         network, opt_state = learn(network, opt_state, transitions, key=key_learn)
 
-        # Log episode statistics
-        track_episodes(jax.device_get(transitions), current_returns, recent_returns)
+        # Track episode statistics
+        t = jax.device_get(transitions)
+        rewards_np = np.asarray(t.rewards)
+        dones_np = np.asarray(t.terminations | t.truncations)
+        for step_r, step_d in zip(rewards_np, dones_np):
+            current_returns += step_r
+            for ret in current_returns[step_d]:
+                recent_returns.append(float(ret))
+            current_returns[step_d] = 0.0
+
         if recent_returns:
             mean_reward = np.mean(recent_returns)
             bar.set_postfix(reward=f"{mean_reward:.1f}")
