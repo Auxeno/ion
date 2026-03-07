@@ -23,24 +23,8 @@ class ActorCritic(nn.Module):
 
     def __init__(self, obs_dim: int, action_dim: int, *, key: PRNGKeyArray) -> None:
         key_a, key_c = jax.random.split(key)
-        self.actor = nn.MLP(
-            obs_dim,
-            action_dim,
-            HIDDEN_DIM,
-            NUM_HIDDEN_LAYERS,
-            activation=jax.nn.tanh,
-            w_init=jax.nn.initializers.orthogonal(),
-            key=key_a,
-        )
-        self.critic = nn.MLP(
-            obs_dim,
-            1,
-            HIDDEN_DIM,
-            NUM_HIDDEN_LAYERS,
-            activation=jax.nn.tanh,
-            w_init=jax.nn.initializers.orthogonal(),
-            key=key_c,
-        )
+        self.actor = nn.MLP(obs_dim, action_dim, 64, 2, activation=jax.nn.tanh, key=key_a)
+        self.critic = nn.MLP(obs_dim, 1, 64, 2, activation=jax.nn.tanh, key=key_c)
 
     def get_value(self, observations: Float[Array, "... d"]) -> Float[Array, "..."]:
         return self.critic(observations).squeeze(-1)
@@ -252,9 +236,6 @@ if __name__ == "__main__":
     NUM_MINIBATCHES = 4
     PPO_CLIP = 0.2
     ENTROPY_BETA = 0.01
-    GRAD_NORM_CLIP = 0.5
-    HIDDEN_DIM = 64
-    NUM_HIDDEN_LAYERS = 2
     SEED = 42
 
     BATCH_SIZE = ROLLOUT_STEPS * NUM_ENVS
@@ -272,7 +253,7 @@ if __name__ == "__main__":
     # Initialize network and optimizer
     network = ActorCritic(obs_dim, action_dim, key=key_network)
     optimizer = optax.chain(
-        optax.clip_by_global_norm(GRAD_NORM_CLIP),
+        optax.clip_by_global_norm(1.0),
         optax.adam(learning_rate=LR, eps=1e-5),
     )
     opt_state = optimizer.init(network.params)
@@ -286,7 +267,6 @@ if __name__ == "__main__":
     # Episode tracking
     current_returns = np.zeros(NUM_ENVS)
     recent_returns: deque[float] = deque(maxlen=100)
-    mean_reward = 0.0
     checkpoints = {TOTAL_ROLLOUTS * p // 10 for p in range(1, 11)}
 
     bar = tqdm(range(TOTAL_ROLLOUTS), desc="PPO CartPole-v1")
@@ -298,9 +278,8 @@ if __name__ == "__main__":
         network, opt_state = learn(network, opt_state, transitions, key=key_learn)
 
         # Track episode statistics
-        t = jax.device_get(transitions)
-        rewards_np = np.asarray(t.rewards)
-        dones_np = np.asarray(t.terminations | t.truncations)
+        rewards_np = np.asarray(transitions.rewards)
+        dones_np = np.asarray(transitions.terminations | transitions.truncations)
         for step_r, step_d in zip(rewards_np, dones_np):
             current_returns += step_r
             for ret in current_returns[step_d]:
@@ -310,6 +289,5 @@ if __name__ == "__main__":
         if recent_returns:
             mean_reward = np.mean(recent_returns)
             bar.set_postfix(reward=f"{mean_reward:.1f}")
-        if i + 1 in checkpoints and recent_returns:
-            step = (i + 1) * BATCH_SIZE
-            tqdm.write(f"  Step {step:>9,} | Mean reward: {mean_reward:.1f}")
+            if i + 1 in checkpoints:
+                tqdm.write(f"  Step {(i + 1) * BATCH_SIZE:>9,} | Mean reward: {mean_reward:.1f}")
