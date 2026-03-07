@@ -35,10 +35,10 @@ def _build_layers(key):
         (nn.SelfAttention(8, num_heads=2, causal=True, key=next(keys)), jnp.ones((4, 8))),
         (nn.LayerNorm(8), jnp.ones((4, 8))),
         (nn.RMSNorm(8), jnp.ones((4, 8))),
-        (nn.MaxPool(1, kernel_size=2), jnp.ones((10, 3))),
-        (nn.MaxPool(2, kernel_size=2), jnp.ones((4, 4, 3))),
-        (nn.AvgPool(1, kernel_size=2), jnp.ones((10, 3))),
-        (nn.AvgPool(2, kernel_size=2), jnp.ones((4, 4, 3))),
+        (nn.MaxPool(kernel_shape=(2,)), jnp.ones((10, 3))),
+        (nn.MaxPool(kernel_shape=(2, 2)), jnp.ones((4, 4, 3))),
+        (nn.AvgPool(kernel_shape=(2,)), jnp.ones((10, 3))),
+        (nn.AvgPool(kernel_shape=(2, 2)), jnp.ones((4, 4, 3))),
         (nn.Identity(), jnp.ones((8,))),
         (nn.MLP(8, 16, 32, num_hidden_layers=2, key=next(keys)), jnp.ones((8,))),
         (dropout_wrapper, jnp.ones((8,))),
@@ -51,7 +51,10 @@ def _build_layers(key):
         (nn.Sequential(nn.Linear(8, 16, key=next(keys)), jax.nn.relu), jnp.ones((8,))),
         (nn.LoRALinear(nn.Linear(8, 16, key=next(keys)), rank=4, key=next(keys)), jnp.ones((8,))),
         (nn.ConvTranspose(3, 8, kernel_shape=(3,), padding=1, key=next(keys)), jnp.ones((10, 3))),
-        (nn.ConvTranspose(3, 8, kernel_shape=(3, 3), padding=1, key=next(keys)), jnp.ones((6, 6, 3))),
+        (
+            nn.ConvTranspose(3, 8, kernel_shape=(3, 3), padding=1, key=next(keys)),
+            jnp.ones((6, 6, 3)),
+        ),
         (nn.LearnedPositionalEmbedding(16, 8, key=next(keys)), jnp.ones((10, 8))),
     ]
 

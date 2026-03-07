@@ -23,7 +23,7 @@ class CNN(nn.Module):
         keys = jax.random.split(key, 4)
         self.conv_1 = nn.Conv(1, 16, kernel_shape=(3, 3), padding=1, key=keys[0])
         self.conv_2 = nn.Conv(16, 32, kernel_shape=(3, 3), padding=1, key=keys[1])
-        self.pool = nn.MaxPool(2, kernel_size=2)
+        self.pool = nn.MaxPool(kernel_shape=(2, 2))
         self.fc_1 = nn.Linear(32 * 7 * 7, 128, key=keys[2])
         self.fc_2 = nn.Linear(128, 10, key=keys[3])
 

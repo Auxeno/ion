@@ -6,14 +6,14 @@ from ion import nn
 
 
 class TestMaxPool:
-    def test_zero_spatial_dims_raises(self):
-        """num_spatial_dims=0 raises ValueError."""
-        with pytest.raises(ValueError, match="num_spatial_dims"):
-            nn.MaxPool(0, kernel_size=2)
+    def test_int_kernel_shape_raises(self):
+        """Passing an int instead of a tuple raises TypeError."""
+        with pytest.raises(TypeError, match="kernel_shape"):
+            nn.MaxPool(kernel_shape=2)  # type: ignore[arg-type]
 
     def test_1d_picks_max(self):
         """Each output element is the maximum of its window."""
-        layer = nn.MaxPool(1, kernel_size=2)
+        layer = nn.MaxPool(kernel_shape=(2,))
         x = jnp.array([[1.0], [3.0], [2.0], [5.0], [4.0], [6.0]])
         y = layer(x)
         expected = jnp.array([[3.0], [5.0], [6.0]])
@@ -21,14 +21,14 @@ class TestMaxPool:
 
     def test_1d_stride_reduces_spatial(self):
         """Stride 2 halves spatial dimension."""
-        layer = nn.MaxPool(1, kernel_size=2, stride=2)
+        layer = nn.MaxPool(kernel_shape=(2,), stride=2)
         x = jnp.ones((8, 3))
         y = layer(x)
         assert y.shape == (4, 3)
 
     def test_2d_picks_max(self):
         """Each output element is the maximum of its 2x2 window."""
-        layer = nn.MaxPool(2, kernel_size=2)
+        layer = nn.MaxPool(kernel_shape=(2, 2))
         x = jnp.array(
             [
                 [[1.0], [2.0], [3.0], [4.0]],
@@ -48,21 +48,21 @@ class TestMaxPool:
 
     def test_2d_stride_reduces_spatial(self):
         """Stride 2 halves spatial dimensions."""
-        layer = nn.MaxPool(2, kernel_size=2, stride=2)
+        layer = nn.MaxPool(kernel_shape=(2, 2), stride=2)
         x = jnp.ones((8, 8, 3))
         y = layer(x)
         assert y.shape == (4, 4, 3)
 
 
 class TestAvgPool:
-    def test_zero_spatial_dims_raises(self):
-        """num_spatial_dims=0 raises ValueError."""
-        with pytest.raises(ValueError, match="num_spatial_dims"):
-            nn.AvgPool(0, kernel_size=2)
+    def test_int_kernel_shape_raises(self):
+        """Passing an int instead of a tuple raises TypeError."""
+        with pytest.raises(TypeError, match="kernel_shape"):
+            nn.AvgPool(kernel_shape=2)  # type: ignore[arg-type]
 
     def test_1d_computes_mean(self):
         """Each output element is the mean of its window."""
-        layer = nn.AvgPool(1, kernel_size=2)
+        layer = nn.AvgPool(kernel_shape=(2,))
         x = jnp.array([[1.0], [3.0], [2.0], [6.0], [4.0], [8.0]])
         y = layer(x)
         expected = jnp.array([[2.0], [4.0], [6.0]])
@@ -70,14 +70,14 @@ class TestAvgPool:
 
     def test_1d_stride_reduces_spatial(self):
         """Stride 2 halves spatial dimension."""
-        layer = nn.AvgPool(1, kernel_size=2, stride=2)
+        layer = nn.AvgPool(kernel_shape=(2,), stride=2)
         x = jnp.ones((8, 3))
         y = layer(x)
         assert y.shape == (4, 3)
 
     def test_1d_padding_averages_only_real_elements(self):
         """Padding should not count padded zeros in the average."""
-        layer = nn.AvgPool(1, kernel_size=3, stride=1, padding=1)
+        layer = nn.AvgPool(kernel_shape=(3,), stride=1, padding=1)
         x = jnp.array([[6.0], [6.0], [6.0], [6.0]])
         y = layer(x)
         expected = jnp.array([[6.0], [6.0], [6.0], [6.0]])
@@ -85,7 +85,7 @@ class TestAvgPool:
 
     def test_2d_computes_mean(self):
         """Each output element is the mean of its 2x2 window."""
-        layer = nn.AvgPool(2, kernel_size=2)
+        layer = nn.AvgPool(kernel_shape=(2, 2))
         x = jnp.array(
             [
                 [[1.0], [2.0], [3.0], [4.0]],
@@ -105,14 +105,14 @@ class TestAvgPool:
 
     def test_2d_stride_reduces_spatial(self):
         """Stride 2 halves spatial dimensions."""
-        layer = nn.AvgPool(2, kernel_size=2, stride=2)
+        layer = nn.AvgPool(kernel_shape=(2, 2), stride=2)
         x = jnp.ones((8, 8, 3))
         y = layer(x)
         assert y.shape == (4, 4, 3)
 
     def test_2d_padding_averages_only_real_elements(self):
         """Padding should not count padded zeros in the average."""
-        layer = nn.AvgPool(2, kernel_size=3, stride=1, padding=1)
+        layer = nn.AvgPool(kernel_shape=(3, 3), stride=1, padding=1)
         x = jnp.full((4, 4, 1), 10.0)
         y = layer(x)
         expected = jnp.full((4, 4, 1), 10.0)
