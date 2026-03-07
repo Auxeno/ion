@@ -106,8 +106,8 @@ if __name__ == "__main__":
         for i in tqdm(range(num_batches), desc=f"Epoch {epoch + 1}/{NUM_EPOCHS}"):
             # Slice a batch from the shuffled indices
             batch_indices = indices[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
-            images = train_images[batch_indices]
-            labels = train_labels[batch_indices]
+            images = jnp.asarray(train_images[batch_indices], dtype=jnp.float32) / 255.0
+            labels = jnp.asarray(train_labels[batch_indices])
 
             # Update model and optimizer state
             model, opt_state, loss = train_step(model, opt_state, images, labels)
@@ -115,5 +115,7 @@ if __name__ == "__main__":
             epoch_loss += loss.item()
 
         # Model eval accuracy
-        test_acc = accuracy(model, test_images, test_labels).item()
+        test_acc = accuracy(
+            model, jnp.asarray(test_images, dtype=jnp.float32) / 255.0, jnp.asarray(test_labels)
+        ).item()
         print(f"  loss: {epoch_loss / num_batches:.4f}  test accuracy: {test_acc:.2%}")
