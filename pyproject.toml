@@ -29,6 +29,7 @@ dev = [
     "pip>=26.0.1",
 ]
 examples = [
+    "gymnax",
     "optax",
     "plotly",
     "tqdm",
