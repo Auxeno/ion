@@ -1,56 +1,15 @@
 """MNIST handwritten digit classification with a small CNN."""
 
-import gzip
-import struct
-import urllib.request
-from pathlib import Path
-
 import jax
 import jax.numpy as jnp
-import ion
-import numpy as np
 import optax
 from jaxtyping import Array, Float, Int
-
-from ion import nn
 from tqdm import tqdm
 
+import ion
+from ion import nn
 
-def load_mnist() -> tuple[
-    Float[Array, "60000 28 28 1"],
-    Int[Array, " 60000"],
-    Float[Array, "10000 28 28 1"],
-    Int[Array, " 10000"],
-]:
-    """Download MNIST dataset and return (train_images, train_labels, test_images, test_labels)."""
-    cache_dir = Path.home() / ".cache" / "ion" / "mnist"
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    url = "https://storage.googleapis.com/cvdf-datasets/mnist/"
-
-    def fetch(filename: str) -> Path:
-        path = cache_dir / filename
-        if not path.exists():
-            print(f"Downloading {filename}...")
-            urllib.request.urlretrieve(url + filename, path)
-        return path
-
-    def parse_images(path: Path) -> Float[Array, "n 28 28 1"]:
-        with gzip.open(path, "rb") as f:
-            _, n, rows, cols = struct.unpack(">IIII", f.read(16))
-            data = np.frombuffer(f.read(), dtype=np.uint8)
-        return jnp.array(data.reshape(n, rows, cols, 1), dtype=jnp.float32) / 255.0
-
-    def parse_labels(path: Path) -> Int[Array, " n"]:
-        with gzip.open(path, "rb") as f:
-            _, n = struct.unpack(">II", f.read(8))
-            data = np.frombuffer(f.read(), dtype=np.uint8)
-        return jnp.array(data, dtype=jnp.int32)
-
-    train_images = parse_images(fetch("train-images-idx3-ubyte.gz"))
-    train_labels = parse_labels(fetch("train-labels-idx1-ubyte.gz"))
-    test_images = parse_images(fetch("t10k-images-idx3-ubyte.gz"))
-    test_labels = parse_labels(fetch("t10k-labels-idx1-ubyte.gz"))
-    return train_images, train_labels, test_images, test_labels
+from ._common.datasets import load_mnist
 
 
 class CNN(nn.Module):
@@ -105,7 +64,7 @@ def train_step(
 ) -> tuple[CNN, optax.OptState, Float[Array, ""]]:
     """Compute gradients, apply optimizer update, and return the new model state."""
     loss, grads = ion.value_and_grad(loss_fn)(model, images, labels)
-    updates, opt_state = optimizer.update(grads, opt_state, model.params)
+    updates, opt_state = optimizer.update(grads, opt_state)
     model = ion.apply_updates(model, updates)
     return model, opt_state, loss
 
@@ -124,7 +83,6 @@ def accuracy(
 
 
 if __name__ == "__main__":
-    # Training hyperparameters
     LEARNING_RATE = 3e-4
     BATCH_SIZE = 128
     NUM_EPOCHS = 5
