@@ -171,7 +171,7 @@ class Module:
             words = [qualname]
 
         # Hash each word to an angle on the hue circle
-        salt = "s5029"
+        salt = "18zm7p"
         angles = []
         for w in words:
             h = int.from_bytes(
