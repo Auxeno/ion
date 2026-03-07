@@ -8,14 +8,13 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-from jaxtyping import Array, Float, Int, PRNGKeyArray
+from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 from tqdm import tqdm
 
 import ion
 from ion import nn
 
-
-TOTAL_STEPS = 400_000
+TOTAL_STEPS = 1_000_000
 ROLLOUT_STEPS = 64
 NUM_ENVS = 16
 LR = 3e-4
@@ -40,11 +39,11 @@ class ActorCritic(nn.Module):
     actor: nn.MLP
     critic: nn.MLP
 
-    def __init__(self, obs_dim: int, act_dim: int, *, key: PRNGKeyArray) -> None:
+    def __init__(self, obs_dim: int, action_dim: int, *, key: PRNGKeyArray) -> None:
         key_a, key_c = jax.random.split(key)
         self.actor = nn.MLP(
             obs_dim,
-            act_dim,
+            action_dim,
             HIDDEN_DIM,
             NUM_HIDDEN_LAYERS,
             activation=jax.nn.tanh,
@@ -61,46 +60,46 @@ class ActorCritic(nn.Module):
             key=key_c,
         )
 
-    def get_value(self, obs: Float[Array, " O"]) -> Float[Array, ""]:
-        return self.critic(obs).squeeze(-1)
+    def get_value(self, observations: Float[Array, "... d"]) -> Float[Array, "..."]:
+        return self.critic(observations).squeeze(-1)
 
     def get_action_and_value(
         self,
-        obs: Float[Array, " O"],
+        observations: Float[Array, "... d"],
         *,
         key: PRNGKeyArray,
-    ) -> tuple[Int[Array, ""], Float[Array, ""], Float[Array, ""]]:
+    ) -> tuple[Int[Array, "..."], Float[Array, "..."], Float[Array, "..."]]:
         """Sample action, compute its log-prob and value estimate."""
-        logits = self.actor(obs)
+        logits = self.actor(observations)
         action = jax.random.categorical(key, logits, axis=-1)
         log_probs = jax.nn.log_softmax(logits, axis=-1)
         log_prob = jnp.take_along_axis(log_probs, action[..., None], axis=-1).squeeze(-1)
-        value = self.critic(obs).squeeze(-1)
+        value = self.critic(observations).squeeze(-1)
         return action, log_prob, value
 
     def get_log_prob_entropy_value(
         self,
-        obs: Float[Array, " O"],
-        action: Int[Array, ""],
-    ) -> tuple[Float[Array, ""], Float[Array, ""], Float[Array, ""]]:
+        observations: Float[Array, "... d"],
+        action: Int[Array, "..."],
+    ) -> tuple[Float[Array, "..."], Float[Array, "..."], Float[Array, "..."]]:
         """Compute action log-prob, entropy, and value estimate."""
-        logits = self.actor(obs)
+        logits = self.actor(observations)
         log_probs = jax.nn.log_softmax(logits, axis=-1)
         log_prob = jnp.take_along_axis(log_probs, action[..., None], axis=-1).squeeze(-1)
         entropy = -jnp.sum(jnp.exp(log_probs) * log_probs, axis=-1)
-        value = self.critic(obs).squeeze(-1)
+        value = self.critic(observations).squeeze(-1)
         return log_prob, entropy, value
 
 
 def calculate_gae(
-    rewards: Float[Array, "T N"],
-    values: Float[Array, "T N"],
-    next_values: Float[Array, "T N"],
-    terminations: Float[Array, "T N"],
-    truncations: Float[Array, "T N"],
+    rewards: Float[Array, "t n"],
+    values: Float[Array, "t n"],
+    next_values: Float[Array, "t n"],
+    terminations: Bool[Array, "t n"],
+    truncations: Bool[Array, "t n"],
     gamma: float,
     gae_lambda: float,
-) -> Float[Array, "T N"]:
+) -> Float[Array, "t n"]:
     """Compute GAE advantages via a reversed scan over timesteps."""
 
     def gae_step(advantage, carry):
@@ -124,16 +123,14 @@ def calculate_gae(
 
 def ppo_loss(
     network: ActorCritic,
-    observations: Float[Array, "B O"],
-    actions: Int[Array, " B"],
-    advantages: Float[Array, " B"],
-    returns: Float[Array, " B"],
-    old_log_probs: Float[Array, " B"],
+    observations: Float[Array, "b d"],
+    actions: Int[Array, " b"],
+    advantages: Float[Array, " b"],
+    returns: Float[Array, " b"],
+    old_log_probs: Float[Array, " b"],
 ) -> Float[Array, ""]:
     """Combined PPO-Clip loss: clipped surrogate + value MSE + entropy."""
-    new_log_probs, entropies, values = jax.vmap(network.get_log_prob_entropy_value)(
-        observations, actions
-    )
+    new_log_probs, entropies, values = network.get_log_prob_entropy_value(observations, actions)
 
     # Clipped surrogate policy loss
     ratio = jnp.exp(new_log_probs - old_log_probs)
@@ -151,17 +148,17 @@ def ppo_loss(
 
 
 class Transition(NamedTuple):
-    observations: jax.Array
-    next_observations: jax.Array
-    rewards: jax.Array
-    terminations: jax.Array
-    truncations: jax.Array
-    actions: jax.Array
-    log_probs: jax.Array
-    values: jax.Array
+    observations: Float[Array, "... d"]
+    next_observations: Float[Array, "... d"]
+    rewards: Float[Array, "..."]
+    terminations: Bool[Array, "..."]
+    truncations: Bool[Array, "..."]
+    actions: Int[Array, "..."]
+    log_probs: Float[Array, "..."]
+    values: Float[Array, "..."]
 
 
-RolloutCarry = tuple[PRNGKeyArray, gymnax.EnvState, Float[Array, "N O"]]
+RolloutCarry = tuple[PRNGKeyArray, gymnax.EnvState, Float[Array, "n d"]]
 
 
 @jax.jit
@@ -172,16 +169,14 @@ def rollout(
     """Collect transitions from vectorized environments via scan."""
 
     def step_fn(carry: RolloutCarry, _: None) -> tuple[RolloutCarry, Transition]:
-        rng, env_states, obs = carry
+        rng, env_states, observations = carry
         rng, key_action, key_step = jax.random.split(rng, 3)
 
         # Select actions from policy
-        actions, log_probs, values = jax.vmap(lambda o, k: network.get_action_and_value(o, key=k))(
-            obs, jax.random.split(key_action, NUM_ENVS)
-        )
+        actions, log_probs, values = network.get_action_and_value(observations, key=key_action)
 
         # Step vectorized environments
-        next_obs, next_states, rewards, terminations, info = jax.vmap(
+        next_observations, next_states, rewards, terminations, info = jax.vmap(
             env.step, in_axes=(0, 0, 0, None)
         )(
             jax.random.split(key_step, NUM_ENVS),
@@ -192,8 +187,8 @@ def rollout(
         truncations = jnp.zeros_like(terminations)  # dummy truncations
 
         transition = Transition(
-            obs,
-            next_obs,
+            observations,
+            next_observations,
             rewards,
             terminations,
             truncations,
@@ -201,9 +196,10 @@ def rollout(
             log_probs,
             values,
         )
-        return (rng, next_states, next_obs), transition
+        return (rng, next_states, next_observations), transition
 
-    return jax.lax.scan(step_fn, carry, None, length=ROLLOUT_STEPS)
+    new_carry, transitions = jax.lax.scan(f=step_fn, init=carry, xs=None, length=ROLLOUT_STEPS)
+    return new_carry, transitions
 
 
 @jax.jit
@@ -217,7 +213,7 @@ def learn(
     """PPO update: compute GAE then scan over minibatch gradient steps."""
 
     # Compute advantages with GAE
-    next_values = jax.vmap(jax.vmap(network.get_value))(batch.next_observations)
+    next_values = network.get_value(batch.next_observations)
     advantages = calculate_gae(
         batch.rewards,
         batch.values,
@@ -263,17 +259,17 @@ def learn(
 
 
 if __name__ == "__main__":
-    # Create Gymnax environment
+    # Create CartPole Gymnax environment
     env, env_params = gymnax.make("CartPole-v1")
     obs_dim = env.observation_space(env_params).shape[0]  # type: ignore[reportArgumentType]
-    act_dim = int(env.action_space(env_params).n)  # type: ignore[reportArgumentType]
+    action_dim = int(env.action_space(env_params).n)  # type: ignore[reportArgumentType]
 
     # Initialize RNG
     rng = jax.random.key(SEED)
     rng, key_network, key_reset, rng_rollout = jax.random.split(rng, 4)
 
     # Initialize network and optimizer
-    network = ActorCritic(obs_dim, act_dim, key=key_network)
+    network = ActorCritic(obs_dim, action_dim, key=key_network)
     optimizer = optax.chain(
         optax.clip_by_global_norm(GRAD_NORM_CLIP),
         optax.adam(learning_rate=LR, eps=1e-5),
@@ -290,7 +286,7 @@ if __name__ == "__main__":
     current_returns = np.zeros(NUM_ENVS)
     recent_returns: deque[float] = deque(maxlen=100)
     mean_reward = 0.0
-    checkpoints = {TOTAL_ROLLOUTS * p // 4 for p in range(1, 5)}
+    checkpoints = {TOTAL_ROLLOUTS * p // 10 for p in range(1, 11)}
 
     bar = tqdm(range(TOTAL_ROLLOUTS), desc="PPO CartPole-v1")
     for i in bar:
