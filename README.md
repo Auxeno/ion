@@ -24,6 +24,8 @@ pip install git+https://github.com/auxeno/ion
 
 Ion is designed to be minimal. The core has four concepts for new users to learn: `Module`, `Param`, transforms (`ion.grad` / `ion.value_and_grad`), and `apply_updates`. Everything else is just JAX.
 
+Visit the [Ion Tour Notebook](https://nbviewer.org/github/auxeno/ion/blob/main/examples/ion_tour.ipynb) for a hands-on walkthrough.
+
 ### Module
 
 Inherit from `nn.Module` to define a model. Subclasses are automatically registered as JAX pytrees and become immutable after initialization (`__init__`).
@@ -153,7 +155,9 @@ MLP(
 )
 ```
 
-Treescope integration is enabled by default and can be toggled via `ion.enable_treescope()` / `ion.disable_treescope()`.
+Treescope integration is enabled by default and can be toggled via `ion.enable_treescope()` / `ion.disable_treescope()`. 
+
+Interact with models using Treescope by running locally or in [Colab](https://colab.research.google.com/github/auxeno/ion/blob/main/examples/ion_tour.ipynb).
 
 ### Serialization
 
