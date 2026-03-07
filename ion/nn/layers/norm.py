@@ -5,7 +5,6 @@ Modules:
     RMSNorm       RMS normalization, no mean centering.   (Zhang & Sennrich, 2019)
     GroupNorm     Normalization over channel groups.      (Wu & He, 2018)
     BatchNorm     Normalization with running statistics.  (Ioffe & Szegedy, 2015)
-    InstanceNorm  Per-instance spatial normalization.     (Ulyanov et al., 2016)
 
 Scale initialized to 1, bias to 0. Normalizes over the last dimension by default.
 """
@@ -53,19 +52,24 @@ class LayerNorm(Module):
 class GroupNorm(Module):
     """Group normalization, splitting channels into groups.
 
-    >>> norm = GroupNorm(num_groups=8, dim=64)
+    >>> norm = GroupNorm(64, num_groups=8)
     >>> norm(x)  # (*, 64) -> (*, 64)
+
+    >>> norm = GroupNorm(64, num_groups=8, num_spatial_dims=2)
+    >>> norm(x)  # (*, h, w, 64) -> (*, h, w, 64)
     """
 
     scale: Param[Float[Array, " d"]]
     b: Param[Float[Array, " d"]]
     num_groups: int
+    num_spatial_dims: int
     eps: float
 
     def __init__(
         self,
-        num_groups: int,
         dim: int,
+        num_groups: int,
+        num_spatial_dims: int = 0,
         eps: float = 1e-5,
         dtype: jnp.dtype = jnp.float32,
     ) -> None:
@@ -77,21 +81,33 @@ class GroupNorm(Module):
         self.b = Param(jnp.zeros(dim, dtype=dtype))
 
         self.num_groups = num_groups
+        self.num_spatial_dims = num_spatial_dims
         self.eps = eps
 
     def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
 
+        num_spatial = self.num_spatial_dims
+
+        batch_shape = x.shape[: -(num_spatial + 1)]
+        x = x.reshape(-1, *x.shape[-(num_spatial + 1) :])
+
+        # Split channels into groups
         group_shape = (*x.shape[:-1], self.num_groups, x.shape[-1] // self.num_groups)
         x = x.reshape(group_shape)
 
-        mean = jnp.mean(x, axis=-1, keepdims=True)
-        var = jnp.mean(jnp.square(x - mean), axis=-1, keepdims=True)
+        reduce_axes = tuple(range(1, num_spatial + 1)) + (-1,)
+
+        mean = jnp.mean(x, axis=reduce_axes, keepdims=True)
+        var = jnp.mean(jnp.square(x - mean), axis=reduce_axes, keepdims=True)
 
         x = (x - mean) * lax.rsqrt(var + self.eps)
 
-        x = x.reshape(*group_shape[:-2], -1)
+        # Merge groups back
+        x = x.reshape(*x.shape[: num_spatial + 1], -1)
 
         x = x * self.scale + self.b
+
+        x = x.reshape(*batch_shape, *x.shape[1:])
 
         return x
 
@@ -195,46 +211,3 @@ class BatchNorm(Module):
         )
 
         return self.replace(running_mean=new_running_mean, running_var=new_running_var)
-
-
-class InstanceNorm(Module):
-    """Instance normalization over spatial dimensions.
-
-    >>> norm = InstanceNorm(16, num_spatial_dims=2)
-    >>> norm(x)  # (*, h, w, 16) -> (*, h, w, 16)
-    """
-
-    scale: Param[Float[Array, " d"]]
-    b: Param[Float[Array, " d"]]
-    num_spatial_dims: int
-    eps: float
-
-    def __init__(
-        self,
-        dim: int,
-        num_spatial_dims: int = 1,
-        eps: float = 1e-5,
-        dtype: jnp.dtype = jnp.float32,
-    ) -> None:
-
-        if num_spatial_dims < 1:
-            raise ValueError(f"num_spatial_dims ({num_spatial_dims}) must be >= 1")
-
-        self.scale = Param(jnp.ones(dim, dtype=dtype))
-        self.b = Param(jnp.zeros(dim, dtype=dtype))
-
-        self.num_spatial_dims = num_spatial_dims
-        self.eps = eps
-
-    def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
-
-        reduce_axes = tuple(range(-self.num_spatial_dims - 1, -1))
-
-        mean = jnp.mean(x, axis=reduce_axes, keepdims=True)
-        var = jnp.mean(jnp.square(x - mean), axis=reduce_axes, keepdims=True)
-
-        x = (x - mean) * lax.rsqrt(var + self.eps)
-
-        x = x * self.scale + self.b
-
-        return x

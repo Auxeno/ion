@@ -8,7 +8,7 @@ from .layers.dropout import Dropout
 from .layers.embedding import Embedding
 from .layers.linear import Identity, Linear
 from .layers.lora import LoRALinear
-from .layers.norm import BatchNorm, GroupNorm, InstanceNorm, LayerNorm, RMSNorm
+from .layers.norm import BatchNorm, GroupNorm, LayerNorm, RMSNorm
 from .layers.pool import AvgPool, MaxPool
 from .layers.positional import LearnedPositionalEmbedding, alibi, apply_rope, rope, sinusoidal
 from .layers.recurrent import GRUCell, LSTMCell
@@ -30,7 +30,6 @@ __all__ = [
     "GRU",
     "GRUCell",
     "Identity",
-    "InstanceNorm",
     "LayerNorm",
     "LearnedPositionalEmbedding",
     "Linear",

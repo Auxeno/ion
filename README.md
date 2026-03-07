@@ -124,7 +124,7 @@ Ion ships with standard neural network layers built on the core. Each is a `Modu
 | Linear          | `Linear`, `Identity`, `LoRALinear`                                        |
 | Convolution     | `Conv`, `ConvTranspose`                                                   |
 | Attention       | `SelfAttention`, `CrossAttention`                                         |
-| Normalization   | `LayerNorm`, `RMSNorm`, `GroupNorm`, `BatchNorm`, `InstanceNorm`          |
+| Normalization   | `LayerNorm`, `RMSNorm`, `GroupNorm`, `BatchNorm`                          |
 | Recurrent       | `LSTMCell`, `GRUCell`, `LSTM`, `GRU`                                     |
 | Pooling         | `MaxPool`, `AvgPool`                                                      |
 | Embedding       | `Embedding`, `LearnedPositionalEmbedding`                                 |

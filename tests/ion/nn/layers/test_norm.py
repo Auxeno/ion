@@ -37,7 +37,7 @@ class TestLayerNorm:
 class TestGroupNorm:
     def test_zero_mean_per_group(self):
         """Output has approximately zero mean within each group."""
-        layer = nn.GroupNorm(2, 8)
+        layer = nn.GroupNorm(8, 2)
         x = jax.random.normal(jax.random.key(0), (4, 8))
         y = layer(x)
         y_groups = y.reshape(4, 2, 4)
@@ -46,7 +46,7 @@ class TestGroupNorm:
 
     def test_unit_variance_per_group(self):
         """Output has approximately unit variance within each group."""
-        layer = nn.GroupNorm(2, 8)
+        layer = nn.GroupNorm(8, 2)
         x = jax.random.normal(jax.random.key(0), (4, 8))
         y = layer(x)
         y_groups = y.reshape(4, 2, 4)
@@ -55,25 +55,59 @@ class TestGroupNorm:
 
     def test_scale_init(self):
         """Scale is initialized to all ones."""
-        layer = nn.GroupNorm(2, 8)
+        layer = nn.GroupNorm(8, 2)
         npt.assert_allclose(layer.scale.value, jnp.ones(8))
 
     def test_bias_init(self):
         """Bias is initialized to all zeros."""
-        layer = nn.GroupNorm(2, 8)
+        layer = nn.GroupNorm(8, 2)
         npt.assert_allclose(layer.b.value, jnp.zeros(8))
 
     def test_indivisible_dim_errors(self):
         """dim not divisible by num_groups raises ValueError."""
         with pytest.raises(ValueError, match="divisible"):
-            nn.GroupNorm(3, 8)
+            nn.GroupNorm(8, 3)
 
     def test_single_group_matches_layer_norm(self):
         """With num_groups=1, GroupNorm behaves like LayerNorm."""
         x = jax.random.normal(jax.random.key(0), (4, 8))
-        gn = nn.GroupNorm(1, 8)
+        gn = nn.GroupNorm(8, 1)
         ln = nn.LayerNorm(8)
         npt.assert_allclose(gn(x), ln(x), atol=1e-6)
+
+    def test_spatial_zero_mean_per_group(self):
+        """With num_spatial_dims=2, output has zero mean over spatial + group channels."""
+        layer = nn.GroupNorm(8, 2, num_spatial_dims=2)
+        x = jax.random.normal(jax.random.key(0), (6, 6, 8))
+        y = layer(x)
+        y_groups = y.reshape(6, 6, 2, 4)
+        means = jnp.mean(y_groups, axis=(0, 1, 3))
+        npt.assert_allclose(means, 0.0, atol=1e-5)
+
+    def test_spatial_unit_variance_per_group(self):
+        """With num_spatial_dims=2, output has unit variance over spatial + group channels."""
+        layer = nn.GroupNorm(8, 2, num_spatial_dims=2)
+        x = jax.random.normal(jax.random.key(0), (6, 6, 8))
+        y = layer(x)
+        y_groups = y.reshape(6, 6, 2, 4)
+        mean = jnp.mean(y_groups, axis=(0, 1, 3), keepdims=True)
+        var = jnp.mean(jnp.square(y_groups - mean), axis=(0, 1, 3))
+        npt.assert_allclose(var, 1.0, atol=1e-4)
+
+    def test_spatial_batch_dims(self):
+        """Arbitrary batch dimensions are preserved with num_spatial_dims."""
+        layer = nn.GroupNorm(8, 2, num_spatial_dims=2)
+        x = jax.random.normal(jax.random.key(0), (2, 3, 6, 6, 8))
+        y = layer(x)
+        assert y.shape == (2, 3, 6, 6, 8)
+
+    def test_instance_norm_via_group_norm(self):
+        """GroupNorm with num_groups=dim and num_spatial_dims gives instance norm."""
+        layer = nn.GroupNorm(3, 3, num_spatial_dims=2)
+        x = jax.random.normal(jax.random.key(0), (8, 8, 3))
+        y = layer(x)
+        means = jnp.mean(y, axis=(0, 1))
+        npt.assert_allclose(means, 0.0, atol=1e-5)
 
 
 class TestRMSNorm:
@@ -141,66 +175,3 @@ class TestBatchNorm:
         x = jax.random.normal(jax.random.key(0), (32, 8))
         y = layer(x)
         assert y.shape == x.shape
-
-
-class TestInstanceNorm:
-    def test_zero_spatial_dims_raises(self):
-        """num_spatial_dims=0 raises ValueError."""
-        with pytest.raises(ValueError, match="num_spatial_dims"):
-            nn.InstanceNorm(4, num_spatial_dims=0)
-
-    def test_zero_mean_per_channel_1d(self):
-        """Output has approximately zero mean over the temporal axis for each channel."""
-        layer = nn.InstanceNorm(4)
-        x = jax.random.normal(jax.random.key(0), (16, 4))
-        y = layer(x)
-        means = jnp.mean(y, axis=-2)
-        npt.assert_allclose(means, 0.0, atol=1e-5)
-
-    def test_unit_variance_per_channel_1d(self):
-        """Output has approximately unit variance over the temporal axis for each channel."""
-        layer = nn.InstanceNorm(4)
-        x = jax.random.normal(jax.random.key(0), (16, 4))
-        y = layer(x)
-        var = jnp.mean(jnp.square(y - jnp.mean(y, axis=-2, keepdims=True)), axis=-2)
-        npt.assert_allclose(var, 1.0, atol=1e-4)
-
-    def test_zero_mean_per_channel_2d(self):
-        """Output has approximately zero mean over spatial axes for each channel."""
-        layer = nn.InstanceNorm(3, num_spatial_dims=2)
-        x = jax.random.normal(jax.random.key(0), (8, 8, 3))
-        y = layer(x)
-        means = jnp.mean(y, axis=(-3, -2))
-        npt.assert_allclose(means, 0.0, atol=1e-5)
-
-    def test_unit_variance_per_channel_2d(self):
-        """Output has approximately unit variance over spatial axes for each channel."""
-        layer = nn.InstanceNorm(3, num_spatial_dims=2)
-        x = jax.random.normal(jax.random.key(0), (8, 8, 3))
-        y = layer(x)
-        var = jnp.mean(jnp.square(y - jnp.mean(y, axis=(-3, -2), keepdims=True)), axis=(-3, -2))
-        npt.assert_allclose(var, 1.0, atol=1e-4)
-
-    def test_batch_dims(self):
-        """Arbitrary batch dimensions are preserved."""
-        layer = nn.InstanceNorm(4)
-        x = jax.random.normal(jax.random.key(0), (2, 3, 16, 4))
-        y = layer(x)
-        assert y.shape == (2, 3, 16, 4)
-
-    def test_batch_dims_2d(self):
-        """Arbitrary batch dimensions are preserved for 2d."""
-        layer = nn.InstanceNorm(3, num_spatial_dims=2)
-        x = jax.random.normal(jax.random.key(0), (2, 5, 8, 8, 3))
-        y = layer(x)
-        assert y.shape == (2, 5, 8, 8, 3)
-
-    def test_scale_init(self):
-        """Scale is initialized to all ones."""
-        layer = nn.InstanceNorm(4)
-        npt.assert_allclose(layer.scale.value, jnp.ones(4))
-
-    def test_bias_init(self):
-        """Bias is initialized to all zeros."""
-        layer = nn.InstanceNorm(4)
-        npt.assert_allclose(layer.b.value, jnp.zeros(4))
