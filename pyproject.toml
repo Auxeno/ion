@@ -30,9 +30,8 @@ dev = [
 ]
 examples = [
     "optax",
-    "tqdm",
     "plotly",
-    "nbformat",
+    "tqdm",
 ]
 
 [tool.ruff]
