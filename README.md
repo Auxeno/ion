@@ -20,7 +20,7 @@ Ion is a neural network library for JAX. Models are represented as [pytrees](htt
 pip install git+https://github.com/auxeno/ion
 ```
 
-## Contents
+## Overview
 
 Ion is designed to be minimal. The core has four concepts for new users to learn: `Module`, `Param`, transforms (`ion.grad` / `ion.value_and_grad`), and `apply_updates`. Everything else is just JAX.
 
@@ -66,8 +66,8 @@ self.b = nn.Param(jnp.zeros(16), trainable=False)  # frozen
 Access all parameters via the `params` property. This returns a pytree with identical structure, containing only `Param` leaves (non-parameter leaves are replaced with `None`):
 
 ```python
-model.params       # pytree of Param leaves, passable to an Optax optimizer
-model.num_params   # total number of parameters (trainable and frozen)
+model.params      # pytree of Param leaves, passable to an Optax optimizer
+model.num_params  # total number of parameters (trainable and frozen)
 ```
 
 Freeze the parameters of entire models or specific sub-modules:
@@ -212,6 +212,14 @@ for x, y in data:
     model, opt_state, loss = train_step(model, opt_state, x, y)
 ```
 
+## Examples
+
+- [Ion Tour](examples/ion_tour.ipynb): Hands-on walkthrough of the core API
+- [CNN Demo](examples/cnn_mnist.py): Image classification with convolutional networks
+- [RNN Demo](examples/rnn_mnist.py): Sequence classification with recurrent networks
+- [VAE Demo Notebook](examples/vae_mnist.ipynb): Variational autoencoder for image generation
+- [PPO Demo](examples/ppo_gymnax.py): Reinforcement learning with Gymnax
+
 ## License
 
 Released under the Apache License 2.0.
@@ -222,9 +230,9 @@ To cite this repository:
 
 ```bibtex
 @software{ion,
-  title  = {Ion: Simple Neural Networks in JAX},
+  title = {Ion: Simple Neural Networks in JAX},
   author = {Alex Goddard},
-  url    = {https://github.com/auxeno/ion},
-  year   = {2026}
+  url = {https://github.com/auxeno/ion},
+  year = {2026}
 }
 ```
