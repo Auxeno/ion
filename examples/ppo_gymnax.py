@@ -1,4 +1,4 @@
-"""PPO on CartPole-v1 with gymnax vectorised environments."""
+"""PPO on CartPole-v1 with gymnax vectorized environments."""
 
 from collections import deque
 from typing import NamedTuple
@@ -162,7 +162,7 @@ def ppo_loss(
     # Value function loss (MSE)
     value_loss = 0.5 * ((returns - values) ** 2).mean()
 
-    # Entropy bonus (negative to maximise entropy)
+    # Entropy bonus (negative to maximize entropy)
     entropy_loss = -entropies.mean()
 
     return policy_loss + value_loss + entropy_loss * ENTROPY_BETA
@@ -190,7 +190,7 @@ def rollout(
     network: ActorCritic,
     carry: Carry,
 ) -> tuple[Carry, Transition]:
-    """Collect transitions from vectorised environments via scan."""
+    """Collect transitions from vectorized environments via scan."""
 
     def step_fn(carry: Carry, _: None) -> tuple[Carry, Transition]:
         rng, env_states, obs = carry
@@ -201,7 +201,7 @@ def rollout(
             obs, jax.random.split(key_action, NUM_ENVS)
         )
 
-        # Step vectorised environments
+        # Step vectorized environments
         next_obs, next_states, rewards, terminations, info = jax.vmap(
             env.step, in_axes=(0, 0, 0, None)
         )(
@@ -298,22 +298,22 @@ def track_episodes(
 if __name__ == "__main__":
     # Create environment
     env, env_params = gymnax.make("CartPole-v1")
-    obs_dim = env.observation_space(env_params).shape[0]
-    act_dim = int(env.action_space(env_params).n)
+    obs_dim = env.observation_space(env_params).shape[0]  # type: ignore[reportArgumentType]
+    act_dim = int(env.action_space(env_params).n)  # type: ignore[reportArgumentType]
 
-    # Initialise RNG
+    # Initialize RNG
     rng = jax.random.key(SEED)
-    rng, key_net, key_reset, rng_rollout = jax.random.split(rng, 4)
+    rng, key_network, key_reset, rng_rollout = jax.random.split(rng, 4)
 
-    # Initialise network and optimizer
-    network = ActorCritic(obs_dim, act_dim, key=key_net)
+    # Initialize network and optimizer
+    network = ActorCritic(obs_dim, act_dim, key=key_network)
     optimizer = optax.chain(
         optax.clip_by_global_norm(GRAD_NORM_CLIP),
         optax.adam(learning_rate=LR, eps=1e-5),
     )
     opt_state = optimizer.init(network.params)
 
-    # Reset vectorised environments
+    # Reset vectorized environments
     observations, env_states = jax.vmap(env.reset, in_axes=(0, None))(
         jax.random.split(key_reset, NUM_ENVS), env_params
     )
@@ -322,6 +322,7 @@ if __name__ == "__main__":
     # Episode tracking
     current_returns = np.zeros(NUM_ENVS)
     recent_returns: deque[float] = deque(maxlen=100)
+    mean_reward = 0.0
     checkpoints = {TOTAL_ROLLOUTS * p // 4 for p in range(1, 5)}
 
     bar = tqdm(range(TOTAL_ROLLOUTS), desc="PPO CartPole-v1")
@@ -335,8 +336,8 @@ if __name__ == "__main__":
         # Log episode statistics
         track_episodes(jax.device_get(transitions), current_returns, recent_returns)
         if recent_returns:
-            mean_rew = np.mean(recent_returns)
-            bar.set_postfix(reward=f"{mean_rew:.1f}")
+            mean_reward = np.mean(recent_returns)
+            bar.set_postfix(reward=f"{mean_reward:.1f}")
         if i + 1 in checkpoints and recent_returns:
             step = (i + 1) * BATCH_SIZE
-            tqdm.write(f"  Step {step:>9,} | Mean reward: {mean_rew:.1f}")
+            tqdm.write(f"  Step {step:>9,} | Mean reward: {mean_reward:.1f}")
