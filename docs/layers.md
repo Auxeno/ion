@@ -92,10 +92,10 @@ Output projection:  ...hk, hkd -> ...d
 
 | Label | Meaning | Used in |
 |-------|---------|---------|
-| `c` | channels | conv, pool, upsample |
-| `h` | height | pool, upsample, conv (2D) |
-| `w` | width | pool, upsample, conv (2D) |
-| `l` | length | pool (1D), upsample (1D) |
+| `c` | channels | conv, pool |
+| `h` | height | pool, conv (2D) |
+| `w` | width | pool, conv (2D) |
+| `l` | length | pool (1D) |
 
 ### Positional Encodings
 
@@ -107,9 +107,9 @@ Output projection:  ...hk, hkd -> ...d
 
 ## Spatial Layers
 
-Convolution, pooling, and upsampling layers are N-dimensional. This keeps the API surface small while supporting 1D, 2D, 3D, and beyond with the same class.
+Convolution and pooling layers are N-dimensional. This keeps the API surface small while supporting 1D, 2D, 3D, and beyond with the same class.
 
-`Conv` and `ConvTranspose` infer the spatial rank from `kernel_shape`, which must be a tuple. Pooling and upsampling layers take `num_spatial_dims` as their first argument.
+`Conv` and `ConvTranspose` infer the spatial rank from `kernel_shape`, which must be a tuple. Pooling layers take `num_spatial_dims` as their first argument.
 
 ```python
 Conv(3, 16, kernel_shape=(5,), key=key)             # Conv1d
@@ -117,7 +117,6 @@ Conv(3, 16, kernel_shape=(3, 3), key=key)           # Conv2d
 ConvTranspose(16, 3, kernel_shape=(3, 3), key=key)  # ConvTranspose2d
 MaxPool(2, kernel_size=2)                           # MaxPool2d
 AvgPool(1, kernel_size=3, padding=1)                # AvgPool1d
-Upsample(2, scale_factor=2)                         # Upsample2d
 ```
 
 Scalar values for `stride`, `padding`, `dilation`, etc. are broadcast across all spatial dimensions. Tuples give per-dimension control.

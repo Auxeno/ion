@@ -12,7 +12,6 @@ from .layers.norm import BatchNorm, GroupNorm, InstanceNorm, LayerNorm, RMSNorm
 from .layers.pool import AvgPool, MaxPool
 from .layers.positional import LearnedPositionalEmbedding, alibi, apply_rope, rope, sinusoidal
 from .layers.recurrent import GRUCell, LSTMCell
-from .layers.upsample import Upsample
 from .module import Module
 from .param import Param
 
@@ -44,7 +43,6 @@ __all__ = [
     "SelfAttention",
     "Sequential",
     "TransformerBlock",
-    "Upsample",
     "alibi",
     "apply_rope",
     "rope",

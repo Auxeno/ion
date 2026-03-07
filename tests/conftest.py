@@ -52,8 +52,6 @@ def _build_layers(key):
         (nn.LoRALinear(nn.Linear(8, 16, key=next(keys)), rank=4, key=next(keys)), jnp.ones((8,))),
         (nn.ConvTranspose(3, 8, kernel_shape=(3,), padding=1, key=next(keys)), jnp.ones((10, 3))),
         (nn.ConvTranspose(3, 8, kernel_shape=(3, 3), padding=1, key=next(keys)), jnp.ones((6, 6, 3))),
-        (nn.Upsample(1, scale_factor=2), jnp.ones((10, 3))),
-        (nn.Upsample(2, scale_factor=2), jnp.ones((4, 4, 3))),
         (nn.LearnedPositionalEmbedding(16, 8, key=next(keys)), jnp.ones((10, 8))),
     ]
 
@@ -84,8 +82,6 @@ _PARAM_NAMES = [
     "lora_linear",
     "conv_transpose_1d",
     "conv_transpose_2d",
-    "upsample_1d",
-    "upsample_2d",
     "learned_positional_embedding",
 ]
 

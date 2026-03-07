@@ -124,7 +124,6 @@ def test_params_property(layer_and_input):
             nn.Identity,
             nn.MaxPool,
             nn.AvgPool,
-            nn.Upsample,
             nn.Dropout,
         ),
     ):
