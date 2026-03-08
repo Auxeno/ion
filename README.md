@@ -57,7 +57,7 @@ Non-array fields (ints, floats, strings, callables) are automatically treated as
 `Param` wraps an array and marks it as a model parameter. It controls whether the array is trainable or frozen.
 
 ```python
-self.w = nn.Param(w_init(key=key, shape=(3, 16)))  # trainable
+self.w = nn.Param(w_init(shape=(3, 16), key=key))  # trainable
 self.b = nn.Param(jnp.zeros(16), trainable=False)  # frozen
 ```
 
