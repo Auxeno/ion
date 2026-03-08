@@ -647,4 +647,4 @@ class TestStopGradient:
         """Freezing doesn't change forward pass values."""
         p_train = nn.Param(jnp.array([1.0, 2.0, 3.0]))
         p_frozen = nn.Param(jnp.array([1.0, 2.0, 3.0]), trainable=False)
-        npt.assert_array_equal(jnp.sum(p_train), jnp.sum(p_frozen))
+        npt.assert_array_equal(jnp.sum(jnp.asarray(p_train)), jnp.sum(jnp.asarray(p_frozen)))

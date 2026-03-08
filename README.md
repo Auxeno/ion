@@ -68,7 +68,7 @@ Setting `trainable=False` applies `jax.lax.stop_gradient` under the hood, making
 Access all parameters via the `params` property. This returns a pytree with identical structure, containing only `Param` leaves (non-parameter leaves are replaced with `None`):
 
 ```python
-model.params      # pytree of Param leaves, passable to an Optax optimizer
+model.params      # pytree of Param leaves (non-Param leaves replaced with None)
 model.num_params  # total number of parameters (trainable and frozen)
 ```
 
@@ -94,7 +94,7 @@ loss, grads = jax.value_and_grad(loss_fn)(model, x, y)
 
 Frozen parameters (`trainable=False`) automatically have `stop_gradient` applied, so their gradients are zero and the backward pass skips them entirely.
 
-There are no custom wrappers like `ion.jit`, `ion.vmap`, or `ion.scan`. Because Ion models are standard pytrees, all native JAX transformations work directly out of the box.
+There are no custom wrappers like `ion.jit`, `ion.grad`, or `ion.vmap`. Because Ion models are standard pytrees, all native JAX transformations work directly out of the box, from the familiar `jax.jit`, `jax.grad`, and `jax.vmap` to higher-order transforms like `jax.jacobian` and `jax.hessian`.   
 
 See [Internals](docs/internals.md) for how the module system and pytree registration work under the hood.
 

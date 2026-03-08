@@ -40,10 +40,14 @@ class TestLoRALinear:
 
         grads = jax.grad(lambda model: model(x).sum())(lora)
         # Base weights should have zero gradients (frozen)
+        assert lora.linear.b is not None
+        assert grads.linear.w is not None
+        assert grads.linear.b is not None
         npt.assert_allclose(grads.linear.w._value, jnp.zeros_like(lora.linear.w._value), atol=1e-7)
         npt.assert_allclose(grads.linear.b._value, jnp.zeros_like(lora.linear.b._value), atol=1e-7)
         # LoRA b is zero-initialized, so grad w.r.t. a is zero at init (chain rule through zero b)
         # But grad w.r.t. b should be non-zero (a is randomly initialized)
+        assert grads.b is not None
         assert jnp.any(grads.b._value != 0)
 
     def test_shapes(self):

@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 import numpy.testing as npt
 import optax
+import pytest
 
 from ion import nn, tree
 
@@ -604,5 +605,88 @@ class TestNewJaxTransforms:
             return jnp.sum(conv(x))
 
         grads = jax.grad(loss_fn)(conv, x)
+        assert conv.b is not None
+        assert grads.w is not None
+        assert grads.b is not None
         npt.assert_allclose(grads.w._value, jnp.zeros_like(conv.w._value), atol=1e-7)
         npt.assert_allclose(grads.b._value, jnp.zeros_like(conv.b._value), atol=1e-7)
+
+    def test_frozen_jacobian_zero(self):
+        """jax.jacobian produces zeros for frozen params."""
+        model = nn.Linear(2, 3, key=jax.random.key(0)).freeze()
+        x = jnp.ones(2)
+
+        jac = jax.jacobian(lambda m, x: m(x))(model, x)
+        npt.assert_allclose(jac.w._value, jnp.zeros_like(jac.w._value))
+        npt.assert_allclose(jac.b._value, jnp.zeros_like(jac.b._value))
+
+    def test_frozen_hessian_zero(self):
+        """jax.hessian produces zeros for frozen params."""
+        p = nn.Param(jnp.array([1.0, 2.0]), trainable=False)
+
+        hess = jax.hessian(lambda p: jnp.sum(p**3))(p)
+        npt.assert_allclose(hess._value, jnp.zeros((2, 2)))
+
+    def test_unfreeze_restores_gradient_flow(self):
+        """Freezing then unfreezing restores gradient flow."""
+        model = nn.Linear(2, 3, key=jax.random.key(0))
+        x = jnp.ones(2)
+
+        def loss(m, x):
+            return jnp.sum(m(x))
+
+        grads_original = jax.grad(loss)(model, x)
+        grads_roundtrip = jax.grad(loss)(model.freeze().unfreeze(), x)
+        npt.assert_allclose(grads_roundtrip.w._value, grads_original.w._value)
+        npt.assert_allclose(grads_roundtrip.b._value, grads_original.b._value)
+
+    def test_frozen_checkpoint_rematerialization(self):
+        """stop_gradient survives jax.checkpoint (remat)."""
+        model = nn.Linear(4, 1, key=jax.random.key(0)).freeze()
+        x = jnp.ones(4)
+
+        @jax.checkpoint
+        def forward(model, x):
+            return jnp.sum(model(x))
+
+        grads = jax.grad(forward)(model, x)
+        npt.assert_allclose(grads.w._value, jnp.zeros_like(model.w._value))
+        npt.assert_allclose(grads.b._value, jnp.zeros_like(model.b._value))
+
+    def test_grad_of_grad_raises(self):
+        """Nested jax.grad(jax.grad(f)) on Param raises because __jax_array__
+        is triggered during abstractification of the intermediate gradient Param.
+        Use jax.hessian instead for second-order derivatives."""
+        p = nn.Param(jnp.array([1.0, 2.0]))
+
+        def f(p):
+            return jnp.sum(p**3)
+
+        with pytest.raises(ValueError, match="__jax_array__"):
+            jax.grad(jax.grad(f))(p)
+
+    def test_frozen_lora_end_to_end(self):
+        """LoRA training: base weights frozen, only a/b update, loss decreases."""
+        k1, k2 = jax.random.split(jax.random.key(0))
+        linear = nn.Linear(4, 4, key=k1)
+        lora = nn.LoRALinear(linear, rank=2, key=k2)
+        frozen_base_w = lora.linear.w._value.copy()
+
+        optimizer = optax.adam(1e-2)
+        opt_state = optimizer.init(lora)
+
+        x = jax.random.normal(jax.random.key(1), (8, 4))
+        y = jnp.ones((8, 4))
+
+        def loss_fn(model, x, y):
+            return jnp.mean((model(x) - y) ** 2)
+
+        initial_loss = loss_fn(lora, x, y)
+
+        for _ in range(10):
+            loss, grads = jax.value_and_grad(loss_fn)(lora, x, y)
+            updates, opt_state = optimizer.update(grads, opt_state)
+            lora = tree.apply_updates(lora, updates)
+
+        assert loss_fn(lora, x, y) < initial_loss
+        npt.assert_array_equal(lora.linear.w._value, frozen_base_w)

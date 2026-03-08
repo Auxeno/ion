@@ -30,6 +30,7 @@ dev = [
 ]
 examples = [
     "gymnax",
+    "nbformat",
     "optax",
     "plotly",
     "tqdm",
