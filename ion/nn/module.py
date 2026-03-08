@@ -11,9 +11,7 @@ See docs/internals.md for implementation details.
 
 import dataclasses
 import functools
-import hashlib
-import math
-import re
+import zlib
 from collections.abc import Iterable, Iterator
 from typing import Any, Self
 
@@ -167,34 +165,12 @@ class Module:
             for field in dataclasses.fields(self)  # type: ignore[reportArgumentType]
         }
 
-        # Generate color for module
+        # Generate color from class name
         qualname = type(self).__qualname__
-
-        words = re.findall(r"[A-Z]+(?=[A-Z][a-z]|\d|\b)|[A-Z][a-z]*|\d+[a-z]*", qualname)
-        if not words:
-            words = [qualname]
-
-        # Hash each word to an angle on the hue circle
-        salt = "18zm7p"
-        angles = []
-        for w in words:
-            h = int.from_bytes(
-                hashlib.sha256(f"{salt}:{w.lower()}".encode()).digest(),
-                byteorder="little",
-            )
-            angles.append(((h % 10_000) / 10_000) * 2 * math.pi)
-
-        # Circular mean: average sin/cos components, then atan2
-        sin_sum = sum(math.sin(a) for a in angles)
-        cos_sum = sum(math.cos(a) for a in angles)
-        hue = math.degrees(math.atan2(sin_sum, cos_sum)) % 360
-
-        # Derive lightness from the full qualname so same-hue modules still differ
-        lh = int.from_bytes(hashlib.sha256(qualname.encode()).digest()[:4], byteorder="little")
-        lightness = 0.75 + (lh % 1000) / 1000 * 0.1  # range 0.75 – 0.85
-
-        # Build oklch color
-        color = f"oklch({lightness:.3f} 0.1 {hue:.1f})"
+        salt = "5g157w"
+        h = zlib.crc32(f"{salt}:{qualname}".encode())
+        hue = (h % 10_000) / 10_000 * 360
+        color = f"oklch(0.8 0.1 {hue:.1f})"
 
         return treescope.repr_lib.render_object_constructor(
             object_type=type(self),
