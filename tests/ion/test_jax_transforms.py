@@ -650,6 +650,8 @@ class TestNewJaxTransforms:
             return jnp.sum(model(x))
 
         grads = jax.grad(forward)(model, x)
+        assert model.b is not None
+        assert grads.b is not None
         npt.assert_allclose(grads.w._value, jnp.zeros_like(model.w._value))
         npt.assert_allclose(grads.b._value, jnp.zeros_like(model.b._value))
 
