@@ -3,8 +3,10 @@
 Classes:
     Param   Marks a JAX array as trainable or frozen.
 
-Registered as a JAX pytree: `value` is a dynamic child, `trainable` is static metadata.
+Registered as a JAX pytree: `_value` is a dynamic child, `trainable` is static metadata.
 Implements `__jax_array__` and arithmetic so it works as a drop-in for plain arrays.
+Setting `trainable=False` applies `jax.lax.stop_gradient` inside `__jax_array__`,
+making the parameter invisible to autodiff.
 
 See docs/internals.md for implementation details.
 """
@@ -13,6 +15,8 @@ import dataclasses
 import functools
 from typing import Any, Generic, TypeVar
 
+import jax
+import jax.numpy as jnp
 import jax.tree_util as jtu
 from jaxtyping import Array
 
@@ -21,10 +25,10 @@ T = TypeVar("T", bound=Array)
 
 def _unwrap(x: Any) -> Any:
     """Extract the underlying array from a `Param`, or pass through as-is."""
-    return x.value if isinstance(x, Param) else x
+    return jnp.asarray(x) if isinstance(x, Param) else x
 
 
-@functools.partial(jtu.register_dataclass, data_fields=["value"], meta_fields=["trainable"])
+@functools.partial(jtu.register_dataclass, data_fields=["_value"], meta_fields=["trainable"])
 @dataclasses.dataclass(frozen=True, eq=False)
 class Param(Generic[T]):
     """Marks a JAX array as a model parameter.
@@ -33,104 +37,106 @@ class Param(Generic[T]):
     >>> b = Param(jnp.ones(4), trainable=False)  # frozen
     """
 
-    value: T
+    _value: T
     trainable: bool = True
 
     def __jax_array__(self) -> Array:
-        return self.value
+        if self.trainable:
+            return self._value
+        return jax.lax.stop_gradient(self._value)
 
     def __getattr__(self, name: str) -> Any:
         # Do not forward explicit dunder retrieval
         if name.startswith("__") and name.endswith("__"):
             raise AttributeError(name)
-        return getattr(self.value, name)
+        return getattr(self.__jax_array__(), name)
 
     def __getitem__(self, key: Any) -> Array:
-        return self.value[key]
+        return jnp.asarray(self)[key]
 
     def __add__(self, other: Any) -> Array:
-        return self.value + _unwrap(other)
+        return jnp.asarray(self) + _unwrap(other)
 
     def __radd__(self, other: Any) -> Array:
-        return _unwrap(other) + self.value
+        return _unwrap(other) + jnp.asarray(self)
 
     def __sub__(self, other: Any) -> Array:
-        return self.value - _unwrap(other)
+        return jnp.asarray(self) - _unwrap(other)
 
     def __rsub__(self, other: Any) -> Array:
-        return _unwrap(other) - self.value
+        return _unwrap(other) - jnp.asarray(self)
 
     def __mul__(self, other: Any) -> Array:
-        return self.value * _unwrap(other)
+        return jnp.asarray(self) * _unwrap(other)
 
     def __rmul__(self, other: Any) -> Array:
-        return _unwrap(other) * self.value
+        return _unwrap(other) * jnp.asarray(self)
 
     def __truediv__(self, other: Any) -> Array:
-        return self.value / _unwrap(other)
+        return jnp.asarray(self) / _unwrap(other)
 
     def __rtruediv__(self, other: Any) -> Array:
-        return _unwrap(other) / self.value
+        return _unwrap(other) / jnp.asarray(self)
 
     def __floordiv__(self, other: Any) -> Array:
-        return self.value // _unwrap(other)
+        return jnp.asarray(self) // _unwrap(other)
 
     def __rfloordiv__(self, other: Any) -> Array:
-        return _unwrap(other) // self.value
+        return _unwrap(other) // jnp.asarray(self)
 
     def __mod__(self, other: Any) -> Array:
-        return self.value % _unwrap(other)
+        return jnp.asarray(self) % _unwrap(other)
 
     def __rmod__(self, other: Any) -> Array:
-        return _unwrap(other) % self.value
+        return _unwrap(other) % jnp.asarray(self)
 
     def __pow__(self, other: Any) -> Array:
-        return self.value ** _unwrap(other)
+        return jnp.asarray(self) ** _unwrap(other)
 
     def __rpow__(self, other: Any) -> Array:
-        return _unwrap(other) ** self.value
+        return _unwrap(other) ** jnp.asarray(self)
 
     def __matmul__(self, other: Any) -> Array:
-        return self.value @ _unwrap(other)
+        return jnp.asarray(self) @ _unwrap(other)
 
     def __rmatmul__(self, other: Any) -> Array:
-        return _unwrap(other) @ self.value
+        return _unwrap(other) @ jnp.asarray(self)
 
     def __neg__(self) -> Array:
-        return -self.value
+        return -jnp.asarray(self)
 
     def __pos__(self) -> Array:
-        return +self.value
+        return +jnp.asarray(self)
 
     def __abs__(self) -> Array:
-        return abs(self.value)
+        return abs(jnp.asarray(self))
 
     def __eq__(self, other: Any) -> Array:
-        return self.value == _unwrap(other)
+        return jnp.asarray(self) == _unwrap(other)
 
     def __ne__(self, other: Any) -> Array:
-        return self.value != _unwrap(other)
+        return jnp.asarray(self) != _unwrap(other)
 
     def __lt__(self, other: Any) -> Array:
-        return self.value < _unwrap(other)
+        return jnp.asarray(self) < _unwrap(other)
 
     def __le__(self, other: Any) -> Array:
-        return self.value <= _unwrap(other)
+        return jnp.asarray(self) <= _unwrap(other)
 
     def __gt__(self, other: Any) -> Array:
-        return self.value > _unwrap(other)
+        return jnp.asarray(self) > _unwrap(other)
 
     def __ge__(self, other: Any) -> Array:
-        return self.value >= _unwrap(other)
+        return jnp.asarray(self) >= _unwrap(other)
 
     def __bool__(self) -> bool:
-        return bool(self.value)
+        return bool(self._value)
 
     def __len__(self) -> int:
-        return len(self.value)
+        return len(self._value)
 
     def __iter__(self):
-        return iter(self.value)
+        return iter(self._value)
 
     @staticmethod
     def short_dtype(name: str) -> str:
@@ -148,16 +154,16 @@ class Param(Generic[T]):
 
     def __repr__(self) -> str:
         trainable_str = f", trainable={self.trainable}"
-        if hasattr(self.value, "shape") and hasattr(self.value, "dtype"):
-            dtype = self.short_dtype(self.value.dtype.name)
-            return f"Param({dtype}{list(self.value.shape)}{trainable_str})"
-        return f"Param({self.value!r}{trainable_str})"
+        if hasattr(self._value, "shape") and hasattr(self._value, "dtype"):
+            dtype = self.short_dtype(self._value.dtype.name)
+            return f"Param({dtype}{list(self._value.shape)}{trainable_str})"
+        return f"Param({self._value!r}{trainable_str})"
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
         """Hook to make `Param`s colored in grey in Treescope."""
         import treescope
 
-        attributes = {"value": self.value, "trainable": self.trainable}
+        attributes = {"value": self._value, "trainable": self.trainable}
 
         # Grey for trainable, ice blue for non-trainable/frozen
         color = "oklch(0.92 0.06 260.0)" if not self.trainable else "oklch(0.925 0.0 0.0)"

@@ -14,7 +14,7 @@ import functools
 import hashlib
 import math
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from typing import Any, Self
 
 import jax
@@ -120,6 +120,10 @@ class Module:
     def __delattr__(self, name: str) -> None:
         """Prevent attribute deletion to maintain a consistent PyTree structure."""
         raise AttributeError(f"Cannot delete attribute '{name}', {type(self).__name__} is frozen.")
+
+    def __iter__(self) -> Iterator[Any]:
+        """Iterate over dataclass field values."""
+        return (getattr(self, f.name) for f in dataclasses.fields(self))  # type: ignore[arg-type]
 
     def __repr__(self) -> str:
         """Minimal textual pretty printing for pytrees."""
@@ -254,4 +258,4 @@ class Module:
         >>> model.num_params  # e.g. 101770
         """
         leaves = jtu.tree_leaves(self, is_leaf=tree.is_param)
-        return sum(p.value.size for p in leaves if tree.is_param(p))
+        return sum(p._value.size for p in leaves if tree.is_param(p))

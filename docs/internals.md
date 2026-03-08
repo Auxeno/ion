@@ -1,11 +1,10 @@
 # Internals
 
-Everything behind the scenes in Ion. Four files and ~400 lines of code make up the whole engine. This document explains the design. Readers are also encouraged to check out the source code as it's fairly straightforward:
+Everything behind the scenes in Ion. Three files and ~250 lines of code make up the whole engine. This document explains the design. Readers are also encouraged to check out the source code as it's fairly straightforward:
 
 - [`ion/nn/module.py`](../ion/nn/module.py): Module base class, pytree registration
 - [`ion/nn/param.py`](../ion/nn/param.py): Param wrapper, trainable/frozen distinction
 - [`ion/tree.py`](../ion/tree.py): Static wrapper, apply_updates, freeze/unfreeze
-- [`ion/transforms.py`](../ion/transforms.py): grad/value_and_grad for trainable params only
 
 ## Module (`ion/nn/module.py`)
 
@@ -25,43 +24,27 @@ Three things happen in `__init_subclass__` when a class inherits from `Module`:
 
 JAX pytrees see all arrays equally and have no built-in way to distinguish trainable weights from frozen weights from plain buffers. `Param` makes this explicit:
 
-- `Param(array)`: trainable (`ion.grad` differentiates, optimizers update)
-- `Param(array, trainable=False)`: frozen (carried through but excluded from gradients)
+- `Param(array)`: trainable (gradients flow normally, optimizers update)
+- `Param(array, trainable=False)`: frozen (`stop_gradient` applied via `__jax_array__`, making this parameter invisible to autodiff)
 - bare array: plain data buffer, never treated as a parameter
 
 ### Pytree registration
 
-`Param` is registered via `register_dataclass` with `value` as a dynamic child (traced/differentiated by JAX) and `trainable` as static metadata (baked into compiled programs as a cache key). Changing `trainable` triggers recompilation, but it's a one-time flag set at construction.
+`Param` is registered via `register_dataclass` with `_value` as a dynamic child (traced/differentiated by JAX) and `trainable` as static metadata (baked into compiled programs as a cache key). Changing `trainable` triggers recompilation, but it's a one-time flag set at construction.
 
 ### Transparent array behavior
 
-`__jax_array__` lets `jnp.*` unwrap automatically (`jnp.dot(param, x)` works). `__getattr__` forwards `.shape`, `.dtype`, etc. to the inner array. Arithmetic and comparisons return raw arrays, not `Param`, because intermediate results are not parameters.
+`__jax_array__` returns the raw array for trainable params and applies `jax.lax.stop_gradient` for frozen params, making the `trainable` flag physically real in JAX's autodiff. `__getattr__` routes attribute access (`.shape`, `.dtype`, `.T`, `.reshape(...)`) through `jnp.asarray(self)`, which calls `__jax_array__()`, so frozen params remain invisible to autodiff even through method calls. The `_value` field is private and should not be accessed directly in user code, as it bypasses `stop_gradient`. Arithmetic and comparisons return raw arrays, not `Param`, because intermediate results are not parameters.
 
 ## Tree (`ion/tree.py`)
+
+### apply_updates
+
+Adds optimizer deltas to a model's trainable parameters. Only `Param` leaves are modified; non-`Param` arrays (like batch statistics) pass through unchanged. Walks the model and update trees in parallel, skipping positions where the update is `None`, the leaf is not a `Param`, or the parameter is frozen (`Param(trainable=False)`). The `Param` wrapper is preserved on updated values so trainability metadata survives the step.
 
 ### Static
 
 A pytree node with no children. JAX treats its value as static metadata. Used by `Module` pytree registration to wrap non-array leaves (ints, strings, callables) so they become invisible to JAX tracing while being preserved through flatten/unflatten roundtrips.
-
-### apply_updates
-
-Adds optimizer deltas to a model's trainable parameters. Walks the model and update trees in parallel, skipping positions where the update is `None` or the parameter is frozen (`Param(trainable=False)`). The `Param` wrapper is preserved on updated values so trainability metadata survives the step.
-
-## Transforms (`ion/transforms.py`)
-
-### grad / value_and_grad
-
-`jax.grad` differentiates every float array in its first argument and provides no way to exclude frozen parameters or non-parameter arrays like batch statistics.
-
-`ion.grad` solves this in three steps:
-
-1. Flatten the first arg, split leaves into trainable `Param`s vs everything else
-2. Pass only trainable leaves to `jax.grad`, holding everything else constant
-3. Pad non-trainable positions with `None` and unflatten back to the original pytree shape
-
-The caller gets a gradient tree matching the model structure. Trainable `Param` positions contain gradient values wrapped in `Param`. Everything else, frozen `Param`s and non-parameter leaves are replaced with `None`. Frozen params become bare `None`, not `Param(value=None)`, so the `Param` wrapper is removed entirely. This follows the JAX convention where `None` signals "no gradient at this position." `value_and_grad` works identically but also returns the output.
-
-Note: `jax.jit` works natively with all modules because `Module` pytree registration wraps non-array leaves in `Static` automatically. No `ion.jit` wrapper is needed.
 
 ## 🔪 Sharp Edges
 
@@ -94,12 +77,14 @@ Known gotchas to be aware of when using Ion. Some are limitations of JAX:
 
 - **`replace()` can change pytree structure.** Replacing a `Param` field with a plain array or `None` changes the treedef. This is useful for model surgery, but subsequent `jax.tree.map` between the original and modified model will crash with a structure mismatch.
 
-- **`apply_updates` silently drops updates to frozen params.** There is no warning when optimizer updates target frozen parameters. The updates are simply ignored and the frozen values are preserved.
+- **`apply_updates` only modifies `Param` leaves.** Non-`Param` arrays are left unchanged. Frozen `Param` updates are silently skipped. Note that `jax.grad` does compute gradients for all array leaves in the pytree, including non-`Param` arrays. The optimizer will track state for these leaves, but `apply_updates` discards their updates. Continuing to calculate non-parameter array gradients could may be desirable to some users so Ion leaves it in.
 
-- **`ion.grad` on plain arrays returns `None`.** If the first argument has no trainable `Param` leaves (e.g. a plain `jnp.array`), all gradient positions will be `None`. Use `jax.grad` directly for non-`Param` differentiation.
+- **Some JAX/LAX functions don't accept `Param` directly.** Most operations will work transparently because `Param.__jax_array__` converts automatically, but lower-level functions like `lax.conv_general_dilated` may reject a `Param` where they expect a plain array. Use `jnp.asarray(param)` to convert. This calls `__jax_array__`, which applies `stop_gradient` for frozen params, so autograd correctness is preserved. **Do not use `param._value`**, which bypasses `stop_gradient` entirely: frozen params would receive gradients during the backward pass (wasting compute), and only `apply_updates` silently discarding them would prevent actual weight changes. The `_value` field is private and reserved for internal code that deliberately needs the raw array.
 
 - **Module immutability is shallow.** `_frozen` prevents field reassignment, but mutable containers (lists, dicts, numpy arrays) in fields can still be mutated in-place. For example, `model.layers.append(...)` bypasses the freeze. Worse, in-place mutation of a `Static`-wrapped field (like a list of ints) will **not** trigger JIT recompilation because JAX identifies the pytree aux data by object identity, so the same mutated list still hits the stale cached trace with the old value baked in. Use `replace()` to create a new module with the updated field instead.
 
 - **`Param.__eq__` returns a JAX array, not a bool.** `param in list` can raise `ValueError` for multi-element params because Python calls `bool()` on the array result, which is ambiguous for arrays with more than one element.
+
+- **Nested `jax.grad(jax.grad(f))` on `Param` raises `ValueError`.** JAX triggers `__jax_array__()` during abstractification of the intermediate gradient `Param`, which is no longer supported. In practice this rarely matters: `jax.grad(jax.grad(f))` only works on scalar-to-scalar functions even with plain arrays (the inner `grad` of `f: R^n -> R` returns a vector, which the outer `grad` rejects). Use `jax.hessian` for second-order derivatives, which works correctly with both `Param` and `Module`.
 
 - **`Module.params` preserves static fields alongside `Param` leaves.** Plain arrays become `None`, while non-array fields (ints, floats, strings, callables) remain unchanged. This is by design: static fields are structural metadata stored in the treedef, not pytree leaves, so they are naturally unaffected when `params` replaces non-`Param` leaves with `None`.

@@ -29,7 +29,7 @@ class TestLinear:
         """He normal initialization gives var(w) close to 2/fan_in."""
         key = jax.random.key(42)
         layer = nn.Linear(2048, 2048, key=key)
-        var = jnp.var(layer.w.value)
+        var = jnp.var(layer.w._value)
         expected_var = 2.0 / 2048
         npt.assert_allclose(var, expected_var, atol=0.05)
 

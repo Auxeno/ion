@@ -26,12 +26,12 @@ class TestLayerNorm:
     def test_scale_init(self):
         """Scale is initialized to all ones."""
         layer = nn.LayerNorm(8)
-        npt.assert_allclose(layer.scale.value, jnp.ones(8))
+        npt.assert_allclose(layer.scale._value, jnp.ones(8))
 
     def test_bias_init(self):
         """Bias is initialized to all zeros."""
         layer = nn.LayerNorm(8)
-        npt.assert_allclose(layer.b.value, jnp.zeros(8))
+        npt.assert_allclose(layer.b._value, jnp.zeros(8))
 
 
 class TestGroupNorm:
@@ -56,12 +56,12 @@ class TestGroupNorm:
     def test_scale_init(self):
         """Scale is initialized to all ones."""
         layer = nn.GroupNorm(8, 2)
-        npt.assert_allclose(layer.scale.value, jnp.ones(8))
+        npt.assert_allclose(layer.scale._value, jnp.ones(8))
 
     def test_bias_init(self):
         """Bias is initialized to all zeros."""
         layer = nn.GroupNorm(8, 2)
-        npt.assert_allclose(layer.b.value, jnp.zeros(8))
+        npt.assert_allclose(layer.b._value, jnp.zeros(8))
 
     def test_indivisible_dim_errors(self):
         """dim not divisible by num_groups raises ValueError."""
@@ -122,7 +122,7 @@ class TestRMSNorm:
     def test_scale_init(self):
         """Scale is initialized to all ones."""
         layer = nn.RMSNorm(8)
-        npt.assert_allclose(layer.scale.value, jnp.ones(8))
+        npt.assert_allclose(layer.scale._value, jnp.ones(8))
 
 
 class TestBatchNorm:
@@ -161,12 +161,12 @@ class TestBatchNorm:
     def test_scale_init(self):
         """Scale is initialized to all ones."""
         layer = nn.BatchNorm(8)
-        npt.assert_allclose(layer.scale.value, jnp.ones(8))
+        npt.assert_allclose(layer.scale._value, jnp.ones(8))
 
     def test_bias_init(self):
         """Bias is initialized to all zeros."""
         layer = nn.BatchNorm(8)
-        npt.assert_allclose(layer.b.value, jnp.zeros(8))  # type: ignore[union-attr]
+        npt.assert_allclose(layer.b._value, jnp.zeros(8))  # type: ignore[union-attr]
 
     def test_no_bias(self):
         """bias=False produces None bias and still works."""

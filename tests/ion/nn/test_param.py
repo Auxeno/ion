@@ -8,7 +8,6 @@ import jax.tree_util as jtu
 import numpy.testing as npt
 import pytest
 
-import ion
 from ion import checkpoint, nn, tree
 
 
@@ -22,7 +21,7 @@ class TestPytreeRegistration:
         reconstructed = treedef.unflatten(leaves)
         assert isinstance(reconstructed, nn.Param)
         assert reconstructed.trainable is True
-        npt.assert_array_equal(reconstructed.value, p.value)
+        npt.assert_array_equal(reconstructed._value, p._value)
 
     def test_trainable_preserved_as_static(self):
         """trainable flag is preserved through flatten/unflatten as aux data."""
@@ -36,7 +35,7 @@ class TestPytreeRegistration:
         p = nn.Param(jnp.array([1.0, 2.0]))
         doubled = jax.tree.map(lambda x: x * 2, p)
         assert isinstance(doubled, nn.Param)
-        npt.assert_array_equal(doubled.value, jnp.array([2.0, 4.0]))
+        npt.assert_array_equal(doubled._value, jnp.array([2.0, 4.0]))
 
 
 class TestJaxArrayProtocol:
@@ -213,20 +212,20 @@ class TestJaxTransforms:
 
         @jax.jit
         def f(param):
-            return jnp.sum(param.value)
+            return jnp.sum(param)
 
         npt.assert_allclose(f(p), 3.0)
 
     def test_grad(self):
-        """jax.grad flows through Param's value."""
+        """jax.grad flows through Param."""
         p = nn.Param(jnp.array([1.0, 2.0, 3.0]))
 
         def loss(param):
-            return jnp.sum(param.value**2)
+            return jnp.sum(param**2)
 
         grads = jax.grad(loss)(p)
         assert isinstance(grads, nn.Param)
-        npt.assert_array_equal(grads.value, jnp.array([2.0, 4.0, 6.0]))
+        npt.assert_array_equal(grads._value, jnp.array([2.0, 4.0, 6.0]))
 
     def test_vmap(self):
         """Param works through jax.vmap."""
@@ -235,15 +234,15 @@ class TestJaxTransforms:
 
         @jax.vmap
         def f(param):
-            return jnp.sum(param.value)
+            return jnp.sum(param)
 
         result = f(p)
         npt.assert_array_equal(result, jnp.array([3.0, 7.0]))
 
 
-class TestLuxTransforms:
-    def test_ion_grad(self):
-        """ion.grad differentiates through Param-containing modules."""
+class TestJaxGradWithModules:
+    def test_jax_grad(self):
+        """jax.grad differentiates through Param-containing modules."""
 
         class Model(nn.Module):
             w: nn.Param
@@ -252,17 +251,17 @@ class TestLuxTransforms:
                 self.w = nn.Param(jax.random.normal(key, (2,)))
 
             def __call__(self, x):
-                return jnp.sum(self.w.value * x)
+                return jnp.sum(self.w * x)
 
         model = Model(key=jax.random.key(0))
         x = jnp.array([1.0, 2.0])
 
-        grads = ion.grad(lambda m, x: m(x))(model, x)
+        grads = jax.grad(lambda m, x: m(x))(model, x)
         # Gradient of sum(w * x) w.r.t. w is x
-        npt.assert_allclose(grads.w.value, x)
+        npt.assert_allclose(grads.w._value, x)
 
-    def test_ion_value_and_grad(self):
-        """ion.value_and_grad works with Param-containing modules."""
+    def test_jax_value_and_grad(self):
+        """jax.value_and_grad works with Param-containing modules."""
 
         class Model(nn.Module):
             w: nn.Param
@@ -271,15 +270,15 @@ class TestLuxTransforms:
                 self.w = nn.Param(jax.random.normal(key, (2,)))
 
             def __call__(self, x):
-                return jnp.sum(self.w.value * x)
+                return jnp.sum(self.w * x)
 
         model = Model(key=jax.random.key(0))
         x = jnp.array([1.0, 2.0])
 
-        val, grads = ion.value_and_grad(lambda m, x: m(x))(model, x)
-        expected_val = jnp.sum(model.w.value * x)
+        val, grads = jax.value_and_grad(lambda m, x: m(x))(model, x)
+        expected_val = jnp.sum(model.w._value * x)
         npt.assert_allclose(val, expected_val)
-        npt.assert_allclose(grads.w.value, x)
+        npt.assert_allclose(grads.w._value, x)
 
 
 class TestTreeUtilities:
@@ -321,7 +320,7 @@ class TestApplyUpdates:
 
         result = tree.apply_updates(data, updates)
         assert isinstance(result["w"], nn.Param)
-        npt.assert_allclose(result["w"].value, jnp.array([1.1, 2.2]))
+        npt.assert_allclose(result["w"]._value, jnp.array([1.1, 2.2]))
 
     def test_apply_updates_skips_frozen_param(self):
         """apply_updates leaves frozen Params unchanged."""
@@ -332,7 +331,7 @@ class TestApplyUpdates:
         result = tree.apply_updates(data, updates)
         assert isinstance(result["w"], nn.Param)
         assert result["w"].trainable is False
-        npt.assert_allclose(result["w"].value, jnp.array([1.0, 2.0]))
+        npt.assert_allclose(result["w"]._value, jnp.array([1.0, 2.0]))
 
     def test_apply_updates_skips_none_updates(self):
         """apply_updates leaves params unchanged when update is None."""
@@ -341,7 +340,7 @@ class TestApplyUpdates:
 
         result = tree.apply_updates(data, updates)
         assert isinstance(result["w"], nn.Param)
-        npt.assert_allclose(result["w"].value, jnp.array([1.0]))
+        npt.assert_allclose(result["w"]._value, jnp.array([1.0]))
         npt.assert_allclose(result["x"], 5.0)
 
 
@@ -362,7 +361,7 @@ class TestSaveLoad:
             loaded = checkpoint.load(f.name, model)
 
         assert isinstance(loaded.w, nn.Param)
-        npt.assert_array_equal(loaded.w.value, model.w.value)
+        npt.assert_array_equal(loaded.w._value, model.w._value)
         assert loaded.w.trainable is True
 
 
@@ -500,7 +499,7 @@ class TestRepr:
 class TestParamGetattr:
     def test_getattr_bare_new_still_recurses_for_non_dunder(self):
         """Param created via object.__new__ without __init__ still causes RecursionError
-        for non-dunder attrs, because self.value doesn't exist and __getattr__ loops."""
+        for non-dunder attrs, because _value doesn't exist and __getattr__ loops."""
         p = object.__new__(nn.Param)
         with pytest.raises(RecursionError):
             _ = p.shape
@@ -516,7 +515,7 @@ class TestParamGetattr:
         p = nn.Param(jnp.array([1.0, 2.0]))
         p2 = copy.deepcopy(p)
         assert isinstance(p2, nn.Param)
-        npt.assert_array_equal(p2.value, p.value)
+        npt.assert_array_equal(p2._value, p._value)
         assert p2.trainable == p.trainable
 
     def test_copy_preserves_param(self):
@@ -524,7 +523,7 @@ class TestParamGetattr:
         p = nn.Param(jnp.array([1.0, 2.0]))
         p2 = copy.copy(p)
         assert isinstance(p2, nn.Param)
-        npt.assert_array_equal(p2.value, p.value)
+        npt.assert_array_equal(p2._value, p._value)
         assert p2.trainable == p.trainable
 
 
@@ -557,3 +556,95 @@ class TestParamInOperator:
         result = p1 == p2
         assert isinstance(result, jax.Array)
         assert result.shape == (2,)
+
+
+class TestStopGradient:
+    def test_trainable_jax_array_returns_raw_value(self):
+        """__jax_array__ returns raw array for trainable Param."""
+        p = nn.Param(jnp.array([1.0, 2.0]))
+        assert p.__jax_array__() is p._value
+
+    def test_frozen_jax_array_applies_stop_gradient(self):
+        """__jax_array__ returns stop_gradient(value) for frozen Param."""
+        p = nn.Param(jnp.array([1.0, 2.0]), trainable=False)
+        grad = jax.grad(lambda p: jnp.sum(p))(p)
+        npt.assert_allclose(grad._value, jnp.zeros(2))
+
+    def test_trainable_param_nonzero_gradient(self):
+        """jax.grad produces correct non-zero gradient for trainable Param."""
+        p = nn.Param(jnp.array([1.0, 2.0, 3.0]))
+        grad = jax.grad(lambda p: jnp.sum(p))(p)
+        npt.assert_allclose(grad._value, jnp.ones(3))
+
+    def test_frozen_arithmetic_respects_stop_gradient(self):
+        """Arithmetic on frozen Param goes through stop_gradient."""
+        p = nn.Param(jnp.array([1.0, 2.0]), trainable=False)
+        grad = jax.grad(lambda p: jnp.sum(p + 1.0))(p)
+        npt.assert_allclose(grad._value, jnp.zeros(2))
+
+    def test_frozen_matmul_respects_stop_gradient(self):
+        """Matrix multiply on frozen Param goes through stop_gradient."""
+        p = nn.Param(jnp.ones((2, 3)), trainable=False)
+        x = jnp.ones(2)
+        grad = jax.grad(lambda p: jnp.sum(x @ p))(p)
+        npt.assert_allclose(grad._value, jnp.zeros((2, 3)))
+
+    def test_frozen_getattr_respects_stop_gradient(self):
+        """Method calls (.reshape) on frozen Param go through stop_gradient."""
+        p = nn.Param(jnp.ones((2, 3)), trainable=False)
+        grad = jax.grad(lambda p: jnp.sum(p.reshape(-1)))(p)
+        npt.assert_allclose(grad._value, jnp.zeros((2, 3)))
+
+    def test_frozen_getattr_transpose(self):
+        """Transpose (.T) on frozen Param goes through stop_gradient."""
+        p = nn.Param(jnp.ones((2, 3)), trainable=False)
+        grad = jax.grad(lambda p: jnp.sum(p.T))(p)
+        npt.assert_allclose(grad._value, jnp.zeros((2, 3)))
+
+    def test_frozen_jnp_asarray(self):
+        """jnp.asarray on frozen Param applies stop_gradient."""
+        p = nn.Param(jnp.ones(3), trainable=False)
+        grad = jax.grad(lambda p: jnp.sum(jnp.asarray(p)))(p)
+        npt.assert_allclose(grad._value, jnp.zeros(3))
+
+    def test_frozen_in_jnp_function(self):
+        """Frozen Param passed to jnp function gets stop_gradient."""
+        p = nn.Param(jnp.array([1.0, 2.0]), trainable=False)
+        grad = jax.grad(lambda p: jnp.dot(p, p))(p)
+        npt.assert_allclose(grad._value, jnp.zeros(2))
+
+    def test_mixed_trainable_frozen_gradient(self):
+        """Only trainable Params get non-zero gradients in the same expression."""
+        w = nn.Param(jnp.array([2.0, 3.0]))
+        b = nn.Param(jnp.array([1.0, 1.0]), trainable=False)
+
+        def loss(w, b):
+            return jnp.sum(w * b)
+
+        gw, gb = jax.grad(loss, argnums=(0, 1))(w, b)
+        npt.assert_allclose(gw._value, b._value)  # d/dw(w*b) = b
+        npt.assert_allclose(gb._value, jnp.zeros(2))  # frozen
+
+    def test_stop_gradient_under_jit(self):
+        """stop_gradient works correctly under jax.jit."""
+        p = nn.Param(jnp.ones(3), trainable=False)
+        grad = jax.jit(jax.grad(lambda p: jnp.sum(p)))(p)
+        npt.assert_allclose(grad._value, jnp.zeros(3))
+
+    def test_stop_gradient_under_vmap(self):
+        """stop_gradient works correctly under jax.vmap."""
+        p = nn.Param(jnp.ones(3), trainable=False)
+
+        def loss(p, x):
+            return jnp.sum(p * x)
+
+        batched_grad = jax.vmap(jax.grad(loss), in_axes=(None, 0))
+        xs = jnp.ones((4, 3))
+        grads = batched_grad(p, xs)
+        npt.assert_allclose(grads._value, jnp.zeros((4, 3)))
+
+    def test_frozen_preserves_forward_output(self):
+        """Freezing doesn't change forward pass values."""
+        p_train = nn.Param(jnp.array([1.0, 2.0, 3.0]))
+        p_frozen = nn.Param(jnp.array([1.0, 2.0, 3.0]), trainable=False)
+        npt.assert_array_equal(jnp.sum(jnp.asarray(p_train)), jnp.sum(jnp.asarray(p_frozen)))

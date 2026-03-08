@@ -110,8 +110,8 @@ class TestPytreeRegistration:
         m = Model(key=jax.random.key(0))
         leaves, treedef = jtu.tree_flatten(m)
         reconstructed = treedef.unflatten(leaves)
-        npt.assert_array_equal(reconstructed.w.value, m.w.value)
-        npt.assert_array_equal(reconstructed.b.value, m.b.value)
+        npt.assert_array_equal(reconstructed.w._value, m.w._value)
+        npt.assert_array_equal(reconstructed.b._value, m.b._value)
 
     def test_children_follow_field_order(self):
         """Non-array fields are wrapped as Static, so leaves are empty, but roundtrip preserves values."""
@@ -148,7 +148,7 @@ class TestPytreeRegistration:
         leaves, treedef = jtu.tree_flatten(m)
         # This would fail if unflatten tried to call __init__(in_dim, out_dim, key)
         reconstructed = treedef.unflatten(leaves)
-        npt.assert_array_equal(reconstructed.w.value, m.w.value)
+        npt.assert_array_equal(reconstructed.w._value, m.w._value)
 
     def test_tree_map(self):
         """jax.tree.map transforms leaves inside a module."""
@@ -162,7 +162,7 @@ class TestPytreeRegistration:
         m = Model()
         doubled = jax.tree.map(lambda x: x * 2, m)
         assert isinstance(doubled, Model)
-        npt.assert_array_equal(doubled.w.value, jnp.array([2.0, 4.0]))
+        npt.assert_array_equal(doubled.w._value, jnp.array([2.0, 4.0]))
 
     def test_tree_leaves(self):
         """jax.tree.leaves extracts all leaf values."""
@@ -440,7 +440,7 @@ class TestFreezeUnfreeze:
                 self.w = nn.Param(jnp.ones(3))
 
         m = Model()
-        npt.assert_array_equal(m.freeze().unfreeze().w.value, m.w.value)
+        npt.assert_array_equal(m.freeze().unfreeze().w._value, m.w._value)
         assert m.freeze().unfreeze().w.trainable is True
 
     def test_freeze_preserves_values(self):
@@ -452,7 +452,7 @@ class TestFreezeUnfreeze:
 
         m = Model(key=jax.random.key(0))
         frozen = m.freeze()
-        npt.assert_array_equal(frozen.w.value, m.w.value)
+        npt.assert_array_equal(frozen.w._value, m.w._value)
 
     def test_freeze_nested_module(self):
         class Inner(nn.Module):
@@ -512,7 +512,7 @@ class TestNoneField:
         leaves, treedef = jtu.tree_flatten(linear)
         reconstructed = treedef.unflatten(leaves)
         assert reconstructed.b is None
-        npt.assert_array_equal(reconstructed.w.value, linear.w.value)
+        npt.assert_array_equal(reconstructed.w._value, linear.w._value)
 
     def test_none_field_works_under_jit(self):
         linear = nn.Linear(4, 8, bias=False, key=jax.random.key(0))
@@ -583,11 +583,11 @@ class TestReplaceEdgeCases:
     def test_replace_with_param(self):
         """replace can swap a Param value."""
         linear = nn.Linear(4, 8, key=jax.random.key(0))
-        new_w = nn.Param(jnp.zeros_like(linear.w.value))
+        new_w = nn.Param(jnp.zeros_like(linear.w._value))
         replaced = linear.replace(w=new_w)
-        npt.assert_array_equal(replaced.w.value, jnp.zeros_like(linear.w.value))
+        npt.assert_array_equal(replaced.w._value, jnp.zeros_like(linear.w._value))
         # Original unchanged
-        assert not jnp.array_equal(linear.w.value, replaced.w.value)
+        assert not jnp.array_equal(linear.w._value, replaced.w._value)
 
     def test_replace_param_with_non_param_breaks_tree_ops(self):
         """Replacing a Param field with a plain value creates a structurally different pytree."""
@@ -621,7 +621,7 @@ class TestReplaceEdgeCases:
 
         m = Model()
         m2 = m.replace(b=None)
-        # Original has 2 leaves (w.value, b.value), replacement has 1
+        # Original has 2 leaves (w._value, b._value), replacement has 1
         assert len(jax.tree.leaves(m)) == 2
         assert len(jax.tree.leaves(m2)) == 1
 
@@ -734,11 +734,11 @@ class TestInheritance:
         m = Child(jax.random.key(0))
         leaves, treedef = jtu.tree_flatten(m)
         m2 = treedef.unflatten(leaves)
-        npt.assert_array_equal(m2.w.value, m.w.value)
-        npt.assert_array_equal(m2.b.value, m.b.value)
+        npt.assert_array_equal(m2.w._value, m.w._value)
+        npt.assert_array_equal(m2.b._value, m.b._value)
 
     def test_inherited_module_grad(self):
-        """ion.grad works on an inherited module."""
+        """jax.grad works on an inherited module."""
 
         class Base(nn.Module):
             w: nn.Param
@@ -753,12 +753,10 @@ class TestInheritance:
                 super().__init__(key)
                 self.b = nn.Param(jnp.zeros(4))
 
-        import ion
-
         m = Child(jax.random.key(0))
-        grads = ion.grad(lambda m: (m.w.value + m.b.value).sum())(m)
-        npt.assert_allclose(grads.w.value, jnp.ones(4))
-        npt.assert_allclose(grads.b.value, jnp.ones(4))
+        grads = jax.grad(lambda m: (m.w + m.b).sum())(m)
+        npt.assert_allclose(grads.w._value, jnp.ones(4))
+        npt.assert_allclose(grads.b._value, jnp.ones(4))
 
 
 class TestParamsWithFrozen:
@@ -824,10 +822,10 @@ class TestDeepNesting:
         assert len(leaves) == 1
         # Roundtrip
         reconstructed = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
-        npt.assert_array_equal(reconstructed.middle.inner.w.value, m.middle.inner.w.value)
+        npt.assert_array_equal(reconstructed.middle.inner.w._value, m.middle.inner.w._value)
         # jit
-        result = jax.jit(lambda m: jnp.sum(m.middle.inner.w.value))(m)
-        npt.assert_allclose(result, jnp.sum(m.middle.inner.w.value))
+        result = jax.jit(lambda m: jnp.sum(m.middle.inner.w))(m)
+        npt.assert_allclose(result, jnp.sum(m.middle.inner.w._value))
 
 
 class TestStaticWrapping:
@@ -883,7 +881,7 @@ class TestStaticWrapping:
             return jnp.sum(model.w * jnp.array([4.0, 5.0, 6.0]))
 
         grads = jax.grad(loss)(Model())
-        npt.assert_allclose(grads.w.value, jnp.array([4.0, 5.0, 6.0]))
+        npt.assert_allclose(grads.w._value, jnp.array([4.0, 5.0, 6.0]))
 
 
 class TestModuleMutableFields:
@@ -958,7 +956,7 @@ class TestModuleInheritanceEdgeCases:
         assert m.w.shape == (4,)
         leaves, treedef = jtu.tree_flatten(m)
         m2 = treedef.unflatten(leaves)
-        npt.assert_array_equal(m2.w.value, m.w.value)
+        npt.assert_array_equal(m2.w._value, m.w._value)
 
     def test_sibling_classes_dont_interfere(self):
         """Two sibling Module subclasses with same field names don't interfere."""
@@ -996,7 +994,7 @@ class TestModuleCopy:
         m2 = copy.deepcopy(m)
         assert isinstance(m2, Model)
         assert isinstance(m2.w, nn.Param)
-        npt.assert_array_equal(m2.w.value, m.w.value)
+        npt.assert_array_equal(m2.w._value, m.w._value)
         assert m2.w.trainable == m.w.trainable
 
     def test_copy_module_works(self):
@@ -1011,7 +1009,7 @@ class TestModuleCopy:
         m = Model()
         m2 = copy.copy(m)
         assert isinstance(m2.w, nn.Param)
-        npt.assert_array_equal(m2.w.value, m.w.value)
+        npt.assert_array_equal(m2.w._value, m.w._value)
 
 
 class TestModuleWrappingEdgeCases:
@@ -1119,7 +1117,7 @@ class TestReprInsideTransformations:
         @jax.jit
         def f(m):
             _ = repr(m)
-            return jnp.sum(m.w.value)
+            return jnp.sum(m.w)
 
         result = f(m)
         npt.assert_allclose(result, 3.0)
@@ -1137,7 +1135,7 @@ class TestReprInsideTransformations:
 
         def f(m):
             _ = repr(m)
-            return jnp.sum(m.w.value)
+            return jnp.sum(m.w)
 
         # vmap over a batch dim added to the param
         batched_m = jax.tree.map(lambda x: jnp.stack([x, x]), m)

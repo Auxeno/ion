@@ -44,7 +44,7 @@ def freeze(pytree: PyTree) -> PyTree:
 
     def _freeze_leaf(leaf):
         if isinstance(leaf, Param) and leaf.trainable:
-            return Param(leaf.value, trainable=False)
+            return Param(leaf._value, trainable=False)
         return leaf
 
     return jax.tree.map(_freeze_leaf, pytree, is_leaf=is_param)
@@ -58,7 +58,7 @@ def unfreeze(pytree: PyTree) -> PyTree:
 
     def _unfreeze_leaf(leaf):
         if isinstance(leaf, Param) and not leaf.trainable:
-            return Param(leaf.value, trainable=True)
+            return Param(leaf._value, trainable=True)
         return leaf
 
     return jax.tree.map(_unfreeze_leaf, pytree, is_leaf=is_param)
@@ -73,12 +73,12 @@ def apply_updates(model: PyTree, updates: PyTree) -> PyTree:
     def _apply(param: Any, update: Any) -> Any:
         if update is None:
             return param
-        if isinstance(param, Param) and not param.trainable:
+        if not isinstance(param, Param):
             return param
-        if isinstance(param, Param):
-            delta = update.value if isinstance(update, Param) else update
-            return Param(param.value + delta, trainable=param.trainable)
-        return param + update
+        if not param.trainable:
+            return param
+        delta = update._value if isinstance(update, Param) else update
+        return Param(param._value + delta, trainable=param.trainable)
 
     return jax.tree.map(
         _apply,

@@ -55,7 +55,7 @@ class TestLearnedPositionalEmbedding:
         """Different PRNG keys produce different weights."""
         p1 = nn.LearnedPositionalEmbedding(128, 64, key=jax.random.key(0))
         p2 = nn.LearnedPositionalEmbedding(128, 64, key=jax.random.key(1))
-        assert not jnp.array_equal(p1.w.value, p2.w.value)
+        assert not jnp.array_equal(p1.w._value, p2.w._value)
 
 
 class TestSinusoidal:

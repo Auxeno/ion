@@ -98,7 +98,7 @@ class Conv(Module):
 
         x = lax.conv_general_dilated(
             lhs=x,
-            rhs=self.w.value,
+            rhs=jnp.asarray(self.w),
             window_strides=self.stride,
             padding=self.padding,
             rhs_dilation=self.dilation,
@@ -222,7 +222,7 @@ class ConvTranspose(Module):
 
         x = lax.conv_general_dilated(
             lhs=x,
-            rhs=self.w.value,
+            rhs=jnp.asarray(self.w),
             window_strides=(1,) * num_spatial,
             padding=self.padding,
             lhs_dilation=self.stride,

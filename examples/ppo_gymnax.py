@@ -206,7 +206,7 @@ def learn(
         network, opt_state = carry
 
         # Compute PPO loss and parameter gradients
-        loss, grads = ion.value_and_grad(ppo_loss)(
+        loss, grads = jax.value_and_grad(ppo_loss)(
             network,
             batch.observations[indices],
             batch.actions[indices],
@@ -256,7 +256,7 @@ if __name__ == "__main__":
         optax.clip_by_global_norm(1.0),
         optax.adam(learning_rate=LR, eps=1e-5),
     )
-    opt_state = optimizer.init(network.params)
+    opt_state = optimizer.init(network)
 
     # Reset vectorized environments
     observations, env_states = jax.vmap(env.reset, in_axes=(0, None))(

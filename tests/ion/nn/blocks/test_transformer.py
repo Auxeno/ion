@@ -93,9 +93,9 @@ class TestTransformerBlock:
         custom = nn.TransformerBlock(
             32, num_heads=4, w_init=jax.nn.initializers.ones, key=jax.random.key(0)
         )
-        assert not jnp.allclose(default.att.w_qkv.value, custom.att.w_qkv.value)
-        assert not jnp.allclose(default.ff_1.w.value, custom.ff_1.w.value)
-        assert not jnp.allclose(default.ff_2.w.value, custom.ff_2.w.value)
+        assert not jnp.allclose(default.att.w_qkv._value, custom.att.w_qkv._value)
+        assert not jnp.allclose(default.ff_1.w._value, custom.ff_1.w._value)
+        assert not jnp.allclose(default.ff_2.w._value, custom.ff_2.w._value)
 
     def test_mask_output_shape(self):
         """Mask is threaded through; output shape is preserved."""
@@ -204,9 +204,9 @@ class TestCrossTransformerBlock:
         custom = nn.CrossTransformerBlock(
             32, num_heads=4, w_init=jax.nn.initializers.ones, key=jax.random.key(0)
         )
-        assert not jnp.allclose(default.att.w_q.value, custom.att.w_q.value)
-        assert not jnp.allclose(default.ff_1.w.value, custom.ff_1.w.value)
-        assert not jnp.allclose(default.ff_2.w.value, custom.ff_2.w.value)
+        assert not jnp.allclose(default.att.w_q._value, custom.att.w_q._value)
+        assert not jnp.allclose(default.ff_1.w._value, custom.ff_1.w._value)
+        assert not jnp.allclose(default.ff_2.w._value, custom.ff_2.w._value)
 
     def test_mask_output_shape(self):
         """Mask is threaded through; output shape is preserved."""
