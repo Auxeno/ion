@@ -50,3 +50,7 @@ reportIncompatibleMethodOverride = false
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+filterwarnings = [
+    # From Optax
+    "ignore:Setting `jax_pmap_shmap_merge`:DeprecationWarning",
+]
