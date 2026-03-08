@@ -8,8 +8,8 @@ license = "Apache-2.0"
 authors = [{name = "Alex Goddard"}]
 dependencies = [
     "jax>=0.5.0",
-    "jaxtyping>=0.3.9",
-    "treescope>=0.1.10",
+    "jaxtyping>=0.3.0",
+    "treescope",
 ]
 
 [project.urls]
@@ -22,11 +22,11 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.2",
-    "pyright>=1.1.408",
-    "ruff>=0.15.2",
-    "ipykernel>=7.2.0",
-    "pip>=26.0.1",
+    "pytest",
+    "pyright",
+    "ruff",
+    "ipykernel",
+    "pip",
 ]
 examples = [
     "gymnax",
