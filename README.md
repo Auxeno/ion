@@ -22,7 +22,7 @@ pip install git+https://github.com/auxeno/ion
 
 ## Overview
 
-Ion is designed to be minimal. The core has three concepts: `Module`, `Param`, and `apply_updates`. Everything else is just JAX. Models are pytrees, so native JAX transforms like `jax.grad`, `jax.vmap`, and `jax.jit` work directly.
+Ion is designed to be minimal. The core has three concepts to learn: `Module`, `Param`, and `apply_updates`. Everything else is just JAX. Models are pytrees, so native JAX transforms like `jax.grad`, `jax.vmap`, and `jax.jit` just work.
 
 Visit the [Ion Tour Notebook](https://nbviewer.org/github/auxeno/ion/blob/main/examples/ion_tour.ipynb) for a hands-on walkthrough.
 
@@ -80,34 +80,36 @@ model = model.replace(encoder=model.encoder.freeze())  # freeze one layer
 unfrozen_model = model.unfreeze()                      # unfreeze everything
 ```
 
-### Gradients
-
-Because Ion models are standard pytrees and `Param` implements `__jax_array__`, all native JAX transforms work directly:
-
-```python
-def loss_fn(model, x, y):
-    logits = model(x)
-    return optax.softmax_cross_entropy_with_integer_labels(logits, y).mean()
-
-loss, grads = jax.value_and_grad(loss_fn)(model, x, y)
-```
-
-Frozen parameters (`trainable=False`) automatically have `stop_gradient` applied, so their gradients are zero and the backward pass skips them entirely.
-
-There are no custom wrappers like `ion.jit`, `ion.grad`, or `ion.vmap`. Because Ion models are standard pytrees, all native JAX transformations work directly out of the box, from the familiar `jax.jit`, `jax.grad`, and `jax.vmap` to higher-order transforms like `jax.jacobian` and `jax.hessian`.   
-
-See [Internals](docs/internals.md) for how the module system and pytree registration work under the hood.
-
 ### Apply Updates
 
-`apply_updates` only modifies `Param` leaves. Non-parameter arrays (like batch statistics) pass through unchanged.
+`apply_updates` only applies updates to trainable `Param` leaves. Non-parameter arrays (like batch statistics) and non-trainable `Params` pass through unchanged.
 
 ```python
 updates, opt_state = optimizer.update(grads, opt_state)
 model = ion.apply_updates(model, updates)
 ```
 
-That's the entire core.
+That's the entire core. See [Internals](docs/internals.md) for how the module system and pytree registration work under the hood.
+
+## Transformations
+
+There are no custom wrappers like `ion.jit`, `ion.grad`, or `ion.vmap`. Because Ion models are standard pytrees, all native JAX transformations work directly out of the box, from the familiar `jax.jit`, `jax.grad`, and `jax.vmap` to higher-order transforms like `jax.jacobian` and `jax.hessian`.
+
+Frozen parameters (`trainable=False`) automatically have `stop_gradient` applied, so their gradients are zero and the backward pass skips them entirely.
+
+```python
+@jax.grad
+def loss_fn(model, x, y):
+    logits = model(x)
+    return optax.softmax_cross_entropy_with_integer_labels(logits, y).mean()
+
+@jax.jit
+def train_step(model, opt_state, x, y):
+    grads = loss_fn(model, x, y)
+    updates, opt_state = optimizer.update(grads, opt_state)
+    model = ion.apply_updates(model, updates)
+    return model, opt_state
+```
 
 ### Layers
 

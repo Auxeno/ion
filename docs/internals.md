@@ -38,13 +38,13 @@ JAX pytrees see all arrays equally and have no built-in way to distinguish train
 
 ## Tree (`ion/tree.py`)
 
-### Static
-
-A pytree node with no children. JAX treats its value as static metadata. Used by `Module` pytree registration to wrap non-array leaves (ints, strings, callables) so they become invisible to JAX tracing while being preserved through flatten/unflatten roundtrips.
-
 ### apply_updates
 
 Adds optimizer deltas to a model's trainable parameters. Only `Param` leaves are modified; non-`Param` arrays (like batch statistics) pass through unchanged. Walks the model and update trees in parallel, skipping positions where the update is `None`, the leaf is not a `Param`, or the parameter is frozen (`Param(trainable=False)`). The `Param` wrapper is preserved on updated values so trainability metadata survives the step.
+
+### Static
+
+A pytree node with no children. JAX treats its value as static metadata. Used by `Module` pytree registration to wrap non-array leaves (ints, strings, callables) so they become invisible to JAX tracing while being preserved through flatten/unflatten roundtrips.
 
 ## 🔪 Sharp Edges
 
