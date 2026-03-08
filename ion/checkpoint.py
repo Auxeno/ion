@@ -43,7 +43,7 @@ def save(path: str, pytree: PyTree) -> None:
     for key_path, leaf in leaves_with_paths:
         key = _path_key(key_path)
         if isinstance(leaf, Param):
-            arrays_to_save[key + ".value"] = np.asarray(leaf.value)
+            arrays_to_save[key + "._value"] = np.asarray(leaf._value)
             trainable_flags[key] = leaf.trainable
         elif isinstance(leaf, (jax.Array, np.ndarray)):
             arrays_to_save[key] = np.asarray(leaf)
@@ -76,7 +76,7 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
     for key_path, leaf in leaves_with_paths:
         key = _path_key(key_path)
         if isinstance(leaf, Param):
-            array_key = key + ".value"
+            array_key = key + "._value"
             expected_keys.add(array_key)
             if array_key not in saved_data:
                 raise ValueError(
@@ -85,7 +85,7 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
                     f"Available keys: {sorted(array_keys_in_file)}"
                 )
             saved_array = saved_data[array_key]
-            ref_shape = leaf.value.shape
+            ref_shape = leaf._value.shape
             if saved_array.shape != ref_shape:
                 raise ValueError(
                     f"Shape mismatch for '{array_key}': "

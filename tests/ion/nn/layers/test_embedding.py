@@ -52,4 +52,4 @@ class TestEmbedding:
         """Different PRNG keys produce different weights."""
         e1 = nn.Embedding(10, 8, key=jax.random.key(0))
         e2 = nn.Embedding(10, 8, key=jax.random.key(1))
-        assert not jnp.array_equal(e1.w.value, e2.w.value)
+        assert not jnp.array_equal(e1.w._value, e2.w._value)

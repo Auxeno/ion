@@ -22,7 +22,7 @@ class TestSaveLoad:
         with tempfile.NamedTemporaryFile(suffix=".npz") as f:
             checkpoint.save(f.name, model)
             loaded = checkpoint.load(f.name, model)
-        npt.assert_array_equal(loaded.w.value, model.w.value)
+        npt.assert_array_equal(loaded.w._value, model.w._value)
 
     def test_static_leaves_from_reference(self):
         """Non-array leaves come from the reference tree, not the file."""
@@ -43,7 +43,7 @@ class TestSaveLoad:
             loaded = checkpoint.load(f.name, reference)
 
         # Arrays come from the file (original)
-        npt.assert_array_equal(loaded.w.value, original.w.value)
+        npt.assert_array_equal(loaded.w._value, original.w._value)
         # Static int comes from the reference tree
         assert loaded.count == 99
 
@@ -64,7 +64,7 @@ class TestSaveLoad:
             checkpoint.save(f.name, model)
             saved = np.load(f.name)
             array_keys = sorted(k for k in saved.files if k != "__ion_metadata__")
-            assert array_keys == ["b.value", "w.value"]
+            assert array_keys == ["b._value", "w._value"]
 
     def test_field_reorder_loads_correctly(self):
         """Reordering fields in the reference model still loads correctly."""
@@ -94,8 +94,8 @@ class TestSaveLoad:
             checkpoint.save(f.name, original)
             loaded = checkpoint.load(f.name, reference)
 
-        npt.assert_array_equal(loaded.w.value, original.w.value)
-        npt.assert_array_equal(loaded.b.value, original.b.value)
+        npt.assert_array_equal(loaded.w._value, original.w._value)
+        npt.assert_array_equal(loaded.b._value, original.b._value)
 
     def test_param_and_plain_array_mix(self):
         class Model(nn.Module):
@@ -110,7 +110,7 @@ class TestSaveLoad:
         with tempfile.NamedTemporaryFile(suffix=".npz") as f:
             checkpoint.save(f.name, model)
             loaded = checkpoint.load(f.name, model)
-        npt.assert_array_equal(loaded.w.value, model.w.value)
+        npt.assert_array_equal(loaded.w._value, model.w._value)
         npt.assert_array_equal(loaded.buf, model.buf)
 
 
@@ -131,8 +131,8 @@ class TestSaveLoadTrainable:
         # Reference has opposite trainable flags
         reference = Model(key=jax.random.key(1))
         reference = reference.replace(
-            w=nn.Param(reference.w.value, trainable=False),
-            b=nn.Param(reference.b.value, trainable=True),
+            w=nn.Param(reference.w._value, trainable=False),
+            b=nn.Param(reference.b._value, trainable=True),
         )
 
         with tempfile.NamedTemporaryFile(suffix=".npz") as f:
@@ -143,8 +143,8 @@ class TestSaveLoadTrainable:
         assert loaded.w.trainable is True
         assert loaded.b.trainable is False
         # Array values come from the file
-        npt.assert_array_equal(loaded.w.value, model.w.value)
-        npt.assert_array_equal(loaded.b.value, model.b.value)
+        npt.assert_array_equal(loaded.w._value, model.w._value)
+        npt.assert_array_equal(loaded.b._value, model.b._value)
 
     def test_frozen_model_save_restore(self):
         """A fully frozen model roundtrips with correct trainable=False flags."""
@@ -168,7 +168,7 @@ class TestSaveLoadTrainable:
 
         # Saved trainable=False wins over reference trainable=True
         assert loaded.w.trainable is False
-        npt.assert_array_equal(loaded.w.value, model.w.value)
+        npt.assert_array_equal(loaded.w._value, model.w._value)
 
     def test_metadata_in_npz(self):
         """Saved .npz file contains __ion_metadata__ with trainable flags."""
@@ -216,8 +216,8 @@ class TestSaveLoadTrainable:
 
         assert loaded.inner.w.trainable is False  # from file
         assert loaded.b.trainable is True  # from file
-        npt.assert_array_equal(loaded.inner.w.value, model.inner.w.value)
-        npt.assert_array_equal(loaded.b.value, model.b.value)
+        npt.assert_array_equal(loaded.inner.w._value, model.inner.w._value)
+        npt.assert_array_equal(loaded.b._value, model.b._value)
 
 
 class TestSaveLoadStructureMismatch:

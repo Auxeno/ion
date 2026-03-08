@@ -50,10 +50,10 @@ class TestSelfAttention:
     def test_truncated_normal_init(self):
         """Truncated normal init gives std close to 0.02 with no values beyond 2 sigma."""
         layer = nn.SelfAttention(256, num_heads=4, key=jax.random.key(42))
-        std = jnp.std(layer.w_qkv.value)
+        std = jnp.std(layer.w_qkv._value)
         npt.assert_allclose(std, 0.02, atol=0.005)
         # Truncated normal: no values beyond 2 sigma
-        assert jnp.all(jnp.abs(layer.w_qkv.value) <= 0.04 + 1e-6)
+        assert jnp.all(jnp.abs(layer.w_qkv._value) <= 0.04 + 1e-6)
 
     def test_weight_dtype(self):
         """Weights match the requested dtype."""

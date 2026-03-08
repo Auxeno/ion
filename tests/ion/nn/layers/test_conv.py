@@ -55,7 +55,7 @@ class TestConv:
     def test_1d_he_normal_init(self):
         """He normal initialization gives var(w) close to 2/fan_in."""
         layer = nn.Conv(64, 64, kernel_shape=(3,), key=jax.random.key(42))
-        var = jnp.var(layer.w.value)
+        var = jnp.var(layer.w._value)
         fan_in = 3 * 64
         expected_var = 2.0 / fan_in
         npt.assert_allclose(var, expected_var, atol=0.05)
@@ -141,7 +141,7 @@ class TestConv:
     def test_2d_he_normal_init(self):
         """He normal initialization gives var(w) close to 2/fan_in."""
         layer = nn.Conv(64, 64, kernel_shape=(3, 3), key=jax.random.key(42))
-        var = jnp.var(layer.w.value)
+        var = jnp.var(layer.w._value)
         fan_in = 3 * 3 * 64
         expected_var = 2.0 / fan_in
         npt.assert_allclose(var, expected_var, atol=0.05)
@@ -255,7 +255,7 @@ class TestConvTranspose:
     def test_1d_he_normal_init(self):
         """He normal initialization gives var(w) close to 2/fan_in."""
         layer = nn.ConvTranspose(64, 64, kernel_shape=(3,), key=jax.random.key(42))
-        var = jnp.var(layer.w.value)
+        var = jnp.var(layer.w._value)
         fan_in = 3 * 64
         expected_var = 2.0 / fan_in
         npt.assert_allclose(var, expected_var, atol=0.05)
@@ -359,7 +359,7 @@ class TestConvTranspose:
     def test_2d_he_normal_init(self):
         """He normal initialization gives var(w) close to 2/fan_in."""
         layer = nn.ConvTranspose(64, 64, kernel_shape=(3, 3), key=jax.random.key(42))
-        var = jnp.var(layer.w.value)
+        var = jnp.var(layer.w._value)
         fan_in = 3 * 3 * 64
         expected_var = 2.0 / fan_in
         npt.assert_allclose(var, expected_var, atol=0.05)

@@ -48,7 +48,7 @@ class TestLSTMCell:
         cell = nn.LSTMCell(8, hidden_dim, key=jax.random.key(0))
         b = cell.b
         assert b is not None
-        i_b, f_b, g_b, o_b = jnp.split(b.value, 4)
+        i_b, f_b, g_b, o_b = jnp.split(b._value, 4)
         npt.assert_array_equal(i_b, jnp.zeros(hidden_dim))
         npt.assert_array_equal(f_b, jnp.ones(hidden_dim))
         npt.assert_array_equal(g_b, jnp.zeros(hidden_dim))

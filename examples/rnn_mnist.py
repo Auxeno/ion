@@ -53,7 +53,7 @@ def train_step(
     labels: Int[Array, " b"],
 ) -> tuple[SeqModel, optax.OptState, Float[Array, ""]]:
     """Compute gradients, apply optimizer update, and return the new model state."""
-    loss, grads = ion.value_and_grad(loss_fn)(model, sequences, labels)
+    loss, grads = jax.value_and_grad(loss_fn)(model, sequences, labels)
     updates, opt_state = optimizer.update(grads, opt_state)
     model = ion.apply_updates(model, updates)
     return model, opt_state, loss
@@ -89,7 +89,7 @@ if __name__ == "__main__":
     test_lab = jnp.asarray(test_labels)
 
     model = SeqModel(key=jax.random.key(0))
-    opt_state = optimizer.init(model.params)
+    opt_state = optimizer.init(model)
 
     for epoch in range(NUM_EPOCHS):
         # Shuffle training indices each epoch
