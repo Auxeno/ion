@@ -1,6 +1,6 @@
 <div align="center">
 
-  <h1><img src="assets/logo.png" alt="Ion" width="72"><br>Ion</h1>
+  <h1><img src="https://raw.githubusercontent.com/auxeno/ion/main/assets/logo.png" alt="Ion" width="72"><br>Ion</h1>
 
   <h3>Simple neural networks in JAX</h3>
 
@@ -17,7 +17,7 @@ Ion is a minimal neural network library for JAX. The core is three files and ~25
 ## Installation
 
 ```bash
-pip install git+https://github.com/auxeno/ion
+pip install ion-nn
 ```
 
 ## Core Concepts
