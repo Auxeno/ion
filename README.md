@@ -29,6 +29,8 @@ Visit the [Ion Tour Notebook](https://nbviewer.org/github/Auxeno/ion/blob/main/e
 Inherit from `nn.Module` to define a model. Subclasses are automatically registered as JAX pytrees and become immutable after `__init__`.
 
 ```python
+import ion.nn as nn
+
 class MLP(nn.Module):
     layer_1: nn.Linear
     layer_2: nn.Linear
@@ -93,7 +95,7 @@ import jax
 import optax
 
 import ion
-from ion import nn
+import ion.nn as nn
 
 
 @jax.grad
