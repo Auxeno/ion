@@ -24,7 +24,7 @@ pip install git+https://github.com/auxeno/ion
 
 Ion is designed to be minimal. The core has three concepts to learn: `Module`, `Param`, and `apply_updates`. Everything else is just JAX. Models are pytrees, so native JAX transforms like `jax.grad`, `jax.vmap`, and `jax.jit` just work.
 
-Visit the [Ion Tour Notebook](https://nbviewer.org/github/auxeno/ion/blob/main/examples/ion_tour.ipynb) for a hands-on walkthrough.
+Visit the [Ion Tour Notebook](https://nbviewer.org/github/Auxeno/ion/blob/main/examples/ion_tour.ipynb) for a hands-on walkthrough.
 
 ### Module
 
