@@ -41,6 +41,7 @@ dev = [
     "ruff",
     "ipykernel",
     "pip",
+    "optax",
 ]
 examples = [
     "gymnax",
@@ -59,6 +60,7 @@ extend-include = ["*.ipynb"]
 ignore = ["F722", "E731"]
 
 [tool.pyright]
+include = ["ion", "tests"]
 typeCheckingMode = "standard"
 reportIncompatibleMethodOverride = false
 
