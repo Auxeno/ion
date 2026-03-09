@@ -1,11 +1,19 @@
 [project]
-name = "ion"
-version = "0.2.0"
+name = "ion-nn"
+version = "0.2.1"
 description = "Simple neural networks in JAX."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 authors = [{name = "Alex Goddard"}]
+keywords = ["jax", "neural-networks", "deep-learning"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "jax>=0.5.0",
     "jaxtyping>=0.3.0",
