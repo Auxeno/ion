@@ -25,7 +25,7 @@ class SeqModel(nn.Module):
         self.gru = nn.GRU(1, hidden_dim, key=keys[0])
         self.fc = nn.Linear(hidden_dim, 10, key=keys[1])
 
-    def __call__(self, x: Float[Array, "... 784 1"]) -> Float[Array, "... 10"]:
+    def __call__(self, x: Float[Array, "b 784 1"]) -> Float[Array, "b 10"]:
         _, h = self.gru(x)
 
         # Pass final GRU hidden state through dense layer

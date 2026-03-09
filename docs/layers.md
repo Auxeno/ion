@@ -8,39 +8,39 @@ All layers use **channels-last** ordering.
 
 | Domain | Format | Example |
 |--------|--------|---------|
-| Vector data | `(..., features)` | `(batch, 256)` |
-| 1D (sequences) | `(..., length, channels)` | `(batch, 128, 64)` |
-| 2D (images) | `(..., height, width, channels)` | `(batch, 32, 32, 3)` |
-| Attention | `(..., seq, dim)` | `(batch, 128, 512)` |
-| Recurrent | `(..., time, features)` | `(batch, 50, 64)` |
+| Vector data | `(batch, features)` | `(32, 256)` |
+| 1D (sequences) | `(batch, length, channels)` | `(32, 128, 64)` |
+| 2D (images) | `(batch, height, width, channels)` | `(32, 32, 32, 3)` |
+| Attention | `(batch, seq, dim)` | `(32, 128, 512)` |
+| Recurrent | `(batch, time, features)` | `(32, 50, 64)` |
 
 Channels-last is the most typical format for image data and is followed by Flax and TensorFlow. PyTorch and Equinox use the channels-first convention.
 
-### Flexible Batch Dimensions
+### Batch Dimensions
 
-All layers accept arbitrary leading batch dimensions (zero, one, or many). The same layer works on a single example, a batch, or nested batches with no code changes.
+All layers expect at least one leading batch dimension. Structural layers (Conv, Pool, LSTM, GRU, GroupNorm) require exactly the right number of dimensions and will error on incorrect rank. Pointwise layers (Linear, LayerNorm, Embedding, etc.) operate on the last dimension and naturally handle any number of leading dims.
 
 ```python
 linear = nn.Linear(4, 8, key=key)
+x = jnp.ones((32, 4))
+linear(x)  # (32, 4) -> (32, 8)
 
-linear(x)          # (4,)       ->  (8,)       no batch
-linear(x_batched)  # (3, 4)     ->  (3, 8)     one batch dim
-linear(x_multi)    # (5, 3, 4)  ->  (5, 3, 8)  multiple batch dims
+conv = nn.Conv(3, 16, kernel_shape=(3, 3), padding=1, key=key)
+x = jnp.ones((32, 28, 28, 3))
+conv(x)  # (32, 28, 28, 3) -> (32, 28, 28, 16)
 ```
 
-This works the same way for spatial (and all other) layers:
+Use `jax.vmap` for inputs with an multiple batch dimensions:
 
 ```python
-conv = nn.Conv(3, 16, kernel_shape=(3, 3), padding=1, key=key)
+x = jnp.ones((4, 32, 28, 28, 3))
+jax.vmap(conv)(x)  # (4, 32, 28, 28, 3) -> (4, 32, 28, 28, 16)
 
-conv(x)          # (32, 32, 3)        ->  (32, 32, 16)        no batch
-conv(x_batched)  # (8, 32, 32, 3)     ->  (8, 32, 32, 16)     one batch dim
-conv(x_multi)    # (2, 8, 32, 32, 3)  ->  (2, 8, 32, 32, 16)  multiple batch dims
+x = jnp.ones((2, 4, 32, 28, 28, 3))
+jax.vmap(jax.vmap(conv))(x)  # (2, 4, 32, 28, 28, 3) -> (2, 4, 32, 28, 28, 16)
 ```
 
-This is a deliberate design choice favouring ease of use. PyTorch is inconsistent here as some layers (e.g. `nn.Linear`) support arbitrary batch dims while others (e.g. `nn.Conv2d`) only accept unbatched or single-batch input. Equinox requires `jax.vmap` over a model call to add a batch dimension, which is the most explicit approach and best for debugging. Flax and Ion let the user call any layer with or without batch dims freely.
-
-The trade-off for the Flax/Ion approach is users won't catch an accidentally wrong number of dimensions since an extra or missing dim will silently produce wrong-shaped outputs rather than an error, so manage your array shapes carefully.
+This design catches shape errors. Passing the wrong number of dimensions to a Conv or LSTM will raise an error rather than silently reshaping. 
 
 ## Shape Annotations
 
@@ -57,14 +57,15 @@ The same letter can mean different things in different layers. Meaning is determ
 | `o` | output features | linear, lora |
 | `r` | rank | lora |
 | `v` | vocabulary size | embedding |
-| `...` | arbitrary batch dimensions | everywhere |
+| `b` | batch dimension | everywhere |
+| `...` | arbitrary batch dimensions	 | everywhere |
 
 ### Attention
 
 | Label | Meaning | Notes |
 |-------|---------|-------|
 | `d` | model dimension | total embedding size |
-| `h` | number of heads | matches Haiku / original paper convention |
+| `h` | number of heads | matches original paper convention |
 | `k` | per-head dimension (`d_k`) | from "Attention Is All You Need" |
 | `s` | query (source) sequence position | |
 | `t` | key/value (target) sequence position | distinct from `s` in cross-attention |

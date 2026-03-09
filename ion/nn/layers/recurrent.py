@@ -154,7 +154,7 @@ class LSTM(Module):
     """LSTM over a full sequence.
 
     >>> lstm = LSTM(3, 16, key=key)
-    >>> outputs, (h, c) = lstm(x)  # (*, t, 3) -> (*, t, 16), ((*, 16), (*, 16))
+    >>> outputs, (h, c) = lstm(x)  # (b, t, 3) -> (b, t, 16), ((b, 16), (b, 16))
     """
 
     cell: LSTMCell
@@ -176,35 +176,26 @@ class LSTM(Module):
 
     def __call__(
         self,
-        x: Float[Array, "... t i"],
-        hx: tuple[Float[Array, "... h"], Float[Array, "... h"]] | None = None,
-    ) -> tuple[Float[Array, "... t h"], tuple[Float[Array, "... h"], Float[Array, "... h"]]]:
+        x: Float[Array, "b t i"],
+        hx: tuple[Float[Array, "b h"], Float[Array, "b h"]] | None = None,
+    ) -> tuple[Float[Array, "b t h"], tuple[Float[Array, "b h"], Float[Array, "b h"]]]:
 
-        batch_shape = x.shape[:-2]
-        t = x.shape[-2]
+        b, t, i = x.shape
         hd = self.cell.w_h.shape[0]
-
-        x_flat = x.reshape(-1, t, x.shape[-1])
-        b = x_flat.shape[0]
 
         if hx is None:
             h0, c0 = self.cell.initial_state
             h0 = jnp.broadcast_to(h0, (b, hd))
             c0 = jnp.broadcast_to(c0, (b, hd))
         else:
-            h0 = hx[0].reshape(-1, hd)
-            c0 = hx[1].reshape(-1, hd)
+            h0, c0 = hx
 
         def step(carry, x_t):
             out = self.cell(x_t, carry)
             return out, out[0]
 
-        x_time = jnp.moveaxis(x_flat, -2, 0)
-        hx, x = lax.scan(f=step, init=(h0, c0), xs=x_time)
-
-        x = jnp.moveaxis(x, 0, -2)
-        x = x.reshape(*batch_shape, t, hd)
-        hx = (hx[0].reshape(*batch_shape, hd), hx[1].reshape(*batch_shape, hd))
+        hx, x = lax.scan(f=step, init=(h0, c0), xs=jnp.moveaxis(x, 1, 0))
+        x = jnp.moveaxis(x, 0, 1)
 
         return x, hx
 
@@ -213,7 +204,7 @@ class GRU(Module):
     """GRU over a full sequence.
 
     >>> gru = GRU(3, 16, key=key)
-    >>> outputs, h = gru(x)  # (*, t, 3) -> (*, t, 16), (*, 16)
+    >>> outputs, h = gru(x)  # (b, t, 3) -> (b, t, 16), (b, 16)
     """
 
     cell: GRUCell
@@ -235,32 +226,24 @@ class GRU(Module):
 
     def __call__(
         self,
-        x: Float[Array, "... t i"],
-        hx: Float[Array, "... h"] | None = None,
-    ) -> tuple[Float[Array, "... t h"], Float[Array, "... h"]]:
+        x: Float[Array, "b t i"],
+        hx: Float[Array, "b h"] | None = None,
+    ) -> tuple[Float[Array, "b t h"], Float[Array, "b h"]]:
 
-        batch_shape = x.shape[:-2]
-        t = x.shape[-2]
+        b, t, i = x.shape
         hd = self.cell.w_h.shape[0]
-
-        x_flat = x.reshape(-1, t, x.shape[-1])
-        b = x_flat.shape[0]
 
         if hx is None:
             h0 = self.cell.initial_state
             h0 = jnp.broadcast_to(h0, (b, hd))
         else:
-            h0 = hx.reshape(-1, hd)
+            h0 = hx
 
         def step(carry, x_t):
             h = self.cell(x_t, carry)
             return h, h
 
-        x_time = jnp.moveaxis(x_flat, -2, 0)
-        hx, x = lax.scan(f=step, init=h0, xs=x_time)
-
-        x = jnp.moveaxis(x, 0, -2)
-        x = x.reshape(*batch_shape, t, hd)
-        hx = hx.reshape(*batch_shape, hd)
+        hx, x = lax.scan(f=step, init=h0, xs=jnp.moveaxis(x, 1, 0))
+        x = jnp.moveaxis(x, 0, 1)
 
         return x, hx

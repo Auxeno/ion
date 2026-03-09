@@ -78,35 +78,39 @@ class TestGroupNorm:
     def test_spatial_zero_mean_per_group(self):
         """With num_spatial_dims=2, output has zero mean over spatial + group channels."""
         layer = nn.GroupNorm(8, 2, num_spatial_dims=2)
-        x = jax.random.normal(jax.random.key(0), (6, 6, 8))
+        x = jax.random.normal(jax.random.key(0), (1, 6, 6, 8))
         y = layer(x)
-        y_groups = y.reshape(6, 6, 2, 4)
-        means = jnp.mean(y_groups, axis=(0, 1, 3))
+        y_groups = y.reshape(1, 6, 6, 2, 4)
+        means = jnp.mean(y_groups, axis=(1, 2, 4))
         npt.assert_allclose(means, 0.0, atol=1e-5)
 
     def test_spatial_unit_variance_per_group(self):
         """With num_spatial_dims=2, output has unit variance over spatial + group channels."""
         layer = nn.GroupNorm(8, 2, num_spatial_dims=2)
-        x = jax.random.normal(jax.random.key(0), (6, 6, 8))
+        x = jax.random.normal(jax.random.key(0), (1, 6, 6, 8))
         y = layer(x)
-        y_groups = y.reshape(6, 6, 2, 4)
-        mean = jnp.mean(y_groups, axis=(0, 1, 3), keepdims=True)
-        var = jnp.mean(jnp.square(y_groups - mean), axis=(0, 1, 3))
+        y_groups = y.reshape(1, 6, 6, 2, 4)
+        mean = jnp.mean(y_groups, axis=(1, 2, 4), keepdims=True)
+        var = jnp.mean(jnp.square(y_groups - mean), axis=(1, 2, 4))
         npt.assert_allclose(var, 1.0, atol=1e-4)
 
-    def test_spatial_batch_dims(self):
-        """Arbitrary batch dimensions are preserved with num_spatial_dims."""
+    def test_spatial_vmap_batch(self):
+        """jax.vmap adds an extra batch dimension with num_spatial_dims."""
         layer = nn.GroupNorm(8, 2, num_spatial_dims=2)
-        x = jax.random.normal(jax.random.key(0), (2, 3, 6, 6, 8))
+        x = jax.random.normal(jax.random.key(0), (3, 6, 6, 8))
         y = layer(x)
-        assert y.shape == (2, 3, 6, 6, 8)
+        assert y.shape == (3, 6, 6, 8)
+
+        x_extra = jnp.stack([x] * 2)
+        y_extra = jax.vmap(layer)(x_extra)
+        assert y_extra.shape == (2, 3, 6, 6, 8)
 
     def test_instance_norm_via_group_norm(self):
         """GroupNorm with num_groups=dim and num_spatial_dims gives instance norm."""
         layer = nn.GroupNorm(3, 3, num_spatial_dims=2)
-        x = jax.random.normal(jax.random.key(0), (8, 8, 3))
+        x = jax.random.normal(jax.random.key(0), (1, 8, 8, 3))
         y = layer(x)
-        means = jnp.mean(y, axis=(0, 1))
+        means = jnp.mean(y, axis=(1, 2))
         npt.assert_allclose(means, 0.0, atol=1e-5)
 
 

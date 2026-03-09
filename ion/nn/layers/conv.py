@@ -23,7 +23,7 @@ class Conv(Module):
 
     >>> Conv(3, 16, kernel_shape=(5,), padding="SAME", key=key)   # Conv1d
     >>> Conv(3, 16, kernel_shape=(3, 3), padding=1, key=key)      # Conv2d
-    >>> conv(x)  # (*, h, w, 3) -> (*, h, w, 16)
+    >>> conv(x)  # (b, h, w, 3) -> (b, h, w, 16)
     """
 
     w: Param[Float[Array, "..."]]
@@ -86,12 +86,9 @@ class Conv(Module):
         )
         self.b = Param(b_init(shape=(out_channels,), dtype=dtype, key=key_b)) if bias else None
 
-    def __call__(self, x: Float[Array, "..."]) -> Float[Array, "..."]:
+    def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
 
         num_spatial = len(self.kernel_shape)
-        batch_shape = x.shape[: -(num_spatial + 1)]
-        x = x.reshape(-1, *x.shape[-(num_spatial + 1) :])
-
         spatial_dims = tuple(range(1, num_spatial + 1))
         lhs_spec = (0, num_spatial + 1) + spatial_dims
         rhs_spec = (num_spatial + 1, num_spatial) + tuple(range(num_spatial))
@@ -106,8 +103,6 @@ class Conv(Module):
             feature_group_count=self.groups,
         )
 
-        x = x.reshape(*batch_shape, *x.shape[-(num_spatial + 1) :])
-
         if self.b is not None:
             x = x + self.b
 
@@ -119,7 +114,7 @@ class ConvTranspose(Module):
 
     >>> ConvTranspose(3, 16, kernel_shape=(5,), padding=2, key=key)          # ConvTranspose1d
     >>> ConvTranspose(3, 16, kernel_shape=(3, 3), padding="VALID", key=key)  # ConvTranspose2d
-    >>> conv_t(x)  # (*, h, w, 3) -> (*, h, w, 16)
+    >>> conv_t(x)  # (b, h, w, 3) -> (b, h, w, 16)
     """
 
     w: Param[Float[Array, "..."]]
@@ -210,12 +205,9 @@ class ConvTranspose(Module):
         )
         self.b = Param(b_init(shape=(out_channels,), dtype=dtype, key=key_b)) if bias else None
 
-    def __call__(self, x: Float[Array, "..."]) -> Float[Array, "..."]:
+    def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
 
         num_spatial = len(self.kernel_shape)
-        batch_shape = x.shape[: -(num_spatial + 1)]
-        x = x.reshape(-1, *x.shape[-(num_spatial + 1) :])
-
         spatial_dims = tuple(range(1, num_spatial + 1))
         lhs_spec = (0, num_spatial + 1) + spatial_dims
         rhs_spec = (num_spatial + 1, num_spatial) + tuple(range(num_spatial))
@@ -230,8 +222,6 @@ class ConvTranspose(Module):
             dimension_numbers=lax.ConvDimensionNumbers(lhs_spec, rhs_spec, lhs_spec),
             feature_group_count=self.groups,
         )
-
-        x = x.reshape(*batch_shape, *x.shape[-(num_spatial + 1) :])
 
         if self.b is not None:
             x = x + self.b

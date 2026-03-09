@@ -84,12 +84,9 @@ class GroupNorm(Module):
         self.num_spatial_dims = num_spatial_dims
         self.eps = eps
 
-    def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
+    def __call__(self, x: Float[Array, "b ... d"]) -> Float[Array, "b ... d"]:
 
         num_spatial = self.num_spatial_dims
-
-        batch_shape = x.shape[: -(num_spatial + 1)]
-        x = x.reshape(-1, *x.shape[-(num_spatial + 1) :])
 
         # Split channels into groups
         group_shape = (*x.shape[:-1], self.num_groups, x.shape[-1] // self.num_groups)
@@ -106,8 +103,6 @@ class GroupNorm(Module):
         x = x.reshape(*x.shape[: num_spatial + 1], -1)
 
         x = x * self.scale + self.b
-
-        x = x.reshape(*batch_shape, *x.shape[1:])
 
         return x
 
@@ -203,11 +198,7 @@ class BatchNorm(Module):
         mean = jnp.mean(x, axis=reduce_axes)
         var = jnp.mean(jnp.square(x - mean), axis=reduce_axes)
 
-        new_running_mean = lax.stop_gradient(
-            (1 - self.momentum) * self.running_mean + self.momentum * mean
-        )
-        new_running_var = lax.stop_gradient(
-            (1 - self.momentum) * self.running_var + self.momentum * var
-        )
+        new_running_mean = (1 - self.momentum) * self.running_mean + self.momentum * mean
+        new_running_var = (1 - self.momentum) * self.running_var + self.momentum * var
 
         return self.replace(running_mean=new_running_mean, running_var=new_running_var)

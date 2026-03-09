@@ -179,7 +179,7 @@ def learn(
     """PPO update: compute GAE then scan over minibatch gradient steps."""
 
     # Compute advantages with GAE
-    next_values = network.get_value(batch.next_observations)
+    next_values = jax.vmap(network.get_value)(batch.next_observations)
     advantages = calculate_gae(
         batch.rewards,
         batch.values,
@@ -197,10 +197,9 @@ def learn(
     advantages, returns = advantages.flatten(), returns.flatten()
 
     # Generate shuffled minibatch indices
-    minibatch_size = BATCH_SIZE // NUM_MINIBATCHES
     indices = jnp.tile(jnp.arange(BATCH_SIZE, dtype=jnp.int32), (NUM_EPOCHS, 1))
     mb_indices = jax.vmap(jax.random.permutation)(jax.random.split(key, NUM_EPOCHS), indices)
-    mb_indices = mb_indices.reshape(NUM_EPOCHS * NUM_MINIBATCHES, minibatch_size)
+    mb_indices = mb_indices.reshape(NUM_EPOCHS * NUM_MINIBATCHES, MINIBATCH_SIZE)
 
     def minibatch_update(carry, indices):
         network, opt_state = carry
@@ -240,6 +239,7 @@ if __name__ == "__main__":
 
     BATCH_SIZE = ROLLOUT_STEPS * NUM_ENVS
     TOTAL_ROLLOUTS = TOTAL_STEPS // BATCH_SIZE
+    MINIBATCH_SIZE = BATCH_SIZE // NUM_MINIBATCHES
 
     # Create Gymnax environment
     env, env_params = gymnax.make(GYMNAX_ENV_NAME)

@@ -19,7 +19,7 @@ class MaxPool(Module):
     """N-dimensional max pooling.
 
     >>> pool = MaxPool(kernel_shape=(2, 2))
-    >>> pool(x)  # (*, h, w, c) -> (*, h // 2, w // 2, c)
+    >>> pool(x)  # (b, h, w, c) -> (b, h // 2, w // 2, c)
     """
 
     kernel_shape: tuple[int, ...]
@@ -58,11 +58,7 @@ class MaxPool(Module):
         else:
             self.padding = tuple((p, p) for p in padding)
 
-    def __call__(self, x: Float[Array, "..."]) -> Float[Array, "..."]:
-
-        num_spatial_dims = len(self.kernel_shape)
-        batch_shape = x.shape[: -(num_spatial_dims + 1)]
-        x = x.reshape(-1, *x.shape[-(num_spatial_dims + 1) :])
+    def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
 
         padding = self.padding if isinstance(self.padding, str) else ((0, 0), *self.padding, (0, 0))
 
@@ -75,8 +71,6 @@ class MaxPool(Module):
             padding=padding,
         )
 
-        x = x.reshape(*batch_shape, *x.shape[-(num_spatial_dims + 1) :])
-
         return x
 
 
@@ -84,7 +78,7 @@ class AvgPool(Module):
     """N-dimensional average pooling.
 
     >>> pool = AvgPool(kernel_shape=(2, 2))
-    >>> pool(x)  # (*, h, w, c) -> (*, h // 2, w // 2, c)
+    >>> pool(x)  # (b, h, w, c) -> (b, h // 2, w // 2, c)
     """
 
     kernel_shape: tuple[int, ...]
@@ -123,11 +117,7 @@ class AvgPool(Module):
         else:
             self.padding = tuple((p, p) for p in padding)
 
-    def __call__(self, x: Float[Array, "..."]) -> Float[Array, "..."]:
-
-        num_spatial_dims = len(self.kernel_shape)
-        batch_shape = x.shape[: -(num_spatial_dims + 1)]
-        x = x.reshape(-1, *x.shape[-(num_spatial_dims + 1) :])
+    def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
 
         padding = self.padding if isinstance(self.padding, str) else ((0, 0), *self.padding, (0, 0))
 
@@ -155,7 +145,5 @@ class AvgPool(Module):
         )
 
         x = x / window_counts
-
-        x = x.reshape(*batch_shape, *x.shape[-(num_spatial_dims + 1) :])
 
         return x

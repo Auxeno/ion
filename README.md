@@ -67,12 +67,14 @@ self.b = nn.Param(jnp.zeros(16), trainable=False)  # frozen
 `Param` acts as a drop-in for arrays via `__jax_array__` (e.g. `x @ self.w` works without unwrapping). Frozen params have `stop_gradient` applied, so `jax.grad` returns zero gradients at those positions and XLA skips their backward computation.
 
 ```python
-model.params      # pytree of Param leaves (non-Param leaves are None)
-model.num_params  # total parameter count
-
 model.freeze()                                         # freeze all params
 model.unfreeze()                                       # unfreeze all params
 model = model.replace(encoder=model.encoder.freeze())  # freeze a sub-module
+```
+
+```python
+model.params      # pytree of Param leaves (non-Param leaves are None)
+model.num_params  # total parameter count
 ```
 
 ### apply_updates

@@ -153,13 +153,13 @@ class TestGRUCell:
 
 class TestLSTM:
     def test_output_shape(self):
-        """Output has shape (T, hidden_dim)."""
+        """Output has shape (batch, T, hidden_dim)."""
         lstm = nn.LSTM(8, 16, key=jax.random.key(0))
-        x = jnp.ones((5, 8))
+        x = jnp.ones((1, 5, 8))
         y, (h_n, c_n) = lstm(x)
-        assert y.shape == (5, 16)
-        assert h_n.shape == (16,)
-        assert c_n.shape == (16,)
+        assert y.shape == (1, 5, 16)
+        assert h_n.shape == (1, 16)
+        assert c_n.shape == (1, 16)
 
     def test_output_shape_batched(self):
         """Batch dimensions are preserved."""
@@ -170,11 +170,11 @@ class TestLSTM:
         assert h_n.shape == (3, 16)
         assert c_n.shape == (3, 16)
 
-    def test_output_shape_multi_batch(self):
-        """Multiple batch dimensions are preserved."""
+    def test_vmap_batch(self):
+        """jax.vmap adds an extra batch dimension."""
         lstm = nn.LSTM(8, 16, key=jax.random.key(0))
         x = jnp.ones((2, 3, 5, 8))
-        y, (h_n, c_n) = lstm(x)
+        y, (h_n, c_n) = jax.vmap(lstm)(x)
         assert y.shape == (2, 3, 5, 16)
         assert h_n.shape == (2, 3, 16)
         assert c_n.shape == (2, 3, 16)
@@ -182,7 +182,7 @@ class TestLSTM:
     def test_scan_vs_manual(self):
         """Scan-based output matches manual step-by-step unrolling."""
         lstm = nn.LSTM(4, 8, key=jax.random.key(0))
-        x = jax.random.normal(jax.random.key(1), (3, 4))
+        x = jax.random.normal(jax.random.key(1), (1, 3, 4))
 
         y_scan, (h_n, c_n) = lstm(x)
 
@@ -190,44 +190,43 @@ class TestLSTM:
         h, c = cell.initial_state
         hs = []
         for t in range(3):
-            h, c = cell(x[t], (h, c))
+            h, c = cell(x[0, t], (h, c))
             hs.append(h)
         y_manual = jnp.stack(hs)
 
-        npt.assert_allclose(y_scan, y_manual, rtol=1e-5, atol=1e-5)
-        npt.assert_allclose(h_n, h, rtol=1e-5, atol=1e-5)
-        npt.assert_allclose(c_n, c, rtol=1e-5, atol=1e-5)
+        npt.assert_allclose(y_scan[0], y_manual, rtol=1e-5, atol=1e-5)
+        npt.assert_allclose(h_n[0], h, rtol=1e-5, atol=1e-5)
+        npt.assert_allclose(c_n[0], c, rtol=1e-5, atol=1e-5)
 
     def test_custom_initial_state(self):
         """Custom initial state is used instead of zeros."""
         lstm = nn.LSTM(4, 8, key=jax.random.key(0))
-        x = jax.random.normal(jax.random.key(1), (3, 4))
+        x = jax.random.normal(jax.random.key(1), (1, 3, 4))
 
-        h0 = jnp.ones(8) * 0.5
-        c0 = jnp.ones(8) * 0.1
+        h0 = jnp.ones((1, 8)) * 0.5
+        c0 = jnp.ones((1, 8)) * 0.1
         y_custom, _ = lstm(x, hx=(h0, c0))
 
         y_zero, _ = lstm(x)
-        # Outputs should differ with different initial states
         assert not jnp.allclose(y_custom, y_zero)
 
     def test_no_bias(self):
         """No-bias mode works through the wrapper."""
         lstm = nn.LSTM(8, 16, bias=False, key=jax.random.key(0))
         assert lstm.cell.b is None
-        x = jnp.ones((5, 8))
+        x = jnp.ones((1, 5, 8))
         y, (h_n, c_n) = lstm(x)
-        assert y.shape == (5, 16)
+        assert y.shape == (1, 5, 16)
 
 
 class TestGRU:
     def test_output_shape(self):
-        """Output has shape (T, hidden_dim)."""
+        """Output has shape (batch, T, hidden_dim)."""
         gru = nn.GRU(8, 16, key=jax.random.key(0))
-        x = jnp.ones((5, 8))
+        x = jnp.ones((1, 5, 8))
         y, h_n = gru(x)
-        assert y.shape == (5, 16)
-        assert h_n.shape == (16,)
+        assert y.shape == (1, 5, 16)
+        assert h_n.shape == (1, 16)
 
     def test_output_shape_batched(self):
         """Batch dimensions are preserved."""
@@ -237,18 +236,18 @@ class TestGRU:
         assert y.shape == (3, 5, 16)
         assert h_n.shape == (3, 16)
 
-    def test_output_shape_multi_batch(self):
-        """Multiple batch dimensions are preserved."""
+    def test_vmap_batch(self):
+        """jax.vmap adds an extra batch dimension."""
         gru = nn.GRU(8, 16, key=jax.random.key(0))
         x = jnp.ones((2, 3, 5, 8))
-        y, h_n = gru(x)
+        y, h_n = jax.vmap(gru)(x)
         assert y.shape == (2, 3, 5, 16)
         assert h_n.shape == (2, 3, 16)
 
     def test_scan_vs_manual(self):
         """Scan-based output matches manual step-by-step unrolling."""
         gru = nn.GRU(4, 8, key=jax.random.key(0))
-        x = jax.random.normal(jax.random.key(1), (3, 4))
+        x = jax.random.normal(jax.random.key(1), (1, 3, 4))
 
         y_scan, h_n = gru(x)
 
@@ -256,19 +255,19 @@ class TestGRU:
         h = cell.initial_state
         hs = []
         for t in range(3):
-            h = cell(x[t], h)
+            h = cell(x[0, t], h)
             hs.append(h)
         y_manual = jnp.stack(hs)
 
-        npt.assert_allclose(y_scan, y_manual, rtol=1e-5, atol=1e-5)
-        npt.assert_allclose(h_n, h, rtol=1e-5, atol=1e-5)
+        npt.assert_allclose(y_scan[0], y_manual, rtol=1e-5, atol=1e-5)
+        npt.assert_allclose(h_n[0], h, rtol=1e-5, atol=1e-5)
 
     def test_custom_initial_state(self):
         """Custom initial state is used instead of zeros."""
         gru = nn.GRU(4, 8, key=jax.random.key(0))
-        x = jax.random.normal(jax.random.key(1), (3, 4))
+        x = jax.random.normal(jax.random.key(1), (1, 3, 4))
 
-        h0 = jnp.ones(8) * 0.5
+        h0 = jnp.ones((1, 8)) * 0.5
         y_custom, _ = gru(x, hx=h0)
 
         y_zero, _ = gru(x)
@@ -279,6 +278,6 @@ class TestGRU:
         gru = nn.GRU(8, 16, bias=False, key=jax.random.key(0))
         assert gru.cell.b is None
         assert gru.cell.b_h is None
-        x = jnp.ones((5, 8))
+        x = jnp.ones((1, 5, 8))
         y, h_n = gru(x)
-        assert y.shape == (5, 16)
+        assert y.shape == (1, 5, 16)

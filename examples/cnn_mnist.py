@@ -27,7 +27,7 @@ class CNN(nn.Module):
         self.fc_1 = nn.Linear(32 * 7 * 7, 128, key=keys[2])
         self.fc_2 = nn.Linear(128, 10, key=keys[3])
 
-    def __call__(self, x: Float[Array, "... 28 28 1"]) -> Float[Array, "... 10"]:
+    def __call__(self, x: Float[Array, "b 28 28 1"]) -> Float[Array, "b 10"]:
         x = self.conv_1(x)
         x = jax.nn.relu(x)
         x = self.pool(x)
@@ -36,7 +36,7 @@ class CNN(nn.Module):
         x = jax.nn.relu(x)
         x = self.pool(x)
 
-        x = x.reshape(*x.shape[:-3], -1)
+        x = x.reshape(x.shape[0], -1)
 
         x = self.fc_1(x)
         x = jax.nn.relu(x)

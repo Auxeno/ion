@@ -27,7 +27,7 @@ class TransformerBlock(Module):
     """Pre-norm transformer encoder block (self-attention + FFN).
 
     >>> block = TransformerBlock(64, num_heads=8, key=key)
-    >>> block(x)  # (*, seq, 64) -> (*, seq, 64)
+    >>> block(x)  # (b, s, 64) -> (b, s, 64)
     """
 
     att: SelfAttention
@@ -66,9 +66,9 @@ class TransformerBlock(Module):
 
     def __call__(
         self,
-        x: Float[Array, "... s d"],
-        mask: Bool[Array, "... s s"] | Bool[Array, "... 1 s s"] | None = None,
-    ) -> Float[Array, "... s d"]:
+        x: Float[Array, "b s d"],
+        mask: Bool[Array, "b s s"] | Bool[Array, "b 1 s s"] | None = None,
+    ) -> Float[Array, "b s d"]:
 
         residual = x
         x = self.norm_att(x)
@@ -89,8 +89,8 @@ class CrossTransformerBlock(Module):
     """Pre-norm transformer block with cross-attention.
 
     >>> block = CrossTransformerBlock(64, num_heads=8, key=key)
-    >>> block(x, context)  # (*, s, 64), (*, t, 64) -> (*, s, 64)
-    >>> block(x, context, mask=mask)  # mask: bool (*, s, t) or (*, 1, s, t)
+    >>> block(x, context)  # (b, s, 64), (b, t, 64) -> (b, s, 64)
+    >>> block(x, context, mask=mask)  # mask: bool (b, s, t) or (b, 1, s, t)
     """
 
     att: CrossAttention
@@ -128,10 +128,10 @@ class CrossTransformerBlock(Module):
 
     def __call__(
         self,
-        x: Float[Array, "... s d"],
-        context: Float[Array, "... t d"],
-        mask: Bool[Array, "... s t"] | Bool[Array, "... 1 s t"] | None = None,
-    ) -> Float[Array, "... s d"]:
+        x: Float[Array, "b s d"],
+        context: Float[Array, "b t d"],
+        mask: Bool[Array, "b s t"] | Bool[Array, "b 1 s t"] | None = None,
+    ) -> Float[Array, "b s d"]:
 
         residual = x
         x = self.norm_att(x)

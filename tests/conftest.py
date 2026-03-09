@@ -27,35 +27,35 @@ def _build_layers(key):
     gru_cell_wrapper = lambda x: gru_cell(x, gru_cell.initial_state)
 
     return [
-        (nn.Linear(8, 16, key=next(keys)), jnp.ones((8,))),
-        (nn.Linear(8, 16, bias=False, key=next(keys)), jnp.ones((8,))),
-        (nn.Conv(3, 8, kernel_shape=(3,), padding=1, key=next(keys)), jnp.ones((10, 3))),
-        (nn.Conv(3, 8, kernel_shape=(3, 3), padding=1, key=next(keys)), jnp.ones((6, 6, 3))),
-        (nn.SelfAttention(8, num_heads=2, key=next(keys)), jnp.ones((4, 8))),
-        (nn.SelfAttention(8, num_heads=2, causal=True, key=next(keys)), jnp.ones((4, 8))),
-        (nn.LayerNorm(8), jnp.ones((4, 8))),
-        (nn.RMSNorm(8), jnp.ones((4, 8))),
-        (nn.MaxPool(kernel_shape=(2,)), jnp.ones((10, 3))),
-        (nn.MaxPool(kernel_shape=(2, 2)), jnp.ones((4, 4, 3))),
-        (nn.AvgPool(kernel_shape=(2,)), jnp.ones((10, 3))),
-        (nn.AvgPool(kernel_shape=(2, 2)), jnp.ones((4, 4, 3))),
-        (nn.Identity(), jnp.ones((8,))),
-        (nn.MLP(8, 16, 32, num_hidden_layers=2, key=next(keys)), jnp.ones((8,))),
-        (dropout_wrapper, jnp.ones((8,))),
-        (nn.Embedding(16, 8, key=next(keys)), jnp.array([0, 3, 7, 15])),
+        (nn.Linear(8, 16, key=next(keys)), jnp.ones((2, 8))),
+        (nn.Linear(8, 16, bias=False, key=next(keys)), jnp.ones((2, 8))),
+        (nn.Conv(3, 8, kernel_shape=(3,), padding=1, key=next(keys)), jnp.ones((2, 10, 3))),
+        (nn.Conv(3, 8, kernel_shape=(3, 3), padding=1, key=next(keys)), jnp.ones((2, 6, 6, 3))),
+        (nn.SelfAttention(8, num_heads=2, key=next(keys)), jnp.ones((2, 4, 8))),
+        (nn.SelfAttention(8, num_heads=2, causal=True, key=next(keys)), jnp.ones((2, 4, 8))),
+        (nn.LayerNorm(8), jnp.ones((2, 4, 8))),
+        (nn.RMSNorm(8), jnp.ones((2, 4, 8))),
+        (nn.MaxPool(kernel_shape=(2,)), jnp.ones((2, 10, 3))),
+        (nn.MaxPool(kernel_shape=(2, 2)), jnp.ones((2, 4, 4, 3))),
+        (nn.AvgPool(kernel_shape=(2,)), jnp.ones((2, 10, 3))),
+        (nn.AvgPool(kernel_shape=(2, 2)), jnp.ones((2, 4, 4, 3))),
+        (nn.Identity(), jnp.ones((2, 8))),
+        (nn.MLP(8, 16, 32, num_hidden_layers=2, key=next(keys)), jnp.ones((2, 8))),
+        (dropout_wrapper, jnp.ones((2, 8))),
+        (nn.Embedding(16, 8, key=next(keys)), jnp.array([[0, 3, 7, 15], [1, 2, 5, 10]])),
         (nn.BatchNorm(8), jnp.ones((4, 8))),
-        (lstm_cell_wrapper, jnp.ones((8,))),
-        (gru_cell_wrapper, jnp.ones((8,))),
-        (lambda x, _l=nn.LSTM(8, 16, key=next(keys)): _l(x)[0], jnp.ones((5, 8))),
-        (lambda x, _l=nn.GRU(8, 16, key=next(keys)): _l(x)[0], jnp.ones((5, 8))),
-        (nn.Sequential(nn.Linear(8, 16, key=next(keys)), jax.nn.relu), jnp.ones((8,))),
-        (nn.LoRALinear(nn.Linear(8, 16, key=next(keys)), rank=4, key=next(keys)), jnp.ones((8,))),
-        (nn.ConvTranspose(3, 8, kernel_shape=(3,), padding=1, key=next(keys)), jnp.ones((10, 3))),
+        (lstm_cell_wrapper, jnp.ones((2, 8))),
+        (gru_cell_wrapper, jnp.ones((2, 8))),
+        (lambda x, _l=nn.LSTM(8, 16, key=next(keys)): _l(x)[0], jnp.ones((2, 5, 8))),
+        (lambda x, _l=nn.GRU(8, 16, key=next(keys)): _l(x)[0], jnp.ones((2, 5, 8))),
+        (nn.Sequential(nn.Linear(8, 16, key=next(keys)), jax.nn.relu), jnp.ones((2, 8))),
+        (nn.LoRALinear(nn.Linear(8, 16, key=next(keys)), rank=4, key=next(keys)), jnp.ones((2, 8))),
+        (nn.ConvTranspose(3, 8, kernel_shape=(3,), padding=1, key=next(keys)), jnp.ones((2, 10, 3))),
         (
             nn.ConvTranspose(3, 8, kernel_shape=(3, 3), padding=1, key=next(keys)),
-            jnp.ones((6, 6, 3)),
+            jnp.ones((2, 6, 6, 3)),
         ),
-        (nn.LearnedPositionalEmbedding(16, 8, key=next(keys)), jnp.ones((10, 8))),
+        (nn.LearnedPositionalEmbedding(16, 8, key=next(keys)), jnp.ones((2, 10, 8))),
     ]
 
 
@@ -91,6 +91,29 @@ _PARAM_NAMES = [
 
 @pytest.fixture(params=_PARAM_NAMES)
 def layer_and_input(request, key):
+    layers = _build_layers(key)
+    idx = _PARAM_NAMES.index(request.param)
+    return layers[idx]
+
+
+_STRUCTURAL_LAYER_NAMES = [
+    "conv_1d",
+    "conv_2d",
+    "attention",
+    "attention_causal",
+    "maxpool_1d",
+    "maxpool_2d",
+    "avgpool_1d",
+    "avgpool_2d",
+    "conv_transpose_1d",
+    "conv_transpose_2d",
+    "lstm",
+    "gru",
+]
+
+
+@pytest.fixture(params=_STRUCTURAL_LAYER_NAMES)
+def structural_layer_and_input(request, key):
     layers = _build_layers(key)
     idx = _PARAM_NAMES.index(request.param)
     return layers[idx]

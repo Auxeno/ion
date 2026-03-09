@@ -1,5 +1,7 @@
 import tempfile
 
+import pytest
+
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
@@ -10,15 +12,14 @@ from ion import nn
 
 
 def test_batch_dims(layer_and_input):
-    """Prepending batch dims to the input prepends them to the output."""
+    """Use jax.vmap to add extra batch dimensions."""
     layer, x = layer_and_input
-    out_core = layer(x).shape
+    out = layer(x)
 
-    x_1 = jnp.stack([x] * 2)
-    assert layer(x_1).shape == (2, *out_core)
-
-    x_2 = jnp.stack([x_1] * 3)
-    assert layer(x_2).shape == (3, 2, *out_core)
+    # vmap adds an extra leading batch dim
+    x_extra = jnp.stack([x] * 3)
+    out_extra = jax.vmap(layer)(x_extra)
+    assert out_extra.shape == (3, *out.shape)
 
 
 def test_jit(layer_and_input):
@@ -131,6 +132,14 @@ def test_params_property(layer_and_input):
     assert len(leaves) > 0
     for leaf in leaves:
         assert hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact)
+
+
+def test_wrong_rank_raises(structural_layer_and_input):
+    """Structural layers reject inputs with wrong number of dimensions."""
+    layer, x = structural_layer_and_input
+    unbatched = x[0]
+    with pytest.raises(Exception):
+        layer(unbatched)
 
 
 def test_serialization(layer_and_input):
