@@ -12,7 +12,7 @@
 
 ---
 
-Ion is a neural network library for JAX. Models are represented as [pytrees](https://docs.jax.dev/en/latest/pytrees.html) with explicit parameters and native compatibility with JAX transformations (`jax.jit`, `jax.grad`, `jax.vmap`). It ships with most standard neural network layers and supports custom layer definition via `nn.Module` subclassing.
+Ion is a minimal neural network library for JAX. The core is three files and ~250 lines of code, with three concepts to learn: `Module`, `Param`, and `apply_updates`. Everything else is just JAX. Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html), so all native JAX transforms (`jax.grad`, `jax.jit`, `jax.vmap`, etc.) work directly. There are no custom `ion.jit` or `ion.grad` wrappers. Ion ships with most standard neural network layers and supports custom layer definition via `nn.Module`.
 
 ## Installation
 
@@ -20,88 +20,87 @@ Ion is a neural network library for JAX. Models are represented as [pytrees](htt
 pip install git+https://github.com/auxeno/ion
 ```
 
-## Overview
-
-Ion is designed to be minimal. The core has three concepts to learn: `Module`, `Param`, and `apply_updates`. Everything else is just JAX. Models are pytrees, so native JAX transforms like `jax.grad`, `jax.vmap`, and `jax.jit` just work.
+## Core Concepts
 
 Visit the [Ion Tour Notebook](https://nbviewer.org/github/Auxeno/ion/blob/main/examples/ion_tour.ipynb) for a hands-on walkthrough.
 
 ### Module
 
-Inherit from `nn.Module` to define a model. Subclasses are automatically registered as JAX pytrees and become immutable after initialization (`__init__`).
+Inherit from `nn.Module` to define a model. Subclasses are automatically registered as JAX pytrees and become immutable after `__init__`.
 
 ```python
 class MLP(nn.Module):
     layer_1: nn.Linear
     layer_2: nn.Linear
+    activation: Callable
 
-    def __init__(self, *, key):
+    def __init__(self, activation=jax.nn.relu, *, key):
         keys = jax.random.split(key, 2)
         self.layer_1 = nn.Linear(784, 128, key=keys[0])
         self.layer_2 = nn.Linear(128, 10, key=keys[1])
+        self.activation = activation
 
     def __call__(self, x):
-        return self.layer_2(jax.nn.relu(self.layer_1(x)))
+        x = self.activation(self.layer_1(x))
+        return self.layer_2(x)
 ```
 
-Because modules are immutable after construction, use the `replace` method to create a modified copy.
+Non-array fields (ints, floats, strings, callables) are automatically treated as static metadata, invisible to JAX tracing. Config values like `num_heads` or `use_bias` and activation functions can be stored directly on the module with no issues.
+
+Modules are immutable after construction. Use `replace` to create a modified copy:
 
 ```python
-model = model.replace(activation=jax.nn.gelu)  # swap activation function
+model = model.replace(activation=jax.nn.tanh)
 ```
-
-Non-array fields (ints, floats, strings, callables) are automatically treated as static metadata. They are preserved during pytree flattening and unflattening but remain invisible to JAX tracing. This prevents `jax.jit` tracing errors, allowing config settings (e.g., `num_heads`, `use_bias`) and activation functions to be stored directly on the module with no issues.
 
 ### Param
 
-`Param` wraps an array and marks it as a model parameter. It controls whether the array is trainable or frozen.
+`Param` wraps an array and marks it as a model parameter, either trainable or frozen.
 
 ```python
 self.w = nn.Param(w_init(shape=(3, 16), key=key))  # trainable
 self.b = nn.Param(jnp.zeros(16), trainable=False)  # frozen
 ```
 
-`Param` implements `__jax_array__` and forwards arithmetic operations, allowing it to function as a drop-in replacement for standard arrays (e.g., `x @ self.w` evaluates without explicit unwrapping).
-
-Setting `trainable=False` applies `jax.lax.stop_gradient` under the hood, making the parameter a constant for differentiation. `jax.grad` naturally produces zero gradients for frozen parameters, and XLA skips backward computation through them. All native JAX transforms work directly: `jax.grad`, `jax.jacobian`, `jax.hessian`, etc.
-
-Access all parameters via the `params` property. This returns a pytree with identical structure, containing only `Param` leaves (non-parameter leaves are replaced with `None`):
+`Param` acts as a drop-in for arrays via `__jax_array__` (e.g. `x @ self.w` works without unwrapping). Frozen params have `stop_gradient` applied, so `jax.grad` returns zero gradients at those positions and XLA skips their backward computation.
 
 ```python
-model.params      # pytree of Param leaves (non-Param leaves replaced with None)
-model.num_params  # total number of parameters (trainable and frozen)
+model.params      # pytree of Param leaves (non-Param leaves are None)
+model.num_params  # total parameter count
+
+model.freeze()                                         # freeze all params
+model.unfreeze()                                       # unfreeze all params
+model = model.replace(encoder=model.encoder.freeze())  # freeze a sub-module
 ```
 
-Freeze the parameters of entire models or specific sub-modules:
+### apply_updates
 
-```python
-frozen_model = model.freeze()                          # freeze everything
-model = model.replace(encoder=model.encoder.freeze())  # freeze one layer
-unfrozen_model = model.unfreeze()                      # unfreeze everything
-```
-
-### Apply Updates
-
-`apply_updates` only applies updates to trainable `Param` leaves. Non-parameter arrays (like batch statistics) and non-trainable `Params` pass through unchanged.
+Adds optimizer deltas to trainable `Param` leaves only. Non-parameter arrays and frozen params pass through unchanged.
 
 ```python
 updates, opt_state = optimizer.update(grads, opt_state)
 model = ion.apply_updates(model, updates)
 ```
 
-That's the entire core. See [Internals](docs/internals.md) for how the module system and pytree registration work under the hood.
+That's the entire core. See [Internals](docs/internals.md) for how it works under the hood.
 
-## Transformations
+## Example
 
-There are no custom wrappers like `ion.jit`, `ion.grad`, or `ion.vmap`. Because Ion models are standard pytrees, all native JAX transformations work directly out of the box, from the familiar `jax.jit`, `jax.grad`, and `jax.vmap` to higher-order transforms like `jax.jacobian` and `jax.hessian`.
-
-Frozen parameters (`trainable=False`) automatically have `stop_gradient` applied, so their gradients are zero and the backward pass skips them entirely.
+Putting it together with the MLP defined above:
 
 ```python
+import jax
+import optax
+
+import ion
+from ion import nn
+
+
 @jax.grad
 def loss_fn(model, x, y):
     logits = model(x)
     return optax.softmax_cross_entropy_with_integer_labels(logits, y).mean()
+
 
 @jax.jit
 def train_step(model, opt_state, x, y):
@@ -109,11 +108,20 @@ def train_step(model, opt_state, x, y):
     updates, opt_state = optimizer.update(grads, opt_state)
     model = ion.apply_updates(model, updates)
     return model, opt_state
+
+
+model = MLP(key=jax.random.key(0))
+
+optimizer = optax.adam(3e-4)
+opt_state = optimizer.init(model)
+
+for x, y in data:
+    model, opt_state = train_step(model, opt_state, x, y)
 ```
 
-### Layers
+## Layers
 
-Ion ships with standard neural network layers built on the core. Each is a `Module` with trainable `Param` leaves. Under the hood these are just a JAX pytrees.
+Ion ships with standard neural network layers. Each is a `Module` with trainable `Param` leaves.
 
 | Category        | Layers                                                                    |
 |-----------------|---------------------------------------------------------------------------|
@@ -121,7 +129,7 @@ Ion ships with standard neural network layers built on the core. Each is a `Modu
 | Convolution     | `Conv`, `ConvTranspose`                                                   |
 | Attention       | `SelfAttention`, `CrossAttention`                                         |
 | Normalization   | `LayerNorm`, `RMSNorm`, `GroupNorm`, `BatchNorm`                          |
-| Recurrent       | `LSTMCell`, `GRUCell`, `LSTM`, `GRU`                                     |
+| Recurrent       | `LSTMCell`, `GRUCell`, `LSTM`, `GRU`                                      |
 | Pooling         | `MaxPool`, `AvgPool`                                                      |
 | Embedding       | `Embedding`, `LearnedPositionalEmbedding`                                 |
 | Positional      | `sinusoidal`, `rope`, `apply_rope`, `alibi`                               |
@@ -132,7 +140,7 @@ See [Layer Conventions](docs/layers.md) for data format, weight init, and spatia
 
 ### Pretty Printing
 
-In notebook environments, Ion utilizes [Treescope](https://github.com/google-deepmind/treescope) for interactive, color-coded visualization. Modules also have a built-in text formatter for standard terminal `repr` output.
+In notebooks, [Treescope](https://github.com/google-deepmind/treescope) provides interactive, color-coded visualization. Modules also have built-in text formatting for terminal output.
 
 ```python
 >>> model = MLP(key=jax.random.key(0))
@@ -147,64 +155,15 @@ MLP(
     w=Param(f32[128, 10], trainable=True),
     b=Param(f32[10], trainable=True),
   ),
+  activation=relu,
 )
 ```
-
-Treescope integration is enabled by default and can be toggled via `ion.enable_treescope()` / `ion.disable_treescope()`. 
-
-Interact with models using Treescope by running locally or in [Colab](https://colab.research.google.com/github/auxeno/ion/blob/main/examples/ion_tour.ipynb).
 
 ### Serialization
 
 ```python
 ion.save("model.npz", model)
 model = ion.load("model.npz", model)
-```
-
-## Example
-
-```python
-import jax
-import optax
-
-import ion
-from ion import nn
-
-
-class MLP(nn.Module):
-    layer_1: nn.Linear
-    layer_2: nn.Linear
-
-    def __init__(self, *, key):
-        keys = jax.random.split(key, 2)
-        self.layer_1 = nn.Linear(784, 128, key=keys[0])
-        self.layer_2 = nn.Linear(128, 10, key=keys[1])
-
-    def __call__(self, x):
-        x = jax.nn.relu(self.layer_1(x))
-        return self.layer_2(x)
-
-
-def loss_fn(model, x, y):
-    logits = model(x)
-    return optax.softmax_cross_entropy_with_integer_labels(logits, y).mean()
-
-
-@jax.jit
-def train_step(model, opt_state, x, y):
-    loss, grads = jax.value_and_grad(loss_fn)(model, x, y)
-    updates, opt_state = optimizer.update(grads, opt_state)
-    model = ion.apply_updates(model, updates)
-    return model, opt_state, loss
-
-
-model = MLP(key=jax.random.key(0))
-
-optimizer = optax.adam(3e-4)
-opt_state = optimizer.init(model)
-
-for x, y in data:
-    model, opt_state, loss = train_step(model, opt_state, x, y)
 ```
 
 ## Examples
