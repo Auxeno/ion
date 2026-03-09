@@ -196,6 +196,78 @@ class TestApplyUpdatesEdgeCases:
         npt.assert_array_equal(result.running_var, bn.running_var)
 
 
+class TestApplyUpdatesUnderJit:
+    def test_apply_updates_under_jit(self):
+        """apply_updates works correctly inside jax.jit."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            b: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.b = nn.Param(jnp.zeros(3))
+
+        model = Model()
+        updates = jax.tree.map(lambda p: jnp.ones_like(p) * 0.1, model)
+
+        result = jax.jit(tree.apply_updates)(model, updates)
+        npt.assert_allclose(result.w._value, jnp.array([1.1, 1.1, 1.1]))
+        npt.assert_allclose(result.b._value, jnp.array([0.1, 0.1, 0.1]))
+
+    def test_apply_updates_skips_frozen_under_jit(self):
+        """Frozen params are still skipped by apply_updates inside jax.jit."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            b: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.b = nn.Param(jnp.zeros(3), trainable=False)
+
+        model = Model()
+        updates = jax.tree.map(lambda p: jnp.ones_like(p) * 0.1, model)
+
+        result = jax.jit(tree.apply_updates)(model, updates)
+        npt.assert_allclose(result.w._value, jnp.array([1.1, 1.1, 1.1]))
+        npt.assert_allclose(result.b._value, jnp.zeros(3))  # unchanged
+
+
+class TestFreezePreservesPlainArrays:
+    def test_freeze_preserves_jax_array_field(self):
+        """Freeze doesn't affect plain jax.Array fields (only Params)."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            buf: jax.Array
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (3,)))
+                self.buf = jnp.ones(3)
+
+        m = Model(key=jax.random.key(0))
+        frozen = tree.freeze(m)
+        npt.assert_array_equal(frozen.buf, m.buf)
+        assert frozen.w.trainable is False
+
+    def test_unfreeze_preserves_jax_array_field(self):
+        """Unfreeze doesn't affect plain jax.Array fields."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            buf: jax.Array
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (3,)), trainable=False)
+                self.buf = jnp.ones(3)
+
+        m = Model(key=jax.random.key(0))
+        unfrozen = tree.unfreeze(m)
+        npt.assert_array_equal(unfrozen.buf, m.buf)
+        assert unfrozen.w.trainable is True
+
+
 class TestStatic:
     def test_pytree_no_children(self):
         assert jax.tree.leaves(Static(42)) == []

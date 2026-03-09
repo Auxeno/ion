@@ -648,3 +648,74 @@ class TestStopGradient:
         p_train = nn.Param(jnp.array([1.0, 2.0, 3.0]))
         p_frozen = nn.Param(jnp.array([1.0, 2.0, 3.0]), trainable=False)
         npt.assert_array_equal(jnp.sum(jnp.asarray(p_train)), jnp.sum(jnp.asarray(p_frozen)))
+
+    def test_value_bypasses_stop_gradient(self):
+        """Accessing _value on a frozen Param allows gradients to leak through."""
+        p = nn.Param(jnp.array([1.0, 2.0, 3.0]), trainable=False)
+
+        def bad_loss(p):
+            return jnp.sum(p._value)
+
+        grads = jax.grad(bad_loss)(p)
+        # Gradients leak through _value, this is a documented sharp edge
+        npt.assert_allclose(grads._value, jnp.ones(3))
+
+    def test_value_bypass_under_jit(self):
+        """_value bypass is dangerous even under JIT."""
+        p = nn.Param(jnp.ones(3), trainable=False)
+
+        grads = jax.jit(jax.grad(lambda p: jnp.sum(p._value)))(p)
+        npt.assert_allclose(grads._value, jnp.ones(3))
+
+
+class TestLaxCompatibility:
+    """internals.md: 'Some JAX/LAX functions don't accept Param directly.'
+    and 'jnp.asarray(param) to convert.'"""
+
+    def test_lax_add_rejects_param(self):
+        """Lower-level lax functions reject Param where they expect plain arrays."""
+        p = nn.Param(jnp.array([1.0, 2.0]))
+        with pytest.raises((TypeError, ValueError)):
+            jax.lax.add(p, p)  # type: ignore
+
+    def test_jnp_asarray_converts_param_for_lax(self):
+        """jnp.asarray is the documented escape hatch for lax compatibility."""
+        p = nn.Param(jnp.array([1.0, 2.0]))
+        result = jax.lax.add(jnp.asarray(p), jnp.asarray(p))
+        npt.assert_array_equal(result, jnp.array([2.0, 4.0]))
+
+    def test_jnp_asarray_on_frozen_preserves_stop_gradient_in_lax(self):
+        """jnp.asarray on frozen Param preserves stop_gradient when passed to lax."""
+        p = nn.Param(jnp.array([1.0, 2.0]), trainable=False)
+
+        def loss(p):
+            arr = jnp.asarray(p)
+            return jnp.sum(jax.lax.add(arr, arr))
+
+        grads = jax.grad(loss)(p)
+        npt.assert_allclose(grads._value, jnp.zeros(2))
+
+
+class TestTrainableRecompilation:
+    """internals.md: 'Changing a static value triggers JIT recompilation.'"""
+
+    def test_trainable_change_triggers_recompilation(self):
+        """Different trainable flags produce different gradient behavior under JIT."""
+        p_train = nn.Param(jnp.ones(3), trainable=True)
+        p_frozen = nn.Param(jnp.ones(3), trainable=False)
+
+        grad_fn = jax.jit(jax.grad(lambda p: jnp.sum(p)))
+
+        g_train = grad_fn(p_train)
+        g_frozen = grad_fn(p_frozen)
+
+        npt.assert_allclose(g_train._value, jnp.ones(3))
+        npt.assert_allclose(g_frozen._value, jnp.zeros(3))
+
+    def test_forward_value_unchanged_by_trainable(self):
+        """Changing trainable doesn't affect forward pass values, only gradients."""
+        p_train = nn.Param(jnp.ones(3), trainable=True)
+        p_frozen = nn.Param(jnp.ones(3), trainable=False)
+
+        f = jax.jit(lambda p: jnp.sum(p))
+        npt.assert_allclose(f(p_train), f(p_frozen))

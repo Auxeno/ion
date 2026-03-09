@@ -667,6 +667,182 @@ class TestNewJaxTransforms:
         with pytest.raises(ValueError, match="__jax_array__"):
             jax.grad(jax.grad(f))(p)
 
+    def test_grad_computes_for_non_param_arrays(self):
+        """jax.grad produces gradient arrays for non-Param array leaves too."""
+
+        class WithBuf(nn.Module):
+            w: nn.Param
+            buf: jax.Array
+
+            def __init__(self, key: jax.Array):
+                self.w = nn.Param(jax.random.normal(key, (3,)))
+                self.buf = jnp.ones(3)
+
+            def __call__(self, x):
+                return self.w * x + self.buf
+
+        model = WithBuf(key=jax.random.key(0))
+
+        def loss(m, x):
+            return jnp.sum(m(x))
+
+        grads = jax.grad(loss)(model, jnp.ones(3))
+        # buf is a plain array but grad still computes a value for it
+        assert grads.buf is not None
+        assert isinstance(grads.buf, jax.Array)
+        # apply_updates would discard this gradient (tested in test_tree.py)
+
+    def test_optimizer_state_covers_frozen_leaves(self):
+        """Optimizer allocates the same state buffers for frozen params as trainable."""
+        model = Linear(2, 3, key=jax.random.key(0))
+        frozen = model.freeze()
+
+        optimizer = optax.adam(1e-3)
+        state_trainable = optimizer.init(model)
+        state_frozen = optimizer.init(frozen)
+
+        # Optimizer allocates the same number of state leaves regardless of trainable flag
+        leaves_t = jax.tree.leaves(state_trainable)
+        leaves_f = jax.tree.leaves(state_frozen)
+        assert len(leaves_t) == len(leaves_f)
+
+        # Shapes match too, frozen params get full momentum/variance buffers
+        for lt, lf in zip(leaves_t, leaves_f):
+            assert lt.shape == lf.shape
+
+    def test_partial_freeze_under_jit_grad(self):
+        """Partially frozen model under jit(grad) produces correct gradients."""
+
+        class Model(nn.Module):
+            encoder: Linear
+            decoder: Linear
+
+            def __init__(self, key):
+                k1, k2 = jax.random.split(key)
+                self.encoder = Linear(2, 3, key=k1)
+                self.decoder = Linear(3, 1, key=k2)
+
+        model = Model(key=jax.random.key(0))
+        model = model.replace(encoder=model.encoder.freeze())
+
+        def loss(model, x):
+            h = x @ model.encoder.w + model.encoder.b
+            return jnp.sum(h @ model.decoder.w + model.decoder.b)
+
+        grads = jax.jit(jax.grad(loss))(model, jnp.ones((1, 2)))
+        npt.assert_allclose(
+            grads.encoder.w._value, jnp.zeros_like(model.encoder.w._value), atol=1e-7
+        )
+        assert jnp.any(grads.decoder.w._value != 0)
+
+    def test_jit_vmap_grad(self):
+        """jit(vmap(grad)) for per-example gradients."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0]))
+
+        def loss(model, x):
+            return jnp.sum(model.w * x)
+
+        model = Model()
+        xs = jnp.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+        per_ex = jax.jit(jax.vmap(jax.grad(loss), in_axes=(None, 0)))(model, xs)
+        npt.assert_allclose(per_ex.w._value, xs)
+
+    def test_jit_vmap_forward(self):
+        """jit(vmap(model)) forward pass composition."""
+        model = nn.Linear(4, 2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (8, 4))
+
+        eager = jax.vmap(model)(x)
+        jitted = jax.jit(jax.vmap(model))(x)
+        npt.assert_allclose(jitted, eager)
+
+    def test_jax_hessian_on_module(self):
+        """jax.hessian works on a Module, not just bare Param."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.array([1.0, 2.0]))
+
+        def f(model):
+            return jnp.sum(model.w**3)
+
+        hess = jax.hessian(f)(Model())
+        # Hessian of Module returns nested structure: hess.w.w is the (2, 2) block
+        npt.assert_allclose(jnp.diag(hess.w.w._value), jnp.array([6.0, 12.0]))
+
+    def test_jitted_training_step_with_frozen_encoder(self):
+        """Full JIT-compiled training step with partially frozen model."""
+
+        class Model(nn.Module):
+            encoder: nn.Linear
+            decoder: nn.Linear
+
+            def __init__(self, key):
+                k1, k2 = jax.random.split(key)
+                self.encoder = nn.Linear(4, 4, key=k1)
+                self.decoder = nn.Linear(4, 1, key=k2)
+
+        model = Model(key=jax.random.key(0))
+        model = model.replace(encoder=model.encoder.freeze())
+        frozen_w = model.encoder.w._value.copy()
+
+        optimizer = optax.adam(1e-2)
+        opt_state = optimizer.init(model)
+
+        x = jax.random.normal(jax.random.key(1), (16, 4))
+        y = jnp.ones((16, 1))
+
+        @jax.jit
+        def step(model, opt_state, x, y):
+            def loss_fn(m):
+                return jnp.mean((m.decoder(m.encoder(x)) - y) ** 2)
+
+            loss, grads = jax.value_and_grad(loss_fn)(model)
+            updates, opt_state = optimizer.update(grads, opt_state)
+            model = tree.apply_updates(model, updates)
+            return model, opt_state, loss
+
+        initial_loss = jnp.mean((model.decoder(model.encoder(x)) - y) ** 2)
+        for _ in range(20):
+            model, opt_state, loss = step(model, opt_state, x, y)
+
+        final_loss = jnp.mean((model.decoder(model.encoder(x)) - y) ** 2)
+        assert final_loss < initial_loss
+        npt.assert_array_equal(model.encoder.w._value, frozen_w)
+
+    def test_lax_scan_training_loop(self):
+        """Training loop via jax.lax.scan (functional iteration)."""
+        model = nn.Linear(4, 1, key=jax.random.key(0))
+        optimizer = optax.sgd(0.01)
+        opt_state = optimizer.init(model)
+
+        x = jax.random.normal(jax.random.key(1), (8, 4))
+        y = jnp.ones((8, 1))
+
+        def loss_fn(m, x, y):
+            return jnp.mean((m(x) - y) ** 2)
+
+        def scan_step(carry, _):
+            model, opt_state = carry
+            loss, grads = jax.value_and_grad(loss_fn)(model, x, y)
+            updates, opt_state = optimizer.update(grads, opt_state)
+            model = tree.apply_updates(model, updates)
+            return (model, opt_state), loss
+
+        initial_loss = loss_fn(model, x, y)
+        (model, _), losses = jax.lax.scan(scan_step, (model, opt_state), None, length=20)
+        final_loss = loss_fn(model, x, y)
+
+        assert final_loss < initial_loss
+        assert losses[-1] < losses[0]
+
     def test_frozen_lora_end_to_end(self):
         """LoRA training: base weights frozen, only a/b update, loss decreases."""
         k1, k2 = jax.random.split(jax.random.key(0))

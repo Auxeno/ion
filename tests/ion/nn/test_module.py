@@ -346,6 +346,13 @@ class TestNumParams:
         model = nn.Identity()
         assert model.num_params == 0
 
+    def test_frozen_params_counted(self):
+        """internals.md: num_params includes both trainable and frozen params."""
+        model = nn.Linear(4, 8, key=jax.random.key(0))
+        trainable_count = model.num_params
+        frozen_count = model.freeze().num_params
+        assert trainable_count == frozen_count
+
 
 class TestRepr:
     def test_param_field(self):
@@ -607,6 +614,21 @@ class TestReplaceEdgeCases:
 
         # The tree structures are different!
         assert original_def != new_def
+
+    def test_replace_changing_structure_works_under_jit(self):
+        """internals.md: 'replace() can change pytree structure.' JIT will recompile this."""
+        linear = nn.Linear(4, 8, key=jax.random.key(0))
+        no_bias = linear.replace(b=None)
+
+        @jax.jit
+        def f(m, x):
+            return m(x)
+
+        x = jnp.ones((1, 4))
+        r1 = f(linear, x)
+        r2 = f(no_bias, x)
+        assert r1.shape == (1, 8)
+        assert r2.shape == (1, 8)
 
     def test_replace_with_none_changes_structure(self):
         """Replacing a Param with None changes pytree structure (loses a leaf)."""
@@ -1247,6 +1269,75 @@ class TestStaticFieldTypes:
         npt.assert_allclose(result2, 1.0)
 
 
+class TestPytreeSharedReferences:
+    """internals.md: 'JAX pytrees are trees, not graphs'.'"""
+
+    def test_shared_module_is_duplicated_through_flatten_unflatten(self):
+        """Shared sub-module reference becomes two independent copies after roundtrip."""
+
+        class Inner(nn.Module):
+            w: nn.Param
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (2,)))
+
+        class Shared(nn.Module):
+            a: Inner
+            b: Inner
+
+            def __init__(self, layer):
+                self.a = layer
+                self.b = layer
+
+        layer = Inner(jax.random.key(0))
+        model = Shared(layer)
+        assert model.a is model.b
+
+        rebuilt = jtu.tree_unflatten(*reversed(jtu.tree_flatten(model)))
+        assert rebuilt.a is not rebuilt.b
+        npt.assert_array_equal(rebuilt.a.w._value, rebuilt.b.w._value)
+
+    def test_shared_param_is_duplicated(self):
+        """Shared Param reference becomes two independent copies after roundtrip."""
+
+        class SharedParam(nn.Module):
+            a: nn.Param
+            b: nn.Param
+
+            def __init__(self, p):
+                self.a = p
+                self.b = p
+
+        p = nn.Param(jnp.ones(3))
+        model = SharedParam(p)
+        assert model.a is model.b
+
+        rebuilt = jtu.tree_unflatten(*reversed(jtu.tree_flatten(model)))
+        assert rebuilt.a is not rebuilt.b
+
+    def test_weight_tying_via_array_reference(self):
+        """Weight tying via direct array reference works and grads flow through."""
+
+        class TiedModel(nn.Module):
+            embed: nn.Param
+            hidden: nn.Param
+
+            def __init__(self, key: jax.Array):
+                self.embed = nn.Param(jax.random.normal(key, (4, 8)))
+                self.hidden = nn.Param(jnp.zeros(8))
+
+            def decode(self, h):
+                return h @ self.embed.T
+
+        model = TiedModel(key=jax.random.key(0))
+        h = jnp.ones(8)
+        out = model.decode(h)
+        assert out.shape == (4,)
+
+        grads = jax.grad(lambda m, h: jnp.sum(m.decode(h)))(model, h)
+        assert jnp.any(grads.embed._value != 0)
+
+
 class TestParamsPropertyEdgeCases:
     def test_params_replaces_plain_array_with_none_but_keeps_static(self):
         """Plain arrays become None but static fields are preserved (by design)."""
@@ -1266,6 +1357,23 @@ class TestParamsPropertyEdgeCases:
         assert isinstance(p.w, nn.Param)
         assert p.buf is None
         assert p.scale == 2.0
+
+    def test_params_with_callable_field(self):
+        """internals.md: 'Module.params preserves static fields alongside Param leaves.
+        Non-array fields remain unchanged.'"""
+
+        class Model(nn.Module):
+            w: nn.Param
+            act: Callable
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.act = jax.nn.relu
+
+        m = Model()
+        p = m.params
+        assert isinstance(p.w, nn.Param)
+        assert p.act is jax.nn.relu
 
     def test_params_with_nested_module_plain_array(self):
         """Nested module's plain array fields also become None."""

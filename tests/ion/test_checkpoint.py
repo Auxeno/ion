@@ -114,6 +114,32 @@ class TestSaveLoad:
         npt.assert_array_equal(loaded.buf, model.buf)
 
 
+class TestSaveLoadCallable:
+    def test_callable_comes_from_reference_not_file(self):
+        """Callable fields are restored from the reference tree, not the saved file."""
+        from collections.abc import Callable
+
+        class ModelWithAct(nn.Module):
+            w: nn.Param
+            act: Callable
+
+            def __init__(self, act, *, key):
+                self.w = nn.Param(jax.random.normal(key, (4,)))
+                self.act = act
+
+        original = ModelWithAct(jax.nn.relu, key=jax.random.key(0))
+
+        with tempfile.NamedTemporaryFile(suffix=".npz") as f:
+            checkpoint.save(f.name, original)
+            ref = ModelWithAct(jax.nn.gelu, key=jax.random.key(1))
+            loaded = checkpoint.load(f.name, ref)
+
+        # Array data comes from the saved file
+        npt.assert_array_equal(loaded.w._value, original.w._value)
+        # Callable comes from the reference tree (gelu, not relu)
+        assert loaded.act is jax.nn.gelu
+
+
 class TestSaveLoadTrainable:
     def test_trainable_flag_roundtrip(self):
         """Trainable flags are saved and restored from the file."""

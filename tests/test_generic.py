@@ -142,6 +142,14 @@ def test_wrong_rank_raises(structural_layer_and_input):
         layer(unbatched)
 
 
+def test_wrong_rank_raises_under_jit(structural_layer_and_input):
+    """Rank errors are caught even under JIT (at trace time)."""
+    layer, x = structural_layer_and_input
+    unbatched = x[0]
+    with pytest.raises(Exception):
+        jax.jit(layer)(unbatched)
+
+
 def test_serialization(layer_and_input):
     """Serialize then deserialize produces identical outputs."""
     layer, x = layer_and_input
