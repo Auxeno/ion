@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2
+
+- Fixed README image path and install command for PyPI.
+- Added hatchling wheel build config.
+
 ## 0.2.1
 
 - **Strict input shapes for structural layers.** Conv, ConvTranspose, Pool, GroupNorm, Attention, Transformer, LSTM, and GRU now require exactly the right number of dimensions (one batch dim) and error on incorrect rank. Previously these layers silently reshaped arbitrary leading batch dims, masking shape bugs. Use `jax.vmap` for multiple batch dimensions. Pointwise layers (Linear, LayerNorm, RMSNorm, Embedding, etc.) are unaffected.
