@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3
+
+- Added GitHub Actions CI workflow (tests across Python 3.11, 3.12, 3.13 with linting and type checking).
+- Added GitHub Actions workflow for automated PyPI publishing on release.
+- Switched to git-tag-based versioning via `hatch-vcs`.
+- Added CI status badge to README.
+
 ## 0.2.2
 
 - Fixed README image path and install command for PyPI.
