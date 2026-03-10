@@ -23,7 +23,7 @@ class SelfAttention(Module):
 
     >>> attn = SelfAttention(64, num_heads=8, key=key)
     >>> attn(x)  # (b, seq, 64) -> (b, seq, 64)
-    >>> attn(x, mask=mask)  # mask: bool (b, s, s) or (b, 1, s, s)
+    >>> attn(x, mask=mask)  # mask: bool (s, s) or (b, h, s, s)
     """
 
     w_qkv: Param[Float[Array, "d 3 h k"]]
@@ -58,7 +58,7 @@ class SelfAttention(Module):
     def __call__(
         self,
         x: Float[Array, "b s d"],
-        mask: Bool[Array, "b s s"] | Bool[Array, "b 1 s s"] | None = None,
+        mask: Bool[Array, "s s"] | Bool[Array, "b h s s"] | None = None,
     ) -> Float[Array, "b s d"]:
 
         b, s, d = x.shape
@@ -91,7 +91,7 @@ class CrossAttention(Module):
 
     >>> attn = CrossAttention(64, num_heads=8, key=key)
     >>> attn(x, context)  # (b, s, 64), (b, t, 64) -> (b, s, 64)
-    >>> attn(x, context, mask=mask)  # mask: bool (b, s, t) or (b, 1, s, t)
+    >>> attn(x, context, mask=mask)  # mask: bool (s, t) or (b, h, s, t)
     """
 
     w_q: Param[Float[Array, "d h k"]]
@@ -125,7 +125,7 @@ class CrossAttention(Module):
         self,
         x: Float[Array, "b s d"],
         context: Float[Array, "b t d"],
-        mask: Bool[Array, "b s t"] | Bool[Array, "b 1 s t"] | None = None,
+        mask: Bool[Array, "s t"] | Bool[Array, "b h s t"] | None = None,
     ) -> Float[Array, "b s d"]:
 
         b, s, d = x.shape

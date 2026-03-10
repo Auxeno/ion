@@ -101,6 +101,30 @@ class TestSelfAttention:
         y2 = layer(x, mask=None)
         npt.assert_array_equal(y1, y2)
 
+    def test_mask_ss(self):
+        """(s, s) mask broadcasts across batch and heads."""
+        layer = nn.SelfAttention(8, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (2, 4, 8))
+        mask = jnp.ones((4, 4), dtype=bool).at[0, 1].set(False)
+        y = layer(x, mask=mask)
+        assert y.shape == (2, 4, 8)
+
+    def test_mask_hss(self):
+        """(h, s, s) mask broadcasts across batch."""
+        layer = nn.SelfAttention(8, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (2, 4, 8))
+        mask = jnp.ones((2, 4, 4), dtype=bool).at[0, 0, 1].set(False)
+        y = layer(x, mask=mask)
+        assert y.shape == (2, 4, 8)
+
+    def test_mask_bhss(self):
+        """(b, h, s, s) per-head mask works with batched input."""
+        layer = nn.SelfAttention(8, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (2, 4, 8))
+        mask = jnp.ones((2, 2, 4, 4), dtype=bool).at[0, 0, 0, 1].set(False)
+        y = layer(x, mask=mask)
+        assert y.shape == (2, 4, 8)
+
 
 class TestCrossAttention:
     def test_output_shape(self):
@@ -188,3 +212,30 @@ class TestCrossAttention:
         y1 = layer(x, ctx)
         y2 = layer(x, ctx, mask=None)
         npt.assert_array_equal(y1, y2)
+
+    def test_mask_st(self):
+        """(s, t) mask broadcasts across batch and heads."""
+        layer = nn.CrossAttention(8, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (2, 3, 8))
+        ctx = jax.random.normal(jax.random.key(2), (2, 5, 8))
+        mask = jnp.ones((3, 5), dtype=bool).at[0, 0].set(False)
+        y = layer(x, ctx, mask=mask)
+        assert y.shape == (2, 3, 8)
+
+    def test_mask_hst(self):
+        """(h, s, t) mask broadcasts across batch."""
+        layer = nn.CrossAttention(8, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (2, 3, 8))
+        ctx = jax.random.normal(jax.random.key(2), (2, 5, 8))
+        mask = jnp.ones((2, 3, 5), dtype=bool).at[0, 0, 0].set(False)
+        y = layer(x, ctx, mask=mask)
+        assert y.shape == (2, 3, 8)
+
+    def test_mask_bhst(self):
+        """(b, h, s, t) per-head mask works with batched input."""
+        layer = nn.CrossAttention(8, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (2, 3, 8))
+        ctx = jax.random.normal(jax.random.key(2), (2, 5, 8))
+        mask = jnp.ones((2, 2, 3, 5), dtype=bool).at[0, 0, 0, 0].set(False)
+        y = layer(x, ctx, mask=mask)
+        assert y.shape == (2, 3, 8)
