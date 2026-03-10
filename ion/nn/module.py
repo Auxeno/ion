@@ -72,6 +72,14 @@ def _register_pytree(cls: type) -> None:
 class Module:
     """Base class for neural network modules.
 
+    Notes
+    -----
+    Subclasses are auto-converted to frozen dataclasses and registered as JAX pytrees.
+    Instances are immutable after ``__init__``; use :meth:`replace` for modified copies.
+    Non-array fields are wrapped as static pytree metadata automatically.
+
+    Examples
+    --------
     >>> model = Linear(3, 16, key=key)
     >>> new_model = model.replace(b=None)  # modified copy
     """
@@ -181,8 +189,20 @@ class Module:
         )
 
     def replace(self, **field_updates: Any) -> Self:
-        """Return a new instance with the specified fields updated.
+        """Return a new instance with the specified fields replaced.
 
+        Parameters
+        ----------
+        **field_updates
+            Field names and their new values. Must be existing dataclass fields.
+
+        Returns
+        -------
+        Self
+            Frozen copy with the specified fields replaced.
+
+        Examples
+        --------
         >>> new_model = model.replace(b=None)  # remove bias
         """
 

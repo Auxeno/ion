@@ -31,8 +31,17 @@ def _path_key(key_path: tuple) -> str:
 
 
 def save(path: str, pytree: PyTree) -> None:
-    """Serialize a PyTree's array leaves and metadata to a `.npz` file.
+    """Serialize a pytree's array leaves and metadata to a ``.npz`` file.
 
+    Parameters
+    ----------
+    path : str
+        Destination file path (``.npz`` appended if missing).
+    pytree : PyTree
+        Pytree to serialize. Only array leaves and ``Param`` trainable flags are written.
+
+    Examples
+    --------
     >>> ion.checkpoint.save("model.npz", model)
     """
     leaves_with_paths = jtu.tree_flatten_with_path(pytree, is_leaf=is_param)[0]
@@ -57,11 +66,22 @@ def save(path: str, pytree: PyTree) -> None:
 
 
 def load(path: str, reference_pytree: PyTree) -> PyTree:
-    """Load array leaves and metadata from a `.npz` file into a reference PyTree.
+    """Load array leaves and metadata from a ``.npz`` file into a reference pytree.
 
-    Trainable flags are restored from saved metadata.
-    All other values (callables, static scalars) come from the reference tree.
+    Parameters
+    ----------
+    path : str
+        Path to a ``.npz`` file created by :func:`save`.
+    reference_pytree : PyTree
+        Provides tree structure and non-array leaves; array leaves are replaced.
 
+    Returns
+    -------
+    PyTree
+        Pytree with arrays and ``Param`` trainable flags restored from file.
+
+    Examples
+    --------
     >>> model = ion.checkpoint.load("model.npz", model)
     """
     leaves_with_paths, tree_def = jtu.tree_flatten_with_path(reference_pytree, is_leaf=is_param)

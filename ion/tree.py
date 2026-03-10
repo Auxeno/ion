@@ -36,6 +36,48 @@ def is_trainable_param(x: Any) -> bool:
     return isinstance(x, Param) and x.trainable
 
 
+def apply_updates(model: PyTree, updates: PyTree) -> PyTree:
+    """Add optimizer deltas to a model's trainable parameters.
+
+    Parameters
+    ----------
+    model : PyTree
+        Model pytree containing ``Param`` leaves.
+    updates : PyTree
+        Matching-structure pytree of gradient or optimizer deltas.
+
+    Returns
+    -------
+    PyTree
+        Updated model with ``Param`` wrappers preserved.
+
+    Notes
+    -----
+    Frozen params, non-``Param`` leaves, and ``None`` updates are skipped.
+
+    Examples
+    --------
+    >>> model = ion.tree.apply_updates(model, grads)
+    """
+
+    def _apply(param: Any, update: Any) -> Any:
+        if update is None:
+            return param
+        if not isinstance(param, Param):
+            return param
+        if not param.trainable:
+            return param
+        delta = update._value if isinstance(update, Param) else update
+        return Param(param._value + delta, trainable=param.trainable)
+
+    return jax.tree.map(
+        _apply,
+        model,
+        updates,
+        is_leaf=lambda x: x is None or isinstance(x, Param),
+    )
+
+
 def freeze(pytree: PyTree) -> PyTree:
     """Return a copy with all `Param`s set to `trainable=False`.
 
@@ -62,30 +104,6 @@ def unfreeze(pytree: PyTree) -> PyTree:
         return leaf
 
     return jax.tree.map(_unfreeze_leaf, pytree, is_leaf=is_param)
-
-
-def apply_updates(model: PyTree, updates: PyTree) -> PyTree:
-    """Add optimizer deltas to a model's trainable parameters.
-
-    >>> model = ion.tree.apply_updates(model, grads)
-    """
-
-    def _apply(param: Any, update: Any) -> Any:
-        if update is None:
-            return param
-        if not isinstance(param, Param):
-            return param
-        if not param.trainable:
-            return param
-        delta = update._value if isinstance(update, Param) else update
-        return Param(param._value + delta, trainable=param.trainable)
-
-    return jax.tree.map(
-        _apply,
-        model,
-        updates,
-        is_leaf=lambda x: x is None or isinstance(x, Param),
-    )
 
 
 @jtu.register_pytree_node_class
