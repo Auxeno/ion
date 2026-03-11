@@ -9,7 +9,7 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-from ion import nn
+from ion import nn, tree
 
 
 class TestSubclassTransformation:
@@ -506,6 +506,27 @@ class TestFreezeUnfreeze:
 
         m = Model().freeze()
         assert m.w.trainable is False
+
+
+class TestAstype:
+    def test_astype_method(self):
+        """Module.astype delegates to tree.cast correctly."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            buf: jax.Array
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(2, dtype=jnp.float32))
+                self.buf = jnp.zeros(2, dtype=jnp.float32)
+
+        m = Model()
+        via_method = m.astype(jnp.bfloat16)
+        via_func = tree.cast(m, jnp.bfloat16)
+        assert via_method.w._value.dtype == jnp.bfloat16
+        assert via_method.buf.dtype == jnp.bfloat16
+        npt.assert_allclose(via_method.w._value, via_func.w._value)
+        npt.assert_allclose(via_method.buf, via_func.buf)
 
 
 class TestNoneField:

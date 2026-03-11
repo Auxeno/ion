@@ -499,6 +499,7 @@ class TestCast:
         assert result.buf.dtype == jnp.float32
 
 
+
 class TestStaticEdgeCases:
     def test_static_equality_is_identity_based(self):
         """Static doesn't define __eq__, so equal values aren't equal."""

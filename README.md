@@ -67,17 +67,6 @@ self.b = nn.Param(jnp.zeros(16), trainable=False)  # frozen
 
 `Param` acts as a drop-in for arrays via `__jax_array__` (e.g. `x @ self.w` works without unwrapping). Frozen params have `stop_gradient` applied, so `jax.grad` returns zero gradients at those positions and XLA skips their backward computation.
 
-```python
-model.freeze()                                         # freeze all params
-model.unfreeze()                                       # unfreeze all params
-model = model.replace(encoder=model.encoder.freeze())  # freeze a sub-module
-```
-
-```python
-model.params      # pytree of Param leaves (non-Param leaves are None)
-model.num_params  # total parameter count
-```
-
 ### apply_updates
 
 Adds optimizer deltas to trainable `Param` leaves only. Non-parameter arrays and frozen params pass through unchanged.
@@ -122,6 +111,19 @@ opt_state = optimizer.init(model)
 
 for x, y in data:
     model, opt_state = train_step(model, opt_state, x, y)
+```
+
+## Utilities
+
+`nn.Module` provides convenience methods and properties for common operations. Methods return new instances, as modules are immutable.
+
+```python
+model.freeze()                                   # freeze all params
+model.unfreeze()                                 # unfreeze all params
+model = model.replace(base=model.base.freeze())  # freeze a sub-module
+model.astype(jnp.bfloat16)                       # cast params to a different dtype
+model.params                                     # pytree of Param leaves
+model.num_params                                 # total parameter count
 ```
 
 ## Layers

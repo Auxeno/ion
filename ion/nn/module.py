@@ -227,12 +227,25 @@ class Module:
         return new_instance
 
     def freeze(self) -> Self:
-        """Return a copy with all parameters frozen (non-trainable)."""
+        """Return a copy with all parameters frozen (non-trainable). Wraps `ion.freeze`.
+
+        >>> frozen_model = model.freeze()
+        """
         return tree.freeze(self)
 
     def unfreeze(self) -> Self:
-        """Return a copy with all parameters unfrozen (trainable)."""
+        """Return a copy with all parameters unfrozen (trainable). Wraps `ion.unfreeze`.
+
+        >>> unfrozen_model = model.unfreeze()
+        """
         return tree.unfreeze(self)
+
+    def astype(self, dtype: jax.numpy.dtype, *, params_only: bool = False) -> Self:
+        """Return a copy with matching leaves cast to *dtype*. Wraps `ion.cast`.
+
+        >>> bf16_model = model.astype(jnp.bfloat16)
+        """
+        return tree.cast(self, dtype, params_only=params_only)
 
     @property
     def params(self) -> PyTree:
