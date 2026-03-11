@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.4
+
+- **Dtype casting.** New `Module.astype(dtype)` method and `ion.tree.cast(pytree, dtype)` utility for casting all parameters in a model or pytree to a target dtype (e.g. `float16`, `bfloat16`).
+- **TinyStories GPT demo.** New example notebook training a small GPT on the TinyStories dataset.
+- Added NumPy-style docstrings to all public functions.
+- Fixed attention mask shape annotations.
+- Documentation and README updates.
+
 ## 0.2.3
 
 - Added GitHub Actions CI workflow (tests across Python 3.11, 3.12, 3.13 with linting and type checking).
