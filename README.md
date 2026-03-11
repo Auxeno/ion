@@ -6,7 +6,7 @@
 
   [![Python](https://img.shields.io/badge/Python-3.11+-636EFA.svg)](https://www.python.org/)
   [![JAX](https://img.shields.io/badge/JAX-0.5+-AB63FA.svg)](https://github.com/google/jax)
-  [![License](https://img.shields.io/badge/License-Apache_2.0-FFA15A.svg)](LICENSE)
+  [![License](https://img.shields.io/badge/License-Apache_2.0-FFA15A.svg)](https://github.com/auxeno/ion/blob/main/LICENSE)
   [![CI](https://github.com/auxeno/ion/actions/workflows/ci.yml/badge.svg)](https://github.com/auxeno/ion/actions/workflows/ci.yml)
 
 </div>
@@ -23,7 +23,7 @@ pip install ion-nn
 
 ## Core Concepts
 
-Visit the [Ion Tour Notebook](https://nbviewer.org/github/Auxeno/ion/blob/main/examples/ion_tour.ipynb) for a hands-on walkthrough.
+Visit the [Ion Tour Notebook](https://github.com/auxeno/ion/blob/main/examples/ion_tour.ipynb) for a hands-on walkthrough.
 
 ### Param
 
@@ -66,7 +66,7 @@ updates, opt_state = optimizer.update(grads, opt_state)
 model = ion.apply_updates(model, updates)
 ```
 
-That's the entire core. See [Internals](docs/internals.md) for design details, explanations and sharp edges.
+That's the entire core. See [Internals](https://github.com/auxeno/ion/blob/main/docs/internals.md) for design details, explanations and sharp edges.
 
 ## Example
 
@@ -149,7 +149,7 @@ Ion ships with standard neural network layers. Each is a `Module` with trainable
 | Regularization  | `Dropout`                                                                 |
 | Blocks          | `Sequential`, `MLP`, `TransformerBlock`, `CrossTransformerBlock`          |
 
-See [Layer Conventions](docs/layers.md) for data format, weight init, and spatial layer usage.
+See [Layer Conventions](https://github.com/auxeno/ion/blob/main/docs/layers.md) for data format, weight init, and spatial layer usage.
 
 ### Pretty Printing
 
@@ -181,11 +181,12 @@ model = ion.load("model.npz", model)
 
 ## Examples
 
-- [Ion Tour](examples/ion_tour.ipynb): Hands-on walkthrough of the core API
-- [CNN Demo](examples/cnn_mnist.py): Image classification with convolutional networks
-- [RNN Demo](examples/rnn_mnist.py): Sequence classification with recurrent networks
-- [VAE Demo Notebook](examples/vae_mnist.ipynb): Variational autoencoder for image generation
-- [PPO Demo](examples/ppo_gymnax.py): Reinforcement learning with Gymnax
+- [Ion Tour](https://github.com/auxeno/ion/blob/main/examples/ion_tour.ipynb): Hands-on walkthrough of the core API
+- [CNN Demo](https://github.com/auxeno/ion/blob/main/examples/cnn_mnist.py): Image classification with convolutional networks
+- [RNN Demo](https://github.com/auxeno/ion/blob/main/examples/rnn_mnist.py): Sequence classification with recurrent networks
+- [GPT Demo Notebook](https://github.com/auxeno/ion/blob/main/examples/gpt_tinystories.ipynb): Character-level GPT on TinyStories
+- [VAE Demo Notebook](https://github.com/auxeno/ion/blob/main/examples/vae_mnist.ipynb): Variational autoencoder for image generation
+- [PPO Demo](https://github.com/auxeno/ion/blob/main/examples/ppo_gymnax.py): Reinforcement learning with Gymnax
 
 ## License
 
