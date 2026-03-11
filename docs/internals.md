@@ -1,24 +1,10 @@
 # Internals
 
-Everything behind the scenes in Ion. Three files and ~250 lines of code make up the whole engine. This document explains the design. Readers are also encouraged to check out the source code as it's fairly straightforward:
+Everything behind the scenes in Ion. Three files and ~250 lines of code make up the whole engine. This document explains the design. Readers are encouraged to check out the source code as it's fairly straightforward:
 
-- [`ion/nn/module.py`](../ion/nn/module.py): Module base class, pytree registration
 - [`ion/nn/param.py`](../ion/nn/param.py): Param wrapper, trainable/frozen distinction
 - [`ion/tree.py`](../ion/tree.py): Static wrapper, apply_updates, freeze/unfreeze
-
-## Module (`ion/nn/module.py`)
-
-JAX requires two things from objects in `jit`/`grad`/`vmap`: pytree registration so JAX can traverse their structure, and immutability so tracing produces correct results. Plain Python classes satisfy neither.
-
-Three things happen in `__init_subclass__` when a class inherits from `Module`:
-
-1. **Dataclass conversion.** `@dataclasses.dataclass` is applied. If the
-   subclass defines its own `__init__`, it is kept; otherwise one is generated
-   from the annotations.
-
-2. **Pytree registration.** The class is registered with `register_pytree_with_keys`. During flatten, non-array leaves (ints, floats, bools, strings, callables) are wrapped in `Static` so JAX treats them as compile-time constants rather than traced values. `Module` and `Param` fields are returned as-is since they have their own pytree registrations. During unflatten, `Static` wrappers are stripped so the user sees plain values. This means `jax.jit` and `jax.grad` work natively with models without special wrappers. We use `register_pytree_with_keys` instead of `register_dataclass` because constructors take different arguments than stored fields (`Linear(in_dim, out_dim, key)` creates `w` and `b` internally). Unflattening bypasses the constructor with `object.__new__` + `object.__setattr__`.
-
-3. **Freeze after init.** `__init__` is wrapped to set `_frozen` once construction completes. Subsequent attribute assignment raises `AttributeError`, because mutation would silently break JAX tracing. Use `model.replace(field=new_value)` to create a modified copy.
+- [`ion/nn/module.py`](../ion/nn/module.py): Module base class, pytree registration
 
 ## Param (`ion/nn/param.py`)
 
@@ -36,15 +22,32 @@ JAX pytrees see all arrays equally and have no built-in way to distinguish train
 
 `__jax_array__` returns the raw array for trainable params and applies `jax.lax.stop_gradient` for frozen params, making the `trainable` flag physically real in JAX's autodiff. `__getattr__` routes attribute access (`.shape`, `.dtype`, `.T`, `.reshape(...)`) through `jnp.asarray(self)`, which calls `__jax_array__()`, so frozen params remain invisible to autodiff even through method calls. The `_value` field is private and should not be accessed directly in user code, as it bypasses `stop_gradient`. Arithmetic and comparisons return raw arrays, not `Param`, because intermediate results are not parameters.
 
-## Tree (`ion/tree.py`)
+## Static (`ion/tree.py`)
 
-### apply_updates
+A pytree node with no children. JAX treats its value as static metadata, baking it into the compiled program rather than tracing through it. Without `Static`, non-array values (ints, strings, callables) stored on a module would be passed to JAX as traced leaves, causing errors. `Static` moves them into the treedef as auxiliary data so they are invisible to tracing while being preserved through flatten/unflatten roundtrips.
+
+## Module (`ion/nn/module.py`)
+
+JAX requires two things from objects in `jit`/`grad`/`vmap`: pytree registration so JAX can traverse their structure, and immutability so tracing produces correct results. Plain Python classes satisfy neither.
+
+Three things happen in `__init_subclass__` when a class inherits from `Module`:
+
+1. **Dataclass conversion.** `@dataclasses.dataclass` is applied. If the
+   subclass defines its own `__init__`, it is kept; otherwise one is generated
+   from the annotations.
+
+2. **Pytree registration.** The class is registered with `register_pytree_with_keys`.
+
+   - **Flatten.** Non-array leaves (ints, floats, bools, strings, callables) are wrapped in `Static` so JAX treats them as compile-time constants rather than traced values. `Module` and `Param` fields are returned as-is since they have their own pytree registrations.
+   - **Unflatten.** `Static` wrappers are stripped so the user sees plain values. The constructor is bypassed with `object.__new__` + `object.__setattr__`, because constructors take different arguments than stored fields (`Linear(in_dim, out_dim, key)` creates `w` and `b` internally). This is also why we use `register_pytree_with_keys` instead of `register_dataclass`.
+
+   The result is that `jax.jit` and `jax.grad` work natively with models without special wrappers.
+
+3. **Freeze after init.** `__init__` is wrapped to set `_frozen` once construction completes. Subsequent attribute assignment raises `AttributeError`, because mutation would silently break JAX tracing. Use `model.replace(field=new_value)` to create a modified copy.
+
+## apply_updates (`ion/tree.py`)
 
 Adds optimizer deltas to a model's trainable parameters. Only `Param` leaves are modified; non-`Param` arrays (like batch statistics) pass through unchanged. Walks the model and update trees in parallel, skipping positions where the update is `None`, the leaf is not a `Param`, or the parameter is frozen (`Param(trainable=False)`). The `Param` wrapper is preserved on updated values so trainability metadata survives the step.
-
-### Static
-
-A pytree node with no children. JAX treats its value as static metadata. Used by `Module` pytree registration to wrap non-array leaves (ints, strings, callables) so they become invisible to JAX tracing while being preserved through flatten/unflatten roundtrips.
 
 ## 🔪 Sharp Edges
 
