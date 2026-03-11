@@ -75,7 +75,7 @@ class Module:
     Notes
     -----
     Subclasses are auto-converted to frozen dataclasses and registered as JAX pytrees.
-    Instances are immutable after ``__init__``; use :meth:`replace` for modified copies.
+    Instances are immutable after `__init__`; use `replace` for modified copies.
     Non-array fields are wrapped as static pytree metadata automatically.
 
     Examples

@@ -38,13 +38,13 @@ class Param(Generic[T]):
     _value : Array
         The underlying JAX array.
     trainable : bool, optional
-        Whether the parameter is trainable (default ``True``).
+        Whether the parameter is trainable (default `True`).
 
     Notes
     -----
-    Frozen params have ``stop_gradient`` applied via ``__jax_array__``.
-    Arithmetic ops return plain arrays, not ``Param`` instances.
-    Array attributes (``.shape``, ``.dtype``, etc.) are proxied to the underlying array.
+    Frozen params have `stop_gradient` applied via `__jax_array__`.
+    Arithmetic ops return plain arrays, not `Param` instances.
+    Array attributes (`.shape`, `.dtype`, etc.) are proxied to the underlying array.
 
     Examples
     --------

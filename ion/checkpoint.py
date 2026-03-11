@@ -31,14 +31,14 @@ def _path_key(key_path: tuple) -> str:
 
 
 def save(path: str, pytree: PyTree) -> None:
-    """Serialize a pytree's array leaves and metadata to a ``.npz`` file.
+    """Serialize a pytree's array leaves and metadata to a `.npz` file.
 
     Parameters
     ----------
     path : str
-        Destination file path (``.npz`` appended if missing).
+        Destination file path (`.npz` appended if missing).
     pytree : PyTree
-        Pytree to serialize. Only array leaves and ``Param`` trainable flags are written.
+        Pytree to serialize. Only array leaves and `Param` trainable flags are written.
 
     Examples
     --------
@@ -66,19 +66,19 @@ def save(path: str, pytree: PyTree) -> None:
 
 
 def load(path: str, reference_pytree: PyTree) -> PyTree:
-    """Load array leaves and metadata from a ``.npz`` file into a reference pytree.
+    """Load array leaves and metadata from a `.npz` file into a reference pytree.
 
     Parameters
     ----------
     path : str
-        Path to a ``.npz`` file created by :func:`save`.
+        Path to a `.npz` file created by `save`.
     reference_pytree : PyTree
         Provides tree structure and non-array leaves; array leaves are replaced.
 
     Returns
     -------
     PyTree
-        Pytree with arrays and ``Param`` trainable flags restored from file.
+        Pytree with arrays and `Param` trainable flags restored from file.
 
     Examples
     --------

@@ -44,18 +44,18 @@ def apply_updates(model: PyTree, updates: PyTree) -> PyTree:
     Parameters
     ----------
     model : PyTree
-        Model pytree containing ``Param`` leaves.
+        Model pytree containing `Param` leaves.
     updates : PyTree
         Matching-structure pytree of gradient or optimizer deltas.
 
     Returns
     -------
     PyTree
-        Updated model with ``Param`` wrappers preserved.
+        Updated model with `Param` wrappers preserved.
 
     Notes
     -----
-    Frozen params, non-``Param`` leaves, and ``None`` updates are skipped.
+    Frozen params, non-`Param` leaves, and `None` updates are skipped.
 
     Examples
     --------
@@ -89,16 +89,16 @@ def astype(pytree: PyTree, dtype: jnp.dtype, *, params_only: bool = False) -> Py
     Parameters
     ----------
     pytree : PyTree
-        Pytree containing ``Param`` wrappers, plain arrays, or both.
+        Pytree containing `Param` wrappers, plain arrays, or both.
     dtype : jnp.dtype
         Target dtype; its family controls which leaves are cast.
     params_only : bool, optional
-        If ``True``, only ``Param`` leaves are cast. Default ``False``.
+        If `True`, only `Param` leaves are cast. Default `False`.
 
     Returns
     -------
     PyTree
-        Pytree with matching leaves cast and ``Param`` wrappers preserved.
+        Pytree with matching leaves cast and `Param` wrappers preserved.
 
     Examples
     --------
