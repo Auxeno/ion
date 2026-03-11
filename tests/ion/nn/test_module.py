@@ -510,7 +510,7 @@ class TestFreezeUnfreeze:
 
 class TestAstype:
     def test_astype_method(self):
-        """Module.astype delegates to tree.cast correctly."""
+        """Module.astype delegates to tree.astype correctly."""
 
         class Model(nn.Module):
             w: nn.Param
@@ -522,7 +522,7 @@ class TestAstype:
 
         m = Model()
         via_method = m.astype(jnp.bfloat16)
-        via_func = tree.cast(m, jnp.bfloat16)
+        via_func = tree.astype(m, jnp.bfloat16)
         assert via_method.w._value.dtype == jnp.bfloat16
         assert via_method.buf.dtype == jnp.bfloat16
         npt.assert_allclose(via_method.w._value, via_func.w._value)

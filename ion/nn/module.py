@@ -241,11 +241,11 @@ class Module:
         return tree.unfreeze(self)
 
     def astype(self, dtype: jax.numpy.dtype, *, params_only: bool = False) -> Self:
-        """Return a copy with matching leaves cast to *dtype*. Wraps `ion.cast`.
+        """Return a copy with matching leaves cast to *dtype*. Wraps `ion.astype`.
 
         >>> bf16_model = model.astype(jnp.bfloat16)
         """
-        return tree.cast(self, dtype, params_only=params_only)
+        return tree.astype(self, dtype, params_only=params_only)
 
     @property
     def params(self) -> PyTree:

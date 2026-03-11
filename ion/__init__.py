@@ -9,7 +9,7 @@ from .checkpoint import (
 )
 from .tree import (
     apply_updates,
-    cast,
+    astype,
     freeze,
     is_param,
     is_trainable_param,
@@ -56,7 +56,7 @@ __all__ = [
     "nn",
     "tree",
     "apply_updates",
-    "cast",
+    "astype",
     "disable_treescope",
     "enable_treescope",
     "freeze",

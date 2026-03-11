@@ -4,7 +4,7 @@ Functions:
     is_param            Check if a leaf is a Param.
     is_trainable_param  Check if a leaf is a trainable Param.
     apply_updates       Add optimizer deltas to trainable parameters.
-    cast                Cast all floating-point leaves to a given dtype.
+    astype              Cast all floating-point leaves to a given dtype.
     freeze              Set all Params to trainable=False.
     unfreeze            Set all Params to trainable=True.
 
@@ -80,7 +80,7 @@ def apply_updates(model: PyTree, updates: PyTree) -> PyTree:
     )
 
 
-def cast(pytree: PyTree, dtype: jnp.dtype, *, params_only: bool = False) -> PyTree:
+def astype(pytree: PyTree, dtype: jnp.dtype, *, params_only: bool = False) -> PyTree:
     """Cast all leaves in a pytree whose dtype matches the target's family.
 
     If a float dtype is given, only float leaves are cast; likewise for
@@ -102,8 +102,8 @@ def cast(pytree: PyTree, dtype: jnp.dtype, *, params_only: bool = False) -> PyTr
 
     Examples
     --------
-    >>> bf16_model = ion.cast(model, jnp.bfloat16)
-    >>> bf16_params = ion.cast(model, jnp.bfloat16, params_only=True)
+    >>> bf16_model = ion.astype(model, jnp.bfloat16)
+    >>> bf16_params = ion.astype(model, jnp.bfloat16, params_only=True)
     """
 
     # Only apply to leaves of same family as provided dtype
