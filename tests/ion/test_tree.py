@@ -334,6 +334,171 @@ class TestJaxJit:
         npt.assert_allclose(jitted, eager)
 
 
+class TestCast:
+    def test_cast_param_to_bfloat16(self):
+        data = {"w": nn.Param(jnp.ones(3, dtype=jnp.float32))}
+        result = tree.cast(data, jnp.bfloat16)
+        assert result["w"]._value.dtype == jnp.bfloat16
+        assert isinstance(result["w"], nn.Param)
+        assert result["w"].trainable is True
+
+    def test_cast_preserves_trainable_flag(self):
+        data = {"w": nn.Param(jnp.ones(3), trainable=False)}
+        result = tree.cast(data, jnp.bfloat16)
+        assert result["w"].trainable is False
+        assert result["w"]._value.dtype == jnp.bfloat16
+
+    def test_cast_plain_float_array(self):
+        data = {"buf": jnp.ones(3, dtype=jnp.float32)}
+        result = tree.cast(data, jnp.bfloat16)
+        assert result["buf"].dtype == jnp.bfloat16
+
+    def test_cast_leaves_int_arrays_unchanged(self):
+        data = {"ids": jnp.array([1, 2, 3], dtype=jnp.int32)}
+        result = tree.cast(data, jnp.bfloat16)
+        assert result["ids"].dtype == jnp.int32
+
+    def test_cast_on_module(self):
+        class Model(nn.Module):
+            w: nn.Param
+            buf: jax.Array
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(2, dtype=jnp.float32))
+                self.buf = jnp.zeros(2, dtype=jnp.float32)
+
+        m = Model()
+        result = tree.cast(m, jnp.bfloat16)
+        assert result.w._value.dtype == jnp.bfloat16
+        assert result.buf.dtype == jnp.bfloat16
+
+    def test_cast_roundtrip(self):
+        data = {"w": nn.Param(jnp.array([1.0, 2.0, 3.0]))}
+        bf16 = tree.cast(data, jnp.bfloat16)
+        f32 = tree.cast(bf16, jnp.float32)
+        assert f32["w"]._value.dtype == jnp.float32
+        npt.assert_allclose(f32["w"]._value, jnp.array([1.0, 2.0, 3.0]), atol=1e-2)
+
+    def test_cast_nested_module(self):
+        class Inner(nn.Module):
+            w: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(2))
+
+        class Outer(nn.Module):
+            inner: Inner
+            b: nn.Param
+
+            def __init__(self):
+                self.inner = Inner()
+                self.b = nn.Param(jnp.zeros(2))
+
+        m = Outer()
+        result = tree.cast(m, jnp.bfloat16)
+        assert result.inner.w._value.dtype == jnp.bfloat16
+        assert result.b._value.dtype == jnp.bfloat16
+
+    def test_cast_under_jit(self):
+        data = {"w": nn.Param(jnp.ones(3))}
+
+        @jax.jit
+        def f(d):
+            casted = tree.cast(d, jnp.bfloat16)
+            return casted["w"]._value
+
+        result = f(data)
+        assert result.dtype == jnp.bfloat16
+
+    def test_cast_differentiable(self):
+        """Gradients flow through cast (f32 -> bf16 -> f32 roundtrip)."""
+        data = {"w": nn.Param(jnp.array([1.0, 2.0, 3.0]))}
+
+        def loss(d):
+            bf16 = tree.cast(d, jnp.bfloat16)
+            return jnp.sum(bf16["w"]._value.astype(jnp.float32) ** 2)
+
+        grads = jax.grad(loss)(data)
+        # d/dw (w^2) = 2w
+        npt.assert_allclose(grads["w"]._value, jnp.array([2.0, 4.0, 6.0]), atol=1e-2)
+        assert grads["w"]._value.dtype == jnp.float32
+
+    def test_cast_complex_param(self):
+        """Casting to a float dtype leaves complex Params unchanged."""
+        data = {"w": nn.Param(jnp.array([1 + 2j, 3 + 4j], dtype=jnp.complex64))}
+        result = tree.cast(data, jnp.bfloat16)
+        assert result["w"]._value.dtype == jnp.complex64
+
+    def test_cast_complex_array(self):
+        """Casting to a float dtype leaves plain complex arrays unchanged."""
+        data = {"buf": jnp.array([1 + 0j], dtype=jnp.complex64)}
+        result = tree.cast(data, jnp.bfloat16)
+        assert result["buf"].dtype == jnp.complex64
+
+    def test_cast_complex_target_leaves_floats_unchanged(self):
+        """Casting to a complex dtype touches complex leaves but not float leaves."""
+        with jax.enable_x64(True):
+            data = {
+                "w": nn.Param(jnp.ones(2, dtype=jnp.float32)),
+                "z": nn.Param(jnp.array([1 + 2j], dtype=jnp.complex64)),
+                "buf": jnp.zeros(2, dtype=jnp.float32),
+                "cbuf": jnp.array([3 + 4j], dtype=jnp.complex64),
+            }
+            result = tree.cast(data, jnp.complex128)
+            assert result["w"]._value.dtype == jnp.float32
+            assert result["z"]._value.dtype == jnp.complex128
+            assert result["buf"].dtype == jnp.float32
+            assert result["cbuf"].dtype == jnp.complex128
+
+    def test_cast_int_target_casts_int_leaves(self):
+        """Casting to int8 touches integer leaves."""
+        data = {
+            "ids": nn.Param(jnp.array([1, 2, 3], dtype=jnp.int32)),
+            "buf": jnp.array([4, 5], dtype=jnp.int32),
+        }
+        result = tree.cast(data, jnp.int8)
+        assert result["ids"]._value.dtype == jnp.int8
+        assert result["buf"].dtype == jnp.int8
+
+    def test_cast_int_target_leaves_floats_unchanged(self):
+        """Casting to int8 does not touch float or complex leaves."""
+        data = {
+            "w": nn.Param(jnp.ones(2, dtype=jnp.float32)),
+            "z": nn.Param(jnp.array([1 + 2j], dtype=jnp.complex64)),
+            "buf": jnp.zeros(2, dtype=jnp.float32),
+        }
+        result = tree.cast(data, jnp.int8)
+        assert result["w"]._value.dtype == jnp.float32
+        assert result["z"]._value.dtype == jnp.complex64
+        assert result["buf"].dtype == jnp.float32
+
+    def test_cast_params_only_casts_params(self):
+        """params_only=True casts Params but leaves plain arrays unchanged."""
+        data = {
+            "w": nn.Param(jnp.ones(3, dtype=jnp.float32)),
+            "buf": jnp.zeros(3, dtype=jnp.float32),
+        }
+        result = tree.cast(data, jnp.bfloat16, params_only=True)
+        assert result["w"]._value.dtype == jnp.bfloat16
+        assert result["buf"].dtype == jnp.float32
+
+    def test_cast_params_only_on_module(self):
+        """params_only=True on a module with mixed Param/array fields."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            buf: jax.Array
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(2, dtype=jnp.float32))
+                self.buf = jnp.zeros(2, dtype=jnp.float32)
+
+        m = Model()
+        result = tree.cast(m, jnp.bfloat16, params_only=True)
+        assert result.w._value.dtype == jnp.bfloat16
+        assert result.buf.dtype == jnp.float32
+
+
 class TestStaticEdgeCases:
     def test_static_equality_is_identity_based(self):
         """Static doesn't define __eq__, so equal values aren't equal."""

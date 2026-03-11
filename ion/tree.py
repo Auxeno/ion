@@ -3,9 +3,10 @@
 Functions:
     is_param            Check if a leaf is a Param.
     is_trainable_param  Check if a leaf is a trainable Param.
+    apply_updates       Add optimizer deltas to trainable parameters.
+    cast                Cast all floating-point leaves to a given dtype.
     freeze              Set all Params to trainable=False.
     unfreeze            Set all Params to trainable=True.
-    apply_updates       Add optimizer deltas to trainable parameters.
 
 Classes:
     Static              Wraps a value so JAX treats it as static metadata.
@@ -20,6 +21,7 @@ See docs/internals.md for implementation details.
 from typing import Any
 
 import jax
+import jax.numpy as jnp
 import jax.tree_util as jtu
 from jaxtyping import PyTree
 
@@ -76,6 +78,53 @@ def apply_updates(model: PyTree, updates: PyTree) -> PyTree:
         updates,
         is_leaf=lambda x: x is None or isinstance(x, Param),
     )
+
+
+def cast(pytree: PyTree, dtype: jnp.dtype, *, params_only: bool = False) -> PyTree:
+    """Cast all leaves in a pytree whose dtype matches the target's family.
+
+    If a float dtype is given, only float leaves are cast; likewise for
+    complex and integer dtypes. Other families are left unchanged.
+
+    Parameters
+    ----------
+    pytree : PyTree
+        Pytree containing ``Param`` wrappers, plain arrays, or both.
+    dtype : jnp.dtype
+        Target dtype; its family controls which leaves are cast.
+    params_only : bool, optional
+        If ``True``, only ``Param`` leaves are cast. Default ``False``.
+
+    Returns
+    -------
+    PyTree
+        Pytree with matching leaves cast and ``Param`` wrappers preserved.
+
+    Examples
+    --------
+    >>> bf16_model = ion.cast(model, jnp.bfloat16)
+    >>> bf16_params = ion.cast(model, jnp.bfloat16, params_only=True)
+    """
+
+    # Only apply to leaves of same family as provided dtype
+    family = (
+        jnp.complexfloating
+        if jnp.issubdtype(dtype, jnp.complexfloating)
+        else jnp.integer
+        if jnp.issubdtype(dtype, jnp.integer)
+        else jnp.floating
+    )
+
+    def _cast(leaf: Any) -> Any:
+        if isinstance(leaf, Param):
+            if jnp.issubdtype(leaf._value.dtype, family):
+                return Param(leaf._value.astype(dtype), trainable=leaf.trainable)
+            return leaf
+        if not params_only and isinstance(leaf, jax.Array) and jnp.issubdtype(leaf.dtype, family):
+            return leaf.astype(dtype)
+        return leaf
+
+    return jax.tree.map(_cast, pytree, is_leaf=is_param)
 
 
 def freeze(pytree: PyTree) -> PyTree:
