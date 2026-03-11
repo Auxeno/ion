@@ -25,12 +25,60 @@ pip install ion-nn
 
 Visit the [Ion Tour Notebook](https://nbviewer.org/github/Auxeno/ion/blob/main/examples/ion_tour.ipynb) for a hands-on walkthrough.
 
+### Param
+
+`Param` wraps an array and marks it as a model parameter, either trainable or frozen.
+
+```python
+w = nn.Param(jax.random.normal(shape=(3, 16), key=key))      # trainable
+b = nn.Param(jax.numpy.zeros(shape=(16,)), trainable=False)  # frozen
+```
+
+`Param` acts as a drop-in for arrays via `__jax_array__` (e.g. `x @ w` works without unwrapping). Frozen params have `stop_gradient` applied, so `jax.grad` returns zero gradients at those positions and XLA skips their backward computation.
+
 ### Module
 
-Inherit from `nn.Module` to define a model. Subclasses are automatically registered as JAX pytrees and become immutable after `__init__`.
+Inherit from `nn.Module` to define a layer. Subclasses are automatically registered as JAX pytrees and become immutable after `__init__`.
 
 ```python
 import ion.nn as nn
+
+class Linear(nn.Module):
+    w: nn.Param
+    b: nn.Param
+
+    def __init__(self, in_dim, out_dim, *, key):
+        self.w = nn.Param(jax.random.normal(shape=(in_dim, out_dim), key=key))
+        self.b = nn.Param(jax.numpy.zeros(shape=(out_dim,)))
+
+    def __call__(self, x):
+        return x @ self.w + self.b
+```
+
+Non-array fields (ints, floats, strings, callables) are automatically treated as static metadata, invisible to JAX tracing. Config values like `num_heads` or `use_bias` and activation functions can be stored directly on the module.
+
+### apply_updates
+
+Adds optimizer deltas to trainable `Param` leaves only. Non-parameter arrays and frozen params pass through unchanged.
+
+```python
+updates, opt_state = optimizer.update(grads, opt_state)
+model = ion.apply_updates(model, updates)
+```
+
+That's the entire core. See [Internals](docs/internals.md) for design details, explanations and sharp edges.
+
+## Example
+
+Putting it all together with a model built from Ion's standard layers:
+
+```python
+import jax
+import optax
+
+import ion
+import ion.nn as nn
+
 
 class MLP(nn.Module):
     layer_1: nn.Linear
@@ -44,50 +92,7 @@ class MLP(nn.Module):
         self.activation = activation
 
     def __call__(self, x):
-        x = self.activation(self.layer_1(x))
-        return self.layer_2(x)
-```
-
-Non-array fields (ints, floats, strings, callables) are automatically treated as static metadata, invisible to JAX tracing. Config values like `num_heads` or `use_bias` and activation functions can be stored directly on the module with no issues.
-
-Modules are immutable after construction. Use `replace` to create a modified copy:
-
-```python
-model = model.replace(activation=jax.nn.tanh)
-```
-
-### Param
-
-`Param` wraps an array and marks it as a model parameter, either trainable or frozen.
-
-```python
-self.w = nn.Param(w_init(shape=(3, 16), key=key))  # trainable
-self.b = nn.Param(jnp.zeros(16), trainable=False)  # frozen
-```
-
-`Param` acts as a drop-in for arrays via `__jax_array__` (e.g. `x @ self.w` works without unwrapping). Frozen params have `stop_gradient` applied, so `jax.grad` returns zero gradients at those positions and XLA skips their backward computation.
-
-### apply_updates
-
-Adds optimizer deltas to trainable `Param` leaves only. Non-parameter arrays and frozen params pass through unchanged.
-
-```python
-updates, opt_state = optimizer.update(grads, opt_state)
-model = ion.apply_updates(model, updates)
-```
-
-That's the entire core. See [Internals](docs/internals.md) for how it works under the hood.
-
-## Example
-
-Putting it together with the MLP defined above:
-
-```python
-import jax
-import optax
-
-import ion
-import ion.nn as nn
+        return self.layer_2(self.activation(self.layer_1(x)))
 
 
 @jax.grad
@@ -118,12 +123,13 @@ for x, y in data:
 `nn.Module` provides convenience methods and properties for common operations. Methods return new instances, as modules are immutable.
 
 ```python
-model.freeze()                                   # freeze all params
-model.unfreeze()                                 # unfreeze all params
-model = model.replace(base=model.base.freeze())  # freeze a sub-module
-model.astype(jnp.bfloat16)                       # cast params to a different dtype
-model.params                                     # pytree of Param leaves
-model.num_params                                 # total parameter count
+model.replace(activation=jax.nn.tanh)    # create a modified copy
+model.freeze()                           # freeze all params
+model.unfreeze()                         # unfreeze all params
+model.replace(base=model.base.freeze())  # freeze a sub-module
+model.astype(jax.numpy.bfloat16)         # cast params to a different dtype
+model.params                             # pytree of Param leaves
+model.num_params                         # total parameter count
 ```
 
 ## Layers
