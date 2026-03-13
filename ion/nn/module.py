@@ -84,6 +84,10 @@ class Module:
     >>> new_model = model.replace(b=None)  # modified copy
     """
 
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        """Forward pass. Subclasses should override this method."""
+        raise NotImplementedError(f"{type(self).__name__} must implement __call__")
+
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Automatically convert subclasses into dataclasses and register them as PyTrees."""
         super().__init_subclass__(**kwargs)
