@@ -74,10 +74,10 @@ The same letter can mean different things in different layers. Meaning is determ
 Einsum patterns:
 
 ```
-QKV projection:     ...d, dihk -> ...ihk
-Attention logits:   ...shk, ...thk -> ...hst
-Attention output:   ...hst, ...thk -> ...shk
-Output projection:  ...hk, hkd -> ...d
+QKV projection:     bd, dihk -> bihk
+Attention logits:   bshk, bthk -> bhst
+Attention output:   bhst, bthk -> bshk
+Output projection:  bhk, hkd -> bd
 ```
 
 ### Recurrent
