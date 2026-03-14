@@ -43,8 +43,8 @@ class Nested(nn.Module):
     extra: nn.Param
 
     def __init__(self, key: jax.Array):
-        k1, k2 = jax.random.split(key)
-        self.linear = Linear(2, 3, key=k1)
+        keys = jax.random.split(key, 2)
+        self.linear = Linear(2, 3, key=keys[0])
         self.extra = nn.Param(jnp.ones(3))
 
 
@@ -205,9 +205,9 @@ class TestGradEdgeCases:
             decoder: Linear
 
             def __init__(self, key):
-                k1, k2 = jax.random.split(key)
-                self.encoder = Linear(2, 3, key=k1)
-                self.decoder = Linear(3, 1, key=k2)
+                keys = jax.random.split(key, 2)
+                self.encoder = Linear(2, 3, key=keys[0])
+                self.decoder = Linear(3, 1, key=keys[1])
 
         model = Model(key=jax.random.key(0))
         model = model.replace(encoder=model.encoder.freeze())
@@ -547,9 +547,9 @@ class TestNewJaxTransforms:
             decoder: nn.Linear
 
             def __init__(self, key):
-                k1, k2 = jax.random.split(key)
-                self.encoder = nn.Linear(4, 4, key=k1)
-                self.decoder = nn.Linear(4, 1, key=k2)
+                keys = jax.random.split(key, 2)
+                self.encoder = nn.Linear(4, 4, key=keys[0])
+                self.decoder = nn.Linear(4, 1, key=keys[1])
 
         model = Model(key=jax.random.key(0))
         model = model.replace(encoder=model.encoder.freeze())
@@ -718,9 +718,9 @@ class TestNewJaxTransforms:
             decoder: Linear
 
             def __init__(self, key):
-                k1, k2 = jax.random.split(key)
-                self.encoder = Linear(2, 3, key=k1)
-                self.decoder = Linear(3, 1, key=k2)
+                keys = jax.random.split(key, 2)
+                self.encoder = Linear(2, 3, key=keys[0])
+                self.decoder = Linear(3, 1, key=keys[1])
 
         model = Model(key=jax.random.key(0))
         model = model.replace(encoder=model.encoder.freeze())
@@ -785,9 +785,9 @@ class TestNewJaxTransforms:
             decoder: nn.Linear
 
             def __init__(self, key):
-                k1, k2 = jax.random.split(key)
-                self.encoder = nn.Linear(4, 4, key=k1)
-                self.decoder = nn.Linear(4, 1, key=k2)
+                keys = jax.random.split(key, 2)
+                self.encoder = nn.Linear(4, 4, key=keys[0])
+                self.decoder = nn.Linear(4, 1, key=keys[1])
 
         model = Model(key=jax.random.key(0))
         model = model.replace(encoder=model.encoder.freeze())
@@ -845,9 +845,9 @@ class TestNewJaxTransforms:
 
     def test_frozen_lora_end_to_end(self):
         """LoRA training: base weights frozen, only a/b update, loss decreases."""
-        k1, k2 = jax.random.split(jax.random.key(0))
-        linear = nn.Linear(4, 4, key=k1)
-        lora = nn.LoRALinear(linear, rank=2, key=k2)
+        keys = jax.random.split(jax.random.key(0), 2)
+        linear = nn.Linear(4, 4, key=keys[0])
+        lora = nn.LoRALinear(linear, rank=2, key=keys[1])
         frozen_base_w = lora.linear.w._value.copy()
 
         optimizer = optax.adam(1e-2)

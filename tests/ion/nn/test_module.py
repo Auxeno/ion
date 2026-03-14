@@ -121,8 +121,8 @@ class TestPytreeRegistration:
             b: nn.Param
 
             def __init__(self, key: jax.Array):
-                k1, k2 = jax.random.split(key)
-                self.w = nn.Param(jax.random.normal(k1, (3, 4)))
+                keys = jax.random.split(key, 2)
+                self.w = nn.Param(jax.random.normal(keys[0], (3, 4)))
                 self.b = nn.Param(jnp.zeros(4))
 
         m = Model(key=jax.random.key(0))
@@ -320,9 +320,9 @@ class TestParams:
             layer2: nn.Linear
 
             def __init__(self, key: jax.Array):
-                k1, k2 = jax.random.split(key)
-                self.layer1 = nn.Linear(4, 8, key=k1)
-                self.layer2 = nn.Linear(8, 2, key=k2)
+                keys = jax.random.split(key, 2)
+                self.layer1 = nn.Linear(4, 8, key=keys[0])
+                self.layer2 = nn.Linear(8, 2, key=keys[1])
 
         m = Container(key=key)
         param_leaves = jax.tree.leaves(m.params)
@@ -351,9 +351,9 @@ class TestNumParams:
             b: nn.Linear
 
             def __init__(self, key):
-                k1, k2 = jax.random.split(key)
-                self.a = nn.Linear(4, 8, key=k1)
-                self.b = nn.Linear(8, 2, key=k2)
+                keys = jax.random.split(key, 2)
+                self.a = nn.Linear(4, 8, key=keys[0])
+                self.b = nn.Linear(8, 2, key=keys[1])
 
         model = Net(key=jax.random.key(0))
         # a: 4*8+8=40, b: 8*2+2=18
@@ -506,9 +506,9 @@ class TestFreezeUnfreeze:
             decoder: nn.Linear
 
             def __init__(self, key):
-                k1, k2 = jax.random.split(key)
-                self.encoder = nn.Linear(4, 8, key=k1)
-                self.decoder = nn.Linear(8, 4, key=k2)
+                keys = jax.random.split(key, 2)
+                self.encoder = nn.Linear(4, 8, key=keys[0])
+                self.decoder = nn.Linear(8, 4, key=keys[1])
 
         m = Model(key=jax.random.key(0))
         m = m.replace(encoder=m.encoder.freeze())
@@ -571,19 +571,19 @@ class TestNoneField:
 class TestContainerFields:
     def test_tuple_of_modules(self):
         """Module with a tuple of sub-modules."""
-        k1, k2 = jax.random.split(jax.random.key(0))
-        seq = nn.Sequential(nn.Linear(4, 8, key=k1), nn.Linear(8, 2, key=k2))
+        keys = jax.random.split(jax.random.key(0), 2)
+        seq = nn.Sequential(nn.Linear(4, 8, key=keys[0]), nn.Linear(8, 2, key=keys[1]))
         x = jnp.ones((1, 4))
         result = jax.jit(seq)(x)
         assert result.shape == (1, 2)
 
     def test_tuple_of_mixed_callables(self):
         """Sequential with Modules and plain functions."""
-        k1, k2 = jax.random.split(jax.random.key(0))
+        keys = jax.random.split(jax.random.key(0), 2)
         seq = nn.Sequential(
-            nn.Linear(4, 8, key=k1),
+            nn.Linear(4, 8, key=keys[0]),
             jax.nn.relu,
-            nn.Linear(8, 2, key=k2),
+            nn.Linear(8, 2, key=keys[1]),
         )
         x = jnp.ones((1, 4))
         eager = seq(x)
@@ -597,8 +597,8 @@ class TestContainerFields:
             layers: list
 
             def __init__(self, key):
-                k1, k2 = jax.random.split(key)
-                self.layers = [nn.Linear(4, 4, key=k1), nn.Linear(4, 4, key=k2)]
+                keys = jax.random.split(key, 2)
+                self.layers = [nn.Linear(4, 4, key=keys[0]), nn.Linear(4, 4, key=keys[1])]
 
             def __call__(self, x):
                 for layer in self.layers:

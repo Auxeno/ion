@@ -318,11 +318,11 @@ class TestJaxJit:
     def test_jax_jit_with_sequential(self):
         """Sequential with (Linear, relu, Linear) works under jax.jit."""
 
-        k1, k2 = jax.random.split(jax.random.key(0))
+        keys = jax.random.split(jax.random.key(0), 2)
         model = nn.Sequential(
-            nn.Linear(2, 4, key=k1),
+            nn.Linear(2, 4, key=keys[0]),
             jax.nn.relu,
-            nn.Linear(4, 1, key=k2),
+            nn.Linear(4, 1, key=keys[1]),
         )
 
         def fn(model, x):

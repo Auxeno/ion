@@ -55,9 +55,9 @@ class TestSaveLoad:
             b: nn.Param
 
             def __init__(self, key):
-                k1, k2 = jax.random.split(key)
-                self.w = nn.Param(jax.random.normal(k1, (4,)))
-                self.b = nn.Param(jax.random.normal(k2, (2,)))
+                keys = jax.random.split(key, 2)
+                self.w = nn.Param(jax.random.normal(keys[0], (4,)))
+                self.b = nn.Param(jax.random.normal(keys[1], (2,)))
 
         model = Model(key=jax.random.key(0))
         with tempfile.NamedTemporaryFile(suffix=".npz") as f:
@@ -74,18 +74,18 @@ class TestSaveLoad:
             b: nn.Param
 
             def __init__(self, key):
-                k1, k2 = jax.random.split(key)
-                self.w = nn.Param(jax.random.normal(k1, (4,)))
-                self.b = nn.Param(jax.random.normal(k2, (2,)))
+                keys = jax.random.split(key, 2)
+                self.w = nn.Param(jax.random.normal(keys[0], (4,)))
+                self.b = nn.Param(jax.random.normal(keys[1], (2,)))
 
         class ModelV2(nn.Module):
             b: nn.Param
             w: nn.Param
 
             def __init__(self, key):
-                k1, k2 = jax.random.split(key)
-                self.b = nn.Param(jax.random.normal(k2, (2,)))
-                self.w = nn.Param(jax.random.normal(k1, (4,)))
+                keys = jax.random.split(key, 2)
+                self.b = nn.Param(jax.random.normal(keys[1], (2,)))
+                self.w = nn.Param(jax.random.normal(keys[0], (4,)))
 
         original = ModelV1(key=jax.random.key(0))
         reference = ModelV2(key=jax.random.key(1))
@@ -149,9 +149,9 @@ class TestSaveLoadTrainable:
             b: nn.Param
 
             def __init__(self, key):
-                k1, k2 = jax.random.split(key)
-                self.w = nn.Param(jax.random.normal(k1, (4,)), trainable=True)
-                self.b = nn.Param(jax.random.normal(k2, (2,)), trainable=False)
+                keys = jax.random.split(key, 2)
+                self.w = nn.Param(jax.random.normal(keys[0], (4,)), trainable=True)
+                self.b = nn.Param(jax.random.normal(keys[1], (2,)), trainable=False)
 
         model = Model(key=jax.random.key(0))
         # Reference has opposite trainable flags
@@ -229,9 +229,9 @@ class TestSaveLoadTrainable:
             b: nn.Param
 
             def __init__(self, key, inner_trainable=True, b_trainable=True):
-                k1, k2 = jax.random.split(key)
-                self.inner = Inner(key=k1, trainable=inner_trainable)
-                self.b = nn.Param(jax.random.normal(k2, (3,)), trainable=b_trainable)
+                keys = jax.random.split(key, 2)
+                self.inner = Inner(key=keys[0], trainable=inner_trainable)
+                self.b = nn.Param(jax.random.normal(keys[1], (3,)), trainable=b_trainable)
 
         model = Outer(key=jax.random.key(0), inner_trainable=False, b_trainable=True)
         reference = Outer(key=jax.random.key(1), inner_trainable=True, b_trainable=True)
@@ -261,9 +261,9 @@ class TestSaveLoadStructureMismatch:
             b: nn.Param
 
             def __init__(self, key):
-                k1, k2 = jax.random.split(key)
-                self.w = nn.Param(jax.random.normal(k1, (4,)))
-                self.b = nn.Param(jax.random.normal(k2, (4,)))
+                keys = jax.random.split(key, 2)
+                self.w = nn.Param(jax.random.normal(keys[0], (4,)))
+                self.b = nn.Param(jax.random.normal(keys[1], (4,)))
 
         small = SmallModel(key=jax.random.key(0))
         big = BigModel(key=jax.random.key(1))
@@ -287,9 +287,9 @@ class TestSaveLoadStructureMismatch:
             b: nn.Param
 
             def __init__(self, key):
-                k1, k2 = jax.random.split(key)
-                self.w = nn.Param(jax.random.normal(k1, (4,)))
-                self.b = nn.Param(jax.random.normal(k2, (4,)))
+                keys = jax.random.split(key, 2)
+                self.w = nn.Param(jax.random.normal(keys[0], (4,)))
+                self.b = nn.Param(jax.random.normal(keys[1], (4,)))
 
         big = BigModel(key=jax.random.key(0))
         small = SmallModel(key=jax.random.key(1))
