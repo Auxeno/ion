@@ -1,6 +1,6 @@
 # Internals
 
-Everything behind the scenes in Ion. Three files and ~250 lines of code make up the whole engine. This document explains the design. Readers are encouraged to check out the source code as it's fairly straightforward:
+Everything behind the scenes in Ion. Three files and ~500 lines of code make up the whole engine. This document explains the design. Readers are encouraged to check out the source code:
 
 - [`ion/nn/param.py`](../ion/nn/param.py): Param wrapper, trainable/frozen distinction
 - [`ion/tree.py`](../ion/tree.py): Static wrapper, apply_updates, freeze/unfreeze
