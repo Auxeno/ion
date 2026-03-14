@@ -82,6 +82,20 @@ class TestDropout:
         drop_frac = jnp.mean(y == 0.0)
         npt.assert_allclose(drop_frac, 0.3, atol=0.03)
 
+    def test_p_one_returns_zeros(self):
+        """p=1.0 drops everything, returning zeros instead of NaN."""
+        layer = nn.Dropout(p=1.0)
+        x = jnp.ones((4, 8))
+        y = layer(x, key=jax.random.key(0))
+        npt.assert_allclose(y, jnp.zeros_like(x), rtol=0, atol=0)
+
+    def test_p_above_one_returns_zeros(self):
+        """p > 1.0 is clamped to full dropout."""
+        layer = nn.Dropout(p=1.5)
+        x = jnp.ones((4, 8))
+        y = layer(x, key=jax.random.key(0))
+        npt.assert_allclose(y, jnp.zeros_like(x), rtol=0, atol=0)
+
     def test_missing_key_raises(self):
         """Calling without a key in stochastic mode raises ValueError."""
         layer = nn.Dropout(p=0.5)

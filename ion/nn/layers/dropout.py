@@ -7,6 +7,7 @@ Uses inverse dropout: outputs are scaled by 1/(1-p) during training.
 """
 
 import jax
+import jax.numpy as jnp
 from jaxtyping import Array, Float, PRNGKeyArray
 
 from ..module import Module
@@ -41,6 +42,9 @@ class Dropout(Module):
 
         if key is None:
             raise ValueError("key is required when not in deterministic mode")
+
+        if self.p >= 1.0:
+            return jnp.zeros_like(x)
 
         keep_prob = 1.0 - self.p
         mask = jax.random.bernoulli(key, p=keep_prob, shape=x.shape)
