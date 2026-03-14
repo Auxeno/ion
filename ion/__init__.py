@@ -1,5 +1,7 @@
 """Neural networks in JAX with immutable pytrees and explicit parameters."""
 
+from importlib.metadata import version
+
 from . import checkpoint as checkpoint
 from . import nn as nn
 from . import tree as tree
@@ -50,6 +52,8 @@ def disable_treescope() -> None:
 
 # Enable Treescope by default
 enable_treescope()
+
+__version__ = version("ion-nn")
 
 __all__ = [
     "checkpoint",
