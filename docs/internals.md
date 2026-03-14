@@ -82,18 +82,18 @@ Known gotchas to be aware of when using Ion. Some are limitations of JAX:
 
 - **`apply_updates` only modifies `Param` leaves.** Non-`Param` arrays are left unchanged. Frozen `Param` updates are silently skipped. Note that `jax.grad` does compute gradients for all array leaves in the pytree, including non-`Param` arrays. The optimizer will track state for these leaves, but `apply_updates` discards their updates. Continuing to calculate non-parameter array gradients could may be desirable to some users so Ion leaves it in.
 
-- **Frozen params still occupy optimizer state.** `stop_gradient` makes XLA skip backward computation, but `optimizer.init(model)` allocates momentum/variance buffers for every leaf. For models where most params are frozen (e.g. LoRA fine-tuning), this wastes significant memory. Use `optax.multi_transform` to assign a stateless optimizer to frozen params:
+- **Frozen params still occupy optimizer state.** `stop_gradient` makes XLA skip backward computation, but `optimizer.init(model)` allocates momentum/variance buffers for every leaf. For models where most params are frozen (e.g. LoRA fine-tuning), this wastes significant memory. Use `optax.partition` to assign a stateless optimizer to frozen params:
 
   ```python
   label = lambda p: nn.Param('train' if p.trainable else 'freeze', trainable=p.trainable)
 
-  optimizer = optax.multi_transform(
-      {'train': optax.adam(3e-4), 'freeze': optax.set_to_zero()},
-      lambda params: jax.tree.map(label, params, is_leaf=ion.is_param),
+  optimizer = optax.partition(
+      transforms={'train': optax.adam(3e-4), 'freeze': optax.set_to_zero()},
+      param_labels=lambda params: jax.tree.map(label, params, is_leaf=ion.is_param),
   )
   ```
 
-  `set_to_zero()` allocates no momentum buffers. The training loop is unchanged. Although `jax.grad` still returns zero arrays at frozen positions in the gradient pytree, XLA's dead code elimination (DCE) optimizes these away inside `jax.jit`: when the zeros have no downstream consumers (because `set_to_zero()` discards them), XLA eliminates both their computation and memory. With this setup, the only overhead from frozen params is the pytree structure itself, no wasted FLOPs or device memory. See [`TestXLAOptimization`](../tests/ion/nn/layers/test_lora.py) for compiled HLO verification.
+  `set_to_zero()` allocates no momentum buffers. The training loop is unchanged. Although `jax.grad` still returns zero arrays at frozen positions in the gradient pytree, XLA's dead code elimination (DCE) optimizes these away inside `jax.jit`: when the zeros have no downstream consumers (because `set_to_zero()` discards them), XLA eliminates both their computation and memory. With this setup, the only overhead from frozen params is the pytree structure itself, no wasted FLOPs or device memory! See [`TestXLAOptimization`](../tests/ion/nn/layers/test_lora.py) for compiled HLO verification.
 
 - **Some JAX/LAX functions don't accept `Param` directly.** Most operations will work transparently because `Param.__jax_array__` converts automatically, but lower-level functions like `lax.conv_general_dilated` may reject a `Param` where they expect a plain array. Use `jnp.asarray(param)` to convert. This calls `__jax_array__`, which applies `stop_gradient` for frozen params, so autograd correctness is preserved. **Do not use `param._value`**, which bypasses `stop_gradient` entirely: frozen params would receive gradients during the backward pass (wasting compute), and only `apply_updates` silently discarding them would prevent actual weight changes. The `_value` field is private and reserved for internal code that deliberately needs the raw array.
 

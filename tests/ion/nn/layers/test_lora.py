@@ -203,3 +203,37 @@ class TestXLAOptimization:
         # Frozen zero grads flow through naive adam but XLA eliminates them;
         # temp memory should be no worse than never computing them at all
         assert temp_bytes(naive) <= temp_bytes(head_only)
+
+    def test_partition_with_set_to_zero(self):
+        """optax.partition + set_to_zero() skips optimizer state for frozen params."""
+        keys = jax.random.split(jax.random.key(0), 2)
+        linear = nn.Linear(4, 4, key=keys[0])
+        lora = nn.LoRALinear(linear, rank=2, key=keys[1])
+
+        # String labels wrapped in Param to preserve pytree structure for optax
+        label = lambda p: nn.Param(
+            'train' if p.trainable else 'freeze', trainable=p.trainable  # type: ignore[arg-type]
+        )
+        optimizer = optax.partition(
+            transforms={'train': optax.adam(3e-4), 'freeze': optax.set_to_zero()},
+            param_labels=lambda params: jax.tree.map(label, params, is_leaf=ion.is_param),
+        )
+        opt_state = optimizer.init(lora)
+        frozen_w = lora.linear.w._value.copy()
+
+        x = jax.random.normal(jax.random.key(1), (8, 4))
+        y = jnp.ones((8, 4))
+
+        def loss_fn(model, x, y):
+            return jnp.mean((model(x) - y) ** 2)
+
+        initial_loss = loss_fn(lora, x, y)
+        for _ in range(10):
+            grads = jax.grad(loss_fn)(lora, x, y)
+            updates, opt_state = optimizer.update(grads, opt_state)
+            lora = ion.apply_updates(lora, updates)
+
+        # Loss decreases, frozen base unchanged, LoRA params updated
+        assert loss_fn(lora, x, y) < initial_loss
+        npt.assert_array_equal(lora.linear.w._value, frozen_w)
+        assert lora.a.trainable and lora.b.trainable
