@@ -7,9 +7,8 @@
   [![Python](https://img.shields.io/badge/Python-3.11+-636EFA.svg)](https://www.python.org/)
   [![License](https://img.shields.io/badge/License-Apache_2.0-FFA15A.svg)](https://github.com/auxeno/ion/blob/main/LICENSE)
   [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&color=313131&labelColor=555555)](https://github.com/astral-sh/ruff)
-  [![Pyright](https://img.shields.io/badge/Pyright-313131.svg)](https://github.com/microsoft/pyright)
-  [![Pytest](https://img.shields.io/badge/Pytest-4DB6AC.svg?logo=pytest&logoColor=white)](https://github.com/pytest-dev/pytest)
   [![CI](https://github.com/auxeno/ion/actions/workflows/ci.yml/badge.svg)](https://github.com/auxeno/ion/actions/workflows/ci.yml)
+  [![codecov](https://codecov.io/gh/auxeno/ion/graph/badge.svg)](https://codecov.io/gh/auxeno/ion)
 
 </div>
 

@@ -37,6 +37,7 @@ packages = ["ion"]
 [dependency-groups]
 dev = [
     "pytest",
+    "pytest-cov",
     "pyright",
     "ruff",
     "ipykernel",
@@ -49,6 +50,10 @@ examples = [
     "optax",
     "plotly",
     "tqdm",
+]
+all = [
+    {include-group = "dev"},
+    {include-group = "examples"},
 ]
 
 [tool.ruff]
