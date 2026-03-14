@@ -333,8 +333,8 @@ class TestSaveLoadStructureMismatch:
             with pytest.raises(ValueError, match="Shape mismatch"):
                 checkpoint.load(f.name, reference)
 
-    def test_load_dtype_mismatch_keeps_saved_dtype(self):
-        """Loading arrays with mismatched dtypes succeeds, keeping the saved dtype."""
+    def test_load_dtype_mismatch_warns_and_keeps_saved_dtype(self):
+        """Loading arrays with mismatched dtypes warns and keeps the saved dtype."""
 
         class Model(nn.Module):
             w: nn.Param
@@ -347,6 +347,45 @@ class TestSaveLoadStructureMismatch:
 
         with tempfile.NamedTemporaryFile(suffix=".npz") as f:
             checkpoint.save(f.name, saved_model)
-            loaded = checkpoint.load(f.name, reference)
+            with pytest.warns(UserWarning, match="Dtype mismatch"):
+                loaded = checkpoint.load(f.name, reference)
             assert loaded.w.dtype == jnp.float32
             assert loaded.w.dtype != reference.w.dtype
+
+    def test_load_plain_array_dtype_mismatch_warns(self):
+        """Loading plain arrays with mismatched dtypes warns."""
+
+        class Model(nn.Module):
+            buf: jax.Array
+
+            def __init__(self, dtype):
+                self.buf = jnp.zeros(4, dtype=dtype)
+
+        saved_model = Model(dtype=jnp.float32)
+        reference = Model(dtype=jnp.bfloat16)
+
+        with tempfile.NamedTemporaryFile(suffix=".npz") as f:
+            checkpoint.save(f.name, saved_model)
+            with pytest.warns(UserWarning, match="Dtype mismatch"):
+                loaded = checkpoint.load(f.name, reference)
+            assert loaded.buf.dtype == jnp.float32
+
+    def test_load_matching_dtype_no_warning(self):
+        """Loading with matching dtypes produces no warning."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (4,)))
+
+        model = Model(key=jax.random.key(0))
+
+        with tempfile.NamedTemporaryFile(suffix=".npz") as f:
+            checkpoint.save(f.name, model)
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("error")
+                loaded = checkpoint.load(f.name, model)
+            npt.assert_array_equal(loaded.w._value, model.w._value)

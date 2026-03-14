@@ -11,6 +11,7 @@ See docs/internals.md for implementation details.
 """
 
 import json
+import warnings
 from typing import Any
 
 import jax
@@ -111,6 +112,14 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
                     f"Shape mismatch for '{array_key}': "
                     f"saved {saved_array.shape} vs reference {ref_shape}"
                 )
+            ref_dtype = leaf._value.dtype
+            if saved_array.dtype != ref_dtype:
+                warnings.warn(
+                    f"Dtype mismatch for '{array_key}': "
+                    f"saved {saved_array.dtype} vs reference {ref_dtype}. "
+                    f"Using saved dtype.",
+                    stacklevel=2,
+                )
             trainable = trainable_flags.get(key, leaf.trainable)
             loaded_leaves.append(Param(jnp.array(saved_array), trainable=trainable))
         elif isinstance(leaf, (jax.Array, np.ndarray)):
@@ -127,6 +136,13 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
                 raise ValueError(
                     f"Shape mismatch for '{key}': "
                     f"saved {saved_array.shape} vs reference {ref_shape}"
+                )
+            if saved_array.dtype != leaf.dtype:
+                warnings.warn(
+                    f"Dtype mismatch for '{key}': "
+                    f"saved {saved_array.dtype} vs reference {leaf.dtype}. "
+                    f"Using saved dtype.",
+                    stacklevel=2,
                 )
             loaded_leaves.append(jnp.array(saved_array))
         else:
