@@ -34,6 +34,12 @@ jobs:
       - name: Run tests
         run: uv run pytest --cov=ion --cov-report=xml
 
+      - name: Test package install
+        if: matrix.python-version == '3.13'
+        run: |
+          uv build
+          uv run --isolated --with dist/*.whl python -c "import ion; print(ion.__version__)"
+
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.13'
         uses: codecov/codecov-action@v5
