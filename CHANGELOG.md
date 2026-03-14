@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.5
+
+- Added `__call__` method to `Module` so static type checkers see generic modules as callable.
+- Added dynamic `__version__` to package root.
+- Added Python 3.14 as supported.
+- Improved test coverage and added automated pip install test.
+- Documentation and README updates.
+
 ## 0.2.4
 
 - **Dtype casting.** New `Module.astype(dtype)` method and `ion.tree.cast(pytree, dtype)` utility for casting all parameters in a model or pytree to a target dtype (e.g. `float16`, `bfloat16`).
