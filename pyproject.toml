@@ -1,7 +1,7 @@
 [project]
 name = "ion-nn"
 dynamic = ["version"]
-description = "Simple neural networks in JAX."
+description = "A minimal neural network library for JAX."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
