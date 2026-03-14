@@ -142,7 +142,14 @@ Each layer family uses init schemes suited to its typical activation:
 
 ## Stateless Design
 
-All layers are stateless and frozen after `__init__`. Two patterns handle state:
+All layers are stateless and frozen after `__init__`. Dropout takes a `key` argument at call time for stochastic masking.
 
-- **Dropout** takes a `key` argument at call time for stochastic masking.
-- **BatchNorm** stores running statistics on the module. A `training` flag controls whether batch or running stats are used. The `update` method returns a new module with updated running statistics.
+### Why no BatchNorm?
+
+BatchNorm's mutable running statistics are fundamentally at odds with Ion's functional, immutable design. Every API pattern we explored was a footgun: forgetting to call `.update()` silently leaves running stats at their initial values, producing a model that trains fine but degrades at eval time. Rather than ship a layer that's inherently error-prone, we made a deliberate choice to omit it.
+
+If you need batch normalization, you have good options:
+
+- **Use LayerNorm or GroupNorm.** Most modern architectures have moved away from BatchNorm. GroupNorm with `num_groups=1` is equivalent to LayerNorm; with `num_groups=dim` it gives instance normalization.
+- **Build your own.** The stateless forward pass is simple; the challenge is managing running statistics in your training loop.
+- **Use Flax NNX.** Its mutable model design makes inplace updates to batch statistics easy.

@@ -187,14 +187,6 @@ class TestApplyUpdatesEdgeCases:
         npt.assert_allclose(result["w"]._value, jnp.array([1.5]))
         assert result["w"].trainable is True
 
-    def test_apply_updates_batchnorm_running_stats_unchanged(self):
-        """BatchNorm running stats (non-Param arrays) are not modified."""
-        bn = nn.BatchNorm(8, training=True)
-        updates = jax.tree.map(jnp.zeros_like, bn)
-        result = tree.apply_updates(bn, updates)
-        npt.assert_array_equal(result.running_mean, bn.running_mean)
-        npt.assert_array_equal(result.running_var, bn.running_var)
-
 
 class TestApplyUpdatesUnderJit:
     def test_apply_updates_under_jit(self):

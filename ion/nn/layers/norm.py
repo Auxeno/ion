@@ -4,12 +4,10 @@ Modules:
     LayerNorm     Layer normalization.                    (Ba et al., 2016)
     RMSNorm       RMS normalization, no mean centering.   (Zhang & Sennrich, 2019)
     GroupNorm     Normalization over channel groups.      (Wu & He, 2018)
-    BatchNorm     Normalization with running statistics.  (Ioffe & Szegedy, 2015)
 
-Scale initialized to 1, bias to 0. Normalizes over the last dimension by default.
+Scales initialized to ones, bias to zeros. Normalizes over the last dimension by default.
+BatchNorm is intentionally omitted. See docs/layers.md for rationale.
 """
-
-from typing import Self
 
 import jax.numpy as jnp
 from jax import lax
@@ -131,74 +129,3 @@ class RMSNorm(Module):
         x = x * self.scale
 
         return x
-
-
-class BatchNorm(Module):
-    """Batch normalization with running statistics.
-
-    Running statistics don't fit neatly into a functional model. Prefer
-    LayerNorm or GroupNorm when possible.
-
-    >>> bn = BatchNorm(64, training=True)
-    >>> y = bn(x)          # (*, 64) -> (*, 64), normalize with batch stats
-    >>> bn = bn.update(x)  # step running statistics
-    """
-
-    scale: Param[Float[Array, " d"]]
-    b: Param[Float[Array, " d"]] | None
-    running_mean: Float[Array, " d"]
-    running_var: Float[Array, " d"]
-    momentum: float
-    eps: float
-    training: bool
-
-    def __init__(
-        self,
-        dim: int,
-        momentum: float = 0.1,
-        eps: float = 1e-5,
-        bias: bool = True,
-        training: bool = False,
-        dtype: jnp.dtype = jnp.float32,
-    ) -> None:
-
-        self.scale = Param(jnp.ones(dim, dtype=dtype))
-        self.b = Param(jnp.zeros(dim, dtype=dtype)) if bias else None
-
-        self.running_mean = jnp.zeros(dim, dtype=dtype)
-        self.running_var = jnp.ones(dim, dtype=dtype)
-
-        self.momentum = momentum
-        self.eps = eps
-        self.training = training
-
-    def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
-
-        reduce_axes = tuple(range(x.ndim - 1))
-
-        if self.training:
-            mean = jnp.mean(x, axis=reduce_axes)
-            var = jnp.mean(jnp.square(x - mean), axis=reduce_axes)
-        else:
-            mean = self.running_mean
-            var = self.running_var
-
-        y = (x - mean) * lax.rsqrt(var + self.eps)
-        y = y * self.scale
-
-        if self.b is not None:
-            y = y + self.b
-
-        return y
-
-    def update(self, x: Float[Array, "... d"]) -> Self:
-        """Return a new BatchNorm with running statistics updated from batch statistics."""
-
-        reduce_axes = tuple(range(x.ndim - 1))
-        mean = jnp.mean(x, axis=reduce_axes)
-        var = jnp.mean(jnp.square(x - mean), axis=reduce_axes)
-
-        new_running_mean = (1 - self.momentum) * self.running_mean + self.momentum * mean
-        new_running_var = (1 - self.momentum) * self.running_var + self.momentum * var
-
-        return self.replace(running_mean=new_running_mean, running_var=new_running_var)

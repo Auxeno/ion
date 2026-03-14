@@ -575,25 +575,6 @@ class TestNewJaxTransforms:
         assert final_loss < initial_loss
         npt.assert_array_equal(model.encoder.w._value, frozen_w)
 
-    def test_training_loop_batchnorm(self):
-        """Running stats not corrupted by apply_updates."""
-        bn = nn.BatchNorm(4, training=True)
-        optimizer = optax.adam(1e-2)
-        opt_state = optimizer.init(bn)
-
-        x = jax.random.normal(jax.random.key(0), (8, 4))
-
-        def loss_fn(model, x):
-            return jnp.mean(model(x) ** 2)
-
-        loss, grads = jax.value_and_grad(loss_fn)(bn, x)
-        updates, opt_state = optimizer.update(grads, opt_state)
-        result = tree.apply_updates(bn, updates)
-
-        # Running stats (non-Param) are unchanged by apply_updates
-        npt.assert_array_equal(result.running_mean, bn.running_mean)
-        npt.assert_array_equal(result.running_var, bn.running_var)
-
     def test_frozen_conv_zero_gradient(self):
         """Frozen Conv layer produces zero grads (tests the conv.py jnp.asarray fix)."""
         conv = nn.Conv(3, 8, kernel_shape=(3, 3), padding="SAME", key=jax.random.key(0))
