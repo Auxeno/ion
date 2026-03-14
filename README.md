@@ -15,9 +15,7 @@
 
 ---
 
-## Why Ion
-
-Ion's core is a minimal ~250 lines of code across three files. There are three concepts to learn (`Module`, `Param`, and `apply_updates`). Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html) with simple calling semantics `model(x)` that *always* work directly with `jax.grad`, `jax.jit`, `jax.vmap`, and every other JAX transform. Everything else is just JAX.
+Ion is a library for building and training neural networks in JAX. The core is a minimal ~250 lines of code across three files. There are three concepts to learn (`Module`, `Param`, and `apply_updates`). Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html) with simple calling semantics `model(x)` that *always* work directly with `jax.grad`, `jax.jit`, `jax.vmap`, and every other JAX transform. Everything else is just JAX.
 
 Ion also ships with standard neural network layers (linear, convolution, attention, normalization, recurrent, and more) built with the core.
 
@@ -25,15 +23,15 @@ Ion also ships with standard neural network layers (linear, convolution, attenti
 > <summary>Why do I need a neural network library in JAX?</summary>
 > <br>
 >
-> Building simple NN models from scratch in JAX is straightforward. As they get more complex however, two things become painful: managing parameters (initializing them, tracking which are trainable, freezing some for fine-tuning) and composing modules (reusing layers, wiring them through JAX transforms, not reimplementing things like convolution padding from scratch). A neural network library takes care of this so you can focus on the model and the training loop.
+> Building *simple* NN models from scratch in JAX is straightforward. As they get more complex however, two things become painful: managing parameters (initializing them, tracking which are trainable, freezing some for fine-tuning) and composing modules (reusing layers, wiring them through JAX transforms, not reimplementing things like convolution padding from scratch). A neural network library takes care of this so you can focus on model building and training.
 > </details>
 <br>
 
 > <details>
-> <summary>How does Ion compare to existing JAX neural network libraries?</summary>
+> <summary>How does Ion compare to Equinox and Flax?</summary>
 > <br>
 >
-> **[Equinox](https://github.com/patrick-kidger/equinox)** is a pytree library for scientific computing with neural networks as one use case alongside companion libraries like Diffrax and Lineax. It provides filtered transforms, partition/combine utilities, and general pytree tools that give users fine-grained control over how JAX interacts with their code. Ion is narrower in scope: three building blocks on top of JAX for defining and training neural networks, using native `jax.grad`/`jax.jit` directly with no additional API layer. Equinox is excellent, and particularly well-suited if your work extends beyond neural networks into broader scientific computing.
+> **[Equinox](https://github.com/patrick-kidger/equinox)** is a pytree library for scientific computing with neural networks as one of several possible use-cases. It sits alongside companion libraries like Diffrax and Lineax. It provides filtered transforms, partition/combine utilities, and general pytree tools that give users fine-grained control over how JAX interacts with their code. Ion is narrower in scope: three building blocks on top of JAX for defining and training neural networks, using native `jax.grad`/`jax.jit` directly with no additional API layer. Equinox is excellent, and particularly well-suited if your work extends beyond neural networks into broader scientific computing.
 >
 > **[Flax NNX](https://github.com/google/flax)** takes a different philosophical approach. NNX models are mutable graph objects with reference semantics, and custom transforms (`nnx.jit`, `nnx.grad`) that allow mutability within JAX's functional programming model. The result is flexible, PyTorch-like ergonomics at the cost of complexity behind the scenes (state extraction, reference threading, graph tracing) that can make it hard to reason about what your code is doing. Ion keeps things straightforward: immutable pytrees, native JAX transforms, and explicit state passing. NNX is a great choice if you value PyTorch-like ergonomics and are happy to trust the framework.
 > </details>
@@ -97,7 +95,7 @@ That's the entire core. See [Internals](https://github.com/auxeno/ion/blob/main/
 Putting it all together with a model built from Ion's standard layers:
 
 ```python
-import typing, jax, optax
+import jax, optax, typing
 
 import ion
 import ion.nn as nn
