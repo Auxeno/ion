@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 import numpy.testing as npt
+import pytest
 
 from ion import nn
 
@@ -80,3 +81,9 @@ class TestDropout:
         y = layer(x, key=jax.random.key(42))
         drop_frac = jnp.mean(y == 0.0)
         npt.assert_allclose(drop_frac, 0.3, atol=0.03)
+
+    def test_missing_key_raises(self):
+        """Calling without a key in stochastic mode raises ValueError."""
+        layer = nn.Dropout(p=0.5)
+        with pytest.raises(ValueError, match="key is required"):
+            layer(jnp.ones(4))

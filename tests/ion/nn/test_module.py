@@ -12,6 +12,24 @@ import pytest
 from ion import nn, tree
 
 
+class TestBaseModule:
+    def test_call_raises_not_implemented(self):
+        """Base Module.__call__ raises NotImplementedError."""
+
+        class Empty(nn.Module):
+            pass
+
+        m = Empty()  # type: ignore[reportCallIssue]
+        with pytest.raises(NotImplementedError, match="Empty"):
+            m(jnp.ones(3))
+
+    def test_iter_yields_field_values(self):
+        """Module.__iter__ yields dataclass field values in order."""
+        model = nn.Linear(3, 4, key=jax.random.key(0))
+        fields = list(model)
+        assert len(fields) == 2  # w and b
+
+
 class TestSubclassTransformation:
     def test_annotations_become_dataclass_fields(self):
         """Annotated fields are recognized by dataclasses.fields()."""

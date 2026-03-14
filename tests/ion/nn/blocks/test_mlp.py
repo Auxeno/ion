@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import pytest
 
 from ion import nn
 
@@ -27,3 +28,21 @@ class TestMLP:
         y = mlp(x)
         assert y.shape == (16,)
 
+    def test_negative_hidden_layers_raises(self):
+        """Negative num_hidden_layers raises ValueError."""
+        with pytest.raises(ValueError, match="must be >= 0"):
+            nn.MLP(8, 16, 32, num_hidden_layers=-1, key=jax.random.key(0))
+
+    def test_final_activation(self):
+        """final_activation is applied to the output."""
+        mlp = nn.MLP(
+            3,
+            1,
+            hidden_dim=8,
+            num_hidden_layers=1,
+            final_activation=jax.nn.sigmoid,
+            key=jax.random.key(0),
+        )
+        x = jnp.ones((2, 3))
+        y = mlp(x)
+        assert jnp.all((y >= 0) & (y <= 1))

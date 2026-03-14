@@ -231,7 +231,9 @@ class TestConvTranspose:
 
     def test_1d_stride_upsamples(self):
         """Stride > 1 upsamples spatial dimension."""
-        layer = nn.ConvTranspose(3, 8, kernel_shape=(3,), stride=2, padding=1, key=jax.random.key(0))
+        layer = nn.ConvTranspose(
+            3, 8, kernel_shape=(3,), stride=2, padding=1, key=jax.random.key(0)
+        )
         x = jnp.ones((1, 10, 3))
         y = layer(x)
         assert y.shape == (1, 19, 8)
@@ -294,7 +296,9 @@ class TestConvTranspose:
     def test_1d_output_padding_validation(self):
         """output_padding >= stride raises ValueError."""
         with pytest.raises(ValueError, match="output_padding"):
-            nn.ConvTranspose(3, 8, kernel_shape=(3,), stride=2, output_padding=2, key=jax.random.key(0))
+            nn.ConvTranspose(
+                3, 8, kernel_shape=(3,), stride=2, output_padding=2, key=jax.random.key(0)
+            )
 
     def test_2d_output_shape_no_padding(self):
         """No padding expands spatial dims by kernel_size - 1."""
@@ -371,7 +375,9 @@ class TestConvTranspose:
 
     def test_2d_weight_dtype(self):
         """Weights match the requested dtype."""
-        layer = nn.ConvTranspose(3, 8, kernel_shape=(3, 3), dtype=jnp.float32, key=jax.random.key(0))
+        layer = nn.ConvTranspose(
+            3, 8, kernel_shape=(3, 3), dtype=jnp.float32, key=jax.random.key(0)
+        )
         assert layer.w.dtype == jnp.float32
 
     def test_2d_groups_output_shape(self):

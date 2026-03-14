@@ -107,6 +107,7 @@ class TestAlibi:
     def test_non_power_of_2_raises(self):
         """Non-power-of-2 num_heads raises ValueError."""
         import pytest
+
         with pytest.raises(ValueError):
             nn.alibi(16, 3)
 
@@ -133,6 +134,7 @@ class TestRope:
     def test_odd_head_dim_raises(self):
         """Odd head_dim raises ValueError."""
         import pytest
+
         with pytest.raises(ValueError):
             nn.rope(128, 63)
 

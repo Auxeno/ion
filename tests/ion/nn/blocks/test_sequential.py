@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 import numpy.testing as npt
+import pytest
 
 from ion import nn
 
@@ -72,3 +73,8 @@ class TestSequential:
         x = jnp.ones((4,))
         npt.assert_allclose(model(x), x, rtol=0, atol=0)
         assert len(model) == 0
+
+    def test_non_callable_raises(self):
+        """Passing a non-callable raises TypeError."""
+        with pytest.raises(TypeError, match="callable"):
+            nn.Sequential(42)  # type: ignore[arg-type]

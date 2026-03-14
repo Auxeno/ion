@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 import numpy.testing as npt
+import pytest
 
 from ion import nn
 
@@ -126,6 +127,13 @@ class TestSelfAttention:
         assert y.shape == (2, 4, 8)
 
 
+class TestSelfAttentionValidation:
+    def test_dim_not_divisible_by_num_heads_raises(self):
+        """dim must be divisible by num_heads."""
+        with pytest.raises(ValueError, match="divisible"):
+            nn.SelfAttention(dim=7, num_heads=3, key=jax.random.key(0))
+
+
 class TestCrossAttention:
     def test_output_shape(self):
         """Output shape matches query sequence shape."""
@@ -239,3 +247,10 @@ class TestCrossAttention:
         mask = jnp.ones((2, 2, 3, 5), dtype=bool).at[0, 0, 0, 0].set(False)
         y = layer(x, ctx, mask=mask)
         assert y.shape == (2, 3, 8)
+
+
+class TestCrossAttentionValidation:
+    def test_dim_not_divisible_by_num_heads_raises(self):
+        """dim must be divisible by num_heads."""
+        with pytest.raises(ValueError, match="divisible"):
+            nn.CrossAttention(dim=7, num_heads=3, key=jax.random.key(0))

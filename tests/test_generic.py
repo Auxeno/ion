@@ -1,11 +1,10 @@
 import tempfile
 
-import pytest
-
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy.testing as npt
+import pytest
 
 import ion
 from ion import nn

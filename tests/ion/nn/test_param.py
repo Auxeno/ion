@@ -198,11 +198,8 @@ class TestImmutability:
     def test_frozen_setattr_raises(self):
         """Setting an attribute on a frozen Param raises."""
         p = nn.Param(jnp.array(1.0))
-        try:
+        with pytest.raises((AttributeError, dataclasses.FrozenInstanceError)):
             p.value = jnp.array(2.0)  # type: ignore[misc]
-            assert False, "Should have raised"
-        except (AttributeError, dataclasses.FrozenInstanceError):
-            pass
 
 
 class TestJaxTransforms:
@@ -442,6 +439,61 @@ class TestProtocols:
         npt.assert_allclose(float(p[1, 1]), 4.0)
 
 
+class TestScalarReverseArithmetic:
+    """Reverse ops triggered by Python scalars on the left (not jnp.array)."""
+
+    def test_radd_scalar(self):
+        """Python float + Param triggers __radd__."""
+        p = nn.Param(jnp.array([1.0, 2.0]))
+        result = 10.0 + p
+        npt.assert_array_equal(result, jnp.array([11.0, 12.0]))
+
+    def test_rsub_scalar(self):
+        """Python float - Param triggers __rsub__."""
+        p = nn.Param(jnp.array([1.0, 2.0]))
+        result = 10.0 - p
+        npt.assert_array_equal(result, jnp.array([9.0, 8.0]))
+
+    def test_rmul_scalar(self):
+        """Python float * Param triggers __rmul__."""
+        p = nn.Param(jnp.array([2.0, 3.0]))
+        result = 3.0 * p
+        npt.assert_array_equal(result, jnp.array([6.0, 9.0]))
+
+    def test_rtruediv_scalar(self):
+        """Python float / Param triggers __rtruediv__."""
+        p = nn.Param(jnp.array([2.0, 4.0]))
+        result = 12.0 / p
+        npt.assert_array_equal(result, jnp.array([6.0, 3.0]))
+
+    def test_rfloordiv_scalar(self):
+        """Python float // Param triggers __rfloordiv__."""
+        p = nn.Param(jnp.array([2.0, 3.0]))
+        result = 7.0 // p
+        npt.assert_array_equal(result, jnp.array([3.0, 2.0]))
+
+    def test_rmod_scalar(self):
+        """Python float % Param triggers __rmod__."""
+        p = nn.Param(jnp.array([3.0, 4.0]))
+        result = 7.0 % p
+        npt.assert_array_equal(result, jnp.array([1.0, 3.0]))
+
+    def test_rpow_scalar(self):
+        """Python float ** Param triggers __rpow__."""
+        p = nn.Param(jnp.array([3.0, 2.0]))
+        result = 2.0**p
+        npt.assert_array_equal(result, jnp.array([8.0, 4.0]))
+
+    def test_rmatmul_ndarray(self):
+        """numpy array @ Param triggers __rmatmul__."""
+        import numpy as np
+
+        x = np.ones((2, 3))
+        p = nn.Param(jnp.ones((3, 4)))
+        result = x @ p
+        assert result.shape == (2, 4)
+
+
 class TestAttributeForwardingExtended:
     def test_ndim(self):
         p = nn.Param(jnp.zeros((2, 3, 4)))
@@ -477,6 +529,11 @@ class TestRepr:
         for dtype, abbrev in cases:
             p = nn.Param(jnp.zeros(2, dtype=dtype))
             assert abbrev in repr(p), f"Expected {abbrev} in repr for {dtype}"
+
+    def test_bool_dtype_repr(self):
+        """Bool dtype has no abbreviation prefix, falls through to raw name."""
+        p = nn.Param(jnp.array([True, False]))
+        assert "bool" in repr(p)
 
     def test_scalar_param_repr(self):
         p = nn.Param(jnp.array(1.0))
@@ -676,7 +733,7 @@ class TestLaxCompatibility:
         """Lower-level lax functions reject Param where they expect plain arrays."""
         p = nn.Param(jnp.array([1.0, 2.0]))
         with pytest.raises((TypeError, ValueError)):
-            jax.lax.add(p, p)  # type: ignore
+            jax.lax.add(p, p)  # type: ignore[arg-type]
 
     def test_jnp_asarray_converts_param_for_lax(self):
         """jnp.asarray is the documented escape hatch for lax compatibility."""

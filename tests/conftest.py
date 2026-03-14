@@ -50,7 +50,10 @@ def _build_layers(key):
         (lambda x, _l=nn.GRU(8, 16, key=next(keys)): _l(x)[0], jnp.ones((2, 5, 8))),
         (nn.Sequential(nn.Linear(8, 16, key=next(keys)), jax.nn.relu), jnp.ones((2, 8))),
         (nn.LoRALinear(nn.Linear(8, 16, key=next(keys)), rank=4, key=next(keys)), jnp.ones((2, 8))),
-        (nn.ConvTranspose(3, 8, kernel_shape=(3,), padding=1, key=next(keys)), jnp.ones((2, 10, 3))),
+        (
+            nn.ConvTranspose(3, 8, kernel_shape=(3,), padding=1, key=next(keys)),
+            jnp.ones((2, 10, 3)),
+        ),
         (
             nn.ConvTranspose(3, 8, kernel_shape=(3, 3), padding=1, key=next(keys)),
             jnp.ones((2, 6, 6, 3)),

@@ -58,6 +58,32 @@ class TestMaxPool:
         assert y.shape == (1, 4, 4, 3)
 
 
+class TestMaxPoolConstructor:
+    def test_empty_kernel_shape_raises(self):
+        """Empty kernel_shape raises ValueError."""
+        with pytest.raises(ValueError, match="at least one element"):
+            nn.MaxPool(kernel_shape=())
+
+    def test_explicit_tuple_stride(self):
+        """Explicit tuple stride controls output spatial size."""
+        pool = nn.MaxPool(kernel_shape=(2, 2), stride=(1, 1))
+        x = jnp.ones((1, 4, 4, 3))
+        assert pool(x).shape == (1, 3, 3, 3)
+
+    def test_string_padding(self):
+        """String padding like 'SAME' is passed through to lax."""
+        pool = nn.MaxPool(kernel_shape=(2, 2), padding="SAME")
+        x = jnp.ones((1, 4, 4, 3))
+        assert pool(x).shape == (1, 2, 2, 3)
+
+    def test_tuple_padding(self):
+        """Tuple padding specifies per-dimension symmetric padding."""
+        pool = nn.MaxPool(kernel_shape=(2, 2), padding=(1, 1))
+        x = jnp.ones((1, 4, 4, 3))
+        y = pool(x)
+        assert y.shape[1] > 0 and y.shape[2] > 0
+
+
 class TestAvgPool:
     def test_int_kernel_shape_raises(self):
         """Passing an int instead of a tuple raises TypeError."""
@@ -125,3 +151,29 @@ class TestAvgPool:
         y = layer(x)
         expected = jnp.full((1, 4, 4, 1), 10.0)  # (1, 4, 4, 1)
         npt.assert_allclose(y, expected)
+
+
+class TestAvgPoolConstructor:
+    def test_empty_kernel_shape_raises(self):
+        """Empty kernel_shape raises ValueError."""
+        with pytest.raises(ValueError, match="at least one element"):
+            nn.AvgPool(kernel_shape=())
+
+    def test_explicit_tuple_stride(self):
+        """Explicit tuple stride controls output spatial size."""
+        pool = nn.AvgPool(kernel_shape=(2, 2), stride=(1, 1))
+        x = jnp.ones((1, 4, 4, 3))
+        assert pool(x).shape == (1, 3, 3, 3)
+
+    def test_string_padding(self):
+        """String padding like 'SAME' is passed through to lax."""
+        pool = nn.AvgPool(kernel_shape=(2, 2), padding="SAME")
+        x = jnp.ones((1, 4, 4, 3))
+        assert pool(x).shape == (1, 2, 2, 3)
+
+    def test_tuple_padding(self):
+        """Tuple padding specifies per-dimension symmetric padding."""
+        pool = nn.AvgPool(kernel_shape=(2, 2), padding=(1, 1))
+        x = jnp.ones((1, 4, 4, 3))
+        y = pool(x)
+        assert y.shape[1] > 0 and y.shape[2] > 0
