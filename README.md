@@ -6,7 +6,6 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11+-4E69FF.svg)](https://www.python.org/)
 [![PyPI](https://img.shields.io/pypi/v/ion-nn?color=8E51FF)](https://pypi.org/project/ion-nn/)
-[![License](https://img.shields.io/badge/License-Apache_2.0-EC3100.svg)](https://github.com/auxeno/ion/blob/main/LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&color=313131&labelColor=555555)](https://github.com/astral-sh/ruff)
 [![CI](https://github.com/auxeno/ion/actions/workflows/ci.yml/badge.svg)](https://github.com/auxeno/ion/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/auxeno/ion/graph/badge.svg)](https://codecov.io/gh/auxeno/ion)
