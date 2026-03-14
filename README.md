@@ -18,6 +18,7 @@
 Ion is a library for building and training neural networks in JAX. The core is a minimal ~250 lines of code across three files. There are three concepts to learn (`Module`, `Param`, and `apply_updates`). Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html) with simple calling semantics `model(x)` that *always* work directly with `jax.grad`, `jax.jit`, `jax.vmap`, and every other JAX transform. Everything else is just JAX.
 
 Ion also ships with standard neural network layers (linear, convolution, attention, normalization, recurrent, and more) built with the core.
+<br>
 
 > <details>
 > <summary>Why do I need a neural network library in JAX?</summary>
