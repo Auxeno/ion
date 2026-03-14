@@ -2,19 +2,42 @@
 
   <h1><img src="https://raw.githubusercontent.com/auxeno/ion/main/assets/logo.png" alt="Ion" width="72"><br>Ion</h1>
 
-  <h3>Simple neural networks in JAX</h3>
+  <h3>A minimal neural network library for JAX</h3>
 
-  [![Python](https://img.shields.io/badge/Python-3.11+-636EFA.svg)](https://www.python.org/)
-  [![License](https://img.shields.io/badge/License-Apache_2.0-FFA15A.svg)](https://github.com/auxeno/ion/blob/main/LICENSE)
-  [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&color=313131&labelColor=555555)](https://github.com/astral-sh/ruff)
-  [![CI](https://github.com/auxeno/ion/actions/workflows/ci.yml/badge.svg)](https://github.com/auxeno/ion/actions/workflows/ci.yml)
-  [![codecov](https://codecov.io/gh/auxeno/ion/graph/badge.svg)](https://codecov.io/gh/auxeno/ion)
+[![Python](https://img.shields.io/badge/Python-3.11+-4E69FF.svg)](https://www.python.org/)
+[![PyPI](https://img.shields.io/pypi/v/ion-nn?color=8E51FF)](https://pypi.org/project/ion-nn/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-EC3100.svg)](https://github.com/auxeno/ion/blob/main/LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&color=313131&labelColor=555555)](https://github.com/astral-sh/ruff)
+[![CI](https://github.com/auxeno/ion/actions/workflows/ci.yml/badge.svg)](https://github.com/auxeno/ion/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/auxeno/ion/graph/badge.svg)](https://codecov.io/gh/auxeno/ion)
 
 </div>
 
 ---
 
-Ion is a minimal neural network library for JAX. The core is three files and ~250 lines of code, with three concepts to learn: `Module`, `Param`, and `apply_updates`. Everything else is just JAX. Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html), so all native JAX transforms (`jax.grad`, `jax.jit`, `jax.vmap`, etc.) work directly. There are no custom `ion.jit` or `ion.grad` wrappers. Ion ships with most standard neural network layers and supports custom layer definition via `nn.Module`.
+## Why Ion
+
+Ion's core is a minimal ~250 lines of code across three files. There are three concepts to learn (`Module`, `Param`, and `apply_updates`). Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html) with simple calling semantics `model(x)` that *always* work directly with `jax.grad`, `jax.jit`, `jax.vmap`, and every other JAX transform. Everything else is just JAX.
+
+Ion also ships with standard neural network layers (linear, convolution, attention, normalization, recurrent, and more) built with the core.
+
+> <details>
+> <summary>Why do I need a neural network library in JAX?</summary>
+> <br>
+>
+> Building simple NN models from scratch in JAX is straightforward. As they get more complex however, two things become painful: managing parameters (initializing them, tracking which are trainable, freezing some for fine-tuning) and composing modules (reusing layers, wiring them through JAX transforms, not reimplementing things like convolution padding from scratch). A neural network library takes care of this so you can focus on the model and the training loop.
+> </details>
+<br>
+
+> <details>
+> <summary>How does Ion compare to existing JAX neural network libraries?</summary>
+> <br>
+>
+> **[Equinox](https://github.com/patrick-kidger/equinox)** is a pytree library for scientific computing with neural networks as one use case alongside companion libraries like Diffrax and Lineax. It provides filtered transforms, partition/combine utilities, and general pytree tools that give users fine-grained control over how JAX interacts with their code. Ion is narrower in scope: three building blocks on top of JAX for defining and training neural networks, using native `jax.grad`/`jax.jit` directly with no additional API layer. Equinox is excellent, and particularly well-suited if your work extends beyond neural networks into broader scientific computing.
+>
+> **[Flax NNX](https://github.com/google/flax)** takes a different philosophical approach. NNX models are mutable graph objects with reference semantics, and custom transforms (`nnx.jit`, `nnx.grad`) that allow mutability within JAX's functional programming model. The result is flexible, PyTorch-like ergonomics at the cost of complexity behind the scenes (state extraction, reference threading, graph tracing) that can make it hard to reason about what your code is doing. Ion keeps things straightforward: immutable pytrees, native JAX transforms, and explicit state passing. NNX is a great choice if you value PyTorch-like ergonomics and are happy to trust the framework.
+> </details>
+<br>
 
 ## Installation
 
@@ -24,7 +47,7 @@ pip install ion-nn
 
 ## Core Concepts
 
-Visit the [Ion Tour Notebook](https://github.com/auxeno/ion/blob/main/examples/ion_tour.ipynb) for a hands-on walkthrough.
+There are three Ion-specific concepts you need to build and train models: `Param`, `Module` and `apply_updates`.
 
 ### Param
 
@@ -67,15 +90,14 @@ updates, opt_state = optimizer.update(grads, opt_state)
 model = ion.apply_updates(model, updates)
 ```
 
-That's the entire core. See [Internals](https://github.com/auxeno/ion/blob/main/docs/internals.md) for design details, explanations and sharp edges.
+That's the entire core. See [Internals](https://github.com/auxeno/ion/blob/main/docs/internals.md) for design details and sharp edges.
 
 ## Example
 
 Putting it all together with a model built from Ion's standard layers:
 
 ```python
-import jax
-import optax
+import typing, jax, optax
 
 import ion
 import ion.nn as nn
@@ -84,7 +106,7 @@ import ion.nn as nn
 class MLP(nn.Module):
     layer_1: nn.Linear
     layer_2: nn.Linear
-    activation: Callable
+    activation: typing.Callable
 
     def __init__(self, activation=jax.nn.relu, *, key):
         keys = jax.random.split(key, 2)
@@ -96,7 +118,6 @@ class MLP(nn.Module):
         return self.layer_2(self.activation(self.layer_1(x)))
 
 
-@jax.grad
 def loss_fn(model, x, y):
     logits = model(x)
     return optax.softmax_cross_entropy_with_integer_labels(logits, y).mean()
@@ -104,7 +125,7 @@ def loss_fn(model, x, y):
 
 @jax.jit
 def train_step(model, opt_state, x, y):
-    grads = loss_fn(model, x, y)
+    grads = jax.grad(loss_fn)(model, x, y)
     updates, opt_state = optimizer.update(grads, opt_state)
     model = ion.apply_updates(model, updates)
     return model, opt_state
@@ -152,7 +173,7 @@ Ion ships with standard neural network layers. Each is a `Module` with trainable
 
 See [Layer Conventions](https://github.com/auxeno/ion/blob/main/docs/layers.md) for data format, weight init, and spatial layer usage.
 
-### Pretty Printing
+## Pretty Printing
 
 In notebooks, [Treescope](https://github.com/google-deepmind/treescope) provides interactive, color-coded visualization. Modules also have built-in text formatting for terminal output.
 
@@ -173,7 +194,9 @@ MLP(
 )
 ```
 
-### Serialization
+## Serialization
+
+Save and load model parameters as `.npz` files. `load` requires a model instance as a template to reconstruct the pytree structure.
 
 ```python
 ion.save("model.npz", model)
