@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 import numpy.testing as npt
+import optax
 
 import ion
 from ion import nn
@@ -124,3 +125,81 @@ class TestFreezeUnfreeze:
         frozen = ion.freeze(linear)
         unfrozen = ion.unfreeze(frozen)
         assert unfrozen.w.trainable is True
+
+
+class TestXLAOptimization:
+    """XLA dead code elimination for frozen parameter gradients."""
+
+    def test_frozen_base_skips_backward_flops(self):
+        """Freezing the base layer eliminates backward FLOPs for it."""
+        keys = jax.random.split(jax.random.key(0), 2)
+        linear = nn.Linear(512, 512, key=keys[0])
+        optimizer = optax.adam(3e-4)
+        x = jnp.ones((32, 512))
+        y = jnp.ones((32, 512))
+
+        def compile_step(lora):
+            state = optimizer.init(lora)
+
+            @jax.jit
+            def step(model, state, x, y):
+                grads = jax.grad(lambda m: jnp.mean((m(x) - y) ** 2))(model)
+                updates, state = optimizer.update(grads, state)
+                return ion.apply_updates(model, updates), state
+
+            return jax.jit(step).lower(lora, state, x, y).compile()
+
+        frozen = compile_step(nn.LoRALinear(linear, rank=8, key=keys[1]))
+        unfrozen = compile_step(nn.LoRALinear(linear, rank=8, key=keys[1]).unfreeze())
+
+        def flops(compiled):
+            cost = compiled.cost_analysis()
+            return (cost[0] if isinstance(cost, list) else cost)["flops"]
+
+        # stop_gradient on the frozen base means XLA skips its backward pass
+        assert flops(frozen) < flops(unfrozen)
+
+    def test_frozen_grads_no_extra_temp_memory(self):
+        """XLA DCEs unused zero gradients, no extra temp memory."""
+        keys = jax.random.split(jax.random.key(0), 2)
+        linear = nn.Linear(512, 512, key=keys[0])
+        lora = nn.LoRALinear(linear, rank=8, key=keys[1])
+        x = jnp.ones((32, 512))
+        y = jnp.ones((32, 512))
+
+        def loss_fn(m, x, y):
+            return jnp.mean((m(x) - y) ** 2)
+
+        # Naive: adam processes the full gradient tree including frozen zeros
+        opt_naive = optax.adam(3e-4)
+        state_naive = opt_naive.init(lora)
+
+        @jax.jit
+        def step_naive(model, state, x, y):
+            grads = jax.grad(loss_fn)(model, x, y)
+            updates, state = opt_naive.update(grads, state)
+            return ion.apply_updates(model, updates), state
+
+        # Head-only: optimizer never sees frozen params at all
+        opt_head = optax.adam(3e-4)
+        state_head = opt_head.init((lora.a, lora.b))
+
+        @jax.jit
+        def step_head(model, state, x, y):
+            grads = jax.grad(loss_fn)(model, x, y)
+            updates, state = opt_head.update((grads.a, grads.b), state)
+            return model.replace(
+                a=ion.apply_updates(model.a, updates[0]),  # type: ignore[index]
+                b=ion.apply_updates(model.b, updates[1]),  # type: ignore[index]
+            ), state
+
+        naive = jax.jit(step_naive).lower(lora, state_naive, x, y).compile()
+        head_only = jax.jit(step_head).lower(lora, state_head, x, y).compile()
+
+        def temp_bytes(compiled):
+            mem = compiled.memory_analysis()
+            return (mem[0] if isinstance(mem, list) else mem).temp_size_in_bytes
+
+        # Frozen zero grads flow through naive adam but XLA eliminates them;
+        # temp memory should be no worse than never computing them at all
+        assert temp_bytes(naive) <= temp_bytes(head_only)
