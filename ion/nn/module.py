@@ -45,65 +45,83 @@ class _Static:
         return cls(aux)
 
 
-def _register_module_as_pytree(cls: type) -> None:
+def _register_module_as_pytree(cls: type) -> Any:
     """Register a Module subclass as a JAX pytree."""
     array_like = (jax.Array, np.ndarray, Param, Module)
     field_names = tuple(field.name for field in dataclasses.fields(cls))
 
-    def flatten_with_keys(obj: Any) -> tuple[list[tuple[Any, Any]], tuple]:
-        children = []
-        child_names = []
-        static_names = []
-        static_values = []
+    def _classify(obj: Any) -> tuple[tuple[tuple[str, str], ...], tuple[str, ...]]:
+        """Classify each field as a dynamic child or static aux. Returns cached info."""
+        child_info: list[tuple[str, str]] = []
+        static_names: list[str] = []
 
         for name in field_names:
             value = obj.__dict__[name]
 
-            # Params, Modules, Arrays -> dynamic children (traced by JAX)
             if isinstance(value, array_like):
-                child_names.append(name)
+                child_info.append((name, "leaf"))
+            elif isinstance(value, (tuple, list)) and any(
+                isinstance(x, array_like) for x in value
+            ):
+                child_info.append((name, type(value).__name__))
+            elif isinstance(value, dict) and any(
+                isinstance(v, array_like) for v in value.values()
+            ):
+                child_info.append((name, "dict"))
+            else:
+                static_names.append(name)
+
+        return tuple(child_info), tuple(static_names)
+
+    def flatten_with_keys(obj: Any) -> tuple[list[tuple[Any, Any]], tuple]:
+        child_info = obj.__dict__.get("_child_info")
+        if child_info is None:
+            child_info, static_names = _classify(obj)
+        else:
+            static_names = obj._static_names
+
+        children = []
+        for name, kind in child_info:
+            value = obj.__dict__[name]
+            if kind == "leaf":
                 children.append((jtu.GetAttrKey(name), value))
-
-            # Containers with array-like elements -> dynamic, non-arrays wrapped in _Static
-            elif isinstance(value, (tuple, list)) and any(isinstance(x, array_like) for x in value):
-                wrapped = type(value)(x if isinstance(x, array_like) else _Static(x) for x in value)
-                child_names.append(name)
-                children.append((jtu.GetAttrKey(name), wrapped))
-
-            elif isinstance(value, dict) and any(isinstance(v, array_like) for v in value.values()):
+            elif kind == "dict":
                 wrapped = {
                     k: v if isinstance(v, array_like) else _Static(v) for k, v in value.items()
                 }
-                child_names.append(name)
+                children.append((jtu.GetAttrKey(name), wrapped))
+            else:
+                wrapped = type(value)(
+                    x if isinstance(x, array_like) else _Static(x) for x in value
+                )
                 children.append((jtu.GetAttrKey(name), wrapped))
 
-            # Everything else (int, str, callable, None, ...) -> static aux
-            else:
-                static_names.append(name)
-                static_values.append(value)
-
-        return children, (tuple(child_names), tuple(static_names), tuple(static_values))
+        static_values = tuple(obj.__dict__[name] for name in static_names)
+        return children, (child_info, static_names, static_values)
 
     def unflatten(aux: tuple, children: Iterable[Any]) -> Any:
-        child_names, static_names, static_values = aux
+        child_info, static_names, static_values = aux
         new_instance = object.__new__(cls)
 
         # Restore dynamic children, unwrapping _Static in mixed containers
-        for name, value in zip(child_names, children):
-            if isinstance(value, (tuple, list)):
-                value = type(value)(x.value if isinstance(x, _Static) else x for x in value)
-            elif isinstance(value, dict):
+        for (name, kind), value in zip(child_info, children):
+            if kind == "dict":
                 value = {k: v.value if isinstance(v, _Static) else v for k, v in value.items()}
+            elif kind != "leaf":
+                value = type(value)(x.value if isinstance(x, _Static) else x for x in value)
             object.__setattr__(new_instance, name, value)
 
         # Restore static fields directly
         for name, value in zip(static_names, static_values):
             object.__setattr__(new_instance, name, value)
 
+        object.__setattr__(new_instance, "_child_info", child_info)
+        object.__setattr__(new_instance, "_static_names", static_names)
         object.__setattr__(new_instance, "_frozen", True)
         return new_instance
 
     jtu.register_pytree_with_keys(cls, flatten_with_keys, unflatten)
+    return _classify
 
 
 class Module:
@@ -133,6 +151,9 @@ class Module:
         has_custom_constructor = "__init__" in cls.__dict__
         dataclasses.dataclass(init=not has_custom_constructor, repr=False, eq=False)(cls)
 
+        # Register as pytree first so _classify is available to the constructor
+        _classify = _register_module_as_pytree(cls)
+
         # Intercept the constructor to inject post-initialization freezing
         original_constructor = cls.__init__
 
@@ -148,11 +169,12 @@ class Module:
             original_constructor(self, *args, **kwargs)
             object.__setattr__(self, "_init_depth", depth)
             if depth == 0:
+                child_info, static_names = _classify(self)
+                object.__setattr__(self, "_child_info", child_info)
+                object.__setattr__(self, "_static_names", static_names)
                 object.__setattr__(self, "_frozen", True)
 
         cls.__init__ = _constructor_with_freeze
-
-        _register_module_as_pytree(cls)
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Allow attribute assignment only during initialization."""
