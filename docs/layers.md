@@ -140,6 +140,73 @@ Each layer family uses init schemes suited to its typical activation:
 
 **Recurrent** layers use Glorot uniform for input-to-hidden weights and orthogonal for hidden-to-hidden weights. Orthogonal init preserves gradient norms across time steps, reducing vanishing/exploding gradients in long sequences. LSTM forget gate bias is initialized to 1 to encourage remembering early in training.
 
+## Attention Masking
+
+`SelfAttention` and `CrossAttention` accept an optional boolean `mask` where `True` means attend and `False` means ignore. Masked positions are filled with `-inf` before softmax.
+
+```python
+attn = nn.SelfAttention(64, num_heads=8, key=key)
+
+# Causal (autoregressive) masking via constructor flag
+attn = nn.SelfAttention(64, num_heads=8, causal=True, key=key)
+attn(x)  # lower-triangular mask applied automatically
+
+# Sliding window attention: each token attends to its local neighborhood
+window = 32
+ids = jnp.arange(seq_len)
+mask = jnp.abs(ids[:, None] - ids[None, :]) <= window
+attn(x, mask=mask)  # (s, s) broadcasted across batch and heads
+
+# Per-head masks: e.g. different window sizes per head
+windows = jnp.array([2, 4, 8, 16, 32, 64, 128, 256])  # one per head
+mask = jnp.abs(ids[:, None] - ids[None, :]) <= windows[:, None, None]
+mask = jnp.broadcast_to(mask, (batch, 8, seq_len, seq_len))
+attn(x, mask=mask)  # (b, h, s, s)
+```
+
+For `CrossAttention`, the mask shape matches the query-key dimensions:
+
+```python
+cross_attn = nn.CrossAttention(64, num_heads=8, key=key)
+mask = jnp.ones((src_len, tgt_len), dtype=bool)     # (s, t)
+cross_attn(x, context, mask=mask)
+```
+
+## Recurrent State
+
+Sequence layers (`LSTM`, `GRU`) default to zero-initialized hidden state. Pass `hx` to provide a custom initial state, for example when processing sequences across multiple chunks.
+
+```python
+lstm = nn.LSTM(3, 16, key=key)
+outputs, (h, c) = lstm(x)               # zero-initialized state
+outputs, (h, c) = lstm(x, hx=(h0, c0))  # custom initial state
+
+gru = nn.GRU(3, 16, key=key)
+outputs, h = gru(x)                     # zero-initialized state
+outputs, h = gru(x, hx=h0)              # custom initial state
+```
+
+Cell layers (`LSTMCell`, `GRUCell`) expose an `initial_state` property for convenience:
+
+```python
+cell = nn.LSTMCell(3, 16, key=key)
+hx = cell.initial_state  # (zeros(16), zeros(16))
+```
+
+## GroupNorm Spatial Dimensions
+
+By default, `GroupNorm` normalizes over channels only (`num_spatial_dims=0`). For spatial data like images, set `num_spatial_dims` so the spatial dimensions are included in the group statistics.
+
+```python
+# Channels only (e.g. after a linear layer)
+norm = nn.GroupNorm(64, num_groups=8)
+norm(x)  # (b, 64) -> (b, 64)
+
+# With 2D spatial dims (e.g. after a conv layer)
+norm = nn.GroupNorm(64, num_groups=8, num_spatial_dims=2)
+norm(x)  # (b, h, w, 64) -> (b, h, w, 64)
+```
+
 ## Stateless Design
 
 All layers are stateless and frozen after `__init__`. Dropout takes a `key` argument at call time for stochastic masking.
