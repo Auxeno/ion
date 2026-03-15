@@ -3,7 +3,7 @@
 Everything behind the scenes in Ion. Three files and ~500 lines of code make up the whole engine. This document explains the design. Readers are encouraged to check out the source code:
 
 - [`ion/nn/param.py`](../ion/nn/param.py): Param wrapper, trainable/frozen distinction
-- [`ion/tree.py`](../ion/tree.py): Static wrapper, apply_updates, freeze/unfreeze
+- [`ion/tree.py`](../ion/tree.py): apply_updates, freeze/unfreeze
 - [`ion/nn/module.py`](../ion/nn/module.py): Module base class, pytree registration
 
 ## Param (`ion/nn/param.py`)
@@ -22,10 +22,6 @@ JAX pytrees see all arrays equally and have no built-in way to distinguish train
 
 `__jax_array__` returns the raw array for trainable params and applies `jax.lax.stop_gradient` for frozen params, making the `trainable` flag physically real in JAX's autodiff. `__getattr__` routes attribute access (`.shape`, `.dtype`, `.T`, `.reshape(...)`) through `jnp.asarray(self)`, which calls `__jax_array__()`, so frozen params remain invisible to autodiff even through method calls. The `_value` field is private and should not be accessed directly in user code, as it bypasses `stop_gradient`. Arithmetic and comparisons return raw arrays, not `Param`, because intermediate results are not parameters.
 
-## Static (`ion/tree.py`)
-
-A pytree node with no children. JAX treats its value as static metadata, baking it into the compiled program rather than tracing through it. Without `Static`, non-array values (ints, strings, callables) stored on a module would be passed to JAX as traced leaves, causing errors. `Static` moves them into the treedef as auxiliary data so they are invisible to tracing while being preserved through flatten/unflatten roundtrips.
-
 ## Module (`ion/nn/module.py`)
 
 JAX requires two things from objects in `jit`/`grad`/`vmap`: pytree registration so JAX can traverse their structure, and immutability so tracing produces correct results. Plain Python classes satisfy neither.
@@ -36,10 +32,13 @@ Three things happen in `__init_subclass__` when a class inherits from `Module`:
    subclass defines its own `__init__`, it is kept; otherwise one is generated
    from the annotations.
 
-2. **Pytree registration.** The class is registered with `register_pytree_with_keys`.
+2. **Pytree registration.** The class is registered with `register_pytree_with_keys`. At flatten time, each field is classified with a single `isinstance` check:
 
-   - **Flatten.** Non-array leaves (ints, floats, bools, strings, callables) are wrapped in `Static` so JAX treats them as compile-time constants rather than traced values. `Module` and `Param` fields are returned as-is since they have their own pytree registrations.
-   - **Unflatten.** `Static` wrappers are stripped so the user sees plain values. The constructor is bypassed with `object.__new__` + `object.__setattr__`, because constructors take different arguments than stored fields (`Linear(in_dim, out_dim, key)` creates `w` and `b` internally). This is also why we use `register_pytree_with_keys` instead of `register_dataclass`.
+   - **Array-like** (`Param`, `Module`, `jax.Array`, `np.ndarray`) → dynamic child, passed to JAX as-is.
+   - **Container with array-like elements** (e.g. a tuple of `Module`s in `Sequential`) → dynamic child. Non-array elements in the container are wrapped in `_Static` so JAX treats them as compile-time constants.
+   - **Everything else** (int, float, str, callable, None, ...) → static auxiliary data, stored in the treedef directly. No wrapping needed.
+
+   Unflatten reverses this: dynamic children are restored (with any `_Static` wrappers in containers stripped), static fields are set directly, and the constructor is bypassed with `object.__new__` + `object.__setattr__` because constructors take different arguments than stored fields (`Linear(in_dim, out_dim, key)` creates `w` and `b` internally). This is also why we use `register_pytree_with_keys` instead of `register_dataclass`.
 
    The result is that `jax.jit` and `jax.grad` work natively with models without special wrappers.
 
@@ -53,7 +52,7 @@ Adds optimizer deltas to a model's trainable parameters. Only `Param` leaves are
 
 Known gotchas to be aware of when using Ion. Some are limitations of JAX:
 
-- **Python ints, floats, and strings are static, not dynamic.** When stored as module fields, plain Python scalars are wrapped in `Static` and baked into the compiled program. JAX cannot trace through them, so they are invisible to `jax.grad` and fixed at `jax.jit` compile time. Changing a static value (including `Param.trainable`) triggers JIT recompilation since every unique combination compiles a separate trace. If you need a value to be dynamic at runtime (e.g. a temperature parameter, a step counter), store it as a `jnp.array` or `Param` instead. Similarly, avoid calling `freeze()`/`unfreeze()` inside a training loop as it recompiles on every step. Set trainability once and keep it fixed.
+- **Python ints, floats, and strings are static, not dynamic.** When stored as module fields, plain Python scalars are placed in the treedef as static auxiliary data and baked into the compiled program. JAX cannot trace through them, so they are invisible to `jax.grad` and fixed at `jax.jit` compile time. Changing a static value (including `Param.trainable`) triggers JIT recompilation since every unique combination compiles a separate trace. If you need a value to be dynamic at runtime (e.g. a temperature parameter, a step counter), store it as a `jnp.array` or `Param` instead. Similarly, avoid calling `freeze()`/`unfreeze()` inside a training loop as it recompiles on every step. Set trainability once and keep it fixed.
 
   ```python
   # Static: recompiles if temperature changes
@@ -97,7 +96,7 @@ Known gotchas to be aware of when using Ion. Some are limitations of JAX:
 
 - **Some JAX/LAX functions don't accept `Param` directly.** Most operations will work transparently because `Param.__jax_array__` converts automatically, but lower-level functions like `lax.conv_general_dilated` may reject a `Param` where they expect a plain array. Use `jnp.asarray(param)` to convert. This calls `__jax_array__`, which applies `stop_gradient` for frozen params, so autograd correctness is preserved. **Do not use `param._value`**, which bypasses `stop_gradient` entirely: frozen params would receive gradients during the backward pass (wasting compute), and only `apply_updates` silently discarding them would prevent actual weight changes. The `_value` field is private and reserved for internal code that deliberately needs the raw array.
 
-- **Module immutability is shallow.** `_frozen` prevents field reassignment, but mutable containers (lists, dicts, numpy arrays) in fields can still be mutated in-place. For example, `model.layers.append(...)` bypasses the freeze. Worse, in-place mutation of a `Static`-wrapped field (like a list of ints) will **not** trigger JIT recompilation because JAX identifies the pytree aux data by object identity, so the same mutated list still hits the stale cached trace with the old value baked in. Use `replace()` to create a new module with the updated field instead.
+- **Module immutability is shallow.** `_frozen` prevents field reassignment, but mutable containers (lists, dicts, numpy arrays) in fields can still be mutated in-place. For example, `model.layers.append(...)` bypasses the freeze. Worse, in-place mutation of a static field (like a list of ints) will **not** trigger JIT recompilation because JAX identifies the pytree aux data by object identity, so the same mutated list still hits the stale cached trace with the old value baked in. Use `replace()` to create a new module with the updated field instead.
 
 - **`Param.__eq__` returns a JAX array, not a bool.** `param in list` can raise `ValueError` for multi-element params because Python calls `bool()` on the array result, which is ambiguous for arrays with more than one element.
 

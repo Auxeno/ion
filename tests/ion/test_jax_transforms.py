@@ -122,7 +122,7 @@ class TestGrad:
         model = Nested(key=jax.random.key(0))
         x = jnp.ones((1, 2))
         grads = jax.grad(loss)(model, x)
-        # All params are trainable → all should have gradients
+        # All params are trainable -> all should have gradients
         assert grads.linear.w is not None
         assert grads.linear.b is not None
         assert grads.extra is not None
@@ -483,7 +483,7 @@ class TestNewJaxTransforms:
 
         x = jnp.ones(2)
         jac = jax.jacobian(f)(model, x)
-        # Jacobian of output (3,) w.r.t. w (2, 3) → shape (3, 2, 3)
+        # Jacobian of output (3,) w.r.t. w (2, 3) -> shape (3, 2, 3)
         assert jac.w._value.shape == (3, 2, 3)
 
     def test_jax_hessian(self):
@@ -494,7 +494,7 @@ class TestNewJaxTransforms:
             return jnp.sum(p**3)
 
         hess = jax.hessian(f)(p)
-        # Hessian of scalar w.r.t. p (2,) → shape (2, 2)
+        # Hessian of scalar w.r.t. p (2,) -> shape (2, 2)
         assert hess._value.shape == (2, 2)
         # d²/dp² of sum(p³) = 6*p on diagonal
         npt.assert_allclose(jnp.diag(hess._value), 6.0 * p._value)
@@ -518,7 +518,7 @@ class TestNewJaxTransforms:
         npt.assert_allclose(per_example_grads.w._value, xs)
 
     def test_training_loop_loss_decreases(self):
-        """10-step loop: jax.value_and_grad → optax → apply_updates, assert final loss < initial loss."""
+        """10-step loop: jax.value_and_grad -> optax -> apply_updates, assert final loss < initial loss."""
         model = nn.Linear(4, 1, key=jax.random.key(0))
         optimizer = optax.adam(1e-2)
         opt_state = optimizer.init(model)

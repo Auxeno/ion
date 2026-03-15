@@ -21,109 +21,69 @@ import numpy as np
 from jaxtyping import PyTree
 
 from .. import tree
-from ..tree import Static
+from ..tree import _Static
 from .param import Param
 
 
-def _register_pytree(cls: type) -> None:
-    """Register a class as a JAX pytree, partitioning fields into dynamic children and static aux."""
+def _register_module(cls: type) -> None:
+    """Register a Module as a JAX pytree, partitioning fields into dynamic children and static aux."""
+    array_like = (jax.Array, np.ndarray, Param, Module)
     field_names = tuple(field.name for field in dataclasses.fields(cls))
 
     def flatten_with_keys(obj: Any) -> tuple[list[tuple[Any, Any]], tuple]:
         children = []
-        aux_names = []
-        aux_values = []
+        child_names = []
+        static_names = []
+        static_values = []
 
         for name in field_names:
             value = obj.__dict__[name]
 
-            if isinstance(value, _ARRAYLIKE):
+            # Params, Modules, Arrays -> dynamic children (traced by JAX)
+            if isinstance(value, array_like):
+                child_names.append(name)
                 children.append((jtu.GetAttrKey(name), value))
 
-            elif isinstance(value, (tuple, list)) and any(
-                isinstance(x, _ARRAYLIKE) for x in value
-            ):
-                wrapped = type(value)(
-                    x if isinstance(x, _ARRAYLIKE) else Static(x) for x in value
-                )
+            # Containers with array-like elements -> dynamic, non-arrays wrapped in _Static
+            elif isinstance(value, (tuple, list)) and any(isinstance(x, array_like) for x in value):
+                wrapped = type(value)(x if isinstance(x, array_like) else _Static(x) for x in value)
+                child_names.append(name)
                 children.append((jtu.GetAttrKey(name), wrapped))
 
-            elif isinstance(value, dict) and any(
-                isinstance(v, _ARRAYLIKE) for v in value.values()
-            ):
+            elif isinstance(value, dict) and any(isinstance(v, array_like) for v in value.values()):
                 wrapped = {
-                    k: v if isinstance(v, _ARRAYLIKE) else Static(v)
-                    for k, v in value.items()
+                    k: v if isinstance(v, array_like) else _Static(v) for k, v in value.items()
                 }
+                child_names.append(name)
                 children.append((jtu.GetAttrKey(name), wrapped))
 
+            # Everything else (int, str, callable, None, ...) -> static aux
             else:
-                aux_names.append(name)
-                aux_values.append(value)
+                static_names.append(name)
+                static_values.append(value)
 
-        return children, (tuple(aux_names), tuple(aux_values))
-
-    def flatten_func(obj: Any) -> tuple[list, tuple]:
-        children = []
-        aux_names = []
-        aux_values = []
-
-        for name in field_names:
-            value = obj.__dict__[name]
-
-            if isinstance(value, _ARRAYLIKE):
-                children.append(value)
-
-            elif isinstance(value, (tuple, list)) and any(
-                isinstance(x, _ARRAYLIKE) for x in value
-            ):
-                wrapped = type(value)(
-                    x if isinstance(x, _ARRAYLIKE) else Static(x) for x in value
-                )
-                children.append(wrapped)
-
-            elif isinstance(value, dict) and any(
-                isinstance(v, _ARRAYLIKE) for v in value.values()
-            ):
-                wrapped = {
-                    k: v if isinstance(v, _ARRAYLIKE) else Static(v)
-                    for k, v in value.items()
-                }
-                children.append(wrapped)
-
-            else:
-                aux_names.append(name)
-                aux_values.append(value)
-
-        return children, (tuple(aux_names), tuple(aux_values))
+        return children, (tuple(child_names), tuple(static_names), tuple(static_values))
 
     def unflatten(aux: tuple, children: Iterable[Any]) -> Any:
-        static_names, static_values = aux
-        static_set = frozenset(static_names)
+        child_names, static_names, static_values = aux
         new_instance = object.__new__(cls)
-        child_iter = iter(children)
-        static_iter = iter(static_values)
 
-        for name in field_names:
-            if name in static_set:
-                object.__setattr__(new_instance, name, next(static_iter))
-            else:
-                value = next(child_iter)
-                if isinstance(value, (tuple, list)):
-                    value = type(value)(
-                        x.value if isinstance(x, Static) else x for x in value
-                    )
-                elif isinstance(value, dict):
-                    value = {
-                        k: v.value if isinstance(v, Static) else v
-                        for k, v in value.items()
-                    }
-                object.__setattr__(new_instance, name, value)
+        # Restore dynamic children, unwrapping _Static in mixed containers
+        for name, value in zip(child_names, children):
+            if isinstance(value, (tuple, list)):
+                value = type(value)(x.value if isinstance(x, _Static) else x for x in value)
+            elif isinstance(value, dict):
+                value = {k: v.value if isinstance(v, _Static) else v for k, v in value.items()}
+            object.__setattr__(new_instance, name, value)
+
+        # Restore static fields directly
+        for name, value in zip(static_names, static_values):
+            object.__setattr__(new_instance, name, value)
 
         object.__setattr__(new_instance, "_frozen", True)
         return new_instance
 
-    jtu.register_pytree_with_keys(cls, flatten_with_keys, unflatten, flatten_func=flatten_func)
+    jtu.register_pytree_with_keys(cls, flatten_with_keys, unflatten)
 
 
 class Module:
@@ -172,7 +132,7 @@ class Module:
 
         cls.__init__ = _constructor_with_freeze
 
-        _register_pytree(cls)
+        _register_module(cls)
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Allow attribute assignment only during initialization."""
@@ -329,6 +289,3 @@ class Module:
         """
         leaves = jtu.tree_leaves(self, is_leaf=tree.is_param)
         return sum(p._value.size for p in leaves if tree.is_param(p))
-
-
-_ARRAYLIKE = (jax.Array, np.ndarray, Param, Module)

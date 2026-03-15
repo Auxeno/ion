@@ -9,7 +9,7 @@ Functions:
     unfreeze            Set all Params to trainable=True.
 
 Classes:
-    Static              Wraps a value so JAX treats it as static metadata.
+    _Static             Wraps a value so JAX treats it as static metadata (internal).
 
 Neural network pytrees mix `Param` wrappers, plain arrays, and static Python
 values. Standard `jax.tree_util` treats every leaf uniformly, these utilities
@@ -156,7 +156,7 @@ def unfreeze(pytree: PyTree) -> PyTree:
 
 
 @jtu.register_pytree_node_class
-class Static:
+class _Static:
     """Wraps a value so JAX treats it as static metadata, not a traced array."""
 
     __slots__ = ("value",)

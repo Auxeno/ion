@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import numpy.testing as npt
 
 from ion import nn, tree
-from ion.tree import Static
+from ion.tree import _Static
 
 
 class TestApplyUpdates:
@@ -260,24 +260,24 @@ class TestFreezePreservesPlainArrays:
         assert unfrozen.w.trainable is True
 
 
-class TestStatic:
+class Test_Static:
     def test_pytree_no_children(self):
-        assert jax.tree.leaves(Static(42)) == []
+        assert jax.tree.leaves(_Static(42)) == []
 
     def test_value_preserved_through_flatten(self):
-        s = Static({"dropout": 0.1, "mode": "train"})
+        s = _Static({"dropout": 0.1, "mode": "train"})
         children, aux = s.tree_flatten()
         assert children == []
-        recovered = Static.tree_unflatten(aux, children)
+        recovered = _Static.tree_unflatten(aux, children)
         assert recovered.value == s.value
 
     def test_used_in_tree_map(self):
-        """tree_map sees no children inside Static, so the inner value is untouched."""
-        pytree = {"arr": jnp.array(1.0), "cfg": Static(99)}
+        """tree_map sees no children inside _Static, so the inner value is untouched."""
+        pytree = {"arr": jnp.array(1.0), "cfg": _Static(99)}
         mapped = jax.tree.map(lambda x: x * 2, pytree)
         npt.assert_array_equal(mapped["arr"], jnp.array(2.0))
-        # Static has no children so tree_map passes it through unchanged
-        assert isinstance(mapped["cfg"], Static)
+        # _Static has no children so tree_map passes it through unchanged
+        assert isinstance(mapped["cfg"], _Static)
         assert mapped["cfg"].value == 99
 
 
@@ -491,23 +491,23 @@ class TestAstype:
         assert result.buf.dtype == jnp.float32
 
 
-class TestStaticEdgeCases:
+class Test_StaticEdgeCases:
     def test_static_equality_is_identity_based(self):
-        """Static doesn't define __eq__, so equal values aren't equal."""
-        s1 = Static(42)
-        s2 = Static(42)
+        """_Static doesn't define __eq__, so equal values aren't equal."""
+        s1 = _Static(42)
+        s2 = _Static(42)
         assert s1 is not s2
         assert not (s1 == s2)
 
     def test_static_with_mutable_value(self):
-        """Static holds a reference, so mutating the original mutates the wrapper."""
+        """_Static holds a reference, so mutating the original mutates the wrapper."""
         data = {"key": "value"}
-        s = Static(data)
+        s = _Static(data)
         data["key"] = "mutated"
         assert s.value["key"] == "mutated"
 
     def test_static_in_jit_recompiles_on_value_change(self):
-        """Changing a Static value triggers JIT recompilation."""
+        """Changing a _Static value triggers JIT recompilation."""
 
         class Model(nn.Module):
             w: nn.Param
