@@ -32,13 +32,15 @@ Three things happen in `__init_subclass__` when a class inherits from `Module`:
    subclass defines its own `__init__`, it is kept; otherwise one is generated
    from the annotations.
 
-2. **Pytree registration.** The class is registered with `register_pytree_with_keys`. At flatten time, each field is classified with a single `isinstance` check:
+2. **Pytree registration.** The class is registered with `register_pytree_with_keys`. Each field is classified once at construction time (via `isinstance` checks) and the result is cached on the instance:
 
    - **Array-like** (`Param`, `Module`, `jax.Array`, `np.ndarray`) → dynamic child, passed to JAX as-is.
    - **Container with array-like elements** (e.g. a tuple of `Module`s in `Sequential`) → dynamic child. Non-array elements in the container are wrapped in `_Static` so JAX treats them as compile-time constants.
    - **Everything else** (int, float, str, callable, None, ...) → static auxiliary data, stored in the treedef directly. No wrapping needed.
 
-   Unflatten reverses this: dynamic children are restored (with any `_Static` wrappers in containers stripped), static fields are set directly, and the constructor is bypassed with `object.__new__` + `object.__setattr__` because constructors take different arguments than stored fields (`Linear(in_dim, out_dim, key)` creates `w` and `b` internally). This is also why we use `register_pytree_with_keys` instead of `register_dataclass`.
+   Since modules are frozen after `__init__`, the classification never changes and subsequent flatten calls skip the `isinstance` checks entirely. Unflatten restores the cached classification from the treedef's auxiliary data so reconstructed instances are equally fast.
+
+   Unflatten reverses the field split: dynamic children are restored (with any `_Static` wrappers in containers stripped), static fields are set directly, and the constructor is bypassed with `object.__new__` + `object.__setattr__` because constructors take different arguments than stored fields (`Linear(in_dim, out_dim, key)` creates `w` and `b` internally). This is also why we use `register_pytree_with_keys` instead of `register_dataclass`.
 
    The result is that `jax.jit` and `jax.grad` work natively with models without special wrappers.
 
