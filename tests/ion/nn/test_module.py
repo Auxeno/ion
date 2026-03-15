@@ -132,7 +132,7 @@ class TestPytreeRegistration:
         npt.assert_array_equal(reconstructed.b._value, m.b._value)
 
     def test_children_follow_field_order(self):
-        """Non-array fields are wrapped as Static, so leaves are empty, but roundtrip preserves values."""
+        """Non-array fields become static aux, so leaves are empty, but roundtrip preserves values."""
 
         class Model(nn.Module):
             first: int
@@ -1090,7 +1090,7 @@ class TestModuleWrappingEdgeCases:
         assert len(leaves) == 2
 
     def test_python_int_is_static_metadata(self):
-        """Plain Python int is wrapped in Static (no dynamic leaf)."""
+        """Plain Python int becomes static aux (no dynamic leaf)."""
 
         class Model(nn.Module):
             w: nn.Param
@@ -1105,7 +1105,7 @@ class TestModuleWrappingEdgeCases:
         assert len(leaves) == 1
 
     def test_custom_class_field_becomes_static(self):
-        """A custom (non-Module) class instance is wrapped in Static."""
+        """A custom (non-Module) class instance becomes static aux."""
 
         class Config:
             def __init__(self, lr):

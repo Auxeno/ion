@@ -25,48 +25,105 @@ from ..tree import Static
 from .param import Param
 
 
-def _wrap_non_arrays(value: Any) -> Any:
-    """Wrap non-array leaves in Static so JAX treats them as compile-time constants."""
-    if isinstance(value, (Module, Param)):
-        return value
-    return jax.tree.map(
-        lambda leaf: (
-            leaf if isinstance(leaf, (Module, Param, jax.Array, np.ndarray)) else Static(leaf)
-        ),
-        value,
-        is_leaf=lambda x: isinstance(x, (Module, Param, Static)),
-    )
-
-
-def _unwrap_non_arrays(value: Any) -> Any:
-    """Inverse of `_wrap_non_arrays`. Strips Static wrappers back to plain values."""
-    if isinstance(value, (Module, Param)):
-        return value
-    return jax.tree.map(
-        lambda leaf: leaf.value if isinstance(leaf, Static) else leaf,
-        value,
-        is_leaf=lambda x: isinstance(x, (Module, Param, Static)),
-    )
-
-
 def _register_pytree(cls: type) -> None:
-    """Register a class as a JAX pytree, wrapping non-array leaves as static metadata."""
+    """Register a class as a JAX pytree, partitioning fields into dynamic children and static aux."""
     field_names = tuple(field.name for field in dataclasses.fields(cls))
 
-    def flatten_with_keys(obj: Any) -> tuple[list[tuple[Any, Any]], None]:
-        children = [
-            (jtu.GetAttrKey(name), _wrap_non_arrays(getattr(obj, name))) for name in field_names
-        ]
-        return children, None
+    def flatten_with_keys(obj: Any) -> tuple[list[tuple[Any, Any]], tuple]:
+        children = []
+        aux_names = []
+        aux_values = []
 
-    def unflatten(_auxiliary_data: None, children: Iterable[Any]) -> Any:
+        for name in field_names:
+            value = obj.__dict__[name]
+
+            if isinstance(value, _ARRAYLIKE):
+                children.append((jtu.GetAttrKey(name), value))
+
+            elif isinstance(value, (tuple, list)) and any(
+                isinstance(x, _ARRAYLIKE) for x in value
+            ):
+                wrapped = type(value)(
+                    x if isinstance(x, _ARRAYLIKE) else Static(x) for x in value
+                )
+                children.append((jtu.GetAttrKey(name), wrapped))
+
+            elif isinstance(value, dict) and any(
+                isinstance(v, _ARRAYLIKE) for v in value.values()
+            ):
+                wrapped = {
+                    k: v if isinstance(v, _ARRAYLIKE) else Static(v)
+                    for k, v in value.items()
+                }
+                children.append((jtu.GetAttrKey(name), wrapped))
+
+            else:
+                aux_names.append(name)
+                aux_values.append(value)
+
+        return children, (tuple(aux_names), tuple(aux_values))
+
+    def flatten_func(obj: Any) -> tuple[list, tuple]:
+        children = []
+        aux_names = []
+        aux_values = []
+
+        for name in field_names:
+            value = obj.__dict__[name]
+
+            if isinstance(value, _ARRAYLIKE):
+                children.append(value)
+
+            elif isinstance(value, (tuple, list)) and any(
+                isinstance(x, _ARRAYLIKE) for x in value
+            ):
+                wrapped = type(value)(
+                    x if isinstance(x, _ARRAYLIKE) else Static(x) for x in value
+                )
+                children.append(wrapped)
+
+            elif isinstance(value, dict) and any(
+                isinstance(v, _ARRAYLIKE) for v in value.values()
+            ):
+                wrapped = {
+                    k: v if isinstance(v, _ARRAYLIKE) else Static(v)
+                    for k, v in value.items()
+                }
+                children.append(wrapped)
+
+            else:
+                aux_names.append(name)
+                aux_values.append(value)
+
+        return children, (tuple(aux_names), tuple(aux_values))
+
+    def unflatten(aux: tuple, children: Iterable[Any]) -> Any:
+        static_names, static_values = aux
+        static_set = frozenset(static_names)
         new_instance = object.__new__(cls)
-        for name, value in zip(field_names, children):
-            object.__setattr__(new_instance, name, _unwrap_non_arrays(value))
+        child_iter = iter(children)
+        static_iter = iter(static_values)
+
+        for name in field_names:
+            if name in static_set:
+                object.__setattr__(new_instance, name, next(static_iter))
+            else:
+                value = next(child_iter)
+                if isinstance(value, (tuple, list)):
+                    value = type(value)(
+                        x.value if isinstance(x, Static) else x for x in value
+                    )
+                elif isinstance(value, dict):
+                    value = {
+                        k: v.value if isinstance(v, Static) else v
+                        for k, v in value.items()
+                    }
+                object.__setattr__(new_instance, name, value)
+
         object.__setattr__(new_instance, "_frozen", True)
         return new_instance
 
-    jtu.register_pytree_with_keys(cls, flatten_with_keys, unflatten)
+    jtu.register_pytree_with_keys(cls, flatten_with_keys, unflatten, flatten_func=flatten_func)
 
 
 class Module:
@@ -272,3 +329,6 @@ class Module:
         """
         leaves = jtu.tree_leaves(self, is_leaf=tree.is_param)
         return sum(p._value.size for p in leaves if tree.is_param(p))
+
+
+_ARRAYLIKE = (jax.Array, np.ndarray, Param, Module)
