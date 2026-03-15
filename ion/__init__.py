@@ -19,23 +19,39 @@ from .tree import (
 )
 
 
-def enable_treescope() -> None:
-    """Activate treescope as the default interactive renderer when inside an IPython env."""
+def enable_treescope(everything: bool = False) -> None:
+    """Activate treescope as the default interactive renderer.
+
+    >>> ion.enable_treescope()                 # Ion Modules and Params only
+    >>> ion.enable_treescope(everything=True)  # all types
+    """
     try:
         import IPython  # type: ignore[reportMissingImports]
 
-        if IPython.get_ipython() is None:  # type: ignore[reportPrivateImportUsage]
+        ip = IPython.get_ipython()  # type: ignore[reportPrivateImportUsage]
+        if ip is None:
             return
 
-        from treescope import basic_interactive_setup
+        if everything:
+            from treescope import basic_interactive_setup
 
-        basic_interactive_setup()
+            basic_interactive_setup()
+        else:
+            import treescope
+
+            html_fmt = ip.display_formatter.formatters["text/html"]  # type: ignore[reportAttributeAccessIssue,reportOptionalMemberAccess]
+            render = treescope.render_to_html
+            html_fmt.for_type(nn.Module, lambda obj: render(obj))
+            html_fmt.for_type(nn.Param, lambda obj: render(obj))
     except ImportError:
         pass
 
 
 def disable_treescope() -> None:
-    """Deactivate treescope as the default interactive renderer."""
+    """Deactivate treescope rendering.
+
+    >>> ion.disable_treescope()
+    """
     try:
         import IPython  # type: ignore[reportMissingImports]
         import treescope

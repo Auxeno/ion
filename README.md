@@ -187,7 +187,15 @@ See [Layer Conventions](https://github.com/auxeno/ion/blob/main/docs/layers.md) 
 
 ## Pretty Printing
 
-In notebooks, [Treescope](https://github.com/google-deepmind/treescope) provides interactive, color-coded visualization. Modules also have built-in text formatting for terminal output.
+In notebooks, [Treescope](https://github.com/google-deepmind/treescope) provides interactive, color-coded visualization of Ion Modules and Params. Treescope is enabled by default on import, and can be configured:
+
+```python
+ion.enable_treescope()                 # Ion Modules and Params only (default)
+ion.enable_treescope(everything=True)  # all types
+ion.disable_treescope()                # turn off
+```
+
+Modules also have built-in text formatting for terminal output.
 
 ```python
 >>> model = MLP(key=jax.random.key(0))
