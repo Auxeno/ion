@@ -23,7 +23,21 @@ Ion also ships with standard neural network layers (linear, convolution, attenti
 > <summary>Why do I need a neural network library in JAX?</summary>
 > <br>
 >
-> Building *simple* NN models from scratch in JAX is straightforward. As they get more complex however, two things become painful: managing parameters (initializing them, tracking which are trainable, freezing some for fine-tuning) and composing modules (reusing layers, wiring them through JAX transforms, not reimplementing things like convolution padding from scratch). A neural network library takes care of this so you can focus on model building and training.
+> Building *simple* NN models from scratch in JAX is straightforward. As they get more complex however, two things become painful: managing parameters (initializing them, tracking which are trainable, freezing some for fine-tuning) and composing modules (reusing layers, wiring them through JAX transforms, not reimplementing things like convolution padding from scratch for every project). A neural network library takes care of this so you can focus on model building and training.
+> </details>
+<br>
+
+> <details>
+> <summary>Who is Ion for?</summary>
+> <br>
+>
+> Ion is for JAX users who want a neural network library that is small, easy to learn, and easy to understand.
+>
+> Ion is simple and easy to learn. The core introduces three concepts, `Module`, `Param`, and `apply_updates`, and from there JAX does everything else. There are no custom transforms, no special contexts, no framework-specific calling conventions. If you already know JAX, you can learn Ion in an hour.
+>
+> Ion is easy to use. Models are called with `model(x)` and trained with `jax.grad` and `optax` directly. Because the core is ~500 lines with not much happening behind the scenes, it's straightforward to reason about what JAX is doing. This matters most in complex training setups like multi-stage fine-tuning or custom gradient flows. Convenience methods like `model.freeze()`, `model.astype(jnp.bfloat16)`, and `model.replace(...)` keep day-to-day usage ergonomic.
+>
+> If you need a broader pytree toolkit for scientific computing beyond neural networks, [Equinox](https://github.com/patrick-kidger/equinox) is excellent. If you want PyTorch-like mutability and don't mind more machinery behind the scenes, [Flax NNX](https://github.com/google/flax) is a great choice. Both Equinox and Flax are also well battle-tested and have existing model hubs.
 > </details>
 <br>
 
