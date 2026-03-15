@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.6
+
+- **Removed BatchNorm.** Dropped `BatchNorm` from the library.
+- Added warning when hydrating models with mismatched parameter dtypes.
+- Fixed dropout edge case when `p >= 1`.
+- Treescope visualization now defaults to showing only Modules and Params.
+- Documentation and README updates.
+
 ## 0.2.5
 
 - Added `__call__` method to `Module` so static type checkers see generic modules as callable.
