@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.7
+
+- **Faster pytree registration.** Module flatten/unflatten are now defined once at class creation and the pytree structure is cached, improving speed through JAX transforms.
+- Moved `_Static` into `module.py` (internal cleanup).
+- Documentation updates.
+
 ## 0.2.6
 
 - **Removed BatchNorm.** Dropped `BatchNorm` from the library.
