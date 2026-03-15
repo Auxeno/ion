@@ -21,12 +21,32 @@ import numpy as np
 from jaxtyping import PyTree
 
 from .. import tree
-from ..tree import _Static
 from .param import Param
 
 
-def _register_module(cls: type) -> None:
-    """Register a Module as a JAX pytree, partitioning fields into dynamic children and static aux."""
+@jtu.register_pytree_node_class
+class _Static:
+    """Wraps a value so JAX treats it as static metadata, not a traced array.
+
+    Used internally by _register_module_as_pytree for non-array elements inside mixed containers
+    (e.g. a callable sitting alongside Modules in a tuple).
+    """
+
+    __slots__ = ("value",)
+
+    def __init__(self, value):
+        self.value = value
+
+    def tree_flatten(self):
+        return [], self.value
+
+    @classmethod
+    def tree_unflatten(cls, aux, children):
+        return cls(aux)
+
+
+def _register_module_as_pytree(cls: type) -> None:
+    """Register a Module subclass as a JAX pytree."""
     array_like = (jax.Array, np.ndarray, Param, Module)
     field_names = tuple(field.name for field in dataclasses.fields(cls))
 
@@ -132,7 +152,7 @@ class Module:
 
         cls.__init__ = _constructor_with_freeze
 
-        _register_module(cls)
+        _register_module_as_pytree(cls)
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Allow attribute assignment only during initialization."""

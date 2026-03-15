@@ -1435,3 +1435,141 @@ class TestParamsPropertyEdgeCases:
         p = m.params
         assert isinstance(p.inner.w, nn.Param)
         assert p.inner.buf is None
+
+
+class TestFieldPartitioning:
+    """Tests for the dynamic child vs static aux partitioning in _register_module."""
+
+    def test_replace_param_with_none_changes_treedef(self):
+        """Replacing a Param field with None moves it from dynamic child to static aux."""
+        model = nn.Linear(3, 4, key=jax.random.key(0))
+        _, treedef_with_bias = jtu.tree_flatten(model)
+
+        model_no_bias = model.replace(b=None)
+        leaves, treedef_no_bias = jtu.tree_flatten(model_no_bias)
+
+        # Different treedef (b moved from child to static aux)
+        assert treedef_with_bias != treedef_no_bias
+        # Only w remains as a leaf
+        assert len(leaves) == 1
+        # Roundtrip preserves None
+        rebuilt = treedef_no_bias.unflatten(leaves)
+        assert rebuilt.b is None
+        npt.assert_array_equal(rebuilt.w._value, model_no_bias.w._value)
+
+    def test_replace_none_with_param_changes_treedef(self):
+        """Replacing None with a Param moves it from static aux to dynamic child."""
+        model = nn.Linear(3, 4, bias=False, key=jax.random.key(0))
+        assert model.b is None
+        leaves_before = jax.tree.leaves(model)
+        assert len(leaves_before) == 1
+
+        new_bias = nn.Param(jnp.zeros(4))
+        model_with_bias = model.replace(b=new_bias)
+        leaves_after = jax.tree.leaves(model_with_bias)
+        assert len(leaves_after) == 2
+
+    def test_surgery_both_versions_work_through_jit(self):
+        """Both pre- and post-surgery models work through jit."""
+        model = nn.Linear(3, 4, key=jax.random.key(0))
+        x = jnp.ones((2, 3))
+
+        result_with_bias = jax.jit(model)(x)
+        assert result_with_bias.shape == (2, 4)
+
+        model_no_bias = model.replace(b=None)
+        result_no_bias = jax.jit(model_no_bias)(x)
+        assert result_no_bias.shape == (2, 4)
+
+    def test_mixed_tuple_modules_and_callable_through_jit_grad(self):
+        """Tuple mixing Modules and callables: Modules are dynamic, callables wrapped in _Static."""
+
+        class Model(nn.Module):
+            layers: tuple
+
+            def __init__(self, key):
+                self.layers = (nn.Linear(3, 3, key=key), jax.nn.relu)
+
+            def __call__(self, x):
+                for layer in self.layers:
+                    x = layer(x)
+                return x
+
+        m = Model(key=jax.random.key(0))
+        x = jnp.ones((2, 3))
+
+        # Works through jit
+        eager = m(x)
+        jitted = jax.jit(m)(x)
+        npt.assert_allclose(jitted, eager)
+
+        # Works through grad
+        grads = jax.grad(lambda m, x: jnp.sum(m(x)))(m, x)
+        assert isinstance(grads.layers[0], nn.Linear)
+        # Callable preserved through roundtrip
+        assert grads.layers[1] is jax.nn.relu
+
+    def test_empty_tuple_field_is_static(self):
+        """Empty tuple has no array-like elements, so it goes to static aux."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            items: tuple
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.items = ()
+
+        m = Model()
+        assert len(jax.tree.leaves(m)) == 1
+        rebuilt = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        assert rebuilt.items == ()
+
+    def test_empty_list_field_is_static(self):
+        """Empty list has no array-like elements, so it goes to static aux."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            items: list
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.items = []
+
+        m = Model()
+        assert len(jax.tree.leaves(m)) == 1
+        rebuilt = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        assert rebuilt.items == []
+
+    def test_empty_dict_field_is_static(self):
+        """Empty dict has no array-like values, so it goes to static aux."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            meta: dict
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.meta = {}
+
+        m = Model()
+        assert len(jax.tree.leaves(m)) == 1
+        rebuilt = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        assert rebuilt.meta == {}
+
+    def test_none_field_is_static(self):
+        """None field goes to static aux, not dynamic children."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            optional: None
+
+            def __init__(self):
+                self.w = nn.Param(jnp.ones(3))
+                self.optional = None
+
+        m = Model()
+        assert len(jax.tree.leaves(m)) == 1
+        rebuilt = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        assert rebuilt.optional is None
+        npt.assert_allclose(jax.jit(lambda m: jnp.sum(m.w))(m), 3.0)

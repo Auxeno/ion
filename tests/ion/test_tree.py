@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import numpy.testing as npt
 
 from ion import nn, tree
-from ion.tree import _Static
+from ion.nn.module import _Static
 
 
 class TestApplyUpdates:
