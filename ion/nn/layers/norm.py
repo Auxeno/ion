@@ -40,11 +40,9 @@ class LayerNorm(Module):
         mean = jnp.mean(x, axis=-1, keepdims=True)
         var = jnp.mean(jnp.square(x - mean), axis=-1, keepdims=True)
 
-        x = (x - mean) * lax.rsqrt(jnp.maximum(0.0, var) + self.eps)
+        x = (x - mean) * lax.rsqrt(var + self.eps)
 
-        x = x * self.scale + self.b
-
-        return x
+        return x * self.scale + self.b
 
 
 class GroupNorm(Module):
@@ -95,14 +93,12 @@ class GroupNorm(Module):
         mean = jnp.mean(x, axis=reduce_axes, keepdims=True)
         var = jnp.mean(jnp.square(x - mean), axis=reduce_axes, keepdims=True)
 
-        x = (x - mean) * lax.rsqrt(jnp.maximum(0.0, var) + self.eps)
+        x = (x - mean) * lax.rsqrt(var + self.eps)
 
         # Merge groups back
         x = x.reshape(*x.shape[: num_spatial + 1], -1)
 
-        x = x * self.scale + self.b
-
-        return x
+        return x * self.scale + self.b
 
 
 class RMSNorm(Module):
@@ -124,8 +120,6 @@ class RMSNorm(Module):
 
         rms = jnp.mean(jnp.square(x), axis=-1, keepdims=True)
 
-        x = x * lax.rsqrt(jnp.maximum(0.0, rms) + self.eps)
+        x = x * lax.rsqrt(rms + self.eps)
 
-        x = x * self.scale
-
-        return x
+        return x * self.scale
