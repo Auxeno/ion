@@ -3,7 +3,6 @@
 Functions:
     is_param            Check if a leaf is a Param.
     is_trainable_param  Check if a leaf is a trainable Param.
-    apply_updates       Add optimizer deltas to trainable parameters.
     astype              Cast all floating-point leaves to a given dtype.
     freeze              Set all Params to trainable=False.
     unfreeze            Set all Params to trainable=True.
@@ -32,48 +31,6 @@ def is_param(x: Any) -> bool:
 def is_trainable_param(x: Any) -> bool:
     """Check if an object is a trainable `Param`."""
     return isinstance(x, Param) and x.trainable
-
-
-def apply_updates(model: PyTree, updates: PyTree) -> PyTree:
-    """Add optimizer deltas to a model's trainable parameters.
-
-    Parameters
-    ----------
-    model : PyTree
-        Model pytree containing `Param` leaves.
-    updates : PyTree
-        Matching-structure pytree of gradient or optimizer deltas.
-
-    Returns
-    -------
-    PyTree
-        Updated model with `Param` wrappers preserved.
-
-    Notes
-    -----
-    Frozen params, non-`Param` leaves, and `None` updates are skipped.
-
-    Examples
-    --------
-    >>> model = ion.tree.apply_updates(model, grads)
-    """
-
-    def _apply(param: Any, update: Any) -> Any:
-        if update is None:
-            return param
-        if not isinstance(param, Param):
-            return param
-        if not param.trainable:
-            return param
-        delta = update._value if isinstance(update, Param) else update
-        return Param(param._value + delta, trainable=param.trainable)
-
-    return jax.tree.map(
-        _apply,
-        model,
-        updates,
-        is_leaf=lambda x: x is None or isinstance(x, Param),
-    )
 
 
 def astype(pytree: PyTree, dtype: jnp.dtype, *, params_only: bool = False) -> PyTree:

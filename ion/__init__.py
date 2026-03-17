@@ -9,8 +9,8 @@ from .checkpoint import (
     load,
     save,
 )
+from .optimizer import Optimizer
 from .tree import (
-    apply_updates,
     astype,
     freeze,
     is_param,
@@ -43,6 +43,7 @@ def enable_treescope(everything: bool = False) -> None:
             render = treescope.render_to_html
             html_fmt.for_type(nn.Module, lambda obj: render(obj))
             html_fmt.for_type(nn.Param, lambda obj: render(obj))
+            html_fmt.for_type(Optimizer, lambda obj: render(obj))
     except ImportError:
         pass
 
@@ -75,7 +76,7 @@ __all__ = [
     "checkpoint",
     "nn",
     "tree",
-    "apply_updates",
+    "Optimizer",
     "astype",
     "disable_treescope",
     "enable_treescope",
