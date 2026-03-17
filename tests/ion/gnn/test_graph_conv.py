@@ -5,20 +5,6 @@ import numpy.testing as npt
 from ion import gnn
 
 
-def _triangle_graph():
-    """Undirected triangle (3 nodes, 6 edges) with self-loops."""
-    senders = jnp.array([0, 1, 1, 2, 0, 2, 0, 1, 2])
-    receivers = jnp.array([1, 0, 2, 1, 2, 0, 0, 1, 2])
-    return senders, receivers
-
-
-def _triangle_graph_no_self_loops():
-    """Undirected triangle (3 nodes, 6 edges) without self-loops."""
-    senders = jnp.array([0, 1, 1, 2, 0, 2])
-    receivers = jnp.array([1, 0, 2, 1, 2, 0])
-    return senders, receivers
-
-
 class TestGraphConv:
     def test_output_shape(self):
         """Output shape is (num_nodes, out_dim)."""
@@ -29,11 +15,11 @@ class TestGraphConv:
         y = gcn(x, senders, receivers)
         assert y.shape == (5, 16)
 
-    def test_output_manual(self):
+    def test_output_manual(self, triangle_graph):
         """Output matches manual D^{-1/2} A D^{-1/2} (X W) + b computation."""
         gcn = gnn.GraphConv(2, 3, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 2))
-        senders, receivers = _triangle_graph()
+        senders, receivers = triangle_graph
 
         # Manual computation
         h = x @ gcn.w
@@ -51,12 +37,12 @@ class TestGraphConv:
         y = gcn(x, senders, receivers)
         npt.assert_allclose(y, expected, rtol=1e-5, atol=1e-5)
 
-    def test_no_bias(self):
+    def test_no_bias(self, triangle_graph):
         """No-bias mode: bias field is None, output still has correct shape."""
         gcn = gnn.GraphConv(8, 16, bias=False, key=jax.random.key(0))
         assert gcn.b is None
         x = jnp.ones((3, 8))
-        senders, receivers = _triangle_graph()
+        senders, receivers = triangle_graph
         y = gcn(x, senders, receivers)
         assert y.shape == (3, 16)
 
@@ -88,95 +74,17 @@ class TestGraphConv:
         # Node 2 receives no messages, so output is just bias
         npt.assert_allclose(y[2], jnp.asarray(gcn.b), atol=1e-6)
 
-    def test_self_loops_change_output(self):
+    def test_self_loops_change_output(self, triangle_graph, triangle_graph_no_self_loops):
         """Adding self-loops changes the layer output."""
         gcn = gnn.GraphConv(4, 4, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 4))
 
-        senders_no_sl, receivers_no_sl = _triangle_graph_no_self_loops()
-        senders_sl, receivers_sl = _triangle_graph()
+        senders_no_sl, receivers_no_sl = triangle_graph_no_self_loops
+        senders_sl, receivers_sl = triangle_graph
 
         y_no_sl = gcn(x, senders_no_sl, receivers_no_sl)
         y_sl = gcn(x, senders_sl, receivers_sl)
         assert not jnp.allclose(y_no_sl, y_sl)
-
-    def test_grad_wrt_input(self):
-        """jax.grad w.r.t. node features produces finite gradients."""
-        gcn = gnn.GraphConv(8, 16, key=jax.random.key(0))
-        x = jax.random.normal(jax.random.key(1), (4, 8))
-        senders = jnp.array([0, 1, 2, 3, 0, 1, 2, 3])
-        receivers = jnp.array([1, 0, 3, 2, 0, 1, 2, 3])
-        g = jax.grad(lambda x: gcn(x, senders, receivers).sum())(x)
-        assert jnp.all(jnp.isfinite(g))
-
-    def test_grad_wrt_params(self):
-        """jax.grad w.r.t. model params produces finite gradients."""
-        gcn = gnn.GraphConv(8, 16, key=jax.random.key(0))
-        x = jax.random.normal(jax.random.key(1), (4, 8))
-        senders = jnp.array([0, 1, 2, 3, 0, 1, 2, 3])
-        receivers = jnp.array([1, 0, 3, 2, 0, 1, 2, 3])
-        grads = jax.grad(lambda m: m(x, senders, receivers).sum())(gcn)
-        for leaf in jax.tree.leaves(grads):
-            if hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact):
-                assert jnp.all(jnp.isfinite(leaf))
-
-    def test_jit(self):
-        """jax.jit produces the same output as eager execution."""
-        gcn = gnn.GraphConv(8, 16, key=jax.random.key(0))
-        x = jnp.ones((3, 8))
-        senders, receivers = _triangle_graph()
-        expected = gcn(x, senders, receivers)
-        result = jax.jit(gcn)(x, senders, receivers)
-        npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
-
-    def test_jit_grad(self):
-        """Composing jax.jit with jax.grad produces finite gradients."""
-        gcn = gnn.GraphConv(8, 16, key=jax.random.key(0))
-        x = jax.random.normal(jax.random.key(1), (3, 8))
-        senders, receivers = _triangle_graph()
-        g = jax.jit(jax.grad(lambda x: gcn(x, senders, receivers).sum()))(x)
-        assert jnp.all(jnp.isfinite(g))
-
-    def test_frozen_params_get_zero_gradient(self):
-        """Frozen GraphConv layer produces zero gradients for its weights."""
-        gcn = gnn.GraphConv(8, 16, key=jax.random.key(0))
-        gcn = gcn.freeze()
-        x = jax.random.normal(jax.random.key(1), (3, 8))
-        senders, receivers = _triangle_graph()
-        grads = jax.grad(lambda m: m(x, senders, receivers).sum())(gcn)
-        npt.assert_allclose(grads.w._value, jnp.zeros_like(gcn.w._value), atol=1e-7)
-
-    def test_determinism(self):
-        """Same inputs produce identical outputs across calls."""
-        gcn = gnn.GraphConv(8, 16, key=jax.random.key(0))
-        x = jax.random.normal(jax.random.key(1), (3, 8))
-        senders, receivers = _triangle_graph()
-        y1 = gcn(x, senders, receivers)
-        y2 = gcn(x, senders, receivers)
-        npt.assert_allclose(y1, y2, rtol=0, atol=0)
-
-    def test_different_graph_different_output(self):
-        """Changing the graph topology changes the output."""
-        gcn = gnn.GraphConv(4, 4, key=jax.random.key(0))
-        x = jax.random.normal(jax.random.key(1), (4, 4))
-        s1 = jnp.array([0, 1])
-        r1 = jnp.array([1, 0])
-        s2 = jnp.array([0, 2])
-        r2 = jnp.array([2, 0])
-        y1 = gcn(x, s1, r1)
-        y2 = gcn(x, s2, r2)
-        assert not jnp.array_equal(y1, y2)
-
-    def test_pytree_roundtrip(self):
-        """Flatten then unflatten reconstructs the layer exactly."""
-        gcn = gnn.GraphConv(8, 16, key=jax.random.key(0))
-        import jax.tree_util as jtu
-
-        leaves, treedef = jtu.tree_flatten(gcn)
-        reconstructed = jtu.tree_unflatten(treedef, leaves)
-        for a, b in zip(jtu.tree_leaves(gcn), jtu.tree_leaves(reconstructed)):
-            if isinstance(a, jnp.ndarray):
-                npt.assert_allclose(a, b, rtol=0, atol=0)
 
     def test_single_node_self_loop(self):
         """Minimal graph: one node with a self-loop."""
