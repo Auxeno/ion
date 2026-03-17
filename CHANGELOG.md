@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- **Optimizer.** New `ion.Optimizer` wraps an optax transform with Param-aware updates,
+  replacing `apply_updates` as the third core abstraction alongside `Param` and `Module`.
+  Frozen params are automatically partitioned so no optimizer memory is wasted on them.
+- **Breaking:** Removed `ion.apply_updates`. Use new `ion.Optimizer` instead.
+- **Dependency:** `optax` is now a runtime dependency (previously dev-only).
+- Fix Treescope not rendering arrays.
+
 ## 0.2.7
 
 - **Faster pytree registration.** Module flatten/unflatten are now defined once at class creation and the pytree structure is cached, improving speed through JAX transforms.
