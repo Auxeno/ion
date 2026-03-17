@@ -41,15 +41,15 @@ def _apply_updates(model: PyTree, updates: PyTree) -> PyTree:
 
 
 def _auto_partition(
-    transform: optax.GradientTransformation,
+    tx: optax.GradientTransformation,
     model: PyTree,
 ) -> optax.GradientTransformation:
-    """Wrap transform with `optax.partition` if model has non-trainable array leaves."""
+    """Wrap tx with `optax.partition` if model has non-trainable array leaves."""
 
     # Skip allocating optimizer state for frozen and non-Param leaves to save memory
     leaves = jax.tree.leaves(model, is_leaf=is_param)
     if all(isinstance(leaf, Param) and leaf.trainable for leaf in leaves):
-        return transform
+        return tx
 
     def _label(leaf: Any) -> Any:
         if isinstance(leaf, Param):
@@ -60,7 +60,7 @@ def _auto_partition(
         return "freeze"
 
     return optax.partition(
-        transforms={"train": transform, "freeze": optax.set_to_zero()},
+        transforms={"train": tx, "freeze": optax.set_to_zero()},
         param_labels=lambda params: jax.tree.map(
             _label,
             params,
@@ -75,7 +75,7 @@ class Optimizer:
 
     Parameters
     ----------
-    transform : optax.GradientTransformation
+    tx : optax.GradientTransformation
         An optax optimizer (e.g. `optax.adam(3e-4)`).
     model : PyTree
         Model to optimize. Frozen and non-Param leaves are auto-partitioned out.
@@ -88,8 +88,8 @@ class Optimizer:
 
     __slots__ = ("_transform", "state", "step")
 
-    def __init__(self, transform: optax.GradientTransformation, model: PyTree) -> None:
-        self._transform = _auto_partition(transform, model)
+    def __init__(self, tx: optax.GradientTransformation, model: PyTree) -> None:
+        self._transform = _auto_partition(tx, model)
         self.state = self._transform.init(model)
         self.step = jnp.array(0, dtype=jnp.int32)
 
@@ -126,13 +126,13 @@ class Optimizer:
     @classmethod
     def _new(
         cls,
-        transform: optax.GradientTransformation,
+        tx: optax.GradientTransformation,
         state: optax.OptState,
         step: jax.Array,
     ) -> "Optimizer":
         """Construct without running `__init__` (for unflatten and update)."""
         obj = object.__new__(cls)
-        obj._transform = transform
+        obj._transform = tx
         obj.state = state
         obj.step = step
         return obj
