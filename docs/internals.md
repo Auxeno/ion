@@ -3,8 +3,9 @@
 Everything behind the scenes in Ion. Three files and ~500 lines of code make up the whole engine. This document explains the design. Readers are encouraged to check out the source code:
 
 - [`ion/nn/param.py`](../ion/nn/param.py): Param wrapper, trainable/frozen distinction
-- [`ion/tree.py`](../ion/tree.py): apply_updates, freeze/unfreeze
 - [`ion/nn/module.py`](../ion/nn/module.py): Module base class, pytree registration
+- [`ion/optimizer.py`](../ion/optimizer.py): Optimizer wrapper, auto-partitioning for frozen params
+- [`ion/tree.py`](../ion/tree.py): freeze/unfreeze, astype utilities
 
 ## Param (`ion/nn/param.py`)
 
@@ -46,9 +47,17 @@ Three things happen in `__init_subclass__` when a class inherits from `Module`:
 
 3. **Freeze after init.** `__init__` is wrapped to set `_frozen` once construction completes. Subsequent attribute assignment raises `AttributeError`, because mutation would silently break JAX tracing. Use `model.replace(field=new_value)` to create a modified copy.
 
-## apply_updates (`ion/tree.py`)
+## Optimizer (`ion/optimizer.py`)
 
-Adds optimizer deltas to a model's trainable parameters. Only `Param` leaves are modified; non-`Param` arrays (like batch statistics) pass through unchanged. Walks the model and update trees in parallel, skipping positions where the update is `None`, the leaf is not a `Param`, or the parameter is frozen (`Param(trainable=False)`). The `Param` wrapper is preserved on updated values so trainability metadata survives the step.
+Wraps an optax `GradientTransformation` with Param-aware updates. Registered as a JAX pytree so it works with `jax.jit` and `jax.lax.scan`.
+
+**Auto-partitioning.** On construction, if the model contains any frozen `Param` leaves, the optimizer automatically wraps the transform with `optax.partition`, assigning the real optimizer to trainable params and `optax.set_to_zero()` to frozen params. This means no momentum/variance buffers are allocated for frozen weights. Important for LoRA and other fine-tuning setups where most params are frozen.
+
+**Update.** `optimizer.update(model, grads)` calls the underlying optax transform, then applies the resulting deltas to the model's trainable `Param` leaves only. Non-`Param` arrays (like batch statistics) and frozen `Param` leaves pass through unchanged. The `Param` wrapper is preserved on updated values so trainability metadata survives the step.
+
+**Step counter.** `optimizer.step` is an `int32` array that increments on each `update()` call. This is independent of any internal step tracking by optax transforms (e.g. warmup schedules).
+
+**Pytree registration.** `state` and `step` are dynamic children (traced by JAX); `_transform` is static auxiliary data (baked into the compiled program).
 
 ## 🔪 Sharp Edges
 
@@ -81,22 +90,7 @@ Known gotchas to be aware of when using Ion. Some are limitations of JAX:
 
 - **`replace()` can change pytree structure.** Replacing a `Param` field with a plain array or `None` changes the treedef. This is useful for model surgery, but subsequent `jax.tree.map` between the original and modified model will crash with a structure mismatch.
 
-- **`apply_updates` only modifies `Param` leaves.** Non-`Param` arrays are left unchanged. Frozen `Param` updates are silently skipped. Note that `jax.grad` does compute gradients for all array leaves in the pytree, including non-`Param` arrays. The optimizer will track state for these leaves, but `apply_updates` discards their updates. Continuing to calculate non-parameter array gradients could may be desirable to some users so Ion leaves it in.
-
-- **Frozen params still occupy optimizer state.** `stop_gradient` makes XLA skip backward computation, but `optimizer.init(model)` allocates momentum/variance buffers for every leaf. For models where most params are frozen (e.g. LoRA fine-tuning), this wastes significant memory. Use `optax.partition` to assign a stateless optimizer to frozen params:
-
-  ```python
-  label = lambda p: nn.Param('train' if p.trainable else 'freeze', trainable=p.trainable)
-
-  optimizer = optax.partition(
-      transforms={'train': optax.adam(3e-4), 'freeze': optax.set_to_zero()},
-      param_labels=lambda params: jax.tree.map(label, params, is_leaf=ion.is_param),
-  )
-  ```
-
-  `set_to_zero()` allocates no momentum buffers. The training loop is unchanged. Although `jax.grad` still returns zero arrays at frozen positions in the gradient pytree, XLA's dead code elimination (DCE) optimizes these away inside `jax.jit`: when the zeros have no downstream consumers (because `set_to_zero()` discards them), XLA eliminates both their computation and memory. With this setup, the only overhead from frozen params is the pytree structure itself, no wasted FLOPs or device memory! See [`TestXLAOptimization`](../tests/ion/nn/layers/test_lora.py) for compiled HLO verification.
-
-- **Some JAX/LAX functions don't accept `Param` directly.** Most operations will work transparently because `Param.__jax_array__` converts automatically, but lower-level functions like `lax.conv_general_dilated` may reject a `Param` where they expect a plain array. Use `jnp.asarray(param)` to convert. This calls `__jax_array__`, which applies `stop_gradient` for frozen params, so autograd correctness is preserved. **Do not use `param._value`**, which bypasses `stop_gradient` entirely: frozen params would receive gradients during the backward pass (wasting compute), and only `apply_updates` silently discarding them would prevent actual weight changes. The `_value` field is private and reserved for internal code that deliberately needs the raw array.
+- **Some JAX/LAX functions don't accept `Param` directly.** Most operations will work transparently because `Param.__jax_array__` converts automatically, but lower-level functions like `lax.conv_general_dilated` may reject a `Param` where they expect a plain array. Use `jnp.asarray(param)` to convert. This calls `__jax_array__`, which applies `stop_gradient` for frozen params, so autograd correctness is preserved. **Do not use `param._value`**, which bypasses `stop_gradient` entirely: frozen params would receive gradients during the backward pass (wasting compute). The `_value` field is private and reserved for internal code that deliberately needs the raw array.
 
 - **Module immutability is shallow.** `_frozen` prevents field reassignment, but mutable containers (lists, dicts, numpy arrays) in fields can still be mutated in-place. For example, `model.layers.append(...)` bypasses the freeze. Worse, in-place mutation of a static field (like a list of ints) will **not** trigger JIT recompilation because JAX identifies the pytree aux data by object identity, so the same mutated list still hits the stale cached trace with the old value baked in. Use `replace()` to create a new module with the updated field instead.
 

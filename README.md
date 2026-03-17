@@ -14,7 +14,7 @@
 
 ---
 
-Ion is a neural network library for JAX built on three core abstractions: `Module`, `Param`, and `apply_updates`, totalling 500 lines of code. Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html) that are called with `model(x)` and *always* work directly with `jax.grad`, `jax.jit`, `jax.vmap`. Beyond that, you just write JAX and it works.
+Ion is a neural network library for JAX built on three core abstractions: `Module`, `Param`, and `Optimizer`, totalling 500 lines of code. Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html) that are called with `model(x)` and *always* work directly with `jax.grad`, `jax.jit`, `jax.vmap`. Beyond that, you just write JAX and it works.
 
 Ion also ships with standard neural network layers (linear, convolution, attention, normalization, recurrent, and more) built with the core.
 <br><br>
@@ -33,9 +33,9 @@ Ion also ships with standard neural network layers (linear, convolution, attenti
 >
 > Ion is for JAX users who want a neural network library that is small, easy to learn, and easy to understand.
 >
-> Ion is simple and easy to learn. The core introduces three concepts, `Module`, `Param`, and `apply_updates`, and from there JAX does everything else. There are no custom transforms, no special contexts, no framework-specific calling conventions. If you already know JAX, you can learn Ion in an hour.
+> Ion is simple and easy to learn. The core introduces three concepts, `Module`, `Param`, and `Optimizer`, and from there JAX does everything else. There are no custom transforms, no special contexts, no framework-specific calling conventions. If you already know JAX, you can learn Ion in an hour.
 >
-> Ion is easy to use. Models are called with `model(x)` and trained with `jax.grad` and `optax` directly. Because the core is ~500 lines with not much happening behind the scenes, it's straightforward to reason about what JAX is doing. This matters most in complex training setups like multi-stage fine-tuning or custom gradient flows. Convenience methods like `model.freeze()`, `model.astype(jnp.bfloat16)`, and `model.replace(...)` keep day-to-day usage ergonomic.
+> Ion is easy to use. Models are called with `model(x)` and trained with `jax.grad` and `ion.Optimizer`. Because the core is ~500 lines with not much happening behind the scenes, it's straightforward to reason about what JAX is doing. This matters most in complex training setups like multi-stage fine-tuning or custom gradient flows. Convenience methods like `model.freeze()`, `model.astype(jnp.bfloat16)`, and `model.replace(...)` keep day-to-day usage ergonomic.
 >
 > If you need a broader pytree toolkit for scientific computing beyond neural networks, [Equinox](https://github.com/patrick-kidger/equinox) is excellent. If you want PyTorch-like mutability and don't mind more machinery behind the scenes, [Flax NNX](https://github.com/google/flax) is a great choice. Both Equinox and Flax are also well battle-tested and have existing model hubs.
 > </details>
@@ -45,7 +45,7 @@ Ion also ships with standard neural network layers (linear, convolution, attenti
 > <summary>How does Ion compare to Equinox and Flax?</summary>
 > <br>
 >
-> **[Equinox](https://github.com/patrick-kidger/equinox)** is an excellent pytree-based scientific computing library where neural networks are one of several possible use-cases. It provides filtered transforms, partition/combine utilities, and general pytree tools that give users fine-grained control over how JAX interacts with their code. Equinox treats all JAX arrays equally, so users must remember to apply `lax.stop_gradient` or manually filter trainable parameters when computing gradients and applying optimizer updates. Ion is narrower in scope: three building blocks on top of JAX for defining and training neural networks, where `Param` explicitly tracks trainability so `jax.grad` and `apply_updates` do the right thing automatically. This design choice trades off flexibility for simplicity.
+> **[Equinox](https://github.com/patrick-kidger/equinox)** is an excellent pytree-based scientific computing library where neural networks are one of several possible use-cases. It provides filtered transforms, partition/combine utilities, and general pytree tools that give users fine-grained control over how JAX interacts with their code. Equinox treats all JAX arrays equally, so users must remember to apply `lax.stop_gradient` or manually filter trainable parameters when computing gradients and applying optimizer updates. Ion is narrower in scope: three building blocks on top of JAX for defining and training neural networks, where `Param` explicitly tracks trainability so `jax.grad` and `Optimizer` do the right thing automatically. This design choice trades off flexibility for simplicity.
 >
 > **[Flax NNX](https://github.com/google/flax)** takes a fundamentally different philosophical approach to Ion and Equinox. NNX models are mutable graph objects with reference semantics, and custom transforms (`nnx.jit`, `nnx.grad`) that allow mutability within JAX's functional programming model. The result is flexible, PyTorch-like ergonomics at the cost of complexity behind the scenes (state extraction, reference threading, graph tracing) that can make it hard to reason about what your code is doing. Ion keeps things straightforward: immutable pytrees, native JAX transforms, and explicit state passing. NNX is a great choice if you value PyTorch-like ergonomics and are happy to trust the framework.
 > </details>
@@ -59,7 +59,7 @@ pip install ion-nn
 
 ## Core Concepts
 
-There are three Ion-specific concepts you need to build and train models: `Param`, `Module` and `apply_updates`.
+There are three Ion-specific concepts you need to build and train models: `Param`, `Module` and `Optimizer`.
 
 ### Param
 
@@ -93,13 +93,13 @@ class Linear(nn.Module):
 
 Non-array fields (ints, floats, strings, callables) are automatically treated as static metadata, invisible to JAX tracing. Config values like `num_heads` or `use_bias` and activation functions can be stored directly on the module.
 
-### apply_updates
+### Optimizer
 
-Adds optimizer deltas to trainable `Param` leaves only. Non-parameter arrays and frozen params pass through unchanged.
+Wraps an optax optimizer with Param-aware updates. If the model has frozen params, they are automatically partitioned so no optimizer memory is wasted on them.
 
 ```python
-updates, opt_state = optimizer.update(grads, opt_state)
-model = ion.apply_updates(model, updates)
+optimizer = ion.Optimizer(optax.adam(3e-4), model)
+model, optimizer = optimizer.update(model, grads)
 ```
 
 That's the entire core. See [Internals](https://github.com/auxeno/ion/blob/main/docs/internals.md) for design details and sharp edges.
@@ -136,20 +136,18 @@ def loss_fn(model, x, y):
 
 
 @jax.jit
-def train_step(model, opt_state, x, y):
+def train_step(model, optimizer, x, y):
     grads = jax.grad(loss_fn)(model, x, y)
-    updates, opt_state = optimizer.update(grads, opt_state)
-    model = ion.apply_updates(model, updates)
-    return model, opt_state
+    model, optimizer = optimizer.update(model, grads)
+    return model, optimizer
 
 
 model = MLP(key=jax.random.key(0))
 
-optimizer = optax.adam(3e-4)
-opt_state = optimizer.init(model)
+optimizer = ion.Optimizer(optax.adam(3e-4), model)
 
 for x, y in data:
-    model, opt_state = train_step(model, opt_state, x, y)
+    model, optimizer = train_step(model, optimizer, x, y)
 ```
 
 ## Utilities
