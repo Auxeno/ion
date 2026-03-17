@@ -41,9 +41,15 @@ def enable_treescope(everything: bool = False) -> None:
 
             html_fmt = ip.display_formatter.formatters["text/html"]  # type: ignore[reportAttributeAccessIssue,reportOptionalMemberAccess]
             render = treescope.render_to_html
+            import numpy as np
+            from jaxlib._jax import ArrayImpl
+
             html_fmt.for_type(nn.Module, lambda obj: render(obj))
             html_fmt.for_type(nn.Param, lambda obj: render(obj))
             html_fmt.for_type(Optimizer, lambda obj: render(obj))
+            html_fmt.for_type(ArrayImpl, lambda obj: render(obj))
+            html_fmt.for_type(np.ndarray, lambda obj: render(obj))
+            treescope.active_autovisualizer.set_globally(treescope.ArrayAutovisualizer())
     except ImportError:
         pass
 
