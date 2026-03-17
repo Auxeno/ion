@@ -180,8 +180,9 @@ Ion ships with standard neural network layers. Each is a `Module` with trainable
 | Positional      | `sinusoidal`, `rope`, `apply_rope`, `alibi`                               |
 | Regularization  | `Dropout`                                                                 |
 | Blocks          | `Sequential`, `MLP`, `TransformerBlock`, `CrossTransformerBlock`          |
+| Graph (GNN)     | `GraphConv`, `GraphAttention`                                            |
 
-See [Layer Conventions](https://github.com/auxeno/ion/blob/main/docs/layers.md) for data format, weight init, and spatial layer usage.
+See [Layer Conventions](https://github.com/auxeno/ion/blob/main/docs/layers.md) for data format, weight init, and spatial layer usage. See [GNN Conventions](https://github.com/auxeno/ion/blob/main/docs/gnn.md) for graph layer usage.
 
 ## Pretty Printing
 
@@ -228,6 +229,7 @@ model = ion.load("model.npz", model)
 - [RNN Demo](https://github.com/auxeno/ion/blob/main/examples/rnn_mnist.py): Sequence classification with recurrent networks
 - [GPT Demo Notebook](https://github.com/auxeno/ion/blob/main/examples/gpt_tinystories.ipynb): Character-level GPT on TinyStories
 - [VAE Demo Notebook](https://github.com/auxeno/ion/blob/main/examples/vae_mnist.ipynb): Variational autoencoder for image generation
+- [GNN Demo](https://github.com/auxeno/ion/blob/main/examples/gnn_cora.py): Node classification on Cora with graph neural networks
 - [PPO Demo](https://github.com/auxeno/ion/blob/main/examples/ppo_gymnax.py): Reinforcement learning with Gymnax
 
 ## License
