@@ -1,10 +1,10 @@
 """Graph Convolutional Network layer from Kipf & Welling, 2017.
 
 Modules:
-    GCN  Graph convolutional layer with symmetric degree normalization.
+    GraphConv  Graph convolutional layer with symmetric degree normalization.
 
 He normal weight init for ReLU activation, zeros for bias.
-Self-loops are the caller's responsibility, see ``gnn.add_self_loops``.
+Self-loops are the caller's responsibility, see `gnn.add_self_loops`.
 """
 
 import jax
@@ -17,10 +17,10 @@ from ..nn.module import Module
 from ..nn.param import Param
 
 
-class GCN(Module):
+class GraphConv(Module):
     """Graph convolutional layer.
 
-    >>> gcn = GCN(16, 32, key=key)
+    >>> gcn = GraphConv(16, 32, key=key)
     >>> gcn(x, senders, receivers)  # (n, 16) -> (n, 32)
     """
 
