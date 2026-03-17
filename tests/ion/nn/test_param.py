@@ -308,39 +308,6 @@ class TestTreeUtilities:
         assert tree.is_trainable_param(jnp.array(1.0)) is False
 
 
-class TestApplyUpdates:
-    def test_apply_updates_preserves_param(self):
-        """apply_updates preserves Param structure."""
-        p = nn.Param(jnp.array([1.0, 2.0]))
-        data = {"w": p}
-        updates = {"w": nn.Param(jnp.array([0.1, 0.2]))}
-
-        result = tree.apply_updates(data, updates)
-        assert isinstance(result["w"], nn.Param)
-        npt.assert_allclose(result["w"]._value, jnp.array([1.1, 2.2]))
-
-    def test_apply_updates_skips_frozen_param(self):
-        """apply_updates leaves frozen Params unchanged."""
-        p = nn.Param(jnp.array([1.0, 2.0]), trainable=False)
-        data = {"w": p}
-        updates = {"w": nn.Param(jnp.array([0.1, 0.2]))}
-
-        result = tree.apply_updates(data, updates)
-        assert isinstance(result["w"], nn.Param)
-        assert result["w"].trainable is False
-        npt.assert_allclose(result["w"]._value, jnp.array([1.0, 2.0]))
-
-    def test_apply_updates_skips_none_updates(self):
-        """apply_updates leaves params unchanged when update is None."""
-        data = {"w": nn.Param(jnp.array([1.0])), "x": jnp.array(5.0)}
-        updates = {"w": None, "x": None}
-
-        result = tree.apply_updates(data, updates)
-        assert isinstance(result["w"], nn.Param)
-        npt.assert_allclose(result["w"]._value, jnp.array([1.0]))
-        npt.assert_allclose(result["x"], 5.0)
-
-
 class TestSaveLoad:
     def test_save_load_roundtrip(self):
         """Param-containing models survive save/load."""
@@ -726,8 +693,7 @@ class TestStopGradient:
 
 
 class TestLaxCompatibility:
-    """internals.md: 'Some JAX/LAX functions don't accept Param directly.'
-    and 'jnp.asarray(param) to convert.'"""
+    """Some JAX/LAX functions don't accept Param directly, use jnp.asarray(param) to convert."""
 
     def test_lax_add_rejects_param(self):
         """Lower-level lax functions reject Param where they expect plain arrays."""

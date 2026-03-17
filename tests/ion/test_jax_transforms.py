@@ -6,7 +6,8 @@ import numpy.testing as npt
 import optax
 import pytest
 
-from ion import nn, tree
+import ion
+from ion import nn
 
 
 class Linear(nn.Module):
@@ -518,10 +519,9 @@ class TestNewJaxTransforms:
         npt.assert_allclose(per_example_grads.w._value, xs)
 
     def test_training_loop_loss_decreases(self):
-        """10-step loop: jax.value_and_grad -> optax -> apply_updates, assert final loss < initial loss."""
+        """10-step loop: jax.value_and_grad -> Optimizer.update, assert final loss < initial loss."""
         model = nn.Linear(4, 1, key=jax.random.key(0))
-        optimizer = optax.adam(1e-2)
-        opt_state = optimizer.init(model)
+        optimizer = ion.Optimizer(optax.adam(1e-2), model)
 
         x = jax.random.normal(jax.random.key(1), (8, 4))
         y = jnp.ones((8, 1))
@@ -533,8 +533,7 @@ class TestNewJaxTransforms:
 
         for _ in range(10):
             loss, grads = jax.value_and_grad(loss_fn)(model, x, y)
-            updates, opt_state = optimizer.update(grads, opt_state)
-            model = tree.apply_updates(model, updates)
+            model, optimizer = optimizer.update(model, grads)
 
         final_loss = loss_fn(model, x, y)
         assert final_loss < initial_loss
@@ -555,8 +554,7 @@ class TestNewJaxTransforms:
         model = model.replace(encoder=model.encoder.freeze())
         frozen_w = model.encoder.w._value.copy()
 
-        optimizer = optax.adam(1e-2)
-        opt_state = optimizer.init(model)
+        optimizer = ion.Optimizer(optax.adam(1e-2), model)
 
         x = jax.random.normal(jax.random.key(1), (8, 4))
         y = jnp.ones((8, 1))
@@ -568,8 +566,7 @@ class TestNewJaxTransforms:
 
         for _ in range(10):
             loss, grads = jax.value_and_grad(loss_fn)(model, x, y)
-            updates, opt_state = optimizer.update(grads, opt_state)
-            model = tree.apply_updates(model, updates)
+            model, optimizer = optimizer.update(model, grads)
 
         final_loss = loss_fn(model, x, y)
         assert final_loss < initial_loss
@@ -671,25 +668,7 @@ class TestNewJaxTransforms:
         # buf is a plain array but grad still computes a value for it
         assert grads.buf is not None
         assert isinstance(grads.buf, jax.Array)
-        # apply_updates would discard this gradient (tested in test_tree.py)
-
-    def test_optimizer_state_covers_frozen_leaves(self):
-        """Optimizer allocates the same state buffers for frozen params as trainable."""
-        model = Linear(2, 3, key=jax.random.key(0))
-        frozen = model.freeze()
-
-        optimizer = optax.adam(1e-3)
-        state_trainable = optimizer.init(model)
-        state_frozen = optimizer.init(frozen)
-
-        # Optimizer allocates the same number of state leaves regardless of trainable flag
-        leaves_t = jax.tree.leaves(state_trainable)
-        leaves_f = jax.tree.leaves(state_frozen)
-        assert len(leaves_t) == len(leaves_f)
-
-        # Shapes match too, frozen params get full momentum/variance buffers
-        for lt, lf in zip(leaves_t, leaves_f):
-            assert lt.shape == lf.shape
+        # Optimizer.update would discard this gradient (non-Param leaves are skipped)
 
     def test_partial_freeze_under_jit_grad(self):
         """Partially frozen model under jit(grad) produces correct gradients."""
@@ -774,25 +753,23 @@ class TestNewJaxTransforms:
         model = model.replace(encoder=model.encoder.freeze())
         frozen_w = model.encoder.w._value.copy()
 
-        optimizer = optax.adam(1e-2)
-        opt_state = optimizer.init(model)
+        optimizer = ion.Optimizer(optax.adam(1e-2), model)
 
         x = jax.random.normal(jax.random.key(1), (16, 4))
         y = jnp.ones((16, 1))
 
         @jax.jit
-        def step(model, opt_state, x, y):
+        def step(model, optimizer, x, y):
             def loss_fn(m):
                 return jnp.mean((m.decoder(m.encoder(x)) - y) ** 2)
 
             loss, grads = jax.value_and_grad(loss_fn)(model)
-            updates, opt_state = optimizer.update(grads, opt_state)
-            model = tree.apply_updates(model, updates)
-            return model, opt_state, loss
+            model, optimizer = optimizer.update(model, grads)
+            return model, optimizer, loss
 
         initial_loss = jnp.mean((model.decoder(model.encoder(x)) - y) ** 2)
         for _ in range(20):
-            model, opt_state, loss = step(model, opt_state, x, y)
+            model, optimizer, loss = step(model, optimizer, x, y)
 
         final_loss = jnp.mean((model.decoder(model.encoder(x)) - y) ** 2)
         assert final_loss < initial_loss
@@ -801,8 +778,7 @@ class TestNewJaxTransforms:
     def test_lax_scan_training_loop(self):
         """Training loop via jax.lax.scan (functional iteration)."""
         model = nn.Linear(4, 1, key=jax.random.key(0))
-        optimizer = optax.sgd(0.01)
-        opt_state = optimizer.init(model)
+        optimizer = ion.Optimizer(optax.sgd(0.01), model)
 
         x = jax.random.normal(jax.random.key(1), (8, 4))
         y = jnp.ones((8, 1))
@@ -811,14 +787,13 @@ class TestNewJaxTransforms:
             return jnp.mean((m(x) - y) ** 2)
 
         def scan_step(carry, _):
-            model, opt_state = carry
+            model, optimizer = carry
             loss, grads = jax.value_and_grad(loss_fn)(model, x, y)
-            updates, opt_state = optimizer.update(grads, opt_state)
-            model = tree.apply_updates(model, updates)
-            return (model, opt_state), loss
+            model, optimizer = optimizer.update(model, grads)
+            return (model, optimizer), loss
 
         initial_loss = loss_fn(model, x, y)
-        (model, _), losses = jax.lax.scan(scan_step, (model, opt_state), None, length=20)
+        (model, _), losses = jax.lax.scan(scan_step, (model, optimizer), None, length=20)
         final_loss = loss_fn(model, x, y)
 
         assert final_loss < initial_loss
@@ -831,8 +806,7 @@ class TestNewJaxTransforms:
         lora = nn.LoRALinear(linear, rank=2, key=keys[1])
         frozen_base_w = lora.linear.w._value.copy()
 
-        optimizer = optax.adam(1e-2)
-        opt_state = optimizer.init(lora)
+        optimizer = ion.Optimizer(optax.adam(1e-2), lora)
 
         x = jax.random.normal(jax.random.key(1), (8, 4))
         y = jnp.ones((8, 4))
@@ -844,8 +818,7 @@ class TestNewJaxTransforms:
 
         for _ in range(10):
             loss, grads = jax.value_and_grad(loss_fn)(lora, x, y)
-            updates, opt_state = optimizer.update(grads, opt_state)
-            lora = tree.apply_updates(lora, updates)
+            lora, optimizer = optimizer.update(lora, grads)
 
         assert loss_fn(lora, x, y) < initial_loss
         npt.assert_array_equal(lora.linear.w._value, frozen_base_w)

@@ -134,20 +134,18 @@ class TestXLAOptimization:
         """Freezing the base layer eliminates backward FLOPs for it."""
         keys = jax.random.split(jax.random.key(0), 2)
         linear = nn.Linear(512, 512, key=keys[0])
-        optimizer = optax.adam(3e-4)
         x = jnp.ones((32, 512))
         y = jnp.ones((32, 512))
 
         def compile_step(lora):
-            state = optimizer.init(lora)
+            opt = ion.Optimizer(optax.adam(3e-4), lora)
 
             @jax.jit
-            def step(model, state, x, y):
+            def step(model, opt, x, y):
                 grads = jax.grad(lambda m: jnp.mean((m(x) - y) ** 2))(model)
-                updates, state = optimizer.update(grads, state)
-                return ion.apply_updates(model, updates), state
+                return opt.update(model, grads)
 
-            return jax.jit(step).lower(lora, state, x, y).compile()
+            return jax.jit(step).lower(lora, opt, x, y).compile()
 
         frozen = compile_step(nn.LoRALinear(linear, rank=8, key=keys[1]))
         unfrozen = compile_step(nn.LoRALinear(linear, rank=8, key=keys[1]).unfreeze())
@@ -170,30 +168,30 @@ class TestXLAOptimization:
         def loss_fn(m, x, y):
             return jnp.mean((m(x) - y) ** 2)
 
-        # Naive: adam processes the full gradient tree including frozen zeros
-        opt_naive = optax.adam(3e-4)
-        state_naive = opt_naive.init(lora)
+        # Naive: ion.Optimizer auto-partitions frozen params
+        opt_naive = ion.Optimizer(optax.adam(3e-4), lora)
 
         @jax.jit
-        def step_naive(model, state, x, y):
+        def step_naive(model, opt, x, y):
             grads = jax.grad(loss_fn)(model, x, y)
-            updates, state = opt_naive.update(grads, state)
-            return ion.apply_updates(model, updates), state
+            return opt.update(model, grads)
 
         # Head-only: optimizer never sees frozen params at all
-        opt_head = optax.adam(3e-4)
-        state_head = opt_head.init((lora.a, lora.b))
+        opt_head_raw = optax.adam(3e-4)
+        state_head = opt_head_raw.init((lora.a, lora.b))
 
         @jax.jit
         def step_head(model, state, x, y):
+            from ion.optimizer import _apply_updates
+
             grads = jax.grad(loss_fn)(model, x, y)
-            updates, state = opt_head.update((grads.a, grads.b), state)
+            updates, state = opt_head_raw.update((grads.a, grads.b), state)
             return model.replace(
-                a=ion.apply_updates(model.a, updates[0]),  # type: ignore[index]
-                b=ion.apply_updates(model.b, updates[1]),  # type: ignore[index]
+                a=_apply_updates(model.a, updates[0]),  # type: ignore[index]
+                b=_apply_updates(model.b, updates[1]),  # type: ignore[index]
             ), state
 
-        naive = jax.jit(step_naive).lower(lora, state_naive, x, y).compile()
+        naive = jax.jit(step_naive).lower(lora, opt_naive, x, y).compile()
         head_only = jax.jit(step_head).lower(lora, state_head, x, y).compile()
 
         def temp_bytes(compiled):
@@ -205,20 +203,12 @@ class TestXLAOptimization:
         assert temp_bytes(naive) <= temp_bytes(head_only)
 
     def test_partition_with_set_to_zero(self):
-        """optax.partition + set_to_zero() skips optimizer state for frozen params."""
+        """ion.Optimizer auto-partitions frozen params with set_to_zero()."""
         keys = jax.random.split(jax.random.key(0), 2)
         linear = nn.Linear(4, 4, key=keys[0])
         lora = nn.LoRALinear(linear, rank=2, key=keys[1])
 
-        # String labels wrapped in Param to preserve pytree structure for optax
-        label = lambda p: nn.Param(
-            'train' if p.trainable else 'freeze', trainable=p.trainable  # type: ignore[arg-type]
-        )
-        optimizer = optax.partition(
-            transforms={'train': optax.adam(3e-4), 'freeze': optax.set_to_zero()},
-            param_labels=lambda params: jax.tree.map(label, params, is_leaf=ion.is_param),
-        )
-        opt_state = optimizer.init(lora)
+        optimizer = ion.Optimizer(optax.adam(3e-4), lora)
         frozen_w = lora.linear.w._value.copy()
 
         x = jax.random.normal(jax.random.key(1), (8, 4))
@@ -230,8 +220,7 @@ class TestXLAOptimization:
         initial_loss = loss_fn(lora, x, y)
         for _ in range(10):
             grads = jax.grad(loss_fn)(lora, x, y)
-            updates, opt_state = optimizer.update(grads, opt_state)
-            lora = ion.apply_updates(lora, updates)
+            lora, optimizer = optimizer.update(lora, grads)
 
         # Loss decreases, frozen base unchanged, LoRA params updated
         assert loss_fn(lora, x, y) < initial_loss
