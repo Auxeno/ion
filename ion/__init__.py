@@ -3,6 +3,7 @@
 from importlib.metadata import version
 
 from . import checkpoint as checkpoint
+from . import gnn as gnn
 from . import nn as nn
 from . import tree as tree
 from .checkpoint import (
@@ -80,6 +81,7 @@ __version__ = version("ion-nn")
 
 __all__ = [
     "checkpoint",
+    "gnn",
     "nn",
     "tree",
     "Optimizer",
