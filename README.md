@@ -45,7 +45,7 @@ Ion also ships with standard neural network layers (linear, convolution, attenti
 > <summary>How does Ion compare to Equinox and Flax?</summary>
 > <br>
 >
-> **[Equinox](https://github.com/patrick-kidger/equinox)** is an excellent pytree-based scientific computing library where neural networks are one of several possible use-cases. It provides filtered transforms, partition/combine utilities, and general pytree tools that give users fine-grained control over how JAX interacts with their code. Equinox treats all JAX arrays equally, so users must remember to apply `lax.stop_gradient` or manually filter trainable parameters when computing gradients and applying optimizer updates. Ion is narrower in scope: three building blocks on top of JAX for defining and training neural networks, where `Param` explicitly tracks trainability so `jax.grad` and `Optimizer` do the right thing automatically. This design choice trades off flexibility for simplicity.
+> **[Equinox](https://github.com/patrick-kidger/equinox)** is an excellent pytree-based scientific computing library where neural networks are one of several possible use-cases. It provides filtered transforms, partition/combine utilities, and general pytree tools that give users fine-grained control over how JAX interacts with their code. Equinox treats all JAX arrays equally, so users must remember to apply `lax.stop_gradient` or manually filter/partition trainable parameters when computing gradients and applying optimizer updates. In Ion, `Param` tracks trainability so `jax.grad` returns zero gradients for frozen params automatically, and `Optimizer` handles the partition internally. The same fine-tuning setup that requires manual `eqx.partition` + `optax.chain` wiring in Equinox is a single `ion.Optimizer(optax.adam(lr), model)` call in Ion. This design choice trades off flexibility for simplicity.
 >
 > **[Flax NNX](https://github.com/google/flax)** takes a fundamentally different philosophical approach to Ion and Equinox. NNX models are mutable graph objects with reference semantics, and custom transforms (`nnx.jit`, `nnx.grad`) that allow mutability within JAX's functional programming model. The result is flexible, PyTorch-like ergonomics at the cost of complexity behind the scenes (state extraction, reference threading, graph tracing) that can make it hard to reason about what your code is doing. Ion keeps things straightforward: immutable pytrees, native JAX transforms, and explicit state passing. NNX is a great choice if you value PyTorch-like ergonomics and are happy to trust the framework.
 > </details>
@@ -95,7 +95,7 @@ Non-array fields (ints, floats, strings, callables) are automatically treated as
 
 ### Optimizer
 
-Wraps an optax optimizer with Param-aware updates. If the model has frozen params, they are automatically partitioned so no optimizer memory is wasted on them.
+Wraps an optax optimizer with Param-aware updates. Frozen params are automatically partitioned out so no optimizer memory is wasted on them, no manual filtering or boilerplate needed.
 
 ```python
 optimizer = ion.Optimizer(optax.adam(3e-4), model)

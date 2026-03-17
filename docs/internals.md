@@ -49,9 +49,9 @@ Three things happen in `__init_subclass__` when a class inherits from `Module`:
 
 ## Optimizer (`ion/optimizer.py`)
 
-Wraps an optax `GradientTransformation` with Param-aware updates. Registered as a JAX pytree so it works with `jax.jit` and `jax.lax.scan`.
+Wraps an optax `GradientTransformation` with Param-aware updates. `Optimizer` is a standalone pytree registered directly via `register_pytree_node_class`, so it works with `jax.jit` and `jax.lax.scan`.
 
-**Auto-partitioning.** On construction, if the model contains any frozen `Param` leaves, the optimizer automatically wraps the transform with `optax.partition`, assigning the real optimizer to trainable params and `optax.set_to_zero()` to frozen params. This means no momentum/variance buffers are allocated for frozen weights. Important for LoRA and other fine-tuning setups where most params are frozen.
+**Auto-partitioning.** On construction, if the model contains any bare JAX arrays or frozen `Param` leaves, the optimizer automatically wraps the transform with `optax.partition`, assigning the real optimizer to trainable params and `optax.set_to_zero()` to frozen params. This means no momentum/variance buffers are allocated for frozen weights. Important for LoRA and other fine-tuning setups where most params are frozen.
 
 **Update.** `optimizer.update(model, grads)` calls the underlying optax transform, then applies the resulting deltas to the model's trainable `Param` leaves only. Non-`Param` arrays (like batch statistics) and frozen `Param` leaves pass through unchanged. The `Param` wrapper is preserved on updated values so trainability metadata survives the step.
 
