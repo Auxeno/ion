@@ -48,15 +48,14 @@ def loss_fn(
 @jax.jit
 def train_step(
     model: SeqModel,
-    opt_state: optax.OptState,
+    optimizer: ion.Optimizer,
     sequences: Float[Array, "b 784 1"],
     labels: Int[Array, " b"],
-) -> tuple[SeqModel, optax.OptState, Float[Array, ""]]:
+) -> tuple[SeqModel, ion.Optimizer, Float[Array, ""]]:
     """Compute gradients, apply optimizer update, and return the new model state."""
     loss, grads = jax.value_and_grad(loss_fn)(model, sequences, labels)
-    updates, opt_state = optimizer.update(grads, opt_state)
-    model = ion.apply_updates(model, updates)
-    return model, opt_state, loss
+    model, optimizer = optimizer.update(model, grads)
+    return model, optimizer, loss
 
 
 @jax.jit
@@ -77,8 +76,6 @@ if __name__ == "__main__":
     BATCH_SIZE = 128
     NUM_EPOCHS = 10
 
-    optimizer = optax.chain(optax.clip_by_global_norm(1.0), optax.adam(LEARNING_RATE))
-
     # Load full dataset into device memory
     train_images, train_labels, test_images, test_labels = load_mnist()
     num_batches = len(train_images) // BATCH_SIZE
@@ -89,7 +86,9 @@ if __name__ == "__main__":
     test_lab = jnp.asarray(test_labels)
 
     model = SeqModel(key=jax.random.key(0))
-    opt_state = optimizer.init(model)
+    optimizer = ion.Optimizer(
+        optax.chain(optax.clip_by_global_norm(1.0), optax.adam(LEARNING_RATE)), model
+    )
 
     for epoch in range(NUM_EPOCHS):
         # Shuffle training indices each epoch
@@ -103,8 +102,8 @@ if __name__ == "__main__":
             sequences = jnp.asarray(train_seq[batch_indices], dtype=jnp.float32) / 255.0
             labels = jnp.asarray(train_labels[batch_indices])
 
-            # Update model and optimizer state
-            model, opt_state, loss = train_step(model, opt_state, sequences, labels)
+            # Update model and optimizer
+            model, optimizer, loss = train_step(model, optimizer, sequences, labels)
 
             epoch_loss += loss.item()
 

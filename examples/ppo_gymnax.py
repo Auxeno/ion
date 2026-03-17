@@ -171,11 +171,11 @@ def ppo_loss(
 @jax.jit
 def learn(
     network: ActorCritic,
-    opt_state: optax.OptState,
+    optimizer: ion.Optimizer,
     batch: Transition,
     *,
     key: PRNGKeyArray,
-) -> tuple[ActorCritic, optax.OptState]:
+) -> tuple[ActorCritic, ion.Optimizer]:
     """PPO update: compute GAE then scan over minibatch gradient steps."""
 
     # Compute advantages with GAE
@@ -202,7 +202,7 @@ def learn(
     mb_indices = mb_indices.reshape(NUM_EPOCHS * NUM_MINIBATCHES, MINIBATCH_SIZE)
 
     def minibatch_update(carry, indices):
-        network, opt_state = carry
+        network, optimizer = carry
 
         # Compute PPO loss and parameter gradients
         loss, grads = jax.value_and_grad(ppo_loss)(
@@ -215,12 +215,11 @@ def learn(
         )
 
         # Apply optimizer update
-        updates, opt_state = optimizer.update(grads, opt_state)
-        network = ion.apply_updates(network, updates)
-        return (network, opt_state), loss
+        network, optimizer = optimizer.update(network, grads)
+        return (network, optimizer), loss
 
-    (network, opt_state), _ = jax.lax.scan(minibatch_update, (network, opt_state), mb_indices)
-    return network, opt_state
+    (network, optimizer), _ = jax.lax.scan(minibatch_update, (network, optimizer), mb_indices)
+    return network, optimizer
 
 
 if __name__ == "__main__":
@@ -252,11 +251,10 @@ if __name__ == "__main__":
 
     # Initialize network and optimizer
     network = ActorCritic(obs_dim, action_dim, key=key_network)
-    optimizer = optax.chain(
-        optax.clip_by_global_norm(1.0),
-        optax.adam(learning_rate=LR, eps=1e-5),
+    optimizer = ion.Optimizer(
+        optax.chain(optax.clip_by_global_norm(1.0), optax.adam(learning_rate=LR, eps=1e-5)),
+        network,
     )
-    opt_state = optimizer.init(network)
 
     # Reset vectorized environments
     observations, env_states = jax.vmap(env.reset, in_axes=(0, None))(
@@ -275,7 +273,7 @@ if __name__ == "__main__":
 
         # Collect transitions and update policy
         carry, transitions = rollout(network, carry)
-        network, opt_state = learn(network, opt_state, transitions, key=key_learn)
+        network, optimizer = learn(network, optimizer, transitions, key=key_learn)
 
         # Track episode statistics
         rewards_np = np.asarray(transitions.rewards)
