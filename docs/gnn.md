@@ -4,13 +4,14 @@ Conventions and usage for Ion's graph neural network layers.
 
 ## Graph Representation
 
-Graphs are represented as three plain arrays, no custom graph object:
+Graphs are represented as plain arrays, no custom graph object:
 
 | Array | Type | Shape | Meaning |
 |-------|------|-------|---------|
 | `x` | float | `(n, d)` | Node feature matrix (n nodes, d features) |
 | `senders` | int | `(e,)` | Source node index for each edge |
 | `receivers` | int | `(e,)` | Destination node index for each edge |
+| `x_edge` | float | `(e, f)` | Edge feature matrix (optional, GATConv/GATv2Conv only) |
 
 Edges are directed. For undirected graphs, include both directions:
 
@@ -107,11 +108,11 @@ y = gat(x, senders, receivers, x_edge)  # x_edge shape: (e, 8)
 |-------|---------|---------|
 | `n` | number of nodes | everywhere |
 | `e` | number of edges | everywhere |
-| `i` | input features | GCNConv, GATConv |
-| `o` | output features | GCNConv, GATConv |
-| `h` | number of attention heads | GATConv |
-| `k` | per-head dimension | GATConv |
-| `f` | edge feature dimension | GATConv (edge_dim) |
+| `i` | input features | GCNConv, GATConv, GATv2Conv |
+| `o` | output features | GCNConv, GATConv, GATv2Conv |
+| `h` | number of attention heads | GATConv, GATv2Conv |
+| `k` | per-head dimension | GATConv, GATv2Conv |
+| `f` | edge feature dimension | GATConv, GATv2Conv (edge_dim) |
 
 ## Weight Initialization
 
@@ -122,14 +123,17 @@ y = gat(x, senders, receivers, x_edge)  # x_edge shape: (e, 8)
 | GATConv (attention) | Glorot uniform | - |
 | GATConv (edge projection) | Glorot uniform | - |
 | GATConv (edge attention) | Glorot uniform | - |
+| GATv2Conv (projection) | Glorot uniform | zeros |
+| GATv2Conv (attention) | Glorot uniform | - |
+| GATv2Conv (edge projection) | Glorot uniform | - |
 
-GCNConv defaults to He normal, matching `Linear`, since it is typically followed by ReLU. GATConv uses Glorot uniform (activation-agnostic) since the projection feeds into a LeakyReLU attention mechanism.
+GCNConv defaults to He normal, matching `Linear`, since it is typically followed by ReLU. GATConv and GATv2Conv use Glorot uniform (activation-agnostic) since the projections feed into a LeakyReLU attention mechanism.
 
 ## Operations
 
 ### segment_softmax
 
-Softmax normalized within segments. Used internally by GATConv to normalize attention weights per receiver node, but useful for custom GNN layers too.
+Softmax normalized within segments. Used internally by GATConv and GATv2Conv to normalize attention weights per receiver node, but useful for custom GNN layers too.
 
 ```python
 from ion.gnn import segment_softmax
