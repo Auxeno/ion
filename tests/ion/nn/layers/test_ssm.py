@@ -31,7 +31,7 @@ class TestLRUCell:
         assert cell.b_im.shape == (8, 16)
         assert cell.c_re.shape == (16, 8)
         assert cell.c_im.shape == (16, 8)
-        assert cell.w_skip.shape == (8,)
+        assert cell.d.shape == (8,)
         assert cell.gamma_log.shape == (16,)
 
     def test_initial_state_zeros(self):
@@ -68,15 +68,15 @@ class TestLRUCell:
         c = cell.c_re._value + 1j * cell.c_im._value
 
         hx_exp = lam * h0 + x.astype(jnp.complex64) @ b
-        y_exp = jnp.real(hx_exp @ c) + cell.w_skip._value * x
+        y_exp = jnp.real(hx_exp @ c) + cell.d._value * x
 
         npt.assert_allclose(hx, hx_exp, rtol=1e-5, atol=1e-5)
         npt.assert_allclose(y, y_exp, rtol=1e-5, atol=1e-5)
 
-    def test_skip_init_zeros(self):
-        """Skip connection w_skip is initialized to zeros by default."""
+    def test_d_init_zeros(self):
+        """Skip connection d is initialized to zeros by default."""
         cell = nn.LRUCell(8, 16, key=jax.random.key(0))
-        npt.assert_array_equal(cell.w_skip._value, jnp.zeros(8))
+        npt.assert_array_equal(cell.d._value, jnp.zeros(8))
 
     def test_output_real_dtype(self):
         """Output y is real-valued (float32), hx is complex64."""

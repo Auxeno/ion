@@ -2,7 +2,7 @@
 
 Modules:
     LRUCell  Single-step Linear Recurrent Unit with diagonal complex state.  (Orvieto et al., 2023)
-    LRU      Linear Recurrent Unit over a full sequence via lax.scan.        (Orvieto et al., 2023)
+    LRU      Linear Recurrent Unit over a full sequence via associative_scan. (Orvieto et al., 2023)
 
 Complex state parameterized via separate real/imaginary arrays.
 Diagonal recurrence enables efficient per-element state updates.
@@ -21,6 +21,13 @@ from ..module import Module
 from ..param import Param
 
 
+def _binary_op(a, b):
+    """Binary operator for parallel scan of diagonal linear recurrence."""
+    a_lambda, a_hidden = a
+    b_lambda, b_hidden = b
+    return b_lambda * a_lambda, b_lambda * a_hidden + b_hidden
+
+
 class LRUCell(Module):
     """Single-step Linear Recurrent Unit cell.
 
@@ -34,7 +41,7 @@ class LRUCell(Module):
     b_im: Param[Float[Array, "i h"]]
     c_re: Param[Float[Array, "h i"]]
     c_im: Param[Float[Array, "h i"]]
-    w_skip: Param[Float[Array, " i"]]
+    d: Param[Float[Array, " i"]]
     gamma_log: Param[Float[Array, " h"]]
 
     def __init__(
@@ -47,12 +54,12 @@ class LRUCell(Module):
         dtype: jnp.dtype = jnp.float32,
         b_init: Initializer = jax.nn.initializers.glorot_normal(),
         c_init: Initializer = jax.nn.initializers.glorot_normal(),
-        skip_init: Initializer = jax.nn.initializers.zeros,
+        d_init: Initializer = jax.nn.initializers.zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
 
-        key_nu, key_theta, key_bre, key_bim, key_cre, key_cim, key_skip = jax.random.split(key, 7)
+        key_nu, key_theta, key_bre, key_bim, key_cre, key_cim, key_d = jax.random.split(key, 7)
 
         # Eigenvalue magnitudes sampled uniformly on annulus [r_min, r_max]
         u1 = jax.random.uniform(key_nu, shape=(hidden_dim,))
@@ -72,11 +79,18 @@ class LRUCell(Module):
         self.c_im = Param(c_init(shape=(hidden_dim, in_dim), dtype=dtype, key=key_cim))
 
         # Skip connection
-        self.w_skip = Param(skip_init(shape=(in_dim,), dtype=dtype, key=key_skip))
+        self.d = Param(d_init(shape=(in_dim,), dtype=dtype, key=key_d))
 
         # Normalization factor, derived from eigenvalue magnitudes
-        diag_lambda = jnp.exp(-jnp.exp(nu_log) + 1j * jnp.exp(theta_log))
-        self.gamma_log = Param(jnp.log(jnp.sqrt(1 - jnp.abs(diag_lambda) ** 2)).astype(dtype))
+        self.gamma_log = Param(jnp.log(jnp.sqrt(1 - jnp.abs(self.diag_lambda) ** 2)).astype(dtype))
+
+    @property
+    def diag_lambda(self) -> Complex[Array, " h"]:
+        return jnp.exp(-jnp.exp(self.nu_log) + 1j * jnp.exp(self.theta_log))
+
+    @property
+    def initial_state(self) -> Complex[Array, " h"]:
+        return jnp.zeros(self.nu_log.shape[0], dtype=jnp.complex64)
 
     def __call__(
         self,
@@ -84,17 +98,12 @@ class LRUCell(Module):
         h: Complex[Array, "... h"],
     ) -> tuple[Float[Array, "... i"], Complex[Array, "... h"]]:
 
-        diag_lambda = jnp.exp(-jnp.exp(self.nu_log) + 1j * jnp.exp(self.theta_log))
         b_proj = (self.b_re + 1j * self.b_im) * jnp.exp(self.gamma_log)
         c_proj = self.c_re + 1j * self.c_im
 
-        h = diag_lambda * h + x.astype(jnp.complex64) @ b_proj
+        h = self.diag_lambda * h + x.astype(jnp.complex64) @ b_proj
 
-        return jnp.real(h @ c_proj) + self.w_skip * x, h
-
-    @property
-    def initial_state(self) -> Complex[Array, " h"]:
-        return jnp.zeros(self.nu_log.shape[0], dtype=jnp.complex64)
+        return jnp.real(h @ c_proj) + self.d * x, h
 
 
 class LRU(Module):
@@ -116,13 +125,13 @@ class LRU(Module):
         dtype: jnp.dtype = jnp.float32,
         b_init: Initializer = jax.nn.initializers.glorot_normal(),
         c_init: Initializer = jax.nn.initializers.glorot_normal(),
-        skip_init: Initializer = jax.nn.initializers.zeros,
+        d_init: Initializer = jax.nn.initializers.zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
 
         self.cell = LRUCell(
-            in_dim, hidden_dim, r_min, r_max, max_phase, dtype, b_init, c_init, skip_init, key=key
+            in_dim, hidden_dim, r_min, r_max, max_phase, dtype, b_init, c_init, d_init, key=key
         )
 
     def __call__(
@@ -132,19 +141,18 @@ class LRU(Module):
     ) -> tuple[Float[Array, "b t i"], Complex[Array, "b h"]]:
 
         b, t, i = x.shape
-        hd = self.cell.nu_log.shape[0]
 
-        if hx is None:
-            h0 = self.cell.initial_state
-            h0 = jnp.broadcast_to(h0, (b, hd))
-        else:
-            h0 = hx
+        b_proj = (self.cell.b_re + 1j * self.cell.b_im) * jnp.exp(self.cell.gamma_log)
+        c_proj = self.cell.c_re + 1j * self.cell.c_im
 
-        def step(carry, x_t):
-            out, h = self.cell(x_t, carry)
-            return h, out
+        lambdas = jnp.broadcast_to(self.cell.diag_lambda, (b, t, self.cell.nu_log.shape[0]))
+        hidden = x.astype(jnp.complex64) @ b_proj
 
-        hx, x = lax.scan(f=step, init=h0, xs=jnp.moveaxis(x, 1, 0))
-        x = jnp.moveaxis(x, 0, 1)
+        lambdas, hidden = lax.associative_scan(fn=_binary_op, elems=(lambdas, hidden), axis=1)
 
-        return x, hx
+        if hx is not None:
+            hidden = lambdas * hx[:, None, :] + hidden
+
+        x = jnp.real(hidden @ c_proj) + self.cell.d * x
+
+        return x, hidden[:, -1, :]
