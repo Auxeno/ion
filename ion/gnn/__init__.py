@@ -1,10 +1,10 @@
-from .gat import GraphAttention
-from .gcn import GraphConv
+from .gat import GATConv
+from .gcn import GCNConv
 from .ops import add_self_loops, segment_softmax
 
 __all__ = [
-    "GraphAttention",
-    "GraphConv",
+    "GATConv",
+    "GCNConv",
     "add_self_loops",
     "segment_softmax",
 ]

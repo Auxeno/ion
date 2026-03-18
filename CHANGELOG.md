@@ -2,8 +2,8 @@
 
 ## 0.4.0
 
-- **Graph Neural Networks.** New `ion.gnn` module with `GraphConv` (Kipf & Welling, 2017) and `GraphAttention` (Velickovic et al., 2018) layers. Graphs are represented as plain arrays (`x`, `senders`, `receivers`) with no custom data structures. Includes `segment_softmax` and `add_self_loops` utilities.
-- **Cora demo.** New example training both GraphConv and GraphAttention on semi-supervised node classification.
+- **Graph Neural Networks.** New `ion.gnn` module with `GCNConv` (Kipf & Welling, 2017) and `GATConv` (Velickovic et al., 2018) layers. Graphs are represented as plain arrays (`x`, `senders`, `receivers`) with no custom data structures. Includes `segment_softmax` and `add_self_loops` utilities.
+- **Cora demo.** New example training both GCNConv and GATConv on semi-supervised node classification.
 - **GNN docs.** New [gnn.md](docs/gnn.md) covering graph representation, shape annotations, weight init, and batching.
 
 ## 0.3.0

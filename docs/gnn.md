@@ -32,18 +32,18 @@ from ion.gnn import add_self_loops
 senders, receivers = add_self_loops(senders, receivers, num_nodes)
 ```
 
-Without self-loops, a node's output depends only on its neighbors, not itself. This is almost never what you want for GraphConv. For GraphAttention, self-loops allow the node to attend to its own features.
+Without self-loops, a node's output depends only on its neighbors, not itself. This is almost never what you want for GCNConv. For GATConv, self-loops allow the node to attend to its own features.
 
 ## Layers
 
-### GraphConv
+### GCNConv
 
 Graph Convolutional Network (Kipf & Welling, 2017). Applies a shared linear transform then aggregates with symmetric degree normalization: D^{-1/2} A D^{-1/2} X W.
 
 ```python
 from ion import gnn
 
-gcn = gnn.GraphConv(in_dim=16, out_dim=32, key=key)
+gcn = gnn.GCNConv(in_dim=16, out_dim=32, key=key)
 y = gcn(x, senders, receivers)  # (n, 16) -> (n, 32)
 ```
 
@@ -54,16 +54,25 @@ x = jax.nn.relu(gcn_1(x, senders, receivers))
 x = gcn_2(x, senders, receivers)
 ```
 
-### GraphAttention
+### GATConv
 
 Graph Attention Network (Velickovic et al., 2018). Learns attention weights over each node's neighborhood using LeakyReLU-gated additive attention. Multi-head attention is supported; heads are concatenated.
 
 ```python
-gat = gnn.GraphAttention(in_dim=16, out_dim=32, num_heads=4, key=key)
+gat = gnn.GATConv(in_dim=16, out_dim=32, num_heads=4, key=key)
 y = gat(x, senders, receivers)  # (n, 16) -> (n, 32)
 ```
 
 `out_dim` must be divisible by `num_heads`. Each head produces `out_dim // num_heads` features, concatenated to `out_dim`.
+
+**Edge features.** Set `edge_dim` to incorporate per-edge features into attention scores. When provided, edge features are projected into the multi-head space and added to the attention logits before the LeakyReLU gate:
+
+```python
+gat = gnn.GATConv(in_dim=16, out_dim=32, num_heads=4, edge_dim=8, key=key)
+y = gat(x, senders, receivers, x_edge)  # x_edge shape: (e, 8)
+```
+
+When `edge_dim` is None (default), no extra parameters are created and behavior is identical to the standard GATConv. If `edge_dim` is set but `x_edge` is not passed at call time, the edge path is skipped. Passing `x_edge` without setting `edge_dim` will raise an error.
 
 ## Shape Annotations
 
@@ -71,26 +80,29 @@ y = gat(x, senders, receivers)  # (n, 16) -> (n, 32)
 |-------|---------|---------|
 | `n` | number of nodes | everywhere |
 | `e` | number of edges | everywhere |
-| `i` | input features | GraphConv, GraphAttention |
-| `o` | output features | GraphConv, GraphAttention |
-| `h` | number of attention heads | GraphAttention |
-| `k` | per-head dimension | GraphAttention |
+| `i` | input features | GCNConv, GATConv |
+| `o` | output features | GCNConv, GATConv |
+| `h` | number of attention heads | GATConv |
+| `k` | per-head dimension | GATConv |
+| `f` | edge feature dimension | GATConv (edge_dim) |
 
 ## Weight Initialization
 
 | Layer | Weights | Bias |
 |-------|---------|------|
-| GraphConv | He normal | zeros |
-| GraphAttention (projection) | Glorot uniform | zeros |
-| GraphAttention (attention) | Glorot uniform | - |
+| GCNConv | He normal | zeros |
+| GATConv (projection) | Glorot uniform | zeros |
+| GATConv (attention) | Glorot uniform | - |
+| GATConv (edge projection) | Glorot uniform | - |
+| GATConv (edge attention) | Glorot uniform | - |
 
-GraphConv defaults to He normal, matching `Linear`, since it is typically followed by ReLU. GraphAttention uses Glorot uniform (activation-agnostic) since the projection feeds into a LeakyReLU attention mechanism.
+GCNConv defaults to He normal, matching `Linear`, since it is typically followed by ReLU. GATConv uses Glorot uniform (activation-agnostic) since the projection feeds into a LeakyReLU attention mechanism.
 
 ## Operations
 
 ### segment_softmax
 
-Softmax normalized within segments. Used internally by GraphAttention to normalize attention weights per receiver node, but useful for custom GNN layers too.
+Softmax normalized within segments. Used internally by GATConv to normalize attention weights per receiver node, but useful for custom GNN layers too.
 
 ```python
 from ion.gnn import segment_softmax
@@ -139,13 +151,13 @@ import ion
 from ion import nn, gnn
 
 class NodeClassifier(nn.Module):
-    gcn_1: gnn.GraphConv
-    gcn_2: gnn.GraphConv
+    gcn_1: gnn.GCNConv
+    gcn_2: gnn.GCNConv
 
     def __init__(self, in_dim: int, hidden_dim: int, num_classes: int, *, key):
         key_1, key_2 = jax.random.split(key)
-        self.gcn_1 = gnn.GraphConv(in_dim, hidden_dim, key=key_1)
-        self.gcn_2 = gnn.GraphConv(hidden_dim, num_classes, key=key_2)
+        self.gcn_1 = gnn.GCNConv(in_dim, hidden_dim, key=key_1)
+        self.gcn_2 = gnn.GCNConv(hidden_dim, num_classes, key=key_2)
 
     def __call__(self, x, senders, receivers):
         x = jax.nn.relu(self.gcn_1(x, senders, receivers))

@@ -6,10 +6,10 @@ import pytest
 from ion import gnn
 
 
-class TestGraphAttention:
+class TestGATConv:
     def test_output_shape(self):
         """Output shape is (num_nodes, out_dim)."""
-        gat = gnn.GraphAttention(8, 16, key=jax.random.key(0))
+        gat = gnn.GATConv(8, 16, key=jax.random.key(0))
         x = jnp.ones((5, 8))
         senders = jnp.array([0, 1, 2, 3])
         receivers = jnp.array([1, 2, 3, 4])
@@ -20,14 +20,14 @@ class TestGraphAttention:
         """Various num_heads values all produce correct output shape."""
         senders, receivers = triangle_graph
         for num_heads in [1, 2, 4, 8]:
-            gat = gnn.GraphAttention(16, 16, num_heads=num_heads, key=jax.random.key(0))
+            gat = gnn.GATConv(16, 16, num_heads=num_heads, key=jax.random.key(0))
             x = jnp.ones((3, 16))
             y = gat(x, senders, receivers)
             assert y.shape == (3, 16)
 
     def test_no_bias(self, triangle_graph):
         """No-bias mode: bias field is None, output still has correct shape."""
-        gat = gnn.GraphAttention(8, 16, bias=False, key=jax.random.key(0))
+        gat = gnn.GATConv(8, 16, bias=False, key=jax.random.key(0))
         assert gat.b is None
         x = jnp.ones((3, 8))
         senders, receivers = triangle_graph
@@ -36,7 +36,7 @@ class TestGraphAttention:
 
     def test_glorot_init(self):
         """Glorot uniform initialization gives var(w) close to 2/(fan_in+fan_out)."""
-        gat = gnn.GraphAttention(2048, 2048, key=jax.random.key(42))
+        gat = gnn.GATConv(2048, 2048, key=jax.random.key(42))
         var = jnp.var(gat.w._value)
         # Glorot uniform: var = 2 / (fan_in + fan_out), but for (i, h, k) shape
         # the effective fan_in=2048, fan_out=2048
@@ -45,19 +45,19 @@ class TestGraphAttention:
 
     def test_zero_bias_init(self):
         """Bias is initialized to all zeros."""
-        gat = gnn.GraphAttention(8, 16, key=jax.random.key(0))
+        gat = gnn.GATConv(8, 16, key=jax.random.key(0))
         assert jnp.all(gat.b == 0)
 
     def test_weight_dtype(self):
         """Weights match the requested dtype."""
-        gat = gnn.GraphAttention(8, 16, dtype=jnp.float32, key=jax.random.key(0))
+        gat = gnn.GATConv(8, 16, dtype=jnp.float32, key=jax.random.key(0))
         assert gat.w.dtype == jnp.float32
         assert gat.att_sender.dtype == jnp.float32
         assert gat.att_receiver.dtype == jnp.float32
 
     def test_attention_changes_with_features(self, triangle_graph):
         """Different node features produce different attention-weighted outputs."""
-        gat = gnn.GraphAttention(4, 4, key=jax.random.key(0))
+        gat = gnn.GATConv(4, 4, key=jax.random.key(0))
         senders, receivers = triangle_graph
         x1 = jax.random.normal(jax.random.key(1), (3, 4))
         x2 = jax.random.normal(jax.random.key(2), (3, 4))
@@ -67,12 +67,12 @@ class TestGraphAttention:
 
     def test_negative_slope(self):
         """Custom negative_slope is stored and used."""
-        gat = gnn.GraphAttention(8, 8, negative_slope=0.1, key=jax.random.key(0))
+        gat = gnn.GATConv(8, 8, negative_slope=0.1, key=jax.random.key(0))
         assert gat.negative_slope == 0.1
 
     def test_neighbor_influence_via_jacobian(self):
         """Connected nodes influence each other, disconnected nodes do not."""
-        gat = gnn.GraphAttention(4, 4, key=jax.random.key(0))
+        gat = gnn.GATConv(4, 4, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 4))
         # Only edge: 0 -> 1 (node 2 is disconnected)
         senders = jnp.array([0])
@@ -86,7 +86,7 @@ class TestGraphAttention:
 
     def test_single_node_self_loop(self):
         """Minimal graph: one node with a self-loop."""
-        gat = gnn.GraphAttention(4, 8, num_heads=2, key=jax.random.key(0))
+        gat = gnn.GATConv(4, 8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (1, 4))
         senders = jnp.array([0])
         receivers = jnp.array([0])
@@ -95,8 +95,87 @@ class TestGraphAttention:
         assert jnp.all(jnp.isfinite(y))
 
 
-class TestGraphAttentionValidation:
+class TestGATConvEdgeFeatures:
+    def test_edge_dim_output_shape(self, triangle_graph):
+        """With edge features, output shape is still (num_nodes, out_dim)."""
+        senders, receivers = triangle_graph
+        num_edges = senders.shape[0]
+        gat = gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
+        y = gat(x, senders, receivers, x_edge)
+        assert y.shape == (3, 16)
+
+    def test_edge_dim_none_matches_no_edge(self, triangle_graph):
+        """edge_dim=None produces identical output to omitting x_edge."""
+        senders, receivers = triangle_graph
+        gat = gnn.GATConv(8, 16, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        y1 = gat(x, senders, receivers)
+        y2 = gat(x, senders, receivers, x_edge=None)
+        npt.assert_allclose(y1, y2, rtol=0, atol=0)
+
+    def test_edge_features_change_output(self, triangle_graph):
+        """Providing different edge features changes the output."""
+        senders, receivers = triangle_graph
+        num_edges = senders.shape[0]
+        gat = gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        x_edge1 = jax.random.normal(jax.random.key(2), (num_edges, 4))
+        x_edge2 = jax.random.normal(jax.random.key(3), (num_edges, 4))
+        y1 = gat(x, senders, receivers, x_edge1)
+        y2 = gat(x, senders, receivers, x_edge2)
+        assert not jnp.allclose(y1, y2)
+
+    def test_edge_dim_grad(self, triangle_graph):
+        """Gradients flow through edge params."""
+        senders, receivers = triangle_graph
+        num_edges = senders.shape[0]
+        gat = gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
+
+        grads = jax.grad(lambda m: m(x, senders, receivers, x_edge).sum())(gat)
+        assert jnp.all(jnp.isfinite(grads.w_edge._value))
+        assert jnp.all(jnp.isfinite(grads.att_edge._value))
+        assert jnp.any(grads.w_edge._value != 0)
+        assert jnp.any(grads.att_edge._value != 0)
+
+    def test_edge_dim_frozen(self, triangle_graph):
+        """Frozen edge params get zero gradients."""
+        senders, receivers = triangle_graph
+        num_edges = senders.shape[0]
+        gat = gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
+        frozen = gat.freeze()
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
+
+        grads = jax.grad(lambda m: m(x, senders, receivers, x_edge).sum())(frozen)
+        npt.assert_allclose(grads.w_edge._value, jnp.zeros_like(grads.w_edge._value), atol=1e-7)
+        npt.assert_allclose(grads.att_edge._value, jnp.zeros_like(grads.att_edge._value), atol=1e-7)
+
+    def test_edge_dim_without_x_edge(self, triangle_graph):
+        """edge_dim set but x_edge omitted still produces valid output (ignores edge path)."""
+        senders, receivers = triangle_graph
+        gat = gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        y = gat(x, senders, receivers)
+        assert y.shape == (3, 16)
+        assert jnp.all(jnp.isfinite(y))
+
+    def test_x_edge_without_edge_dim_raises(self, triangle_graph):
+        """Passing x_edge to a layer without edge_dim raises."""
+        senders, receivers = triangle_graph
+        num_edges = senders.shape[0]
+        gat = gnn.GATConv(8, 16, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
+        with pytest.raises(Exception):
+            gat(x, senders, receivers, x_edge)
+
+
+class TestGATConvValidation:
     def test_out_dim_not_divisible_by_num_heads_raises(self):
         """out_dim must be divisible by num_heads."""
         with pytest.raises(ValueError, match="divisible"):
-            gnn.GraphAttention(8, 7, num_heads=3, key=jax.random.key(0))
+            gnn.GATConv(8, 7, num_heads=3, key=jax.random.key(0))

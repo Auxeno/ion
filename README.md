@@ -180,7 +180,7 @@ Ion ships with standard neural network layers. Each is a `Module` with trainable
 | Positional      | `sinusoidal`, `rope`, `apply_rope`, `alibi`                               |
 | Regularization  | `Dropout`                                                                 |
 | Blocks          | `Sequential`, `MLP`, `TransformerBlock`, `CrossTransformerBlock`          |
-| Graph (GNN)     | `GraphConv`, `GraphAttention`                                            |
+| Graph (GNN)     | `GCNConv`, `GATConv`                                            |
 
 See [Layer Conventions](https://github.com/auxeno/ion/blob/main/docs/layers.md) for data format, weight init, and spatial layer usage. See [GNN Conventions](https://github.com/auxeno/ion/blob/main/docs/gnn.md) for graph layer usage.
 

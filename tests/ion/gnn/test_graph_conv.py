@@ -5,10 +5,10 @@ import numpy.testing as npt
 from ion import gnn
 
 
-class TestGraphConv:
+class TestGCNConv:
     def test_output_shape(self):
         """Output shape is (num_nodes, out_dim)."""
-        gcn = gnn.GraphConv(8, 16, key=jax.random.key(0))
+        gcn = gnn.GCNConv(8, 16, key=jax.random.key(0))
         x = jnp.ones((5, 8))
         senders = jnp.array([0, 1, 2, 3])
         receivers = jnp.array([1, 2, 3, 4])
@@ -17,7 +17,7 @@ class TestGraphConv:
 
     def test_output_manual(self, triangle_graph):
         """Output matches manual D^{-1/2} A D^{-1/2} (X W) + b computation."""
-        gcn = gnn.GraphConv(2, 3, key=jax.random.key(0))
+        gcn = gnn.GCNConv(2, 3, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 2))
         senders, receivers = triangle_graph
 
@@ -39,7 +39,7 @@ class TestGraphConv:
 
     def test_no_bias(self, triangle_graph):
         """No-bias mode: bias field is None, output still has correct shape."""
-        gcn = gnn.GraphConv(8, 16, bias=False, key=jax.random.key(0))
+        gcn = gnn.GCNConv(8, 16, bias=False, key=jax.random.key(0))
         assert gcn.b is None
         x = jnp.ones((3, 8))
         senders, receivers = triangle_graph
@@ -48,24 +48,24 @@ class TestGraphConv:
 
     def test_he_normal_init(self):
         """He normal initialization gives var(w) close to 2/fan_in."""
-        gcn = gnn.GraphConv(2048, 2048, key=jax.random.key(42))
+        gcn = gnn.GCNConv(2048, 2048, key=jax.random.key(42))
         var = jnp.var(gcn.w._value)
         expected_var = 2.0 / 2048
         npt.assert_allclose(var, expected_var, atol=0.05)
 
     def test_zero_bias_init(self):
         """Bias is initialized to all zeros."""
-        gcn = gnn.GraphConv(8, 16, key=jax.random.key(0))
+        gcn = gnn.GCNConv(8, 16, key=jax.random.key(0))
         assert jnp.all(gcn.b == 0)
 
     def test_weight_dtype(self):
         """Weights match the requested dtype."""
-        gcn = gnn.GraphConv(8, 16, dtype=jnp.float32, key=jax.random.key(0))
+        gcn = gnn.GCNConv(8, 16, dtype=jnp.float32, key=jax.random.key(0))
         assert gcn.w.dtype == jnp.float32
 
     def test_isolated_node_gets_only_bias(self):
         """A node with no incoming edges gets zero features (plus bias)."""
-        gcn = gnn.GraphConv(4, 4, key=jax.random.key(0))
+        gcn = gnn.GCNConv(4, 4, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 4))
         # Only edge: 0 -> 1 (node 2 is isolated)
         senders = jnp.array([0])
@@ -76,7 +76,7 @@ class TestGraphConv:
 
     def test_self_loops_change_output(self, triangle_graph, triangle_graph_no_self_loops):
         """Adding self-loops changes the layer output."""
-        gcn = gnn.GraphConv(4, 4, key=jax.random.key(0))
+        gcn = gnn.GCNConv(4, 4, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 4))
 
         senders_no_sl, receivers_no_sl = triangle_graph_no_self_loops
@@ -88,7 +88,7 @@ class TestGraphConv:
 
     def test_single_node_self_loop(self):
         """Minimal graph: one node with a self-loop."""
-        gcn = gnn.GraphConv(4, 8, key=jax.random.key(0))
+        gcn = gnn.GCNConv(4, 8, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (1, 4))
         senders = jnp.array([0])
         receivers = jnp.array([0])

@@ -27,20 +27,22 @@ def _build_gnn_layers(key):
     receivers = jnp.array([1, 0, 2, 1, 2, 0, 0, 1, 2])
     x = jax.random.normal(next(keys), (3, 8))
     return [
-        (gnn.GraphConv(8, 16, key=next(keys)), x, senders, receivers),
-        (gnn.GraphConv(8, 16, bias=False, key=next(keys)), x, senders, receivers),
-        (gnn.GraphAttention(8, 16, num_heads=2, key=next(keys)), x, senders, receivers),
-        (gnn.GraphAttention(8, 16, num_heads=4, key=next(keys)), x, senders, receivers),
-        (gnn.GraphAttention(8, 16, num_heads=2, bias=False, key=next(keys)), x, senders, receivers),
+        (gnn.GCNConv(8, 16, key=next(keys)), x, senders, receivers),
+        (gnn.GCNConv(8, 16, bias=False, key=next(keys)), x, senders, receivers),
+        (gnn.GATConv(8, 16, num_heads=2, key=next(keys)), x, senders, receivers),
+        (gnn.GATConv(8, 16, num_heads=4, key=next(keys)), x, senders, receivers),
+        (gnn.GATConv(8, 16, num_heads=2, bias=False, key=next(keys)), x, senders, receivers),
+        (gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=next(keys)), x, senders, receivers),
     ]
 
 
 _GNN_PARAM_NAMES = [
-    "graph_conv",
-    "graph_conv_no_bias",
-    "graph_attention",
-    "graph_attention_4_heads",
-    "graph_attention_no_bias",
+    "gcn_conv",
+    "gcn_conv_no_bias",
+    "gat_conv",
+    "gat_conv_4_heads",
+    "gat_conv_no_bias",
+    "gat_conv_edge_dim",
 ]
 
 

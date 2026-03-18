@@ -5,8 +5,8 @@ connected by 10,556 citation edges, predict which of 7 CS subfields each
 paper belongs to. Only 140 labeled nodes are used for training; the rest
 are unlabeled. Each node has a 1,433-dim bag-of-words feature vector.
 
-Trains a GraphConv model (fixed degree-weighted averaging) and a
-GraphAttention model (learned neighbor weighting) on the same split.
+Trains a GCNConv model (fixed degree-weighted averaging) and a
+GATConv model (learned neighbor weighting) on the same split.
 """
 
 import jax
@@ -23,13 +23,13 @@ from ._common.datasets import load_cora
 
 
 class GCNModel(nn.Module):
-    graph_conv_1: gnn.GraphConv
-    graph_conv_2: gnn.GraphConv
+    graph_conv_1: gnn.GCNConv
+    graph_conv_2: gnn.GCNConv
 
     def __init__(self, in_dim: int, hidden_dim: int, num_classes: int, *, key: jax.Array) -> None:
         key_1, key_2 = jax.random.split(key)
-        self.graph_conv_1 = gnn.GraphConv(in_dim, hidden_dim, key=key_1)
-        self.graph_conv_2 = gnn.GraphConv(hidden_dim, num_classes, key=key_2)
+        self.graph_conv_1 = gnn.GCNConv(in_dim, hidden_dim, key=key_1)
+        self.graph_conv_2 = gnn.GCNConv(hidden_dim, num_classes, key=key_2)
 
     def __call__(
         self,
@@ -43,13 +43,13 @@ class GCNModel(nn.Module):
 
 
 class GATModel(nn.Module):
-    graph_attention_1: gnn.GraphAttention
-    graph_attention_2: gnn.GraphAttention
+    graph_attention_1: gnn.GATConv
+    graph_attention_2: gnn.GATConv
 
     def __init__(self, in_dim: int, hidden_dim: int, num_classes: int, *, key: jax.Array) -> None:
         key_1, key_2 = jax.random.split(key)
-        self.graph_attention_1 = gnn.GraphAttention(in_dim, hidden_dim, num_heads=4, key=key_1)
-        self.graph_attention_2 = gnn.GraphAttention(hidden_dim, num_classes, num_heads=1, key=key_2)
+        self.graph_attention_1 = gnn.GATConv(in_dim, hidden_dim, num_heads=4, key=key_1)
+        self.graph_attention_2 = gnn.GATConv(hidden_dim, num_classes, num_heads=1, key=key_2)
 
     def __call__(
         self,
@@ -136,11 +136,11 @@ if __name__ == "__main__":
 
     in_dim = x.shape[1]
 
-    # Train GraphConv model
+    # Train GCNConv model
     model = GCNModel(in_dim, HIDDEN_DIM, NUM_CLASSES, key=jax.random.key(0))
     optimizer = ion.Optimizer(optax.adam(LEARNING_RATE), model)
 
-    for epoch in tqdm(range(NUM_EPOCHS), desc="GraphConv"):
+    for epoch in tqdm(range(NUM_EPOCHS), desc="GCNConv"):
         model, optimizer, loss = train_step(
             model, optimizer, x, senders, receivers, labels, train_mask
         )
@@ -148,11 +148,11 @@ if __name__ == "__main__":
             test_acc = accuracy(model, x, senders, receivers, labels, test_mask).item()
             print(f"  loss: {loss.item():.4f}  test accuracy: {test_acc:.2%}")
 
-    # Train GraphAttention model
+    # Train GATConv model
     model = GATModel(in_dim, HIDDEN_DIM, NUM_CLASSES, key=jax.random.key(0))
     optimizer = ion.Optimizer(optax.adam(LEARNING_RATE), model)
 
-    for epoch in tqdm(range(NUM_EPOCHS), desc="GraphAttention"):
+    for epoch in tqdm(range(NUM_EPOCHS), desc="GATConv"):
         model, optimizer, loss = train_step(
             model, optimizer, x, senders, receivers, labels, train_mask
         )
