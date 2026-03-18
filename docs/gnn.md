@@ -169,7 +169,9 @@ Since the two subgraphs are disconnected, GNN layers process them independently.
 
 For JIT compatibility, pad the concatenated arrays to a fixed maximum number of nodes and edges so the shapes remain static across batches. Dummy padding nodes are disconnected (no edges), so they do not affect the output. Mask them out when computing losses or metrics.
 
-## Example
+## Examples
+
+Full examples: [Node classification on Cora](https://github.com/auxeno/ion/blob/main/examples/gnn_cora.py) | [Molecular property prediction on BBBP](https://github.com/auxeno/ion/blob/main/examples/gnn_bbbp.ipynb)
 
 Node classification on a small graph:
 

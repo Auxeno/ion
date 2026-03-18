@@ -229,7 +229,8 @@ model = ion.load("model.npz", model)
 - [RNN Demo](https://github.com/auxeno/ion/blob/main/examples/rnn_mnist.py): Sequence classification with recurrent networks
 - [GPT Demo Notebook](https://github.com/auxeno/ion/blob/main/examples/gpt_tinystories.ipynb): Character-level GPT on TinyStories
 - [VAE Demo Notebook](https://github.com/auxeno/ion/blob/main/examples/vae_mnist.ipynb): Variational autoencoder for image generation
-- [GNN Demo](https://github.com/auxeno/ion/blob/main/examples/gnn_cora.py): Node classification on Cora with graph neural networks
+- [GNN Node Classification](https://github.com/auxeno/ion/blob/main/examples/gnn_cora.py): Node classification on Cora with graph neural networks
+- [GNN Molecular Property Prediction](https://github.com/auxeno/ion/blob/main/examples/gnn_bbbp.ipynb): Blood-brain barrier prediction with graph attention networks
 - [PPO Demo](https://github.com/auxeno/ion/blob/main/examples/ppo_gymnax.py): Reinforcement learning with Gymnax
 
 ## License
