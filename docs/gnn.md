@@ -74,6 +74,31 @@ y = gat(x, senders, receivers, x_edge)  # x_edge shape: (e, 8)
 
 When `edge_dim` is None (default), no extra parameters are created and behavior is identical to the standard GATConv. If `edge_dim` is set but `x_edge` is not passed at call time, the edge path is skipped. Passing `x_edge` without setting `edge_dim` will raise an error.
 
+### GATv2Conv
+
+Dynamic Graph Attention Network (Brody et al., 2022). Fixes a theoretical limitation of GATConv where attention rankings are "static" (identical for all query nodes). GATv2 applies LeakyReLU *after* combining sender and receiver features, making attention scores depend on both nodes:
+
+```
+GATv1:  e_ij = LeakyReLU(a_l^T W h_i + a_r^T W h_j)     -- static attention
+GATv2:  e_ij = a^T LeakyReLU(W_l h_i + W_r h_j)          -- dynamic attention
+```
+
+The interface is identical to GATConv:
+
+```python
+gat = gnn.GATv2Conv(in_dim=16, out_dim=32, num_heads=4, key=key)
+y = gat(x, senders, receivers)  # (n, 16) -> (n, 32)
+```
+
+Structural differences from GATConv: two weight matrices (`w_sender`, `w_receiver`) instead of one, and a single attention vector (`att`) instead of two. This means attention must be computed per-edge rather than decomposed to node-level scores.
+
+**Edge features.** Same `edge_dim` / `x_edge` interface as GATConv. The difference is that edge features are added *inside* the LeakyReLU (before the attention dot product), so the nonlinearity mixes node and edge information:
+
+```python
+gat = gnn.GATv2Conv(in_dim=16, out_dim=32, num_heads=4, edge_dim=8, key=key)
+y = gat(x, senders, receivers, x_edge)  # x_edge shape: (e, 8)
+```
+
 ## Shape Annotations
 
 | Label | Meaning | Used in |

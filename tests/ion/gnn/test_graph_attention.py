@@ -173,9 +173,198 @@ class TestGATConvEdgeFeatures:
         with pytest.raises(Exception):
             gat(x, senders, receivers, x_edge)
 
+    def test_edge_jit(self, triangle_graph):
+        """jax.jit with edge features produces the same output as eager."""
+        senders, receivers = triangle_graph
+        num_edges = senders.shape[0]
+        gat = gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
+        expected = gat(x, senders, receivers, x_edge)
+        result = jax.jit(gat)(x, senders, receivers, x_edge)
+        npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
+
+    def test_edge_determinism(self, triangle_graph):
+        """Same inputs with edge features produce identical outputs."""
+        senders, receivers = triangle_graph
+        num_edges = senders.shape[0]
+        gat = gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
+        y1 = gat(x, senders, receivers, x_edge)
+        y2 = gat(x, senders, receivers, x_edge)
+        npt.assert_allclose(y1, y2, rtol=0, atol=0)
+
 
 class TestGATConvValidation:
     def test_out_dim_not_divisible_by_num_heads_raises(self):
         """out_dim must be divisible by num_heads."""
         with pytest.raises(ValueError, match="divisible"):
             gnn.GATConv(8, 7, num_heads=3, key=jax.random.key(0))
+
+
+class TestGATv2Conv:
+    def test_output_shape(self):
+        """Output shape is (num_nodes, out_dim)."""
+        gat = gnn.GATv2Conv(8, 16, key=jax.random.key(0))
+        x = jnp.ones((5, 8))
+        senders = jnp.array([0, 1, 2, 3])
+        receivers = jnp.array([1, 2, 3, 4])
+        y = gat(x, senders, receivers)
+        assert y.shape == (5, 16)
+
+    def test_output_shape_multi_head(self, triangle_graph):
+        """Various num_heads values all produce correct output shape."""
+        senders, receivers = triangle_graph
+        for num_heads in [1, 2, 4, 8]:
+            gat = gnn.GATv2Conv(16, 16, num_heads=num_heads, key=jax.random.key(0))
+            x = jnp.ones((3, 16))
+            y = gat(x, senders, receivers)
+            assert y.shape == (3, 16)
+
+    def test_no_bias(self, triangle_graph):
+        """No-bias mode: bias field is None, output still has correct shape."""
+        gat = gnn.GATv2Conv(8, 16, bias=False, key=jax.random.key(0))
+        assert gat.b is None
+        x = jnp.ones((3, 8))
+        senders, receivers = triangle_graph
+        y = gat(x, senders, receivers)
+        assert y.shape == (3, 16)
+
+    def test_weight_dtype(self):
+        """Weights match the requested dtype."""
+        gat = gnn.GATv2Conv(8, 16, dtype=jnp.float32, key=jax.random.key(0))
+        assert gat.w_sender.dtype == jnp.float32
+        assert gat.w_receiver.dtype == jnp.float32
+        assert gat.att.dtype == jnp.float32
+
+    def test_attention_changes_with_features(self, triangle_graph):
+        """Different node features produce different attention-weighted outputs."""
+        gat = gnn.GATv2Conv(4, 4, key=jax.random.key(0))
+        senders, receivers = triangle_graph
+        x1 = jax.random.normal(jax.random.key(1), (3, 4))
+        x2 = jax.random.normal(jax.random.key(2), (3, 4))
+        y1 = gat(x1, senders, receivers)
+        y2 = gat(x2, senders, receivers)
+        assert not jnp.allclose(y1, y2)
+
+    def test_negative_slope(self):
+        """Custom negative_slope is stored and used."""
+        gat = gnn.GATv2Conv(8, 8, negative_slope=0.1, key=jax.random.key(0))
+        assert gat.negative_slope == 0.1
+
+    def test_single_node_self_loop(self):
+        """Minimal graph: one node with a self-loop."""
+        gat = gnn.GATv2Conv(4, 8, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (1, 4))
+        senders = jnp.array([0])
+        receivers = jnp.array([0])
+        y = gat(x, senders, receivers)
+        assert y.shape == (1, 8)
+        assert jnp.all(jnp.isfinite(y))
+
+    def test_differs_from_gatv1(self, triangle_graph):
+        """GATv2Conv produces different output than GATConv (dynamic vs static)."""
+        senders, receivers = triangle_graph
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        v1 = gnn.GATConv(8, 16, num_heads=2, key=jax.random.key(0))
+        v2 = gnn.GATv2Conv(8, 16, num_heads=2, key=jax.random.key(0))
+        y1 = v1(x, senders, receivers)
+        y2 = v2(x, senders, receivers)
+        assert not jnp.allclose(y1, y2)
+
+
+class TestGATv2ConvEdgeFeatures:
+    def test_edge_dim_output_shape(self, triangle_graph):
+        """With edge features, output shape is still (num_nodes, out_dim)."""
+        senders, receivers = triangle_graph
+        num_edges = senders.shape[0]
+        gat = gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
+        y = gat(x, senders, receivers, x_edge)
+        assert y.shape == (3, 16)
+
+    def test_edge_features_change_output(self, triangle_graph):
+        """Providing different edge features changes the output."""
+        senders, receivers = triangle_graph
+        num_edges = senders.shape[0]
+        gat = gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        x_edge1 = jax.random.normal(jax.random.key(2), (num_edges, 4))
+        x_edge2 = jax.random.normal(jax.random.key(3), (num_edges, 4))
+        y1 = gat(x, senders, receivers, x_edge1)
+        y2 = gat(x, senders, receivers, x_edge2)
+        assert not jnp.allclose(y1, y2)
+
+    def test_edge_dim_grad(self, triangle_graph):
+        """Gradients flow through edge params."""
+        senders, receivers = triangle_graph
+        num_edges = senders.shape[0]
+        gat = gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
+
+        grads = jax.grad(lambda m: m(x, senders, receivers, x_edge).sum())(gat)
+        assert jnp.all(jnp.isfinite(grads.w_edge._value))
+        assert jnp.any(grads.w_edge._value != 0)
+
+    def test_edge_dim_frozen(self, triangle_graph):
+        """Frozen edge params get zero gradients."""
+        senders, receivers = triangle_graph
+        num_edges = senders.shape[0]
+        gat = gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
+        frozen = gat.freeze()
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
+
+        grads = jax.grad(lambda m: m(x, senders, receivers, x_edge).sum())(frozen)
+        npt.assert_allclose(grads.w_edge._value, jnp.zeros_like(grads.w_edge._value), atol=1e-7)
+
+    def test_edge_dim_without_x_edge(self, triangle_graph):
+        """edge_dim set but x_edge omitted still produces valid output."""
+        senders, receivers = triangle_graph
+        gat = gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        y = gat(x, senders, receivers)
+        assert y.shape == (3, 16)
+        assert jnp.all(jnp.isfinite(y))
+
+    def test_x_edge_without_edge_dim_raises(self, triangle_graph):
+        """Passing x_edge to a layer without edge_dim raises."""
+        senders, receivers = triangle_graph
+        num_edges = senders.shape[0]
+        gat = gnn.GATv2Conv(8, 16, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
+        with pytest.raises(Exception):
+            gat(x, senders, receivers, x_edge)
+
+    def test_edge_jit(self, triangle_graph):
+        """jax.jit with edge features produces the same output as eager."""
+        senders, receivers = triangle_graph
+        num_edges = senders.shape[0]
+        gat = gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
+        expected = gat(x, senders, receivers, x_edge)
+        result = jax.jit(gat)(x, senders, receivers, x_edge)
+        npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
+
+    def test_edge_determinism(self, triangle_graph):
+        """Same inputs with edge features produce identical outputs."""
+        senders, receivers = triangle_graph
+        num_edges = senders.shape[0]
+        gat = gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
+        y1 = gat(x, senders, receivers, x_edge)
+        y2 = gat(x, senders, receivers, x_edge)
+        npt.assert_allclose(y1, y2, rtol=0, atol=0)
+
+
+class TestGATv2ConvValidation:
+    def test_out_dim_not_divisible_by_num_heads_raises(self):
+        """out_dim must be divisible by num_heads."""
+        with pytest.raises(ValueError, match="divisible"):
+            gnn.GATv2Conv(8, 7, num_heads=3, key=jax.random.key(0))

@@ -22,7 +22,7 @@ def triangle_graph_no_self_loops():
 
 
 def _build_gnn_layers(key):
-    keys = iter(jax.random.split(key, 10))
+    keys = iter(jax.random.split(key, 14))
     senders = jnp.array([0, 1, 1, 2, 0, 2, 0, 1, 2])
     receivers = jnp.array([1, 0, 2, 1, 2, 0, 0, 1, 2])
     x = jax.random.normal(next(keys), (3, 8))
@@ -33,6 +33,8 @@ def _build_gnn_layers(key):
         (gnn.GATConv(8, 16, num_heads=4, key=next(keys)), x, senders, receivers),
         (gnn.GATConv(8, 16, num_heads=2, bias=False, key=next(keys)), x, senders, receivers),
         (gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=next(keys)), x, senders, receivers),
+        (gnn.GATv2Conv(8, 16, num_heads=2, key=next(keys)), x, senders, receivers),
+        (gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=next(keys)), x, senders, receivers),
     ]
 
 
@@ -43,6 +45,8 @@ _GNN_PARAM_NAMES = [
     "gat_conv_4_heads",
     "gat_conv_no_bias",
     "gat_conv_edge_dim",
+    "gat_v2_conv",
+    "gat_v2_conv_edge_dim",
 ]
 
 
