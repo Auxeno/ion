@@ -48,6 +48,7 @@ examples = [
     "gymnax",
     "nbformat",
     "plotly",
+    "rdkit",
     "tqdm",
 ]
 all = [
