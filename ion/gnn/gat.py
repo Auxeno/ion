@@ -83,7 +83,7 @@ class GATConv(Module):
         x_edge: Float[Array, "e f"] | None = None,
     ) -> Float[Array, "n o"]:
 
-        num_nodes = x.shape[0]
+        n, i = x.shape
 
         # Project input features into multi-head space
         x = jnp.einsum("ni, ihk -> nhk", x, self.w)
@@ -95,6 +95,7 @@ class GATConv(Module):
 
         # Add edge feature contribution to attention logits
         if x_edge is not None:
+            e_edge, f = x_edge.shape
             edge_proj = jnp.einsum("ef, fhk -> ehk", x_edge, self.w_edge)
             logits_edge = jnp.einsum("ehk, hk -> eh", edge_proj, self.att_edge)
             logits = logits + logits_edge
@@ -102,14 +103,14 @@ class GATConv(Module):
         logits = jax.nn.leaky_relu(logits, self.negative_slope)
 
         # Normalize attention weights per receiver neighborhood
-        attention = segment_softmax(logits, receivers, num_nodes)
+        attention = segment_softmax(logits, receivers, n)
 
         # Aggregate sender features weighted by attention
         messages = x[senders] * attention[..., None]
-        x = jax.ops.segment_sum(messages, receivers, num_nodes)
+        x = jax.ops.segment_sum(messages, receivers, n)
 
         # Concatenate heads into a flat feature vector
-        x = x.reshape(num_nodes, -1)
+        x = x.reshape(n, -1)
 
         if self.b is not None:
             x = x + self.b
@@ -181,7 +182,7 @@ class GATv2Conv(Module):
         x_edge: Float[Array, "e f"] | None = None,
     ) -> Float[Array, "n o"]:
 
-        num_nodes = x.shape[0]
+        n, i = x.shape
 
         # Project with separate sender/receiver weights
         x_s = jnp.einsum("ni, ihk -> nhk", x, self.w_sender)
@@ -201,14 +202,14 @@ class GATv2Conv(Module):
         )
 
         # Normalize attention weights per receiver neighborhood
-        attention = segment_softmax(logits, receivers, num_nodes)
+        attention = segment_softmax(logits, receivers, n)
 
         # Aggregate sender features weighted by attention
         messages = x_s[senders] * attention[..., None]
-        x_out = jax.ops.segment_sum(messages, receivers, num_nodes)
+        x_out = jax.ops.segment_sum(messages, receivers, n)
 
         # Concatenate heads into a flat feature vector
-        x_out = x_out.reshape(num_nodes, -1)
+        x_out = x_out.reshape(n, -1)
 
         if self.b is not None:
             x_out = x_out + self.b

@@ -22,6 +22,8 @@ receivers = jnp.array([1, 0, 2, 1, 2, 0])
 
 This is a COO (coordinate) sparse format. Storage is O(edges), not O(nodes^2). All operations use `jax.ops.segment_sum` for aggregation, which is JIT-friendly and efficient.
 
+All GNN layers expect unbatched inputs. Passing a batched `(b, n, d)` tensor or a 2D edge index `(e, 2)` will raise immediately via tuple unpacking at the top of each `__call__`. For batching multiple graphs, see the section below on concatenating disconnected subgraphs.
+
 ## Self-Loops
 
 The standard GCN formulation (Kipf & Welling, 2017) operates on A_hat = A + I, meaning every node includes its own features in the aggregation. Self-loops are **not** added automatically. Use `add_self_loops` to append them:
@@ -79,8 +81,8 @@ When `edge_dim` is None (default), no extra parameters are created and behavior 
 Dynamic Graph Attention Network (Brody et al., 2022). Fixes a theoretical limitation of GATConv where attention rankings are "static" (identical for all query nodes). GATv2 applies LeakyReLU *after* combining sender and receiver features, making attention scores depend on both nodes:
 
 ```
-GATv1:  e_ij = LeakyReLU(a_l^T W h_i + a_r^T W h_j)     -- static attention
-GATv2:  e_ij = a^T LeakyReLU(W_l h_i + W_r h_j)          -- dynamic attention
+GATv1: e_ij = LeakyReLU(a_l^T W h_i + a_r^T W h_j) - static attention
+GATv2: e_ij = a^T LeakyReLU(W_l h_i + W_r h_j)     - dynamic attention
 ```
 
 The interface is identical to GATConv:
@@ -154,9 +156,9 @@ Ion does not provide a graph batching utility. For a batch of graphs with differ
 ```python
 # Graph 1: 3 nodes, edges (0->1, 1->2)
 # Graph 2: 2 nodes, edges (0->1)
-x = jnp.concatenate([x1, x2])                          # (5, d)
-senders = jnp.concatenate([s1, s2 + 3])                 # offset by num_nodes_1
-receivers = jnp.concatenate([r1, r2 + 3])               # offset by num_nodes_1
+x = jnp.concatenate([x1, x2])              # (5, d)
+senders = jnp.concatenate([s1, s2 + 3])    # offset by num_nodes_1
+receivers = jnp.concatenate([r1, r2 + 3])  # offset by num_nodes_1
 ```
 
 Since the two subgraphs are disconnected, GNN layers process them independently. For graph-level predictions, aggregate node features per graph using `jax.ops.segment_sum` with a graph membership array.

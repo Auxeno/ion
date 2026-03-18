@@ -50,14 +50,14 @@ class GCNConv(Module):
         receivers: Int[Array, " e"],
     ) -> Float[Array, "n o"]:
 
-        num_nodes = x.shape[0]
-        num_edges = senders.shape[0]
+        n, i = x.shape
+        (e,) = senders.shape
 
         x = x @ self.w
 
         # Compute node degrees by counting incoming edges at each receiver
-        edge_counts = jnp.ones(num_edges, dtype=x.dtype)
-        degree = jax.ops.segment_sum(edge_counts, receivers, num_nodes)
+        edge_counts = jnp.ones(e, dtype=x.dtype)
+        degree = jax.ops.segment_sum(edge_counts, receivers, n)
 
         # Compute symmetric normalization coefficients to stabilize hub activations
         node_norm = jnp.where(degree > 0, lax.rsqrt(degree), 0.0)
@@ -65,7 +65,7 @@ class GCNConv(Module):
 
         # Route, scale, and accumulate features from senders to receivers
         messages = x[senders] * edge_weight[:, None]
-        x = jax.ops.segment_sum(messages, receivers, num_nodes)
+        x = jax.ops.segment_sum(messages, receivers, n)
 
         if self.b is not None:
             x = x + self.b
