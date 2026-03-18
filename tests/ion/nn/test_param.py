@@ -42,14 +42,14 @@ class TestJaxArrayProtocol:
     def test_jax_array_protocol(self):
         """__jax_array__ lets jnp operations work directly on Param."""
         p = nn.Param(jnp.array([1.0, 2.0, 3.0]))
-        result = jnp.sum(p)  # type: ignore[arg-type]
+        result = jnp.sum(p)
         npt.assert_allclose(result, 6.0)
 
     def test_jnp_dot(self):
         """Param works with jnp.dot."""
         a = nn.Param(jnp.array([1.0, 2.0]))
         b = jnp.array([3.0, 4.0])
-        npt.assert_allclose(jnp.dot(a, b), 11.0)  # type: ignore[arg-type]
+        npt.assert_allclose(jnp.dot(a, b), 11.0)
 
 
 class TestArithmetic:
@@ -699,7 +699,7 @@ class TestLaxCompatibility:
         """Lower-level lax functions reject Param where they expect plain arrays."""
         p = nn.Param(jnp.array([1.0, 2.0]))
         with pytest.raises((TypeError, ValueError)):
-            jax.lax.add(p, p)  # type: ignore[arg-type]
+            jax.lax.add(p, p)
 
     def test_jnp_asarray_converts_param_for_lax(self):
         """jnp.asarray is the documented escape hatch for lax compatibility."""

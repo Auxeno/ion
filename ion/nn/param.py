@@ -13,7 +13,7 @@ See docs/internals.md for implementation details.
 
 import dataclasses
 import functools
-from typing import Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -21,6 +21,13 @@ import jax.tree_util as jtu
 from jaxtyping import Array
 
 T = TypeVar("T", bound=Array)
+
+if TYPE_CHECKING:
+
+    class _ParamBase(jax.Array, Generic[T]): ...
+else:
+
+    class _ParamBase(Generic[T]): ...
 
 
 def _unwrap(x: Any) -> Any:
@@ -30,7 +37,7 @@ def _unwrap(x: Any) -> Any:
 
 @functools.partial(jtu.register_dataclass, data_fields=["_value"], meta_fields=["trainable"])
 @dataclasses.dataclass(frozen=True, eq=False)
-class Param(Generic[T]):
+class Param(_ParamBase[T]):
     """Marks a JAX array as a model parameter.
 
     Parameters
