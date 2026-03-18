@@ -26,6 +26,9 @@ def _build_layers(key):
     gru_cell = nn.GRUCell(8, 16, key=next(keys))
     gru_cell_wrapper = lambda x: gru_cell(x, gru_cell.initial_state)
 
+    lru_cell = nn.LRUCell(8, 16, key=next(keys))
+    lru_cell_wrapper = lambda x: lru_cell(x, lru_cell.initial_state)[0]
+
     return [
         (nn.Linear(8, 16, key=next(keys)), jnp.ones((2, 8))),
         (nn.Linear(8, 16, bias=False, key=next(keys)), jnp.ones((2, 8))),
@@ -47,6 +50,8 @@ def _build_layers(key):
         (gru_cell_wrapper, jnp.ones((2, 8))),
         (lambda x, _l=nn.LSTM(8, 16, key=next(keys)): _l(x)[0], jnp.ones((2, 5, 8))),
         (lambda x, _l=nn.GRU(8, 16, key=next(keys)): _l(x)[0], jnp.ones((2, 5, 8))),
+        (lru_cell_wrapper, jnp.ones((2, 8))),
+        (lambda x, _l=nn.LRU(8, 16, key=next(keys)): _l(x)[0], jnp.ones((2, 5, 8))),
         (nn.Sequential(nn.Linear(8, 16, key=next(keys)), jax.nn.relu), jnp.ones((2, 8))),
         (nn.LoRALinear(nn.Linear(8, 16, key=next(keys)), rank=4, key=next(keys)), jnp.ones((2, 8))),
         (
@@ -82,6 +87,8 @@ _PARAM_NAMES = [
     "gru_cell",
     "lstm",
     "gru",
+    "lru_cell",
+    "lru",
     "sequential",
     "lora_linear",
     "conv_transpose_1d",
@@ -110,6 +117,7 @@ _STRUCTURAL_LAYER_NAMES = [
     "conv_transpose_2d",
     "lstm",
     "gru",
+    "lru",
 ]
 
 

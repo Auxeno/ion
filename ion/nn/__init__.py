@@ -11,6 +11,7 @@ from .layers.norm import GroupNorm, LayerNorm, RMSNorm
 from .layers.pool import AvgPool, MaxPool
 from .layers.positional import LearnedPositionalEmbedding, alibi, apply_rope, rope, sinusoidal
 from .layers.recurrent import GRU, LSTM, GRUCell, LSTMCell
+from .layers.ssm import LRU, LRUCell
 from .module import Module
 from .param import Param
 
@@ -32,6 +33,8 @@ __all__ = [
     "LearnedPositionalEmbedding",
     "Linear",
     "LoRALinear",
+    "LRU",
+    "LRUCell",
     "LSTM",
     "LSTMCell",
     "MaxPool",
