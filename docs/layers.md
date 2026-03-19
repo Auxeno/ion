@@ -89,6 +89,18 @@ Output projection:  bhk, hkd -> bd
 | `g` | gate dimension | `4h` for LSTM, `3h` for GRU |
 | `t` | time steps | sequence dimension |
 
+### SSM
+
+SSM layers reuse the recurrent dimension labels (`i`, `h`, `t`). SSM matrix parameters use uppercase names (A, B, C, D) to match the literature and avoid collision with dimension labels.
+
+| Label | Meaning | Notes |
+|-------|---------|-------|
+| `i` | input features | |
+| `h` | hidden dimension | complex-valued; see note below |
+| `t` | time steps | sequence dimension |
+
+SSM hidden states are complex-valued. `hidden_dim=N` stores N complex values (2N real parameters), so an SSM with `hidden_dim=64` carries twice the real-valued capacity of a GRU with the same `hidden_dim`. S4D and S5 use conjugate-pair structure: only one eigenvalue per conjugate pair is stored, and the readout uses `2*Re(...)` to recover the full contribution.
+
 ### Convolution & Spatial
 
 | Label | Meaning | Used in |
@@ -185,11 +197,11 @@ gru = nn.GRU(3, 16, key=key)
 outputs, h = gru(x)                     # zero-initialized state
 outputs, h = gru(x, hx=h0)              # custom initial state
 
-s4d = nn.S4D(3, 16, key=key)
+s4d = nn.S4D(3, 8, key=key)
 outputs, h = s4d(x)                     # zero-initialized state
 outputs, h = s4d(x, hx=h0)              # custom initial state
 
-s5 = nn.S5(3, 16, key=key)
+s5 = nn.S5(3, 8, key=key)
 outputs, h = s5(x)                      # zero-initialized state
 outputs, h = s5(x, hx=h0)               # custom initial state
 ```

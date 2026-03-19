@@ -19,6 +19,12 @@ S5: shared MIMO SSM with dense B/C projections. Glorot normal for B/C, zeros
 for D. S4D-Lin initialization for diagonal A (-1/2 + i*pi*n). Per-state
 learnable timestep.
 
+All SSM hidden states are complex-valued. hidden_dim=N stores N complex values
+(2N real parameters). S4D and S5 use conjugate-pair structure: only one
+eigenvalue per conjugate pair is stored, and the readout uses 2*Re(...) to
+recover the full contribution. LRU stores independent complex eigenvalues
+without conjugate symmetry.
+
 Input layout is (batch, time, features).
 Initial state defaults to zeros if not provided.
 """
@@ -49,9 +55,9 @@ class LRUCell(Module):
     >>> y, h = cell(x, h)  # (*, 3), (*, 16) -> (*, 3), (*, 16)
     """
 
-    b: Param[Complex[Array, "i h"]]
-    c: Param[Complex[Array, "h i"]]
-    d: Param[Float[Array, " i"]]
+    B: Param[Complex[Array, "i h"]]
+    C: Param[Complex[Array, "h i"]]
+    D: Param[Float[Array, " i"]]
     nu_log: Param[Float[Array, " h"]]
     theta_log: Param[Float[Array, " h"]]
     gamma_log: Param[Float[Array, " h"]]
@@ -73,11 +79,11 @@ class LRUCell(Module):
         key_b, key_c, key_d, key_nu, key_theta = jax.random.split(key, 5)
 
         # Complex projections: B maps input to hidden state, C maps hidden state to output
-        self.b = Param(w_init(shape=(in_dim, hidden_dim), dtype=jnp.complex64, key=key_b))
-        self.c = Param(w_init(shape=(hidden_dim, in_dim), dtype=jnp.complex64, key=key_c))
+        self.B = Param(w_init(shape=(in_dim, hidden_dim), dtype=jnp.complex64, key=key_b))
+        self.C = Param(w_init(shape=(hidden_dim, in_dim), dtype=jnp.complex64, key=key_c))
 
         # Skip connection: maps input directly to output, bypassing the recurrence
-        self.d = Param(d_init(shape=(in_dim,), dtype=dtype, key=key_d))
+        self.D = Param(d_init(shape=(in_dim,), dtype=dtype, key=key_d))
 
         # Eigenvalue magnitudes sampled uniformly on annulus [r_min, r_max]
         u1 = jax.random.uniform(key_nu, shape=(hidden_dim,))
@@ -88,15 +94,12 @@ class LRUCell(Module):
         # Diagonal eigenvalues: nu decay magnitude, theta phase rotation, gamma normalization
         self.nu_log = Param(nu_log.astype(dtype))
         self.theta_log = Param(theta_log.astype(dtype))
-        self.gamma_log = Param(jnp.log(jnp.sqrt(1 - jnp.abs(self.a) ** 2)).astype(dtype))
-
-    @property
-    def a(self) -> Complex[Array, " h"]:
-        return jnp.exp(-jnp.exp(self.nu_log) + 1j * jnp.exp(self.theta_log))
+        A = jnp.exp(-jnp.exp(self.nu_log) + 1j * jnp.exp(self.theta_log))
+        self.gamma_log = Param(jnp.log(jnp.sqrt(1 - jnp.abs(A) ** 2)).astype(dtype))
 
     @property
     def initial_state(self) -> Complex[Array, " h"]:
-        return jnp.zeros(self.nu_log.shape[0], dtype=self.b.dtype)
+        return jnp.zeros(self.nu_log.shape[0], dtype=self.B.dtype)
 
     def __call__(
         self,
@@ -104,9 +107,10 @@ class LRUCell(Module):
         h: Complex[Array, "... h"],
     ) -> tuple[Float[Array, "... i"], Complex[Array, "... h"]]:
 
-        b_norm = self.b * jnp.exp(self.gamma_log)
-        h = self.a * h + x.astype(self.b.dtype) @ b_norm
-        x = jnp.real(h @ self.c) + self.d * x
+        A = jnp.exp(-jnp.exp(self.nu_log) + 1j * jnp.exp(self.theta_log))
+        B_norm = self.B * jnp.exp(self.gamma_log)
+        h = A * h + x.astype(self.B.dtype) @ B_norm
+        x = jnp.real(h @ self.C) + self.D * x
 
         return x, h
 
@@ -126,7 +130,7 @@ class LRU(Module):
         hidden_dim: int,
         r_min: float = 0.0,
         r_max: float = 1.0,
-        max_phase: float = 6.28,
+        max_phase: float = 2 * pi,
         dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.glorot_normal(),
         d_init: Initializer = jax.nn.initializers.zeros,
@@ -146,17 +150,18 @@ class LRU(Module):
 
         b, t, i = x.shape
 
-        b_norm = self.cell.b * jnp.exp(self.cell.gamma_log)
+        A = jnp.exp(-jnp.exp(self.cell.nu_log) + 1j * jnp.exp(self.cell.theta_log))
+        B_norm = self.cell.B * jnp.exp(self.cell.gamma_log)
 
-        lambdas = jnp.broadcast_to(self.cell.a, (b, t, self.cell.nu_log.shape[0]))
-        hidden = x.astype(self.cell.b.dtype) @ b_norm
+        lambdas = jnp.broadcast_to(A, (b, t, self.cell.nu_log.shape[0]))
+        hidden = x.astype(self.cell.B.dtype) @ B_norm
 
         lambdas, hidden = lax.associative_scan(fn=_binary_op, elems=(lambdas, hidden), axis=1)
 
         if hx is not None:
             hidden = lambdas * hx[:, None, :] + hidden
 
-        x = jnp.real(hidden @ self.cell.c) + self.cell.d * x
+        x = jnp.real(hidden @ self.cell.C) + self.cell.D * x
 
         return x, hidden[:, -1, :]
 
@@ -164,20 +169,20 @@ class LRU(Module):
 class S4DCell(Module):
     """Single-step per-feature SISO S4D cell.
 
-    >>> cell = S4DCell(3, 16, key=key)
+    >>> cell = S4DCell(3, 8, key=key)
     >>> x, h = cell(x, h)  # (*, 3), (*, 3, 8) -> (*, 3), (*, 3, 8)
     """
 
-    log_a_re: Param[Float[Array, "i h"]]
-    a_im: Param[Float[Array, "i h"]]
-    c: Param[Complex[Array, "i h"]]
-    d: Param[Float[Array, " i"]]
+    A_log_re: Param[Float[Array, "i h"]]
+    A_im: Param[Float[Array, "i h"]]
+    C: Param[Complex[Array, "i h"]]
+    D: Param[Float[Array, " i"]]
     log_dt: Param[Float[Array, " i"]]
 
     def __init__(
         self,
         in_dim: int,
-        state_dim: int,
+        hidden_dim: int,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
         dtype: jnp.dtype = jnp.float32,
@@ -189,19 +194,21 @@ class S4DCell(Module):
 
         key_c, key_d, key_dt = jax.random.split(key, 3)
 
-        h = state_dim // 2
+        # Eigenvalues at harmonics (-1/2 + i*pi*n) so each state captures a different frequency
+        self.A_log_re = Param(jnp.full((in_dim, hidden_dim), jnp.log(0.5), dtype=dtype))
+        self.A_im = Param(
+            jnp.broadcast_to(
+                (pi * jnp.arange(hidden_dim)).astype(dtype), (in_dim, hidden_dim)
+            ).copy()
+        )
 
-        # S4D-Lin initialization: A_n = -1/2 + i*pi*n, per-feature
-        self.log_a_re = Param(jnp.full((in_dim, h), jnp.log(0.5), dtype=dtype))
-        self.a_im = Param(jnp.broadcast_to((pi * jnp.arange(h)).astype(dtype), (in_dim, h)).copy())
-
-        # Per-feature complex readout
-        self.c = Param(w_init(shape=(in_dim, h), dtype=jnp.complex64, key=key_c))
+        # C projects each feature's hidden state to a scalar output
+        self.C = Param(w_init(shape=(in_dim, hidden_dim), dtype=jnp.complex64, key=key_c))
 
         # Skip connection
-        self.d = Param(d_init(shape=(in_dim,), dtype=dtype, key=key_d))
+        self.D = Param(d_init(shape=(in_dim,), dtype=dtype, key=key_d))
 
-        # Per-feature learnable discretization timestep (ZOH)
+        # Learnable timestep controlling how finely each feature samples continuous dynamics
         log_dt = jax.random.uniform(
             shape=(in_dim,), minval=jnp.log(dt_min), maxval=jnp.log(dt_max), key=key_dt
         )
@@ -209,7 +216,7 @@ class S4DCell(Module):
 
     @property
     def initial_state(self) -> Complex[Array, "i h"]:
-        return jnp.zeros(self.log_a_re.shape, dtype=self.c.dtype)
+        return jnp.zeros(self.A_log_re.shape, dtype=self.C.dtype)
 
     def __call__(
         self,
@@ -218,12 +225,16 @@ class S4DCell(Module):
     ) -> tuple[Float[Array, "... i"], Complex[Array, "... i h"]]:
 
         dt = jnp.exp(self.log_dt)
-        a = -jnp.exp(self.log_a_re) + 1j * self.a_im
-        a_bar = jnp.exp(a * dt[:, None])
-        b_bar = (a_bar - 1.0) / a
+        A = -jnp.exp(self.A_log_re) + 1j * self.A_im
+        A_bar = jnp.exp(A * dt[:, None])
 
-        h = a_bar * h + b_bar * x[..., :, None].astype(self.c.dtype)
-        x = 2.0 * jnp.real(jnp.sum(self.c * h, axis=-1)) + self.d * x
+        # Input-to-state gain after discretization (B=1, each input drives its own states)
+        B_bar = (A_bar - 1.0) / A
+
+        h = A_bar * h + B_bar * x[..., :, None].astype(self.C.dtype)
+
+        # 2*Re recovers full output from half the conjugate eigenvalue pairs
+        x = 2.0 * jnp.real(jnp.sum(self.C * h, axis=-1)) + self.D * x
 
         return x, h
 
@@ -231,7 +242,7 @@ class S4DCell(Module):
 class S4D(Module):
     """Per-feature SISO S4D over a full sequence.
 
-    >>> s4d = S4D(3, 16, key=key)
+    >>> s4d = S4D(3, 8, key=key)
     >>> outputs, h = s4d(x)  # (b, t, 3) -> (b, t, 3), (b, 3, 8)
     """
 
@@ -240,7 +251,7 @@ class S4D(Module):
     def __init__(
         self,
         in_dim: int,
-        state_dim: int,
+        hidden_dim: int,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
         dtype: jnp.dtype = jnp.float32,
@@ -250,7 +261,7 @@ class S4D(Module):
         key: PRNGKeyArray,
     ) -> None:
 
-        self.cell = S4DCell(in_dim, state_dim, dt_min, dt_max, dtype, w_init, d_init, key=key)
+        self.cell = S4DCell(in_dim, hidden_dim, dt_min, dt_max, dtype, w_init, d_init, key=key)
 
     def __call__(
         self,
@@ -259,22 +270,21 @@ class S4D(Module):
     ) -> tuple[Float[Array, "b t i"], Complex[Array, "b i h"]]:
 
         b, t, i = x.shape
-        ih = self.cell.log_a_re.shape
 
         dt = jnp.exp(self.cell.log_dt)
-        a = -jnp.exp(self.cell.log_a_re) + 1j * self.cell.a_im
-        a_bar = jnp.exp(a * dt[:, None])
-        b_bar = (a_bar - 1.0) / a
+        A = -jnp.exp(self.cell.A_log_re) + 1j * self.cell.A_im
+        A_bar = jnp.exp(A * dt[:, None])
+        B_bar = (A_bar - 1.0) / A
 
-        lambdas = jnp.broadcast_to(a_bar, (b, t, *ih))
-        hidden = b_bar * x[..., None].astype(self.cell.c.dtype)
+        lambdas = jnp.broadcast_to(A_bar, (b, t, *self.cell.A_log_re.shape))
+        hidden = B_bar * x[..., None].astype(self.cell.C.dtype)
 
         lambdas, hidden = lax.associative_scan(fn=_binary_op, elems=(lambdas, hidden), axis=1)
 
         if hx is not None:
             hidden = lambdas * hx[:, None, :, :] + hidden
 
-        x = 2.0 * jnp.real(jnp.sum(self.cell.c * hidden, axis=-1)) + self.cell.d * x
+        x = 2.0 * jnp.real(jnp.sum(self.cell.C * hidden, axis=-1)) + self.cell.D * x
 
         return x, hidden[:, -1, :, :]
 
@@ -282,21 +292,21 @@ class S4D(Module):
 class S5Cell(Module):
     """Single-step MIMO S5 cell with shared diagonal state.
 
-    >>> cell = S5Cell(3, 16, key=key)
+    >>> cell = S5Cell(3, 8, key=key)
     >>> x, h = cell(x, h)  # (*, 3), (*, 8) -> (*, 3), (*, 8)
     """
 
-    log_a_re: Param[Float[Array, " h"]]
-    a_im: Param[Float[Array, " h"]]
-    b: Param[Complex[Array, "i h"]]
-    c: Param[Complex[Array, "h i"]]
-    d: Param[Float[Array, " i"]]
+    A_log_re: Param[Float[Array, " h"]]
+    A_im: Param[Float[Array, " h"]]
+    B: Param[Complex[Array, "i h"]]
+    C: Param[Complex[Array, "h i"]]
+    D: Param[Float[Array, " i"]]
     log_dt: Param[Float[Array, " h"]]
 
     def __init__(
         self,
         in_dim: int,
-        state_dim: int,
+        hidden_dim: int,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
         dtype: jnp.dtype = jnp.float32,
@@ -308,28 +318,26 @@ class S5Cell(Module):
 
         key_b, key_c, key_d, key_dt = jax.random.split(key, 4)
 
-        h = state_dim // 2
-
-        # S4D-Lin initialization: A_n = -1/2 + i*pi*n
-        self.log_a_re = Param(jnp.full(h, jnp.log(0.5), dtype=dtype))
-        self.a_im = Param((pi * jnp.arange(h)).astype(dtype))
+        # Eigenvalues at harmonics (-1/2 + i*pi*n) so each state captures a different frequency
+        self.A_log_re = Param(jnp.full(hidden_dim, jnp.log(0.5), dtype=dtype))
+        self.A_im = Param((pi * jnp.arange(hidden_dim)).astype(dtype))
 
         # Dense complex projections: B maps input to shared state, C maps state to output
-        self.b = Param(w_init(shape=(in_dim, h), dtype=jnp.complex64, key=key_b))
-        self.c = Param(w_init(shape=(h, in_dim), dtype=jnp.complex64, key=key_c))
+        self.B = Param(w_init(shape=(in_dim, hidden_dim), dtype=jnp.complex64, key=key_b))
+        self.C = Param(w_init(shape=(hidden_dim, in_dim), dtype=jnp.complex64, key=key_c))
 
         # Skip connection
-        self.d = Param(d_init(shape=(in_dim,), dtype=dtype, key=key_d))
+        self.D = Param(d_init(shape=(in_dim,), dtype=dtype, key=key_d))
 
-        # Per-state learnable discretization timestep (ZOH)
+        # Learnable timestep controlling how finely each state samples continuous dynamics
         log_dt = jax.random.uniform(
-            shape=(h,), minval=jnp.log(dt_min), maxval=jnp.log(dt_max), key=key_dt
+            shape=(hidden_dim,), minval=jnp.log(dt_min), maxval=jnp.log(dt_max), key=key_dt
         )
         self.log_dt = Param(log_dt.astype(dtype))
 
     @property
     def initial_state(self) -> Complex[Array, " h"]:
-        return jnp.zeros(self.log_a_re.shape[0], dtype=self.b.dtype)
+        return jnp.zeros(self.A_log_re.shape[0], dtype=self.B.dtype)
 
     def __call__(
         self,
@@ -338,12 +346,16 @@ class S5Cell(Module):
     ) -> tuple[Float[Array, "... i"], Complex[Array, "... h"]]:
 
         dt = jnp.exp(self.log_dt)
-        a = -jnp.exp(self.log_a_re) + 1j * self.a_im
-        a_bar = jnp.exp(a * dt)
-        b_bar = self.b * ((a_bar - 1.0) / a)
+        A = -jnp.exp(self.A_log_re) + 1j * self.A_im
+        A_bar = jnp.exp(A * dt)
 
-        h = a_bar * h + x.astype(self.b.dtype) @ b_bar
-        x = 2.0 * jnp.real(h @ self.c) + self.d * x
+        # Discretized input projection (zero-order hold)
+        B_bar = self.B * ((A_bar - 1.0) / A)
+
+        h = A_bar * h + x.astype(self.B.dtype) @ B_bar
+
+        # 2*Re recovers full output from half the conjugate eigenvalue pairs
+        x = 2.0 * jnp.real(h @ self.C) + self.D * x
 
         return x, h
 
@@ -351,7 +363,7 @@ class S5Cell(Module):
 class S5(Module):
     """MIMO S5 over a full sequence.
 
-    >>> s5 = S5(3, 16, key=key)
+    >>> s5 = S5(3, 8, key=key)
     >>> outputs, h = s5(x)  # (b, t, 3) -> (b, t, 3), (b, 8)
     """
 
@@ -360,7 +372,7 @@ class S5(Module):
     def __init__(
         self,
         in_dim: int,
-        state_dim: int,
+        hidden_dim: int,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
         dtype: jnp.dtype = jnp.float32,
@@ -370,7 +382,7 @@ class S5(Module):
         key: PRNGKeyArray,
     ) -> None:
 
-        self.cell = S5Cell(in_dim, state_dim, dt_min, dt_max, dtype, w_init, d_init, key=key)
+        self.cell = S5Cell(in_dim, hidden_dim, dt_min, dt_max, dtype, w_init, d_init, key=key)
 
     def __call__(
         self,
@@ -381,18 +393,18 @@ class S5(Module):
         b, t, i = x.shape
 
         dt = jnp.exp(self.cell.log_dt)
-        a = -jnp.exp(self.cell.log_a_re) + 1j * self.cell.a_im
-        a_bar = jnp.exp(a * dt)
-        b_bar = self.cell.b * ((a_bar - 1.0) / a)
+        A = -jnp.exp(self.cell.A_log_re) + 1j * self.cell.A_im
+        A_bar = jnp.exp(A * dt)
+        B_bar = self.cell.B * ((A_bar - 1.0) / A)
 
-        lambdas = jnp.broadcast_to(a_bar, (b, t, self.cell.log_a_re.shape[0]))
-        hidden = x.astype(self.cell.b.dtype) @ b_bar
+        lambdas = jnp.broadcast_to(A_bar, (b, t, self.cell.A_log_re.shape[0]))
+        hidden = x.astype(self.cell.B.dtype) @ B_bar
 
         lambdas, hidden = lax.associative_scan(fn=_binary_op, elems=(lambdas, hidden), axis=1)
 
         if hx is not None:
             hidden = lambdas * hx[:, None, :] + hidden
 
-        x = 2.0 * jnp.real(hidden @ self.cell.c) + self.cell.d * x
+        x = 2.0 * jnp.real(hidden @ self.cell.C) + self.cell.D * x
 
         return x, hidden[:, -1, :]

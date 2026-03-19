@@ -29,10 +29,10 @@ def _build_layers(key):
     lru_cell = nn.LRUCell(8, 16, key=next(keys))
     lru_cell_wrapper = lambda x: lru_cell(x, lru_cell.initial_state)[0]
 
-    s4d_cell = nn.S4DCell(8, 16, key=next(keys))
+    s4d_cell = nn.S4DCell(8, 8, key=next(keys))
     s4d_cell_wrapper = lambda x: s4d_cell(x, s4d_cell.initial_state)[0]
 
-    s5_cell = nn.S5Cell(8, 16, key=next(keys))
+    s5_cell = nn.S5Cell(8, 8, key=next(keys))
     s5_cell_wrapper = lambda x: s5_cell(x, s5_cell.initial_state)[0]
 
     return [
@@ -59,9 +59,9 @@ def _build_layers(key):
         (lru_cell_wrapper, jnp.ones((2, 8))),
         (lambda x, _l=nn.LRU(8, 16, key=next(keys)): _l(x)[0], jnp.ones((2, 5, 8))),
         (s4d_cell_wrapper, jnp.ones((2, 8))),
-        (lambda x, _l=nn.S4D(8, 16, key=next(keys)): _l(x)[0], jnp.ones((2, 5, 8))),
+        (lambda x, _l=nn.S4D(8, 8, key=next(keys)): _l(x)[0], jnp.ones((2, 5, 8))),
         (s5_cell_wrapper, jnp.ones((2, 8))),
-        (lambda x, _l=nn.S5(8, 16, key=next(keys)): _l(x)[0], jnp.ones((2, 5, 8))),
+        (lambda x, _l=nn.S5(8, 8, key=next(keys)): _l(x)[0], jnp.ones((2, 5, 8))),
         (nn.Sequential(nn.Linear(8, 16, key=next(keys)), jax.nn.relu), jnp.ones((2, 8))),
         (nn.LoRALinear(nn.Linear(8, 16, key=next(keys)), rank=4, key=next(keys)), jnp.ones((2, 8))),
         (
