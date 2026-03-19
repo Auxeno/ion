@@ -8,7 +8,7 @@ Modules:
 
 Glorot uniform for input weights, orthogonal for hidden weights.
 LSTMCell forget gate bias initialized to 1 to encourage remembering.
-Sequence dim is second-to-last: (..., time, features).
+Input layout is (batch, time, features).
 Initial state defaults to zeros if not provided.
 """
 

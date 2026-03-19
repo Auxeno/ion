@@ -174,7 +174,7 @@ cross_attn(x, context, mask=mask)
 
 ## Recurrent State
 
-Sequence layers (`LSTM`, `GRU`) default to zero-initialized hidden state. Pass `hx` to provide a custom initial state, for example when processing sequences across multiple chunks.
+Sequence layers (`LSTM`, `GRU`, `LRU`, `S4D`, `S5`) default to zero-initialized hidden state. Pass `hx` to provide a custom initial state, for example when processing sequences across multiple chunks.
 
 ```python
 lstm = nn.LSTM(3, 16, key=key)
@@ -184,9 +184,17 @@ outputs, (h, c) = lstm(x, hx=(h0, c0))  # custom initial state
 gru = nn.GRU(3, 16, key=key)
 outputs, h = gru(x)                     # zero-initialized state
 outputs, h = gru(x, hx=h0)              # custom initial state
+
+s4d = nn.S4D(3, 16, key=key)
+outputs, h = s4d(x)                     # zero-initialized state
+outputs, h = s4d(x, hx=h0)              # custom initial state
+
+s5 = nn.S5(3, 16, key=key)
+outputs, h = s5(x)                      # zero-initialized state
+outputs, h = s5(x, hx=h0)               # custom initial state
 ```
 
-Cell layers (`LSTMCell`, `GRUCell`) expose an `initial_state` property for convenience:
+Cell layers (`LSTMCell`, `GRUCell`, `LRUCell`, `S4DCell`, `S5Cell`) expose an `initial_state` property for convenience:
 
 ```python
 cell = nn.LSTMCell(3, 16, key=key)
