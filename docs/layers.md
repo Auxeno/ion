@@ -4,7 +4,7 @@ Conventions and design decisions across Ion's layer library.
 
 ## Input Format
 
-All layers use **channels-last** ordering. 
+All layers use **channels-last** ordering.
 
 | Domain | Format | Example |
 |--------|--------|---------|
@@ -18,7 +18,7 @@ Channels-last is the most typical format for image data and is followed by Flax 
 
 ### Batch Dimensions
 
-All layers expect at least one leading batch dimension. Structural layers (Conv, Pool, LSTM, GRU, GroupNorm) require exactly the right number of dimensions and will error on incorrect rank. Pointwise layers (Linear, LayerNorm, Embedding, etc.) operate on the last dimension and naturally handle any number of leading dims.
+All layers expect at least one leading batch dimension. Structural layers (Conv, Pool, RNN, LSTM, GRU, GroupNorm) require exactly the right number of dimensions and will error on incorrect rank. Pointwise layers (Linear, LayerNorm, Embedding, etc.) operate on the last dimension and naturally handle any number of leading dims.
 
 ```python
 linear = nn.Linear(4, 8, key=key)
@@ -86,20 +86,20 @@ Output projection:  bhk, hkd -> bd
 |-------|---------|-------|
 | `i` | input features | |
 | `h` | hidden dimension | same letter as attention heads; context resolves it |
-| `g` | gate dimension | `4h` for LSTM, `3h` for GRU |
+| `g` | gate dimension | `4h` for LSTM, `3h` for GRU, `h` for RNN |
 | `t` | time steps | sequence dimension |
 
 ### SSM
 
-SSM layers reuse the recurrent dimension labels (`i`, `h`, `t`). SSM matrix parameters use uppercase names (A, B, C, D) to match the literature and avoid collision with dimension labels.
+SSM layers reuse the recurrent dimension labels (`i`, `h`, `t`). SSM matrix parameters use uppercase names (A, B, C, D) to match the literature and avoid collision with dimension labels. The output dimension is always `in_dim` (not `state_dim`).
 
 | Label | Meaning | Notes |
 |-------|---------|-------|
-| `i` | input features | |
-| `h` | hidden dimension | complex-valued; see note below |
+| `i` | input features | also the output dimension |
+| `h` | state dimension | complex-valued; see note below |
 | `t` | time steps | sequence dimension |
 
-SSM hidden states are complex-valued. `hidden_dim=N` stores N complex values (2N real parameters), so an SSM with `hidden_dim=64` carries twice the real-valued capacity of a GRU with the same `hidden_dim`. S4D and S5 use conjugate-pair structure: only one eigenvalue per conjugate pair is stored, and the readout uses `2*Re(...)` to recover the full contribution.
+SSM hidden states are complex-valued. S4D and S5 use conjugate-pair structure: `state_dim=N` internally stores `N//2` complex eigenvalues, and the readout uses `2*Re(...)` to recover the full contribution from each pair. LRU uses `hidden_dim` (not `state_dim`) and stores independent complex eigenvalues without conjugate symmetry.
 
 ### Convolution & Spatial
 
@@ -186,9 +186,13 @@ cross_attn(x, context, mask=mask)
 
 ## Recurrent State
 
-Sequence layers (`LSTM`, `GRU`, `LRU`, `S4D`, `S5`) default to zero-initialized hidden state. Pass `hx` to provide a custom initial state, for example when processing sequences across multiple chunks.
+Sequence layers (`RNN`, `LSTM`, `GRU`, `LRU`, `S4D`, `S5`) default to zero-initialized hidden state. Pass `hx` to provide a custom initial state, for example when processing sequences across multiple chunks.
 
 ```python
+rnn = nn.RNN(3, 16, key=key)
+outputs, h = rnn(x)                     # zero-initialized state
+outputs, h = rnn(x, hx=h0)              # custom initial state
+
 lstm = nn.LSTM(3, 16, key=key)
 outputs, (h, c) = lstm(x)               # zero-initialized state
 outputs, (h, c) = lstm(x, hx=(h0, c0))  # custom initial state
@@ -206,7 +210,7 @@ outputs, h = s5(x)                      # zero-initialized state
 outputs, h = s5(x, hx=h0)               # custom initial state
 ```
 
-Cell layers (`LSTMCell`, `GRUCell`, `LRUCell`, `S4DCell`, `S5Cell`) expose an `initial_state` property for convenience:
+Cell layers (`RNNCell`, `LSTMCell`, `GRUCell`, `LRUCell`, `S4DCell`, `S5Cell`) expose an `initial_state` property for convenience:
 
 ```python
 cell = nn.LSTMCell(3, 16, key=key)
