@@ -174,7 +174,8 @@ Ion ships with standard neural network layers. Each is a `Module` with trainable
 | Convolution     | `Conv`, `ConvTranspose`                                                   |
 | Attention       | `SelfAttention`, `CrossAttention`                                         |
 | Normalization   | `LayerNorm`, `RMSNorm`, `GroupNorm`                                       |
-| Recurrent       | `LSTMCell`, `GRUCell`, `LSTM`, `GRU`                                      |
+| Recurrent       | `RNNCell`, `LSTMCell`, `GRUCell`, `RNN`, `LSTM`, `GRU`                    |
+| SSM             | `LRUCell`, `S4DCell`, `S5Cell`, `LRU`, `S4D`, `S5`                        |
 | Pooling         | `MaxPool`, `AvgPool`                                                      |
 | Embedding       | `Embedding`, `LearnedPositionalEmbedding`                                 |
 | Positional      | `sinusoidal`, `rope`, `apply_rope`, `alibi`                               |
@@ -182,7 +183,7 @@ Ion ships with standard neural network layers. Each is a `Module` with trainable
 | Blocks          | `Sequential`, `MLP`, `TransformerBlock`, `CrossTransformerBlock`          |
 | Graph (GNN)     | `GCNConv`, `GATConv`, `GATv2Conv`                                       |
 
-See [Layer Conventions](https://github.com/auxeno/ion/blob/main/docs/layers.md) for data format, weight init, and spatial layer usage. See [GNN Conventions](https://github.com/auxeno/ion/blob/main/docs/gnn.md) for graph layer usage.
+See [Layer Conventions](https://github.com/auxeno/ion/blob/main/docs/layers.md) for data format, weight init, spatial layer usage, and SSM conventions. See [GNN Conventions](https://github.com/auxeno/ion/blob/main/docs/gnn.md) for graph layer usage.
 
 ## Pretty Printing
 
@@ -231,6 +232,7 @@ model = ion.load("model.npz", model)
 - [VAE Demo Notebook](https://github.com/auxeno/ion/blob/main/examples/vae_mnist.ipynb): Variational autoencoder for image generation
 - [GNN Node Classification](https://github.com/auxeno/ion/blob/main/examples/gnn_cora.py): Node classification on Cora with graph neural networks
 - [GNN Molecular Property Prediction](https://github.com/auxeno/ion/blob/main/examples/gnn_bbbp.ipynb): Blood-brain barrier prediction with graph attention networks
+- [SSM Pathfinder](https://github.com/auxeno/ion/blob/main/examples/ssm_pathfinder.ipynb): Exploring state space models on the Pathfinder task
 - [PPO Demo](https://github.com/auxeno/ion/blob/main/examples/ppo_gymnax.py): Reinforcement learning with Gymnax
 
 ## License
