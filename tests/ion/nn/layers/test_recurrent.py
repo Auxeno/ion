@@ -5,6 +5,126 @@ import numpy.testing as npt
 from ion import nn
 
 
+class TestRNNCell:
+    def test_output_shape(self):
+        """Output h has shape (hidden_dim,)."""
+        cell = nn.RNNCell(8, 16, key=jax.random.key(0))
+        x = jnp.ones((8,))
+        h = cell(x, cell.initial_state)
+        assert h.shape == (16,)
+
+    def test_output_shape_batched(self):
+        """Cell broadcasts over batch dimensions."""
+        cell = nn.RNNCell(8, 16, key=jax.random.key(0))
+        x = jnp.ones((3, 8))
+        h0 = jnp.zeros((3, 16))
+        h = cell(x, h0)
+        assert h.shape == (3, 16)
+
+    def test_weight_shapes(self):
+        """w_i, w_h, b have expected shapes (no gate multiplier)."""
+        cell = nn.RNNCell(8, 16, key=jax.random.key(0))
+        assert cell.w_i.shape == (8, 16)
+        assert cell.w_h.shape == (16, 16)
+        assert cell.b.shape == (16,)  # type: ignore[union-attr]
+
+    def test_no_bias(self):
+        """No-bias mode sets b to None."""
+        cell = nn.RNNCell(8, 16, bias=False, key=jax.random.key(0))
+        assert cell.b is None
+
+    def test_recurrent_weight_init(self):
+        """Default orthogonal init on w_h: columns have unit norm (square matrix)."""
+        cell = nn.RNNCell(16, 16, key=jax.random.key(0))
+        col_norms = jnp.linalg.norm(cell.w_h, axis=0)
+        npt.assert_allclose(col_norms, jnp.ones(16), atol=1e-5)
+
+    def test_zero_bias_init(self):
+        """Bias is initialized to all zeros."""
+        cell = nn.RNNCell(8, 16, key=jax.random.key(0))
+        assert jnp.all(cell.b == 0)
+
+    def test_initial_state_zeros(self):
+        """initial_state returns zero-initialized h."""
+        cell = nn.RNNCell(8, 16, key=jax.random.key(0))
+        h = cell.initial_state
+        npt.assert_array_equal(h, jnp.zeros(16))
+
+    def test_manual_computation(self):
+        """Output matches manual computation."""
+        cell = nn.RNNCell(4, 8, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (4,))
+        h0 = cell.initial_state
+
+        h = cell(x, h0)
+
+        h_exp = jnp.tanh(x @ cell.w_i + h0 @ cell.w_h + cell.b)  # type: ignore[operator]
+        npt.assert_allclose(h, h_exp, rtol=1e-5, atol=1e-5)
+
+
+class TestRNN:
+    def test_output_shape(self):
+        """Output has shape (batch, T, hidden_dim)."""
+        rnn = nn.RNN(8, 16, key=jax.random.key(0))
+        x = jnp.ones((1, 5, 8))
+        y, h_n = rnn(x)
+        assert y.shape == (1, 5, 16)
+        assert h_n.shape == (1, 16)
+
+    def test_output_shape_batched(self):
+        """Batch dimensions are preserved."""
+        rnn = nn.RNN(8, 16, key=jax.random.key(0))
+        x = jnp.ones((3, 5, 8))
+        y, h_n = rnn(x)
+        assert y.shape == (3, 5, 16)
+        assert h_n.shape == (3, 16)
+
+    def test_vmap_batch(self):
+        """jax.vmap adds an extra batch dimension."""
+        rnn = nn.RNN(8, 16, key=jax.random.key(0))
+        x = jnp.ones((2, 3, 5, 8))
+        y, h_n = jax.vmap(rnn)(x)
+        assert y.shape == (2, 3, 5, 16)
+        assert h_n.shape == (2, 3, 16)
+
+    def test_scan_vs_manual(self):
+        """Scan-based output matches manual step-by-step unrolling."""
+        rnn = nn.RNN(4, 8, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (1, 3, 4))
+
+        y_scan, h_n = rnn(x)
+
+        cell = rnn.cell
+        h = cell.initial_state
+        hs = []
+        for t in range(3):
+            h = cell(x[0, t], h)
+            hs.append(h)
+        y_manual = jnp.stack(hs)
+
+        npt.assert_allclose(y_scan[0], y_manual, rtol=1e-5, atol=1e-5)
+        npt.assert_allclose(h_n[0], h, rtol=1e-5, atol=1e-5)
+
+    def test_custom_initial_state(self):
+        """Custom initial state is used instead of zeros."""
+        rnn = nn.RNN(4, 8, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (1, 3, 4))
+
+        h0 = jnp.ones((1, 8)) * 0.5
+        y_custom, _ = rnn(x, hx=h0)
+
+        y_zero, _ = rnn(x)
+        assert not jnp.allclose(y_custom, y_zero)
+
+    def test_no_bias(self):
+        """No-bias mode works through the wrapper."""
+        rnn = nn.RNN(8, 16, bias=False, key=jax.random.key(0))
+        assert rnn.cell.b is None
+        x = jnp.ones((1, 5, 8))
+        y, h_n = rnn(x)
+        assert y.shape == (1, 5, 16)
+
+
 class TestLSTMCell:
     def test_output_shape(self):
         """Output (h, c) each have shape (hidden_dim,)."""

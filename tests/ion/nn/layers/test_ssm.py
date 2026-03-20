@@ -145,27 +145,27 @@ class TestLRU:
 
 class TestS4DCell:
     def test_output_shape(self):
-        """Output y has shape (in_dim,), hx has shape (in_dim, hidden_dim) complex."""
+        """Output y has shape (in_dim,), hx has shape (in_dim, hidden_dim//2) complex."""
         cell = nn.S4DCell(8, 8, key=jax.random.key(0))
         y, hx = cell(jnp.ones((8,)), cell.initial_state)
         assert y.shape == (8,)
-        assert hx.shape == (8, 8)
+        assert hx.shape == (8, 4)
 
     def test_output_shape_batched(self):
         """Cell broadcasts over batch dimensions."""
         cell = nn.S4DCell(8, 8, key=jax.random.key(0))
         x = jnp.ones((3, 8))
-        h0 = jnp.zeros((3, 8, 8), dtype=jnp.complex64)
+        h0 = jnp.zeros((3, 8, 4), dtype=jnp.complex64)
         y, hx = cell(x, h0)
         assert y.shape == (3, 8)
-        assert hx.shape == (3, 8, 8)
+        assert hx.shape == (3, 8, 4)
 
     def test_weight_shapes(self):
-        """All parameters have expected shapes."""
+        """All parameters have expected shapes (hidden_dim halved for conjugate pairs)."""
         cell = nn.S4DCell(8, 8, key=jax.random.key(0))
-        assert cell.A_log_re.shape == (8, 8)
-        assert cell.A_im.shape == (8, 8)
-        assert cell.C.shape == (8, 8)
+        assert cell.A_log_re.shape == (8, 4)
+        assert cell.A_im.shape == (8, 4)
+        assert cell.C.shape == (8, 4)
         assert cell.C.dtype == jnp.complex64
         assert cell.D.shape == (8,)
         assert cell.log_dt.shape == (8,)
@@ -176,10 +176,10 @@ class TestS4DCell:
         assert not hasattr(cell, "B")
 
     def test_initial_state_zeros(self):
-        """initial_state returns complex zeros of shape (in_dim, hidden_dim)."""
+        """initial_state returns complex zeros of shape (in_dim, hidden_dim//2)."""
         cell = nn.S4DCell(8, 8, key=jax.random.key(0))
         hx = cell.initial_state
-        npt.assert_array_equal(hx, jnp.zeros((8, 8), dtype=jnp.complex64))
+        npt.assert_array_equal(hx, jnp.zeros((8, 4), dtype=jnp.complex64))
 
     def test_initial_state_dtype(self):
         """initial_state has complex64 dtype."""
@@ -227,20 +227,20 @@ class TestS4DCell:
     def test_s4d_lin_init(self):
         """S4D-Lin initialization: real parts are log(0.5), imag parts are pi*n."""
         cell = nn.S4DCell(8, 8, key=jax.random.key(0))
-        expected_real = jnp.full((8, 8), jnp.log(0.5))
-        expected_imag = jnp.broadcast_to(pi * jnp.arange(8), (8, 8))
+        expected_real = jnp.full((8, 4), jnp.log(0.5))
+        expected_imag = jnp.broadcast_to(pi * jnp.arange(4), (8, 4))
         npt.assert_allclose(cell.A_log_re._value, expected_real, rtol=1e-6)
         npt.assert_allclose(cell.A_im._value, expected_imag, rtol=1e-6)
 
 
 class TestS4D:
     def test_output_shape(self):
-        """Outputs have shape (batch, T, in_dim), hx has shape (batch, in_dim, hidden_dim)."""
+        """Outputs have shape (batch, T, in_dim), hx has shape (batch, in_dim, hidden_dim//2)."""
         s4d = nn.S4D(8, 8, key=jax.random.key(0))
         x = jnp.ones((1, 5, 8))
         outputs, hx = s4d(x)
         assert outputs.shape == (1, 5, 8)
-        assert hx.shape == (1, 8, 8)
+        assert hx.shape == (1, 8, 4)
 
     def test_output_shape_batched(self):
         """Batch dimensions are preserved."""
@@ -248,7 +248,7 @@ class TestS4D:
         x = jnp.ones((3, 5, 8))
         outputs, hx = s4d(x)
         assert outputs.shape == (3, 5, 8)
-        assert hx.shape == (3, 8, 8)
+        assert hx.shape == (3, 8, 4)
 
     def test_vmap_batch(self):
         """jax.vmap adds an extra batch dimension."""
@@ -256,7 +256,7 @@ class TestS4D:
         x = jnp.ones((2, 3, 5, 8))
         outputs, hx = jax.vmap(s4d)(x)
         assert outputs.shape == (2, 3, 5, 8)
-        assert hx.shape == (2, 3, 8, 8)
+        assert hx.shape == (2, 3, 8, 4)
 
     def test_scan_vs_manual(self):
         """Scan-based output matches manual step-by-step unrolling."""
@@ -281,7 +281,7 @@ class TestS4D:
         s4d = nn.S4D(4, 4, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (1, 3, 4))
 
-        h0 = jnp.ones((1, 4, 4), dtype=jnp.complex64) * (0.5 + 0.5j)
+        h0 = jnp.ones((1, 4, 2), dtype=jnp.complex64) * (0.5 + 0.5j)
         y_custom, _ = s4d(x, hx=h0)
 
         y_zero, _ = s4d(x)
@@ -290,38 +290,38 @@ class TestS4D:
 
 class TestS5Cell:
     def test_output_shape(self):
-        """Output y has shape (in_dim,), hx has shape (hidden_dim,) complex."""
+        """Output y has shape (in_dim,), hx has shape (hidden_dim//2,) complex."""
         cell = nn.S5Cell(8, 8, key=jax.random.key(0))
         y, hx = cell(jnp.ones((8,)), cell.initial_state)
         assert y.shape == (8,)
-        assert hx.shape == (8,)
+        assert hx.shape == (4,)
 
     def test_output_shape_batched(self):
         """Cell broadcasts over batch dimensions."""
         cell = nn.S5Cell(8, 8, key=jax.random.key(0))
         x = jnp.ones((3, 8))
-        h0 = jnp.zeros((3, 8), dtype=jnp.complex64)
+        h0 = jnp.zeros((3, 4), dtype=jnp.complex64)
         y, hx = cell(x, h0)
         assert y.shape == (3, 8)
-        assert hx.shape == (3, 8)
+        assert hx.shape == (3, 4)
 
     def test_weight_shapes(self):
-        """All parameters have expected shapes."""
+        """All parameters have expected shapes (hidden_dim halved for conjugate pairs)."""
         cell = nn.S5Cell(8, 8, key=jax.random.key(0))
-        assert cell.A_log_re.shape == (8,)
-        assert cell.A_im.shape == (8,)
-        assert cell.B.shape == (8, 8)
+        assert cell.A_log_re.shape == (4,)
+        assert cell.A_im.shape == (4,)
+        assert cell.B.shape == (8, 4)
         assert cell.B.dtype == jnp.complex64
-        assert cell.C.shape == (8, 8)
+        assert cell.C.shape == (4, 8)
         assert cell.C.dtype == jnp.complex64
         assert cell.D.shape == (8,)
-        assert cell.log_dt.shape == (8,)
+        assert cell.log_dt.shape == (4,)
 
     def test_initial_state_zeros(self):
-        """initial_state returns complex zeros of shape (hidden_dim,)."""
+        """initial_state returns complex zeros of shape (hidden_dim//2,)."""
         cell = nn.S5Cell(8, 8, key=jax.random.key(0))
         hx = cell.initial_state
-        npt.assert_array_equal(hx, jnp.zeros(8, dtype=jnp.complex64))
+        npt.assert_array_equal(hx, jnp.zeros(4, dtype=jnp.complex64))
 
     def test_initial_state_dtype(self):
         """initial_state has complex64 dtype."""
@@ -369,18 +369,18 @@ class TestS5Cell:
     def test_s4d_lin_init(self):
         """S4D-Lin initialization: real parts are log(0.5), imag parts are pi*n."""
         cell = nn.S5Cell(8, 8, key=jax.random.key(0))
-        npt.assert_allclose(cell.A_log_re._value, jnp.full(8, jnp.log(0.5)), rtol=1e-6)
-        npt.assert_allclose(cell.A_im._value, pi * jnp.arange(8), rtol=1e-6)
+        npt.assert_allclose(cell.A_log_re._value, jnp.full(4, jnp.log(0.5)), rtol=1e-6)
+        npt.assert_allclose(cell.A_im._value, pi * jnp.arange(4), rtol=1e-6)
 
 
 class TestS5:
     def test_output_shape(self):
-        """Outputs have shape (batch, T, in_dim), hx has shape (batch, hidden_dim)."""
+        """Outputs have shape (batch, T, in_dim), hx has shape (batch, hidden_dim//2)."""
         s5 = nn.S5(8, 8, key=jax.random.key(0))
         x = jnp.ones((1, 5, 8))
         outputs, hx = s5(x)
         assert outputs.shape == (1, 5, 8)
-        assert hx.shape == (1, 8)
+        assert hx.shape == (1, 4)
 
     def test_output_shape_batched(self):
         """Batch dimensions are preserved."""
@@ -388,7 +388,7 @@ class TestS5:
         x = jnp.ones((3, 5, 8))
         outputs, hx = s5(x)
         assert outputs.shape == (3, 5, 8)
-        assert hx.shape == (3, 8)
+        assert hx.shape == (3, 4)
 
     def test_vmap_batch(self):
         """jax.vmap adds an extra batch dimension."""
@@ -396,7 +396,7 @@ class TestS5:
         x = jnp.ones((2, 3, 5, 8))
         outputs, hx = jax.vmap(s5)(x)
         assert outputs.shape == (2, 3, 5, 8)
-        assert hx.shape == (2, 3, 8)
+        assert hx.shape == (2, 3, 4)
 
     def test_scan_vs_manual(self):
         """Scan-based output matches manual step-by-step unrolling."""
@@ -421,7 +421,7 @@ class TestS5:
         s5 = nn.S5(4, 4, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (1, 3, 4))
 
-        h0 = jnp.ones((1, 4), dtype=jnp.complex64) * (0.5 + 0.5j)
+        h0 = jnp.ones((1, 2), dtype=jnp.complex64) * (0.5 + 0.5j)
         y_custom, _ = s5(x, hx=h0)
 
         y_zero, _ = s5(x)

@@ -20,6 +20,9 @@ def _build_layers(key):
     dropout_wrapper = functools.partial(dropout, key=next(keys))
 
     # Wrap cells so they match the layer(x) calling convention.
+    rnn_cell = nn.RNNCell(8, 16, key=next(keys))
+    rnn_cell_wrapper = lambda x: rnn_cell(x, rnn_cell.initial_state)
+
     lstm_cell = nn.LSTMCell(8, 16, key=next(keys))
     lstm_cell_wrapper = lambda x: lstm_cell(x, lstm_cell.initial_state)[0]
 
@@ -52,8 +55,10 @@ def _build_layers(key):
         (nn.MLP(8, 16, 32, num_hidden_layers=2, key=next(keys)), jnp.ones((2, 8))),
         (dropout_wrapper, jnp.ones((2, 8))),
         (nn.Embedding(16, 8, key=next(keys)), jnp.array([[0, 3, 7, 15], [1, 2, 5, 10]])),
+        (rnn_cell_wrapper, jnp.ones((2, 8))),
         (lstm_cell_wrapper, jnp.ones((2, 8))),
         (gru_cell_wrapper, jnp.ones((2, 8))),
+        (lambda x, _l=nn.RNN(8, 16, key=next(keys)): _l(x)[0], jnp.ones((2, 5, 8))),
         (lambda x, _l=nn.LSTM(8, 16, key=next(keys)): _l(x)[0], jnp.ones((2, 5, 8))),
         (lambda x, _l=nn.GRU(8, 16, key=next(keys)): _l(x)[0], jnp.ones((2, 5, 8))),
         (lru_cell_wrapper, jnp.ones((2, 8))),
@@ -93,8 +98,10 @@ _PARAM_NAMES = [
     "mlp",
     "dropout",
     "embedding",
+    "rnn_cell",
     "lstm_cell",
     "gru_cell",
+    "rnn",
     "lstm",
     "gru",
     "lru_cell",
@@ -129,6 +136,7 @@ _STRUCTURAL_LAYER_NAMES = [
     "avgpool_2d",
     "conv_transpose_1d",
     "conv_transpose_2d",
+    "rnn",
     "lstm",
     "gru",
     "lru",
