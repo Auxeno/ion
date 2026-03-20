@@ -10,7 +10,7 @@ from .layers.lora import LoRALinear
 from .layers.norm import GroupNorm, LayerNorm, RMSNorm
 from .layers.pool import AvgPool, MaxPool
 from .layers.positional import LearnedPositionalEmbedding, alibi, apply_rope, rope, sinusoidal
-from .layers.recurrent import GRU, LSTM, GRUCell, LSTMCell
+from .layers.recurrent import GRU, LSTM, RNN, GRUCell, LSTMCell, RNNCell
 from .layers.ssm import LRU, S4D, S5, LRUCell, S4DCell, S5Cell
 from .module import Module
 from .param import Param
@@ -40,6 +40,8 @@ __all__ = [
     "MaxPool",
     "MLP",
     "RMSNorm",
+    "RNN",
+    "RNNCell",
     "S4D",
     "S4DCell",
     "S5",
