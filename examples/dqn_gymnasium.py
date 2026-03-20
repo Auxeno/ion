@@ -4,6 +4,7 @@ Demonstrates replay buffers, target networks, and the `donate_argnums` trick
 for memory-efficient buffer updates in JAX.
 """
 
+from collections import deque
 from functools import partial
 from typing import Callable, NamedTuple
 
@@ -41,14 +42,12 @@ class QNetwork(nn.Module):
 
 
 class Transition(NamedTuple):
-    """Environment transition."""
-
     observations: Float[Array, "... d"]
     next_observations: Float[Array, "... d"]
-    actions: Int[Array, "..."]
     rewards: Float[Array, "..."]
     terminations: Float[Array, "..."]
     truncations: Float[Array, "..."]
+    actions: Int[Array, "..."]
 
 
 class BufferState(NamedTuple):
@@ -65,10 +64,10 @@ def init_buffer(obs_shape: tuple[int, ...], buffer_size: int) -> BufferState:
         transitions=Transition(
             observations=jnp.zeros((buffer_size, *obs_shape)),
             next_observations=jnp.zeros((buffer_size, *obs_shape)),
-            actions=jnp.zeros(buffer_size, dtype=jnp.int32),
             rewards=jnp.zeros(buffer_size),
             terminations=jnp.zeros(buffer_size),
             truncations=jnp.zeros(buffer_size),
+            actions=jnp.zeros(buffer_size, dtype=jnp.int32),
         ),
         idx=jnp.array(0, dtype=jnp.int32),
         size=jnp.array(0, dtype=jnp.int32),
@@ -109,16 +108,17 @@ def select_action(
 def rollout(
     network: QNetwork,
     envs: gym.vector.SyncVectorEnv,
-    observations: np.ndarray,
+    initial_observations: np.ndarray,
     epsilon: float,
     current_returns: np.ndarray,
-    recent_returns: list[float],
+    recent_returns: deque[float],
     *,
     key: PRNGKeyArray,
 ) -> tuple[np.ndarray, tuple[Transition, ...]]:
-    """Collect rollout from vectorized environments."""
+    """Collect transitions from vectorized environments."""
     experience = []
 
+    observations = initial_observations
     for _ in range(ROLLOUT_STEPS):
         key, key_action = split(key)
         actions = np.asarray(
@@ -131,10 +131,10 @@ def rollout(
             Transition(
                 observations=observations,  # type: ignore[arg-type]
                 next_observations=next_observations,  # type: ignore[arg-type]
-                actions=actions,  # type: ignore[arg-type]
                 rewards=rewards,
                 terminations=terminations.astype(np.float32),
                 truncations=truncations.astype(np.float32),
+                actions=actions,  # type: ignore[arg-type]
             )
         )
 
@@ -165,16 +165,14 @@ def learn(
     indices = jax.random.randint(key, (BATCH_SIZE,), 0, buffer.size)
     batch = jax.tree.map(lambda x: x[indices], buffer.transitions)
 
-    # Double DQN for bootstrap targets
+    # Double DQN bootstrap targets
     next_actions = network(batch.next_observations).argmax(axis=-1)
     next_q = target_network(batch.next_observations)[jnp.arange(BATCH_SIZE), next_actions]
     targets = batch.rewards + GAMMA * (1.0 - batch.terminations) * next_q
 
     def loss_fn(network: QNetwork) -> Float[Array, ""]:
-        # Current predictions with online network
         q_values = network(batch.observations)[jnp.arange(BATCH_SIZE), batch.actions]
-        loss_mse = ((targets - q_values) ** 2).mean()
-        return loss_mse
+        return ((targets - q_values) ** 2).mean()
 
     grads = jax.grad(loss_fn)(network)
     network, optimizer = optimizer.update(network, grads)
@@ -209,17 +207,16 @@ def train_dqn(
         network,
     )
 
-    # Initialize replay buffer and environments
+    # Initialize replay buffer
     obs_shape = envs.single_observation_space.shape  # type: ignore[union-attr]
     buffer = init_buffer(obs_shape, BUFFER_SIZE)  # type: ignore[arg-type]
     observations, _ = envs.reset(seed=seed)
 
     # Episode tracking
     current_returns = np.zeros(NUM_ENVS)
-    recent_returns: list[float] = []
+    recent_returns: deque[float] = deque(maxlen=100)
     steps = 0
 
-    # Training loop
     bar = tqdm(total=TOTAL_STEPS, desc="DQN")
     for rollout_idx in range(total_rollouts):
         rng, key_rollout, key_learn = split(rng, 3)
@@ -243,7 +240,7 @@ def train_dqn(
             )
 
         if recent_returns and steps % 1000 < steps_per_rollout:
-            mean_reward = np.mean(recent_returns[-100:])
+            mean_reward = np.mean(recent_returns)
             bar.set_postfix(reward=f"{mean_reward:.1f}", eps=f"{epsilon:.2f}")
 
     bar.close()
@@ -252,7 +249,7 @@ def train_dqn(
 
 
 if __name__ == "__main__":
-    ENV_NAME = "CartPole-v1"
+    GYMNASIUM_ENV_NAME = "CartPole-v1"
     TOTAL_STEPS = 1_000_000
     ROLLOUT_STEPS = 4
     NUM_ENVS = 8
@@ -268,22 +265,17 @@ if __name__ == "__main__":
     EPS_FRACTION = 0.5
     SEED = 42
 
-    # Saves about 10% on total training time
     split = jax.jit(jax.random.split, static_argnums=1)
 
-    # Create sample env to determine obs and action dim
-    sample_env = gym.make(ENV_NAME)
+    # Create gymnasium environment
+    sample_env = gym.make(GYMNASIUM_ENV_NAME)
     OBS_DIM = sample_env.observation_space.shape[0]  # type: ignore[index]
     ACTION_DIM = int(sample_env.action_space.n)  # type: ignore[attr-defined]
     sample_env.close()
 
-    # Create network
     rng = jax.random.key(SEED)
     rng, key_network = jax.random.split(rng)
     network = QNetwork(OBS_DIM, ACTION_DIM, NETWORK_DIM, key=key_network)
 
-    # Env factory function
-    env_fn = lambda: gym.make(ENV_NAME)
-
-    # Train DQN agent
+    env_fn = lambda: gym.make(GYMNASIUM_ENV_NAME)
     trained = train_dqn(network, env_fn, seed=SEED)

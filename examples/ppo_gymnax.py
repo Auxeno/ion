@@ -76,16 +76,14 @@ def rollout(
     network: ActorCritic,
     carry: RolloutCarry,
 ) -> tuple[RolloutCarry, Transition]:
-    """Collect transitions from vectorized environments via scan."""
+    """Collect transitions from vectorized environments via lax.scan."""
 
     def step_fn(carry: RolloutCarry, _: None) -> tuple[RolloutCarry, Transition]:
         rng, env_states, observations = carry
         rng, key_action, key_step = jax.random.split(rng, 3)
 
-        # Select actions from policy
         actions, log_probs, values = network.get_action_and_value(observations, key=key_action)
 
-        # Step vectorized environments
         next_observations, next_states, rewards, terminations, info = jax.vmap(
             env.step, in_axes=(0, 0, 0, None)
         )(
@@ -121,14 +119,12 @@ def calculate_gae(
     gamma: float,
     gae_lambda: float,
 ) -> Float[Array, "t n"]:
-    """Compute GAE advantages via a reversed scan over timesteps."""
+    """Compute GAE advantages via reversed scan over timesteps."""
 
     def gae_step(advantage, carry):
         reward, value, next_value, termination, truncation = carry
         non_termination = 1.0 - termination
         non_truncation = 1.0 - truncation
-
-        # TD-error + recursive GAE formula
         delta = reward + gamma * next_value * non_termination - value
         advantage = delta + gamma * gae_lambda * non_termination * non_truncation * advantage
         return advantage, advantage
@@ -150,7 +146,7 @@ def ppo_loss(
     returns: Float[Array, " b"],
     old_log_probs: Float[Array, " b"],
 ) -> Float[Array, ""]:
-    """Combined PPO-Clip loss: clipped surrogate + value MSE + entropy."""
+    """PPO clipped surrogate loss with value MSE and entropy bonus."""
     new_log_probs, entropies, values = network.get_log_prob_entropy_value(observations, actions)
 
     # Clipped surrogate policy loss
@@ -159,10 +155,8 @@ def ppo_loss(
     loss_clipped = -advantages * jnp.clip(ratio, 1 - PPO_CLIP, 1 + PPO_CLIP)
     policy_loss = jnp.maximum(loss_unclipped, loss_clipped).mean()
 
-    # Value function loss (MSE)
+    # Value loss and entropy bonus
     value_loss = 0.5 * ((returns - values) ** 2).mean()
-
-    # Entropy bonus (negative to maximize entropy)
     entropy_loss = -entropies.mean()
 
     return policy_loss + value_loss + entropy_loss * ENTROPY_BETA
@@ -176,7 +170,7 @@ def learn(
     *,
     key: PRNGKeyArray,
 ) -> tuple[ActorCritic, ion.Optimizer]:
-    """PPO update: compute GAE then scan over minibatch gradient steps."""
+    """Compute GAE advantages then scan over minibatch PPO updates."""
 
     # Compute advantages with GAE
     next_values = jax.vmap(network.get_value)(batch.next_observations)
@@ -196,15 +190,13 @@ def learn(
     batch = jax.tree.map(lambda x: x.reshape(-1, *x.shape[2:]), batch)
     advantages, returns = advantages.flatten(), returns.flatten()
 
-    # Generate shuffled minibatch indices
+    # Shuffled minibatch indices
     indices = jnp.tile(jnp.arange(BATCH_SIZE, dtype=jnp.int32), (NUM_EPOCHS, 1))
     mb_indices = jax.vmap(jax.random.permutation)(jax.random.split(key, NUM_EPOCHS), indices)
     mb_indices = mb_indices.reshape(NUM_EPOCHS * NUM_MINIBATCHES, MINIBATCH_SIZE)
 
     def minibatch_update(carry, indices):
         network, optimizer = carry
-
-        # Compute PPO loss and parameter gradients
         loss, grads = jax.value_and_grad(ppo_loss)(
             network,
             batch.observations[indices],
@@ -213,13 +205,64 @@ def learn(
             returns[indices],
             batch.log_probs[indices],
         )
-
-        # Apply optimizer update
         network, optimizer = optimizer.update(network, grads)
         return (network, optimizer), loss
 
     (network, optimizer), _ = jax.lax.scan(minibatch_update, (network, optimizer), mb_indices)
     return network, optimizer
+
+
+def train_ppo(
+    network: ActorCritic,
+    *,
+    seed: int = 42,
+) -> ActorCritic:
+    """Train a PPO agent on a gymnax environment."""
+
+    rng = jax.random.key(seed)
+    rng, key_reset, rng_rollout = jax.random.split(rng, 3)
+
+    # Initialize optimizer
+    optimizer = ion.Optimizer(
+        optax.chain(optax.clip_by_global_norm(0.5), optax.adam(learning_rate=LR, eps=1e-5)),
+        network,
+    )
+
+    # Reset vectorized environments
+    observations, env_states = jax.vmap(env.reset, in_axes=(0, None))(
+        jax.random.split(key_reset, NUM_ENVS), env_params
+    )
+    carry = (rng_rollout, env_states, observations)
+
+    # Episode tracking
+    current_returns = np.zeros(NUM_ENVS)
+    recent_returns: deque[float] = deque(maxlen=100)
+    total_rollouts = TOTAL_STEPS // BATCH_SIZE
+    checkpoints = {total_rollouts * p // 10 for p in range(1, 11)}
+
+    bar = tqdm(range(total_rollouts), desc=f"PPO {GYMNAX_ENV_NAME}")
+    for i in bar:
+        rng, key_learn = jax.random.split(rng)
+
+        carry, transitions = rollout(network, carry)
+        network, optimizer = learn(network, optimizer, transitions, key=key_learn)
+
+        # Track episode returns
+        rewards_np = np.asarray(transitions.rewards)
+        dones_np = np.asarray(transitions.terminations | transitions.truncations)
+        for step_r, step_d in zip(rewards_np, dones_np):
+            current_returns += step_r
+            for ret in current_returns[step_d]:
+                recent_returns.append(float(ret))
+            current_returns[step_d] = 0.0
+
+        if recent_returns:
+            mean_reward = np.mean(recent_returns)
+            bar.set_postfix(reward=f"{mean_reward:.1f}")
+            if i + 1 in checkpoints:
+                tqdm.write(f"  Step {(i + 1) * BATCH_SIZE:>9,} | Mean reward: {mean_reward:.1f}")
+
+    return network
 
 
 if __name__ == "__main__":
@@ -237,55 +280,15 @@ if __name__ == "__main__":
     SEED = 42
 
     BATCH_SIZE = ROLLOUT_STEPS * NUM_ENVS
-    TOTAL_ROLLOUTS = TOTAL_STEPS // BATCH_SIZE
     MINIBATCH_SIZE = BATCH_SIZE // NUM_MINIBATCHES
 
-    # Create Gymnax environment
+    # Create gymnax environment
     env, env_params = gymnax.make(GYMNAX_ENV_NAME)
-    obs_dim = env.observation_space(env_params).shape[0]  # type: ignore[reportArgumentType]
-    action_dim = int(env.action_space(env_params).n)  # type: ignore[reportArgumentType]
+    OBS_DIM = env.observation_space(env_params).shape[0]  # type: ignore[reportArgumentType]
+    ACTION_DIM = int(env.action_space(env_params).n)  # type: ignore[reportArgumentType]
 
-    # Initialize RNG
     rng = jax.random.key(SEED)
-    rng, key_network, key_reset, rng_rollout = jax.random.split(rng, 4)
+    rng, key_network = jax.random.split(rng)
+    network = ActorCritic(OBS_DIM, ACTION_DIM, key=key_network)
 
-    # Initialize network and optimizer
-    network = ActorCritic(obs_dim, action_dim, key=key_network)
-    optimizer = ion.Optimizer(
-        optax.chain(optax.clip_by_global_norm(1.0), optax.adam(learning_rate=LR, eps=1e-5)),
-        network,
-    )
-
-    # Reset vectorized environments
-    observations, env_states = jax.vmap(env.reset, in_axes=(0, None))(
-        jax.random.split(key_reset, NUM_ENVS), env_params
-    )
-    carry = (rng_rollout, env_states, observations)
-
-    # Episode tracking
-    current_returns = np.zeros(NUM_ENVS)
-    recent_returns: deque[float] = deque(maxlen=100)
-    checkpoints = {TOTAL_ROLLOUTS * p // 10 for p in range(1, 11)}
-
-    bar = tqdm(range(TOTAL_ROLLOUTS), desc="PPO CartPole-v1")
-    for i in bar:
-        rng, key_learn = jax.random.split(rng)
-
-        # Collect transitions and update policy
-        carry, transitions = rollout(network, carry)
-        network, optimizer = learn(network, optimizer, transitions, key=key_learn)
-
-        # Track episode statistics
-        rewards_np = np.asarray(transitions.rewards)
-        dones_np = np.asarray(transitions.terminations | transitions.truncations)
-        for step_r, step_d in zip(rewards_np, dones_np):
-            current_returns += step_r
-            for ret in current_returns[step_d]:
-                recent_returns.append(float(ret))
-            current_returns[step_d] = 0.0
-
-        if recent_returns:
-            mean_reward = np.mean(recent_returns)
-            bar.set_postfix(reward=f"{mean_reward:.1f}")
-            if i + 1 in checkpoints:
-                tqdm.write(f"  Step {(i + 1) * BATCH_SIZE:>9,} | Mean reward: {mean_reward:.1f}")
+    trained = train_ppo(network, seed=SEED)
