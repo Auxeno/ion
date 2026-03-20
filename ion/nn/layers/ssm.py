@@ -5,26 +5,14 @@ Modules:
     LRU      Linear Recurrent Unit over a sequence via lax.associative_scan.  (Orvieto et al., 2023)
     S4DCell  Single-step per-feature SISO S4D cell (diagonal, S4D-Lin).       (Gu et al., 2022)
     S4D      Per-feature SISO S4D over a sequence via lax.associative_scan.   (Gu et al., 2022)
-    S5Cell   Single-step MIMO Simplified S5 cell with shared diagonal state.  (Smith et al., 2023)
+    S5Cell   Single-step MIMO S5 cell with shared diagonal state.             (Smith et al., 2023)
     S5       MIMO S5 over a sequence via lax.associative_scan.                (Smith et al., 2023)
 
-LRU: glorot normal for B/C projections, zeros for D. Eigenvalue magnitudes
-initialized uniformly on complex annulus [r_min, r_max].
-
-S4D: per-feature SISO SSMs. No explicit B parameter (B=1, absorbed into ZOH).
-Glorot normal for C, zeros for D. S4D-Lin initialization for diagonal A
-(-1/2 + i*pi*n). Per-feature learnable timestep.
-
-S5: shared MIMO SSM with dense B/C projections. Glorot normal for B/C, zeros
-for D. S4D-Lin initialization for diagonal A (-1/2 + i*pi*n). Per-state
-learnable timestep.
-
-All SSM hidden states are complex-valued. hidden_dim=N stores N complex values
-(2N real parameters). S4D and S5 use conjugate-pair structure: only one
-eigenvalue per conjugate pair is stored, and the readout uses 2*Re(...) to
-recover the full contribution. LRU stores independent complex eigenvalues
-without conjugate symmetry.
-
+Sequence layers use associative scan for O(log T) parallel time complexity.
+All hidden states are complex-valued. S4D and S5 use conjugate pairs
+(state_dim N stores N//2 eigenvalues, readout via 2*Re). LRU stores N
+independent complex eigenvalues directly.
+Glorot normal for projections, zeros for D and skip connections.
 Input layout is (batch, time, features).
 Initial state defaults to zeros if not provided.
 """
@@ -170,7 +158,7 @@ class S4DCell(Module):
     """Single-step per-feature SISO S4D cell.
 
     >>> cell = S4DCell(3, 8, key=key)
-    >>> x, h = cell(x, h)  # (*, 3), (*, 3, 8) -> (*, 3), (*, 3, 8)
+    >>> x, h = cell(x, h)  # (*, 3), (*, 3, 4) -> (*, 3), (*, 3, 4)
     """
 
     A_log_re: Param[Float[Array, "i h"]]
@@ -182,7 +170,7 @@ class S4DCell(Module):
     def __init__(
         self,
         in_dim: int,
-        hidden_dim: int,
+        state_dim: int,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
         dtype: jnp.dtype = jnp.float32,
@@ -194,16 +182,15 @@ class S4DCell(Module):
 
         key_c, key_d, key_dt = jax.random.split(key, 3)
 
+        # Halve for conjugate pairs
+        h = state_dim // 2
+
         # Eigenvalues at harmonics (-1/2 + i*pi*n) so each state captures a different frequency
-        self.A_log_re = Param(jnp.full((in_dim, hidden_dim), jnp.log(0.5), dtype=dtype))
-        self.A_im = Param(
-            jnp.broadcast_to(
-                (pi * jnp.arange(hidden_dim)).astype(dtype), (in_dim, hidden_dim)
-            ).copy()
-        )
+        self.A_log_re = Param(jnp.full((in_dim, h), jnp.log(0.5), dtype=dtype))
+        self.A_im = Param(jnp.broadcast_to((pi * jnp.arange(h)).astype(dtype), (in_dim, h)).copy())
 
         # C projects each feature's hidden state to a scalar output
-        self.C = Param(w_init(shape=(in_dim, hidden_dim), dtype=jnp.complex64, key=key_c))
+        self.C = Param(w_init(shape=(in_dim, h), dtype=jnp.complex64, key=key_c))
 
         # Skip connection
         self.D = Param(d_init(shape=(in_dim,), dtype=dtype, key=key_d))
@@ -243,7 +230,7 @@ class S4D(Module):
     """Per-feature SISO S4D over a full sequence.
 
     >>> s4d = S4D(3, 8, key=key)
-    >>> outputs, h = s4d(x)  # (b, t, 3) -> (b, t, 3), (b, 3, 8)
+    >>> outputs, h = s4d(x)  # (b, t, 3) -> (b, t, 3), (b, 3, 4)
     """
 
     cell: S4DCell
@@ -251,7 +238,7 @@ class S4D(Module):
     def __init__(
         self,
         in_dim: int,
-        hidden_dim: int,
+        state_dim: int,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
         dtype: jnp.dtype = jnp.float32,
@@ -261,7 +248,7 @@ class S4D(Module):
         key: PRNGKeyArray,
     ) -> None:
 
-        self.cell = S4DCell(in_dim, hidden_dim, dt_min, dt_max, dtype, w_init, d_init, key=key)
+        self.cell = S4DCell(in_dim, state_dim, dt_min, dt_max, dtype, w_init, d_init, key=key)
 
     def __call__(
         self,
@@ -293,7 +280,7 @@ class S5Cell(Module):
     """Single-step MIMO S5 cell with shared diagonal state.
 
     >>> cell = S5Cell(3, 8, key=key)
-    >>> x, h = cell(x, h)  # (*, 3), (*, 8) -> (*, 3), (*, 8)
+    >>> x, h = cell(x, h)  # (*, 3), (*, 4) -> (*, 3), (*, 4)
     """
 
     A_log_re: Param[Float[Array, " h"]]
@@ -306,7 +293,7 @@ class S5Cell(Module):
     def __init__(
         self,
         in_dim: int,
-        hidden_dim: int,
+        state_dim: int,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
         dtype: jnp.dtype = jnp.float32,
@@ -318,20 +305,23 @@ class S5Cell(Module):
 
         key_b, key_c, key_d, key_dt = jax.random.split(key, 4)
 
+        # Halve for conjugate pairs
+        h = state_dim // 2
+
         # Eigenvalues at harmonics (-1/2 + i*pi*n) so each state captures a different frequency
-        self.A_log_re = Param(jnp.full(hidden_dim, jnp.log(0.5), dtype=dtype))
-        self.A_im = Param((pi * jnp.arange(hidden_dim)).astype(dtype))
+        self.A_log_re = Param(jnp.full(h, jnp.log(0.5), dtype=dtype))
+        self.A_im = Param((pi * jnp.arange(h)).astype(dtype))
 
         # Dense complex projections: B maps input to shared state, C maps state to output
-        self.B = Param(w_init(shape=(in_dim, hidden_dim), dtype=jnp.complex64, key=key_b))
-        self.C = Param(w_init(shape=(hidden_dim, in_dim), dtype=jnp.complex64, key=key_c))
+        self.B = Param(w_init(shape=(in_dim, h), dtype=jnp.complex64, key=key_b))
+        self.C = Param(w_init(shape=(h, in_dim), dtype=jnp.complex64, key=key_c))
 
         # Skip connection
         self.D = Param(d_init(shape=(in_dim,), dtype=dtype, key=key_d))
 
         # Learnable timestep controlling how finely each state samples continuous dynamics
         log_dt = jax.random.uniform(
-            shape=(hidden_dim,), minval=jnp.log(dt_min), maxval=jnp.log(dt_max), key=key_dt
+            shape=(h,), minval=jnp.log(dt_min), maxval=jnp.log(dt_max), key=key_dt
         )
         self.log_dt = Param(log_dt.astype(dtype))
 
@@ -364,7 +354,7 @@ class S5(Module):
     """MIMO S5 over a full sequence.
 
     >>> s5 = S5(3, 8, key=key)
-    >>> outputs, h = s5(x)  # (b, t, 3) -> (b, t, 3), (b, 8)
+    >>> outputs, h = s5(x)  # (b, t, 3) -> (b, t, 3), (b, 4)
     """
 
     cell: S5Cell
@@ -372,7 +362,7 @@ class S5(Module):
     def __init__(
         self,
         in_dim: int,
-        hidden_dim: int,
+        state_dim: int,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
         dtype: jnp.dtype = jnp.float32,
@@ -382,7 +372,7 @@ class S5(Module):
         key: PRNGKeyArray,
     ) -> None:
 
-        self.cell = S5Cell(in_dim, hidden_dim, dt_min, dt_max, dtype, w_init, d_init, key=key)
+        self.cell = S5Cell(in_dim, state_dim, dt_min, dt_max, dtype, w_init, d_init, key=key)
 
     def __call__(
         self,
