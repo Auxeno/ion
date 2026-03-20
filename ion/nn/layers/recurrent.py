@@ -8,6 +8,7 @@ Modules:
     GRUCell   Single-step GRU with reset, update, and new gates.            (Cho et al., 2014)
     GRU       GRU over a full sequence via lax.scan.                        (Cho et al., 2014)
 
+Sequence layers use sequential scan for O(T) parallel time complexity.
 Glorot uniform for input weights, orthogonal for hidden weights.
 LSTMCell forget gate bias initialized to 1 to encourage remembering.
 Input layout is (batch, time, features).
