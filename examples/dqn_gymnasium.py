@@ -20,15 +20,27 @@ from ion import nn
 
 
 class QNetwork(nn.Module):
-    """Q-network for discrete action spaces."""
+    """Dueling Q-network for estimating Q-values."""
 
-    q: nn.MLP
+    torso: nn.MLP
+    advantage_head: nn.Linear
+    value_head: nn.Linear
 
-    def __init__(self, obs_dim: int, action_dim: int, *, key: PRNGKeyArray) -> None:
-        self.q = nn.MLP(obs_dim, action_dim, 64, 2, activation=jax.nn.relu, key=key)
+    def __init__(
+        self, obs_dim: int, action_dim: int, hidden_dim: int = 64, *, key: PRNGKeyArray
+    ) -> None:
+        key_torso, key_a, key_v = jax.random.split(key, 3)
+        self.torso = nn.MLP(
+            obs_dim, hidden_dim, hidden_dim, 2, activation=jax.nn.relu, key=key_torso
+        )
+        self.advantage_head = nn.Linear(hidden_dim, action_dim, key=key_a)
+        self.value_head = nn.Linear(hidden_dim, 1, key=key_v)
 
     def __call__(self, observations: Float[Array, "... d"]) -> Float[Array, "... a"]:
-        return self.q(observations)
+        x = self.torso(observations)
+        advantages = self.advantage_head(x)
+        value = self.value_head(x)
+        return value + (advantages - advantages.mean(axis=-1, keepdims=True))
 
 
 class Transition(NamedTuple):
@@ -117,9 +129,9 @@ def rollout(
 
         experience.append(
             Transition(
-                observations=observations,
-                next_observations=next_observations,
-                actions=actions,
+                observations=observations,  # type: ignore[arg-type]
+                next_observations=next_observations,  # type: ignore[arg-type]
+                actions=actions,  # type: ignore[arg-type]
                 rewards=rewards,
                 terminations=terminations.astype(np.float32),
                 truncations=truncations.astype(np.float32),
@@ -128,7 +140,7 @@ def rollout(
 
         # Track episode returns and reset done environments
         current_returns[:] += rewards
-        dones = np.logical_or(terminations, truncations)
+        dones = terminations | truncations
         if np.any(dones):
             for ret in current_returns[dones]:
                 recent_returns.append(float(ret))
@@ -177,6 +189,7 @@ if __name__ == "__main__":
     TOTAL_STEPS = 1_000_000
     ROLLOUT_STEPS = 4
     NUM_ENVS = 8
+    HIDDEN_DIM = 64
     LR = 1e-3
     GAMMA = 0.99
     TAU = 0.05
@@ -191,20 +204,20 @@ if __name__ == "__main__":
     STEPS_PER_ROLLOUT = ROLLOUT_STEPS * NUM_ENVS
     TOTAL_ROLLOUTS = TOTAL_STEPS // STEPS_PER_ROLLOUT
 
-    # Create gymnasium environments (manual reset via reset_mask)
+    # Create Gymnasium environments (we manual reset)
     envs = gym.vector.SyncVectorEnv(
         [lambda: gym.make(ENV_NAME) for _ in range(NUM_ENVS)],
         autoreset_mode="Disabled",
     )
-    OBS_DIM = envs.single_observation_space.shape[0]
-    ACTION_DIM = int(envs.single_action_space.n)
+    OBS_DIM = envs.single_observation_space.shape[0]  # type: ignore[index]
+    ACTION_DIM = int(envs.single_action_space.n)  # type: ignore[attr-defined]
 
     # Initialize RNG
     rng = jax.random.key(SEED)
     rng, key_network = jax.random.split(rng)
 
     # Initialize network, target network, and optimizer
-    network = QNetwork(OBS_DIM, ACTION_DIM, key=key_network)
+    network = QNetwork(OBS_DIM, ACTION_DIM, HIDDEN_DIM, key=key_network)
     target_network = network
     optimizer = ion.Optimizer(
         optax.chain(optax.clip_by_global_norm(1.0), optax.adam(learning_rate=LR)),
@@ -224,7 +237,7 @@ if __name__ == "__main__":
 
     bar = tqdm(total=TOTAL_STEPS, desc=f"DQN {ENV_NAME}")
     for rollout_idx in range(TOTAL_ROLLOUTS):
-        rng, key_rollout, key_learn = split(rng)
+        rng, key_rollout, key_learn = split(rng, 3)
 
         # Update epsilon
         epsilon = max(
