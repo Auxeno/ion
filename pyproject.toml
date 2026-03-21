@@ -46,8 +46,12 @@ dev = [
 ]
 examples = [
     "gymnax",
+    "gymnasium==1.2.3",
+    "ale-py==0.11.2",
+    "opencv-python-headless",
     "nbformat",
     "plotly",
+    "pygame",
     "rdkit",
     "tqdm",
 ]
