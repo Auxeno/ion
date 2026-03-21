@@ -42,8 +42,8 @@ class QNetwork(nn.Module):
 
 
 class Transition(NamedTuple):
-    observations: Float[Array, "... d"]
-    next_observations: Float[Array, "... d"]
+    observations: Array
+    next_observations: Array
     rewards: Float[Array, "..."]
     terminations: Float[Array, "..."]
     truncations: Float[Array, "..."]
@@ -58,12 +58,14 @@ class BufferState(NamedTuple):
     size: Int[Array, ""]
 
 
-def init_buffer(obs_shape: tuple[int, ...], buffer_size: int) -> BufferState:
+def init_buffer(
+    obs_shape: tuple[int, ...], buffer_size: int, obs_dtype: jnp.dtype = jnp.float32
+) -> BufferState:
     """Allocate an empty replay buffer."""
     return BufferState(
         transitions=Transition(
-            observations=jnp.zeros((buffer_size, *obs_shape)),
-            next_observations=jnp.zeros((buffer_size, *obs_shape)),
+            observations=jnp.zeros((buffer_size, *obs_shape), dtype=obs_dtype),
+            next_observations=jnp.zeros((buffer_size, *obs_shape), dtype=obs_dtype),
             rewards=jnp.zeros(buffer_size),
             terminations=jnp.zeros(buffer_size),
             truncations=jnp.zeros(buffer_size),
@@ -99,7 +101,7 @@ def select_action(
     """Epsilon-greedy action selection."""
     key_random, key_choice = jax.random.split(key)
     num_envs = observations.shape[0]
-    greedy_actions = network(observations).argmax(axis=-1)
+    greedy_actions = network(observations.astype(jnp.float32)).argmax(axis=-1)
     random_actions = jax.random.randint(key_random, (num_envs,), 0, ACTION_DIM)
     use_random = jax.random.uniform(key_choice, (num_envs,)) < epsilon
     return jnp.where(use_random, random_actions, greedy_actions)
@@ -165,13 +167,17 @@ def learn(
     indices = jax.random.randint(key, (BATCH_SIZE,), 0, buffer.size)
     batch = jax.tree.map(lambda x: x[indices], buffer.transitions)
 
+    # Cast observations to float32 (buffer may store uint8 for memory efficiency)
+    observations = batch.observations.astype(jnp.float32)
+    next_observations = batch.next_observations.astype(jnp.float32)
+
     # Double DQN bootstrap targets
-    next_actions = network(batch.next_observations).argmax(axis=-1)
-    next_q = target_network(batch.next_observations)[jnp.arange(BATCH_SIZE), next_actions]
+    next_actions = network(next_observations).argmax(axis=-1)
+    next_q = target_network(next_observations)[jnp.arange(BATCH_SIZE), next_actions]
     targets = batch.rewards + GAMMA * (1.0 - batch.terminations) * next_q
 
     def loss_fn(network: QNetwork) -> Float[Array, ""]:
-        q_values = network(batch.observations)[jnp.arange(BATCH_SIZE), batch.actions]
+        q_values = network(observations)[jnp.arange(BATCH_SIZE), batch.actions]
         return ((targets - q_values) ** 2).mean()
 
     grads = jax.grad(loss_fn)(network)
@@ -209,7 +215,8 @@ def train_dqn(
 
     # Initialize replay buffer
     obs_shape = envs.single_observation_space.shape  # type: ignore[union-attr]
-    buffer = init_buffer(obs_shape, BUFFER_SIZE)  # type: ignore[arg-type]
+    obs_dtype = envs.single_observation_space.dtype  # type: ignore[union-attr]
+    buffer = init_buffer(obs_shape, BUFFER_SIZE, obs_dtype)  # type: ignore[arg-type]
     observations, _ = envs.reset(seed=seed)
 
     # Episode tracking
