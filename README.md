@@ -181,7 +181,7 @@ Ion ships with standard neural network layers. Each is a `Module` with trainable
 | Positional      | `sinusoidal`, `rope`, `apply_rope`, `alibi`                               |
 | Regularization  | `Dropout`                                                                 |
 | Blocks          | `Sequential`, `MLP`, `TransformerBlock`, `CrossTransformerBlock`          |
-| Graph (GNN)     | `GCNConv`, `GATConv`, `GATv2Conv`                                       |
+| GNN             | `GCNConv`, `GATConv`, `GATv2Conv`                                         |
 
 See [Layer Conventions](https://github.com/auxeno/ion/blob/main/docs/layers.md) for data format, weight init, spatial layer usage, and SSM conventions. See [GNN Conventions](https://github.com/auxeno/ion/blob/main/docs/gnn.md) for graph layer usage.
 
@@ -234,6 +234,7 @@ model = ion.load("model.npz", model)
 - [GNN Molecular Property Prediction](https://github.com/auxeno/ion/blob/main/examples/gnn_bbbp.ipynb): Blood-brain barrier prediction with graph attention networks
 - [SSM Pathfinder](https://github.com/auxeno/ion/blob/main/examples/ssm_pathfinder.ipynb): Exploring state space models on the Pathfinder task
 - [PPO Demo](https://github.com/auxeno/ion/blob/main/examples/ppo_gymnax.py): Reinforcement learning with Gymnax
+- [DQN Atari](https://github.com/auxeno/ion/blob/main/examples/dqn_atari.ipynb): Deep Q-networks on Atari with replay buffers and target networks
 
 ## License
 
