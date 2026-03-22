@@ -183,8 +183,8 @@ def learn(
         GAMMA,
         GAE_LAMBDA,
     )
-    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
     returns = advantages + batch.values
+    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
 
     # Flatten (rollout_steps, num_envs, ...) -> (batch_size, ...)
     batch = jax.tree.map(lambda x: x.reshape(-1, *x.shape[2:]), batch)
