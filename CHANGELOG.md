@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.1
+
+- **Edge masking.** `GATConv` and `GATv2Conv` accept an optional `edge_mask` argument to
+  zero out attention on selected edges. Masked edges receive zero attention weight and
+  their edge features (if any) are zeroed.
+- **Numerically stable segment softmax.** `segment_softmax` now handles empty segments
+  (e.g. from full masking) cleanly instead of producing NaN.
+- **RL demos.** New DQN (Atari), PPO, and PQN example scripts and notebooks.
+
 ## 0.5.0
 
 - **State Space Models.** New `S4D` (Gu et al., 2022), `S5` (Smith et al., 2023), and `LRU` (Orvieto et al., 2023) layers with matching cell variants. `LRU` uses `lax.associative_scan` for parallel sequence processing; `S4D` and `S5` use `lax.scan`.
