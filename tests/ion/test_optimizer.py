@@ -22,23 +22,27 @@ class WithBareArray(nn.Module):
 
 class TestOptimizerInit:
     def test_creates_state(self):
+        """Creating an optimizer initializes non-empty internal state."""
         model = nn.Linear(4, 2, key=jax.random.key(0))
         optimizer = ion.Optimizer(optax.adam(1e-3), model)
         assert optimizer.state is not None
         assert len(jax.tree.leaves(optimizer.state)) > 0
 
     def test_step_is_zero_int32(self):
+        """Initial step counter is zero with int32 dtype."""
         model = nn.Linear(4, 2, key=jax.random.key(0))
         optimizer = ion.Optimizer(optax.adam(1e-3), model)
         assert optimizer.step == 0
         assert optimizer.step.dtype == jnp.int32
 
     def test_auto_partitions_frozen(self):
+        """Optimizer auto-partitions when all params are frozen."""
         model = nn.Linear(4, 2, key=jax.random.key(0)).freeze()
         optimizer = ion.Optimizer(optax.adam(1e-3), model)
         assert optimizer.state is not None
 
     def test_no_partition_all_trainable(self):
+        """Optimizer skips partitioning when all params are trainable."""
         model = nn.Linear(4, 2, key=jax.random.key(0))
         optimizer = ion.Optimizer(optax.adam(1e-3), model)
         assert optimizer.state is not None
@@ -59,6 +63,7 @@ class TestOptimizerInit:
 
 class TestOptimizerUpdate:
     def test_returns_model_and_optimizer(self):
+        """Update returns a new model and optimizer instance."""
         model = nn.Linear(4, 1, key=jax.random.key(0))
         optimizer = ion.Optimizer(optax.adam(1e-3), model)
 
@@ -68,6 +73,7 @@ class TestOptimizerUpdate:
         assert isinstance(new_optimizer, ion.Optimizer)
 
     def test_increments_step(self):
+        """Step counter increments by one after each update."""
         model = nn.Linear(4, 1, key=jax.random.key(0))
         optimizer = ion.Optimizer(optax.adam(1e-3), model)
         x = jnp.ones((2, 4))
@@ -191,6 +197,7 @@ class TestOptimizerUpdate:
 
 class TestOptimizerPytree:
     def test_flatten_unflatten_roundtrip(self):
+        """Flattening and unflattening preserves step and state."""
         model = nn.Linear(4, 2, key=jax.random.key(0))
         optimizer = ion.Optimizer(optax.adam(1e-3), model)
 
@@ -447,6 +454,7 @@ class TestOptimizerStructureMismatch:
 
 class TestOptimizerRepr:
     def test_repr_includes_step_and_leaves(self):
+        """Repr string includes step count and state leaf count."""
         model = nn.Linear(4, 2, key=jax.random.key(0))
         optimizer = ion.Optimizer(optax.adam(1e-3), model)
         r = repr(optimizer)

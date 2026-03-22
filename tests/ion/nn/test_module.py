@@ -435,6 +435,8 @@ class TestRepr:
 
 class TestFreezeUnfreeze:
     def test_freeze_sets_all_params_to_non_trainable(self):
+        """Freezing a module sets all params to non-trainable."""
+
         class Model(nn.Module):
             w: nn.Param
             b: nn.Param
@@ -448,6 +450,8 @@ class TestFreezeUnfreeze:
         assert m.b.trainable is False
 
     def test_unfreeze_sets_all_params_to_trainable(self):
+        """Unfreezing a module sets all params to trainable."""
+
         class Model(nn.Module):
             w: nn.Param
 
@@ -458,6 +462,8 @@ class TestFreezeUnfreeze:
         assert m.w.trainable is True
 
     def test_freeze_unfreeze_roundtrip(self):
+        """Freeze then unfreeze preserves values and trainability."""
+
         class Model(nn.Module):
             w: nn.Param
 
@@ -469,6 +475,8 @@ class TestFreezeUnfreeze:
         assert m.freeze().unfreeze().w.trainable is True
 
     def test_freeze_preserves_values(self):
+        """Freezing preserves parameter values."""
+
         class Model(nn.Module):
             w: nn.Param
 
@@ -480,6 +488,8 @@ class TestFreezeUnfreeze:
         npt.assert_array_equal(frozen.w._value, m.w._value)
 
     def test_freeze_nested_module(self):
+        """Freezing a module freezes all nested child params."""
+
         class Inner(nn.Module):
             w: nn.Param
 
@@ -516,6 +526,8 @@ class TestFreezeUnfreeze:
         assert m.decoder.w.trainable is True
 
     def test_freeze_idempotent(self):
+        """Freezing an already-frozen module is a no-op."""
+
         class Model(nn.Module):
             w: nn.Param
 
@@ -554,6 +566,7 @@ class TestNoneField:
         assert linear.b is None
 
     def test_none_field_survives_pytree_roundtrip(self):
+        """None field is preserved through flatten/unflatten."""
         linear = nn.Linear(4, 8, bias=False, key=jax.random.key(0))
         leaves, treedef = jtu.tree_flatten(linear)
         reconstructed = treedef.unflatten(leaves)
@@ -561,6 +574,7 @@ class TestNoneField:
         npt.assert_array_equal(reconstructed.w._value, linear.w._value)
 
     def test_none_field_works_under_jit(self):
+        """Module with a None field works correctly under jit."""
         linear = nn.Linear(4, 8, bias=False, key=jax.random.key(0))
         x = jnp.ones((1, 4))
         eager = linear(x)
@@ -1208,6 +1222,8 @@ class TestStaticFieldTypes:
     """Test that various field types (list, dict, tuple, callable) work through jit."""
 
     def test_list_of_ints_through_jit(self):
+        """List of ints field works as static metadata through jit."""
+
         class Model(nn.Module):
             w: nn.Param
             dims: list
@@ -1224,6 +1240,8 @@ class TestStaticFieldTypes:
         npt.assert_allclose(jax.jit(m)(x), 5.0)
 
     def test_dict_of_scalars_through_jit(self):
+        """Dict of scalars field works as static metadata through jit."""
+
         class Model(nn.Module):
             w: nn.Param
             config: dict
@@ -1240,6 +1258,8 @@ class TestStaticFieldTypes:
         npt.assert_allclose(jax.jit(m)(x), 7.0)
 
     def test_tuple_of_callables_through_jit(self):
+        """Tuple of callables field works as static metadata through jit."""
+
         class Model(nn.Module):
             w: nn.Param
             activations: tuple

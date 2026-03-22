@@ -8,23 +8,27 @@ from ion.nn.module import _Static
 
 class TestFreeze:
     def test_freeze_sets_trainable_false(self):
+        """Freezing sets all Param trainable flags to False."""
         data = {"w": nn.Param(jnp.ones(2)), "b": nn.Param(jnp.zeros(2))}
         frozen = tree.freeze(data)
         assert frozen["w"].trainable is False
         assert frozen["b"].trainable is False
 
     def test_freeze_preserves_values(self):
+        """Freezing preserves the underlying array values."""
         data = {"w": nn.Param(jnp.array([1.0, 2.0]))}
         frozen = tree.freeze(data)
         npt.assert_array_equal(frozen["w"]._value, jnp.array([1.0, 2.0]))
 
     def test_freeze_idempotent(self):
+        """Freezing an already-frozen Param is a no-op."""
         data = {"w": nn.Param(jnp.ones(2), trainable=False)}
         frozen = tree.freeze(data)
         assert frozen["w"].trainable is False
         npt.assert_array_equal(frozen["w"]._value, jnp.ones(2))
 
     def test_freeze_on_module(self):
+        """Freezing a Module sets all its Params to non-trainable."""
         class Model(nn.Module):
             w: nn.Param
             b: nn.Param
@@ -39,6 +43,7 @@ class TestFreeze:
         assert frozen.b.trainable is False
 
     def test_freeze_nested_module(self):
+        """Freezing recursively freezes Params in nested Modules."""
         class Inner(nn.Module):
             w: nn.Param
 
@@ -59,6 +64,7 @@ class TestFreeze:
         assert frozen.b.trainable is False
 
     def test_freeze_does_not_affect_non_params(self):
+        """Freezing leaves non-Param fields unchanged."""
         class Model(nn.Module):
             w: nn.Param
             scale: float
@@ -74,21 +80,25 @@ class TestFreeze:
 
 class TestUnfreeze:
     def test_unfreeze_sets_trainable_true(self):
+        """Unfreezing sets trainable flag to True."""
         data = {"w": nn.Param(jnp.ones(2), trainable=False)}
         unfrozen = tree.unfreeze(data)
         assert unfrozen["w"].trainable is True
 
     def test_unfreeze_preserves_values(self):
+        """Unfreezing preserves the underlying array values."""
         data = {"w": nn.Param(jnp.array([3.0, 4.0]), trainable=False)}
         unfrozen = tree.unfreeze(data)
         npt.assert_array_equal(unfrozen["w"]._value, jnp.array([3.0, 4.0]))
 
     def test_unfreeze_idempotent(self):
+        """Unfreezing an already-trainable Param is a no-op."""
         data = {"w": nn.Param(jnp.ones(2), trainable=True)}
         unfrozen = tree.unfreeze(data)
         assert unfrozen["w"].trainable is True
 
     def test_freeze_then_unfreeze_roundtrip(self):
+        """Freeze then unfreeze restores trainable state and values."""
         data = {"w": nn.Param(jnp.array([1.0, 2.0]))}
         roundtripped = tree.unfreeze(tree.freeze(data))
         assert roundtripped["w"].trainable is True
@@ -131,9 +141,11 @@ class TestFreezePreservesPlainArrays:
 
 class Test_Static:
     def test_pytree_no_children(self):
+        """A _Static node exposes no pytree children."""
         assert jax.tree.leaves(_Static(42)) == []
 
     def test_value_preserved_through_flatten(self):
+        """Flattening and unflattening a _Static preserves its value."""
         s = _Static({"dropout": 0.1, "mode": "train"})
         children, aux = s.tree_flatten()
         assert children == []
@@ -197,6 +209,7 @@ class TestJaxJit:
 
 class TestAstype:
     def test_astype_param_to_bfloat16(self):
+        """Casting a float32 Param to bfloat16 updates its dtype."""
         data = {"w": nn.Param(jnp.ones(3, dtype=jnp.float32))}
         result = tree.astype(data, jnp.bfloat16)
         assert result["w"]._value.dtype == jnp.bfloat16
@@ -204,22 +217,26 @@ class TestAstype:
         assert result["w"].trainable is True
 
     def test_astype_preserves_trainable_flag(self):
+        """Casting preserves the Param trainable flag."""
         data = {"w": nn.Param(jnp.ones(3), trainable=False)}
         result = tree.astype(data, jnp.bfloat16)
         assert result["w"].trainable is False
         assert result["w"]._value.dtype == jnp.bfloat16
 
     def test_astype_plain_float_array(self):
+        """Casting converts plain float arrays to the target dtype."""
         data = {"buf": jnp.ones(3, dtype=jnp.float32)}
         result = tree.astype(data, jnp.bfloat16)
         assert result["buf"].dtype == jnp.bfloat16
 
     def test_astype_leaves_int_arrays_unchanged(self):
+        """Casting to a float dtype leaves integer arrays unchanged."""
         data = {"ids": jnp.array([1, 2, 3], dtype=jnp.int32)}
         result = tree.astype(data, jnp.bfloat16)
         assert result["ids"].dtype == jnp.int32
 
     def test_astype_on_module(self):
+        """Casting a Module converts all its float Params and arrays."""
         class Model(nn.Module):
             w: nn.Param
             buf: jax.Array
@@ -234,6 +251,7 @@ class TestAstype:
         assert result.buf.dtype == jnp.bfloat16
 
     def test_astype_roundtrip(self):
+        """Casting f32 to bf16 and back preserves values within tolerance."""
         data = {"w": nn.Param(jnp.array([1.0, 2.0, 3.0]))}
         bf16 = tree.astype(data, jnp.bfloat16)
         f32 = tree.astype(bf16, jnp.float32)
@@ -241,6 +259,7 @@ class TestAstype:
         npt.assert_allclose(f32["w"]._value, jnp.array([1.0, 2.0, 3.0]), atol=1e-2)
 
     def test_astype_nested_module(self):
+        """Casting recursively converts Params in nested Modules."""
         class Inner(nn.Module):
             w: nn.Param
 
@@ -261,6 +280,7 @@ class TestAstype:
         assert result.b._value.dtype == jnp.bfloat16
 
     def test_astype_under_jit(self):
+        """astype works correctly inside a jit-compiled function."""
         data = {"w": nn.Param(jnp.ones(3))}
 
         @jax.jit
