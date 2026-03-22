@@ -49,9 +49,6 @@ def test_grad(layer_and_input):
 def test_param_grad(layer_and_input):
     """jax.grad w.r.t. model params produces finite gradients."""
     layer, x = layer_and_input
-    if not isinstance(layer, nn.Module):
-        return  # Wrapper (e.g. partial), skip
-
     grads = jax.grad(lambda model: model(x).sum())(layer)
     for leaf in jax.tree.leaves(grads):
         if hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact):
@@ -106,16 +103,9 @@ def test_pytree_roundtrip(layer_and_input):
             assert a == b
 
 
-def _is_module(layer):
-    """Check if layer is a Module (not a functools.partial wrapper)."""
-    return isinstance(layer, nn.Module)
-
-
 def test_params_property(layer_and_input):
     """`.params` returns only inexact (trainable) arrays."""
     layer, _ = layer_and_input
-    if not _is_module(layer):
-        return  # Wrapper (e.g. partial), skip
     if isinstance(
         layer,
         (
@@ -152,11 +142,473 @@ def test_wrong_rank_raises_under_jit(structural_layer_and_input):
 def test_serialization(layer_and_input):
     """Serialize then deserialize produces identical outputs."""
     layer, x = layer_and_input
-    if not _is_module(layer):
-        return  # Wrapper (e.g. partial), skip
     with tempfile.NamedTemporaryFile(suffix=".npz") as f:
         ion.save(f.name, layer)
         loaded = ion.load(f.name, layer)
     y_orig = layer(x)
     y_loaded = loaded(x)
     npt.assert_allclose(y_orig, y_loaded, rtol=0, atol=0)
+
+
+def _assert_trees_close(a, b, rtol=1e-5, atol=1e-5):
+    """Assert all leaves of two pytrees are numerically close."""
+    for leaf_a, leaf_b in zip(jax.tree.leaves(a), jax.tree.leaves(b)):
+        npt.assert_allclose(leaf_a, leaf_b, rtol=rtol, atol=atol)
+
+
+def test_seq_batch_dims(seq_layer_and_input):
+    """jax.vmap adds an extra batch dimension."""
+    layer, x = seq_layer_and_input
+    y, _ = layer(x)
+    x_extra = jnp.stack([x] * 3)
+    y_extra, _ = jax.vmap(layer)(x_extra)
+    assert y_extra.shape == (3, *y.shape)
+
+
+def test_seq_jit(seq_layer_and_input):
+    """jax.jit produces the same output as eager execution."""
+    layer, x = seq_layer_and_input
+    expected = layer(x)
+    result = jax.jit(layer)(x)
+    _assert_trees_close(result, expected)
+
+
+def test_seq_vmap(seq_layer_and_input):
+    """jax.vmap over a leading batch dim matches unbatched output."""
+    layer, x = seq_layer_and_input
+    y, _ = layer(x)
+    y_vmap, _ = jax.vmap(layer)(x[None])
+    npt.assert_allclose(y_vmap[0], y, rtol=1e-5, atol=1e-5)
+
+
+def test_seq_grad(seq_layer_and_input):
+    """jax.grad w.r.t. input produces finite gradients."""
+    layer, x = seq_layer_and_input
+    g = jax.grad(lambda x: layer(x)[0].sum())(x)
+    assert jnp.all(jnp.isfinite(g))
+
+
+def test_seq_param_grad(seq_layer_and_input):
+    """jax.grad w.r.t. model params produces finite gradients."""
+    layer, x = seq_layer_and_input
+    grads = jax.grad(lambda model: model(x)[0].sum())(layer)
+    for leaf in jax.tree.leaves(grads):
+        if hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact):
+            assert jnp.all(jnp.isfinite(leaf))
+
+
+def test_seq_jit_grad(seq_layer_and_input):
+    """Composing jax.jit with jax.grad produces finite gradients."""
+    layer, x = seq_layer_and_input
+    grad_fn = jax.grad(lambda x: layer(x)[0].sum())
+    g = jax.jit(grad_fn)(x)
+    assert jnp.all(jnp.isfinite(g))
+
+
+def test_seq_output_dtype(seq_layer_and_input):
+    """Output dtype matches input dtype."""
+    layer, x = seq_layer_and_input
+    y, _ = layer(x)
+    assert y.dtype == x.dtype
+
+
+def test_seq_determinism(seq_layer_and_input):
+    """Same layer and input produce identical outputs across calls."""
+    layer, x = seq_layer_and_input
+    y1, _ = layer(x)
+    y2, _ = layer(x)
+    npt.assert_allclose(y1, y2, rtol=0, atol=0)
+
+
+def test_seq_pytree_roundtrip(seq_layer_and_input):
+    """Flatten then unflatten reconstructs the layer exactly."""
+    layer, _ = seq_layer_and_input
+    leaves, treedef = jtu.tree_flatten(layer)
+    reconstructed = jtu.tree_unflatten(treedef, leaves)
+    orig_leaves = jtu.tree_leaves(layer)
+    recon_leaves = jtu.tree_leaves(reconstructed)
+    for a, b in zip(orig_leaves, recon_leaves):
+        if isinstance(a, jnp.ndarray):
+            npt.assert_allclose(a, b, rtol=0, atol=0)
+        else:
+            assert a == b
+
+
+def test_seq_serialization(seq_layer_and_input):
+    """Serialize then deserialize produces identical outputs."""
+    layer, x = seq_layer_and_input
+    with tempfile.NamedTemporaryFile(suffix=".npz") as f:
+        ion.save(f.name, layer)
+        loaded = ion.load(f.name, layer)
+    y_orig, _ = layer(x)
+    y_loaded, _ = loaded(x)
+    npt.assert_allclose(y_orig, y_loaded, rtol=0, atol=0)
+
+
+def test_seq_params_property(seq_layer_and_input):
+    """`.params` returns only inexact (trainable) arrays."""
+    layer, _ = seq_layer_and_input
+    params = layer.params
+    leaves = jax.tree.leaves(params)
+    assert len(leaves) > 0
+    for leaf in leaves:
+        assert hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact)
+
+
+def test_seq_wrong_rank_raises(seq_layer_and_input):
+    """Sequence layers reject inputs with wrong number of dimensions."""
+    layer, x = seq_layer_and_input
+    unbatched = x[0]
+    with pytest.raises(Exception):
+        layer(unbatched)
+
+
+def test_seq_wrong_rank_raises_under_jit(seq_layer_and_input):
+    """Rank errors are caught even under JIT (at trace time)."""
+    layer, x = seq_layer_and_input
+    unbatched = x[0]
+    with pytest.raises(Exception):
+        jax.jit(layer)(unbatched)
+
+
+def test_cell_jit(cell_and_input):
+    """jax.jit produces the same output as eager execution."""
+    cell, x = cell_and_input
+    expected = cell(x, cell.initial_state)
+    result = jax.jit(lambda x: cell(x, cell.initial_state))(x)
+    _assert_trees_close(result, expected)
+
+
+def test_cell_vmap(cell_and_input):
+    """jax.vmap over a leading batch dim matches unbatched output."""
+    cell, x = cell_and_input
+    expected = cell(x, cell.initial_state)
+    result = jax.vmap(lambda x: cell(x, cell.initial_state))(x[None])
+    for a, b in zip(jax.tree.leaves(result), jax.tree.leaves(expected)):
+        npt.assert_allclose(a[0], b, rtol=1e-5, atol=1e-5)
+
+
+def test_cell_batch_dims(cell_and_input):
+    """jax.vmap adds an extra batch dimension."""
+    cell, x = cell_and_input
+    out = cell(x, cell.initial_state)
+    x_extra = jnp.stack([x] * 3)
+    out_extra = jax.vmap(lambda x: cell(x, cell.initial_state))(x_extra)
+    for a, b in zip(jax.tree.leaves(out_extra), jax.tree.leaves(out)):
+        assert a.shape == (3, *b.shape)
+
+
+def test_cell_grad(cell_and_input):
+    """jax.grad w.r.t. input produces finite gradients."""
+    cell, x = cell_and_input
+
+    def loss(x):
+        return sum(leaf.sum() for leaf in jax.tree.leaves(cell(x, cell.initial_state)))
+
+    g = jax.grad(loss)(x)
+    assert jnp.all(jnp.isfinite(g))
+
+
+def test_cell_param_grad(cell_and_input):
+    """jax.grad w.r.t. cell params produces finite gradients."""
+    cell, x = cell_and_input
+
+    def loss(cell):
+        return sum(leaf.sum() for leaf in jax.tree.leaves(cell(x, cell.initial_state)))
+
+    grads = jax.grad(loss)(cell)
+    for leaf in jax.tree.leaves(grads):
+        if hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact):
+            assert jnp.all(jnp.isfinite(leaf))
+
+
+def test_cell_jit_grad(cell_and_input):
+    """Composing jax.jit with jax.grad produces finite gradients."""
+    cell, x = cell_and_input
+
+    def loss(x):
+        return sum(leaf.sum() for leaf in jax.tree.leaves(cell(x, cell.initial_state)))
+
+    g = jax.jit(jax.grad(loss))(x)
+    assert jnp.all(jnp.isfinite(g))
+
+
+def test_cell_output_dtype(cell_and_input):
+    """Output dtype matches input dtype."""
+    cell, x = cell_and_input
+    result = cell(x, cell.initial_state)
+    for leaf in jax.tree.leaves(result):
+        assert leaf.dtype == x.dtype
+
+
+def test_cell_determinism(cell_and_input):
+    """Same cell and input produce identical outputs across calls."""
+    cell, x = cell_and_input
+    r1 = cell(x, cell.initial_state)
+    r2 = cell(x, cell.initial_state)
+    _assert_trees_close(r1, r2, rtol=0, atol=0)
+
+
+def test_cell_pytree_roundtrip(cell_and_input):
+    """Flatten then unflatten reconstructs the cell exactly."""
+    cell, _ = cell_and_input
+    leaves, treedef = jtu.tree_flatten(cell)
+    reconstructed = jtu.tree_unflatten(treedef, leaves)
+    orig_leaves = jtu.tree_leaves(cell)
+    recon_leaves = jtu.tree_leaves(reconstructed)
+    for a, b in zip(orig_leaves, recon_leaves):
+        if isinstance(a, jnp.ndarray):
+            npt.assert_allclose(a, b, rtol=0, atol=0)
+        else:
+            assert a == b
+
+
+def test_cell_serialization(cell_and_input):
+    """Serialize then deserialize produces identical outputs."""
+    cell, x = cell_and_input
+    with tempfile.NamedTemporaryFile(suffix=".npz") as f:
+        ion.save(f.name, cell)
+        loaded = ion.load(f.name, cell)
+    expected = cell(x, cell.initial_state)
+    result = loaded(x, loaded.initial_state)
+    _assert_trees_close(result, expected, rtol=0, atol=0)
+
+
+def test_cell_params_property(cell_and_input):
+    """`.params` returns only inexact (trainable) arrays."""
+    cell, _ = cell_and_input
+    params = cell.params
+    leaves = jax.tree.leaves(params)
+    assert len(leaves) > 0
+    for leaf in leaves:
+        assert hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact)
+
+
+def test_ssm_batch_dims(ssm_layer_and_input):
+    """jax.vmap adds an extra batch dimension."""
+    layer, x = ssm_layer_and_input
+    y, _ = layer(x)
+    x_extra = jnp.stack([x] * 3)
+    y_extra, _ = jax.vmap(layer)(x_extra)
+    assert y_extra.shape == (3, *y.shape)
+
+
+def test_ssm_jit(ssm_layer_and_input):
+    """jax.jit produces the same output as eager execution."""
+    layer, x = ssm_layer_and_input
+    expected = layer(x)
+    result = jax.jit(layer)(x)
+    _assert_trees_close(result, expected)
+
+
+def test_ssm_vmap(ssm_layer_and_input):
+    """jax.vmap over a leading batch dim matches unbatched output."""
+    layer, x = ssm_layer_and_input
+    y, _ = layer(x)
+    y_vmap, _ = jax.vmap(layer)(x[None])
+    npt.assert_allclose(y_vmap[0], y, rtol=1e-5, atol=1e-5)
+
+
+def test_ssm_grad(ssm_layer_and_input):
+    """jax.grad w.r.t. input produces finite gradients."""
+    layer, x = ssm_layer_and_input
+    g = jax.grad(lambda x: layer(x)[0].sum())(x)
+    assert jnp.all(jnp.isfinite(g))
+
+
+def test_ssm_param_grad(ssm_layer_and_input):
+    """jax.grad w.r.t. model params produces finite gradients."""
+    layer, x = ssm_layer_and_input
+    grads = jax.grad(lambda model: model(x)[0].sum())(layer)
+    for leaf in jax.tree.leaves(grads):
+        if hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact):
+            assert jnp.all(jnp.isfinite(leaf))
+
+
+def test_ssm_jit_grad(ssm_layer_and_input):
+    """Composing jax.jit with jax.grad produces finite gradients."""
+    layer, x = ssm_layer_and_input
+    grad_fn = jax.grad(lambda x: layer(x)[0].sum())
+    g = jax.jit(grad_fn)(x)
+    assert jnp.all(jnp.isfinite(g))
+
+
+def test_ssm_output_dtype(ssm_layer_and_input):
+    """Real output dtype matches input dtype (state may be complex)."""
+    layer, x = ssm_layer_and_input
+    y, _ = layer(x)
+    assert y.dtype == x.dtype
+
+
+def test_ssm_determinism(ssm_layer_and_input):
+    """Same layer and input produce identical outputs across calls."""
+    layer, x = ssm_layer_and_input
+    y1, _ = layer(x)
+    y2, _ = layer(x)
+    npt.assert_allclose(y1, y2, rtol=0, atol=0)
+
+
+def test_ssm_pytree_roundtrip(ssm_layer_and_input):
+    """Flatten then unflatten reconstructs the layer exactly."""
+    layer, _ = ssm_layer_and_input
+    leaves, treedef = jtu.tree_flatten(layer)
+    reconstructed = jtu.tree_unflatten(treedef, leaves)
+    orig_leaves = jtu.tree_leaves(layer)
+    recon_leaves = jtu.tree_leaves(reconstructed)
+    for a, b in zip(orig_leaves, recon_leaves):
+        if isinstance(a, jnp.ndarray):
+            npt.assert_allclose(a, b, rtol=0, atol=0)
+        else:
+            assert a == b
+
+
+def test_ssm_serialization(ssm_layer_and_input):
+    """Serialize then deserialize produces identical outputs."""
+    layer, x = ssm_layer_and_input
+    with tempfile.NamedTemporaryFile(suffix=".npz") as f:
+        ion.save(f.name, layer)
+        loaded = ion.load(f.name, layer)
+    y_orig, _ = layer(x)
+    y_loaded, _ = loaded(x)
+    npt.assert_allclose(y_orig, y_loaded, rtol=0, atol=0)
+
+
+def test_ssm_params_property(ssm_layer_and_input):
+    """`.params` returns only inexact (trainable) arrays."""
+    layer, _ = ssm_layer_and_input
+    params = layer.params
+    leaves = jax.tree.leaves(params)
+    assert len(leaves) > 0
+    for leaf in leaves:
+        assert hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact)
+
+
+def test_ssm_wrong_rank_raises(ssm_layer_and_input):
+    """SSM layers reject inputs with wrong number of dimensions."""
+    layer, x = ssm_layer_and_input
+    unbatched = x[0]
+    with pytest.raises(Exception):
+        layer(unbatched)
+
+
+def test_ssm_wrong_rank_raises_under_jit(ssm_layer_and_input):
+    """Rank errors are caught even under JIT (at trace time)."""
+    layer, x = ssm_layer_and_input
+    unbatched = x[0]
+    with pytest.raises(Exception):
+        jax.jit(layer)(unbatched)
+
+
+def test_ssm_cell_jit(ssm_cell_and_input):
+    """jax.jit produces the same output as eager execution."""
+    cell, x = ssm_cell_and_input
+    expected = cell(x, cell.initial_state)
+    result = jax.jit(lambda x: cell(x, cell.initial_state))(x)
+    _assert_trees_close(result, expected)
+
+
+def test_ssm_cell_vmap(ssm_cell_and_input):
+    """jax.vmap over a leading batch dim matches unbatched output."""
+    cell, x = ssm_cell_and_input
+    expected = cell(x, cell.initial_state)
+    result = jax.vmap(lambda x: cell(x, cell.initial_state))(x[None])
+    for a, b in zip(jax.tree.leaves(result), jax.tree.leaves(expected)):
+        npt.assert_allclose(a[0], b, rtol=1e-5, atol=1e-5)
+
+
+def test_ssm_cell_batch_dims(ssm_cell_and_input):
+    """jax.vmap adds an extra batch dimension."""
+    cell, x = ssm_cell_and_input
+    out = cell(x, cell.initial_state)
+    x_extra = jnp.stack([x] * 3)
+    out_extra = jax.vmap(lambda x: cell(x, cell.initial_state))(x_extra)
+    for a, b in zip(jax.tree.leaves(out_extra), jax.tree.leaves(out)):
+        assert a.shape == (3, *b.shape)
+
+
+def test_ssm_cell_grad(ssm_cell_and_input):
+    """jax.grad w.r.t. input produces finite gradients."""
+    cell, x = ssm_cell_and_input
+
+    def loss(x):
+        y, _ = cell(x, cell.initial_state)
+        return y.sum()
+
+    g = jax.grad(loss)(x)
+    assert jnp.all(jnp.isfinite(g))
+
+
+def test_ssm_cell_param_grad(ssm_cell_and_input):
+    """jax.grad w.r.t. cell params produces finite gradients."""
+    cell, x = ssm_cell_and_input
+
+    def loss(cell):
+        y, _ = cell(x, cell.initial_state)
+        return y.sum()
+
+    grads = jax.grad(loss)(cell)
+    for leaf in jax.tree.leaves(grads):
+        if hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact):
+            assert jnp.all(jnp.isfinite(leaf))
+
+
+def test_ssm_cell_jit_grad(ssm_cell_and_input):
+    """Composing jax.jit with jax.grad produces finite gradients."""
+    cell, x = ssm_cell_and_input
+
+    def loss(x):
+        y, _ = cell(x, cell.initial_state)
+        return y.sum()
+
+    g = jax.jit(jax.grad(loss))(x)
+    assert jnp.all(jnp.isfinite(g))
+
+
+def test_ssm_cell_output_dtype(ssm_cell_and_input):
+    """Real output dtype matches input dtype (state is complex)."""
+    cell, x = ssm_cell_and_input
+    y, _ = cell(x, cell.initial_state)
+    assert y.dtype == x.dtype
+
+
+def test_ssm_cell_determinism(ssm_cell_and_input):
+    """Same cell and input produce identical outputs across calls."""
+    cell, x = ssm_cell_and_input
+    r1 = cell(x, cell.initial_state)
+    r2 = cell(x, cell.initial_state)
+    _assert_trees_close(r1, r2, rtol=0, atol=0)
+
+
+def test_ssm_cell_pytree_roundtrip(ssm_cell_and_input):
+    """Flatten then unflatten reconstructs the cell exactly."""
+    cell, _ = ssm_cell_and_input
+    leaves, treedef = jtu.tree_flatten(cell)
+    reconstructed = jtu.tree_unflatten(treedef, leaves)
+    orig_leaves = jtu.tree_leaves(cell)
+    recon_leaves = jtu.tree_leaves(reconstructed)
+    for a, b in zip(orig_leaves, recon_leaves):
+        if isinstance(a, jnp.ndarray):
+            npt.assert_allclose(a, b, rtol=0, atol=0)
+        else:
+            assert a == b
+
+
+def test_ssm_cell_serialization(ssm_cell_and_input):
+    """Serialize then deserialize produces identical outputs."""
+    cell, x = ssm_cell_and_input
+    with tempfile.NamedTemporaryFile(suffix=".npz") as f:
+        ion.save(f.name, cell)
+        loaded = ion.load(f.name, cell)
+    expected = cell(x, cell.initial_state)
+    result = loaded(x, loaded.initial_state)
+    _assert_trees_close(result, expected, rtol=0, atol=0)
+
+
+def test_ssm_cell_params_property(ssm_cell_and_input):
+    """`.params` returns only inexact (trainable) arrays."""
+    cell, _ = ssm_cell_and_input
+    params = cell.params
+    leaves = jax.tree.leaves(params)
+    assert len(leaves) > 0
+    for leaf in leaves:
+        assert hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact)
