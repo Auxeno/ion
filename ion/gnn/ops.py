@@ -21,6 +21,7 @@ def segment_softmax(
     """
     # Subtract per-segment max for numerical stability
     maxes = jax.ops.segment_max(data, segment_ids, num_segments)
+    maxes = jnp.where(jnp.isinf(maxes), 0.0, maxes)
     data = jnp.exp(data - maxes[segment_ids])
 
     # Normalize by per-segment sum

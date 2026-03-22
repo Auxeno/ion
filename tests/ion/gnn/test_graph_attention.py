@@ -196,6 +196,74 @@ class TestGATConvEdgeFeatures:
         npt.assert_allclose(y1, y2, rtol=0, atol=0)
 
 
+class TestGATConvEdgeMask:
+    def test_all_true_matches_no_mask(self, triangle_graph):
+        """All-True mask produces the same output as no mask."""
+        senders, receivers = triangle_graph
+        gat = gnn.GATConv(8, 16, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        mask = jnp.ones(senders.shape[0], dtype=bool)
+        y_no_mask = gat(x, senders, receivers)
+        y_masked = gat(x, senders, receivers, edge_mask=mask)
+        npt.assert_allclose(y_masked, y_no_mask, rtol=1e-5, atol=1e-5)
+
+    def test_masked_edge_no_influence(self):
+        """Masked edges have zero influence on the output (verified via Jacobian)."""
+        gat = gnn.GATConv(4, 4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 4))
+        # Edges: 0->1, 2->1. Mask out 2->1.
+        senders = jnp.array([0, 2])
+        receivers = jnp.array([1, 1])
+        mask = jnp.array([True, False])
+        jac = jax.jacobian(lambda x: gat(x, senders, receivers, edge_mask=mask))(x)
+        jac_nodes = jnp.sum(jnp.abs(jac), axis=(1, 3))  # (n, n)
+        # Node 2's edge is masked, so it should not influence node 1
+        npt.assert_allclose(jac_nodes[1, 2], 0.0, atol=1e-5)
+        # Node 0's edge is unmasked, so it should influence node 1
+        assert jac_nodes[1, 0] > 1e-6
+
+    def test_all_false_produces_zero(self):
+        """All-False mask zeroes out all messages, producing zero output (no bias)."""
+        gat = gnn.GATConv(4, 4, bias=False, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 4))
+        senders = jnp.array([0, 1, 2])
+        receivers = jnp.array([1, 2, 0])
+        mask = jnp.zeros(3, dtype=bool)
+        y = gat(x, senders, receivers, edge_mask=mask)
+        npt.assert_allclose(y, jnp.zeros_like(y), atol=1e-6)
+
+    def test_edge_mask_with_edge_features(self, triangle_graph):
+        """Edge mask zeroes out edge feature contributions for masked edges."""
+        senders, receivers = triangle_graph
+        num_edges = senders.shape[0]
+        gat = gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
+        mask = jnp.ones(num_edges, dtype=bool).at[0].set(False)
+        y_masked = gat(x, senders, receivers, x_edge, edge_mask=mask)
+        assert y_masked.shape == (3, 16)
+        assert jnp.all(jnp.isfinite(y_masked))
+
+    def test_edge_mask_grad(self, triangle_graph):
+        """Gradients flow through edge_mask without NaN."""
+        senders, receivers = triangle_graph
+        gat = gnn.GATConv(8, 16, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        mask = jnp.ones(senders.shape[0], dtype=bool).at[0].set(False)
+        grads = jax.grad(lambda m: m(x, senders, receivers, edge_mask=mask).sum())(gat)
+        assert jnp.all(jnp.isfinite(grads.w._value))
+
+    def test_edge_mask_jit(self, triangle_graph):
+        """jax.jit with edge_mask produces same output as eager."""
+        senders, receivers = triangle_graph
+        gat = gnn.GATConv(8, 16, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        mask = jnp.ones(senders.shape[0], dtype=bool).at[0].set(False)
+        expected = gat(x, senders, receivers, edge_mask=mask)
+        result = jax.jit(gat)(x, senders, receivers, edge_mask=mask)
+        npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
+
+
 class TestGATConvValidation:
     def test_out_dim_not_divisible_by_num_heads_raises(self):
         """out_dim must be divisible by num_heads."""
@@ -361,6 +429,71 @@ class TestGATv2ConvEdgeFeatures:
         y1 = gat(x, senders, receivers, x_edge)
         y2 = gat(x, senders, receivers, x_edge)
         npt.assert_allclose(y1, y2, rtol=0, atol=0)
+
+
+class TestGATv2ConvEdgeMask:
+    def test_all_true_matches_no_mask(self, triangle_graph):
+        """All-True mask produces the same output as no mask."""
+        senders, receivers = triangle_graph
+        gat = gnn.GATv2Conv(8, 16, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        mask = jnp.ones(senders.shape[0], dtype=bool)
+        y_no_mask = gat(x, senders, receivers)
+        y_masked = gat(x, senders, receivers, edge_mask=mask)
+        npt.assert_allclose(y_masked, y_no_mask, rtol=1e-5, atol=1e-5)
+
+    def test_masked_edge_no_influence(self):
+        """Masked edges have zero influence on the output (verified via Jacobian)."""
+        gat = gnn.GATv2Conv(4, 4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 4))
+        senders = jnp.array([0, 2])
+        receivers = jnp.array([1, 1])
+        mask = jnp.array([True, False])
+        jac = jax.jacobian(lambda x: gat(x, senders, receivers, edge_mask=mask))(x)
+        jac_nodes = jnp.sum(jnp.abs(jac), axis=(1, 3))
+        npt.assert_allclose(jac_nodes[1, 2], 0.0, atol=1e-5)
+        assert jac_nodes[1, 0] > 1e-6
+
+    def test_all_false_produces_zero(self):
+        """All-False mask zeroes out all messages, producing zero output (no bias)."""
+        gat = gnn.GATv2Conv(4, 4, bias=False, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 4))
+        senders = jnp.array([0, 1, 2])
+        receivers = jnp.array([1, 2, 0])
+        mask = jnp.zeros(3, dtype=bool)
+        y = gat(x, senders, receivers, edge_mask=mask)
+        npt.assert_allclose(y, jnp.zeros_like(y), atol=1e-6)
+
+    def test_edge_mask_with_edge_features(self, triangle_graph):
+        """Edge mask zeroes out edge feature contributions for masked edges."""
+        senders, receivers = triangle_graph
+        num_edges = senders.shape[0]
+        gat = gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
+        mask = jnp.ones(num_edges, dtype=bool).at[0].set(False)
+        y_masked = gat(x, senders, receivers, x_edge, edge_mask=mask)
+        assert y_masked.shape == (3, 16)
+        assert jnp.all(jnp.isfinite(y_masked))
+
+    def test_edge_mask_grad(self, triangle_graph):
+        """Gradients flow through edge_mask without NaN."""
+        senders, receivers = triangle_graph
+        gat = gnn.GATv2Conv(8, 16, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        mask = jnp.ones(senders.shape[0], dtype=bool).at[0].set(False)
+        grads = jax.grad(lambda m: m(x, senders, receivers, edge_mask=mask).sum())(gat)
+        assert jnp.all(jnp.isfinite(grads.w_sender._value))
+
+    def test_edge_mask_jit(self, triangle_graph):
+        """jax.jit with edge_mask produces same output as eager."""
+        senders, receivers = triangle_graph
+        gat = gnn.GATv2Conv(8, 16, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 8))
+        mask = jnp.ones(senders.shape[0], dtype=bool).at[0].set(False)
+        expected = gat(x, senders, receivers, edge_mask=mask)
+        result = jax.jit(gat)(x, senders, receivers, edge_mask=mask)
+        npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
 
 
 class TestGATv2ConvValidation:

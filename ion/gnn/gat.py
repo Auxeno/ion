@@ -11,7 +11,7 @@ Self-loops are the caller's responsibility, see `gnn.add_self_loops`.
 import jax
 import jax.numpy as jnp
 from jax.nn.initializers import Initializer
-from jaxtyping import Array, Float, Int, PRNGKeyArray
+from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 
 from ..nn.module import Module
 from ..nn.param import Param
@@ -81,6 +81,7 @@ class GATConv(Module):
         senders: Int[Array, " e"],
         receivers: Int[Array, " e"],
         x_edge: Float[Array, "e f"] | None = None,
+        edge_mask: Bool[Array, " e"] | None = None,
     ) -> Float[Array, "n o"]:
 
         n, i = x.shape
@@ -95,12 +96,18 @@ class GATConv(Module):
 
         # Add edge feature contribution to attention logits
         if x_edge is not None:
+            if edge_mask is not None:
+                x_edge = x_edge * edge_mask[:, None]
             e_edge, f = x_edge.shape
             edge_proj = jnp.einsum("ef, fhk -> ehk", x_edge, self.w_edge)
             logits_edge = jnp.einsum("ehk, hk -> eh", edge_proj, self.att_edge)
             logits = logits + logits_edge
 
         logits = jax.nn.leaky_relu(logits, self.negative_slope)
+
+        # Mask out edges so they receive zero attention weight
+        if edge_mask is not None:
+            logits = jnp.where(edge_mask[:, None], logits, -jnp.inf)
 
         # Normalize attention weights per receiver neighborhood
         attention = segment_softmax(logits, receivers, n)
@@ -180,6 +187,7 @@ class GATv2Conv(Module):
         senders: Int[Array, " e"],
         receivers: Int[Array, " e"],
         x_edge: Float[Array, "e f"] | None = None,
+        edge_mask: Bool[Array, " e"] | None = None,
     ) -> Float[Array, "n o"]:
 
         n, i = x.shape
@@ -193,6 +201,8 @@ class GATv2Conv(Module):
 
         # Edge features go inside the LeakyReLU (unlike GATv1)
         if x_edge is not None:
+            if edge_mask is not None:
+                x_edge = x_edge * edge_mask[:, None]
             edge_proj = jnp.einsum("ef, fhk -> ehk", x_edge, self.w_edge)
             edge_h = edge_h + edge_proj
 
@@ -200,6 +210,10 @@ class GATv2Conv(Module):
         logits = jnp.einsum(
             "ehk, hk -> eh", jax.nn.leaky_relu(edge_h, self.negative_slope), self.att
         )
+
+        # Mask out edges so they receive zero attention weight
+        if edge_mask is not None:
+            logits = jnp.where(edge_mask[:, None], logits, -jnp.inf)
 
         # Normalize attention weights per receiver neighborhood
         attention = segment_softmax(logits, receivers, n)
