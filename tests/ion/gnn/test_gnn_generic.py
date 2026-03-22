@@ -96,3 +96,24 @@ def test_different_graph_different_output(gnn_layer_and_graph):
     y1 = layer(x, s1, r1)
     y2 = layer(x, s2, r2)
     assert not jnp.array_equal(y1, y2)
+
+
+# bfloat16 tests
+
+
+def test_bf16_output_dtype(gnn_layer_and_graph):
+    """bfloat16 inputs produce bfloat16 outputs."""
+    layer, x, senders, receivers = gnn_layer_and_graph
+    layer = layer.astype(jnp.bfloat16)
+    x = x.astype(jnp.bfloat16)
+    y = layer(x, senders, receivers)
+    assert y.dtype == jnp.bfloat16
+
+
+def test_bf16_finiteness(gnn_layer_and_graph):
+    """bfloat16 outputs are finite."""
+    layer, x, senders, receivers = gnn_layer_and_graph
+    layer = layer.astype(jnp.bfloat16)
+    x = x.astype(jnp.bfloat16)
+    y = layer(x, senders, receivers)
+    assert jnp.all(jnp.isfinite(y))

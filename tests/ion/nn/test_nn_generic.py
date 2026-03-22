@@ -612,3 +612,78 @@ def test_ssm_cell_params_property(ssm_cell_and_input):
     assert len(leaves) > 0
     for leaf in leaves:
         assert hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact)
+
+
+# bfloat16 tests (standard layers, seq layers, cells -- not SSMs)
+
+
+def _cast_bf16(layer, x):
+    """Cast layer weights and float inputs to bfloat16."""
+    layer = layer.astype(jnp.bfloat16)
+    if jnp.issubdtype(x.dtype, jnp.floating):
+        x = x.astype(jnp.bfloat16)
+    return layer, x
+
+
+def test_bf16_output_dtype(layer_and_input):
+    """bfloat16 inputs produce bfloat16 outputs."""
+    layer, x = layer_and_input
+    layer, x = _cast_bf16(layer, x)
+    if not jnp.issubdtype(x.dtype, jnp.floating):
+        return  # Integer inputs (e.g. Embedding)
+    y = layer(x)
+    assert y.dtype == jnp.bfloat16
+
+
+def test_bf16_finiteness(layer_and_input):
+    """bfloat16 outputs are finite."""
+    layer, x = layer_and_input
+    layer, x = _cast_bf16(layer, x)
+    y = layer(x)
+    if jnp.issubdtype(y.dtype, jnp.floating):
+        assert jnp.all(jnp.isfinite(y))
+
+
+def test_seq_bf16_output_dtype(seq_layer_and_input):
+    """bfloat16 inputs produce bfloat16 outputs for sequence layers."""
+    layer, x = seq_layer_and_input
+    layer, x = _cast_bf16(layer, x)
+    h0 = jax.tree.map(
+        lambda a: jnp.zeros((x.shape[0], *a.shape), dtype=jnp.bfloat16),
+        layer.cell.initial_state,
+    )
+    y, _ = layer(x, hx=h0)
+    assert y.dtype == jnp.bfloat16
+
+
+def test_seq_bf16_finiteness(seq_layer_and_input):
+    """bfloat16 outputs are finite for sequence layers."""
+    layer, x = seq_layer_and_input
+    layer, x = _cast_bf16(layer, x)
+    h0 = jax.tree.map(
+        lambda a: jnp.zeros((x.shape[0], *a.shape), dtype=jnp.bfloat16),
+        layer.cell.initial_state,
+    )
+    y, _ = layer(x, hx=h0)
+    assert jnp.all(jnp.isfinite(y))
+
+
+def test_cell_bf16_output_dtype(cell_and_input):
+    """bfloat16 inputs produce bfloat16 outputs for RNN cells."""
+    cell, x = cell_and_input
+    cell, x = _cast_bf16(cell, x)
+    h0 = jax.tree.map(lambda a: a.astype(jnp.bfloat16), cell.initial_state)
+    result = cell(x, h0)
+    for leaf in jax.tree.leaves(result):
+        assert leaf.dtype == jnp.bfloat16
+
+
+def test_cell_bf16_finiteness(cell_and_input):
+    """bfloat16 outputs are finite for RNN cells."""
+    cell, x = cell_and_input
+    cell, x = _cast_bf16(cell, x)
+    h0 = jax.tree.map(lambda a: a.astype(jnp.bfloat16), cell.initial_state)
+    result = cell(x, h0)
+    for leaf in jax.tree.leaves(result):
+        if jnp.issubdtype(leaf.dtype, jnp.floating):
+            assert jnp.all(jnp.isfinite(leaf))
