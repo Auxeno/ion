@@ -26,7 +26,18 @@ class ActorCritic(nn.Module):
         self.actor = nn.MLP(obs_dim, action_dim, 64, 2, activation=jax.nn.tanh, key=key_a)
         self.critic = nn.MLP(obs_dim, 1, 64, 2, activation=jax.nn.tanh, key=key_c)
 
+    def get_action(
+        self,
+        observations: Float[Array, "... d"],
+        *,
+        key: PRNGKeyArray,
+    ) -> Int[Array, "..."]:
+        """Sample actions from the policy."""
+        logits = self.actor(observations)
+        return jax.random.categorical(key, logits, axis=-1)
+
     def get_value(self, observations: Float[Array, "... d"]) -> Float[Array, "..."]:
+        """Estimate state value."""
         return self.critic(observations).squeeze(-1)
 
     def get_action_and_value(
@@ -240,9 +251,12 @@ def train_ppo(
     total_rollouts = TOTAL_STEPS // BATCH_SIZE
     checkpoints = {total_rollouts * p // 10 for p in range(1, 11)}
 
+    # Precompute RNG keys for all rollouts
+    learn_keys = jax.random.split(rng, total_rollouts)
+
     bar = tqdm(range(total_rollouts), desc=f"PPO {GYMNAX_ENV_NAME}")
     for i in bar:
-        rng, key_learn = jax.random.split(rng)
+        key_learn = learn_keys[i]
 
         carry, transitions = rollout(network, carry)
         network, optimizer = learn(network, optimizer, transitions, key=key_learn)

@@ -46,25 +46,37 @@ class QNetwork(nn.Module):
         self.hidden_layers = tuple(layers)
         self.output_layer = nn.Linear(in_dim, action_dim, key=keys[-1])
 
-    def __call__(self, observations: Float[Array, "... d"]) -> Float[Array, "... a"]:
+    def get_q(self, observations: Float[Array, "... d"]) -> Float[Array, "... a"]:
+        """Compute Q-values for all actions."""
         x = observations
         for linear, norm in self.hidden_layers:
             x = jax.nn.relu(norm(linear(x)))
         return self.output_layer(x)
 
+    def get_action(self, observations: Float[Array, "... d"]) -> Int[Array, "..."]:
+        """Select greedy actions."""
+        return self.get_q(observations).argmax(axis=-1)
 
-def eps_greedy_action(
-    q_values: Float[Array, "n a"],
-    epsilon: Float[Array, ""],
-    *,
-    key: PRNGKeyArray,
-) -> Int[Array, " n"]:
-    """Select actions via epsilon-greedy exploration."""
-    key_eps, key_rand = jax.random.split(key)
-    greedy = q_values.argmax(axis=-1)
-    random = jax.random.randint(key_rand, greedy.shape, 0, q_values.shape[-1])
-    explore = jax.random.uniform(key_eps, greedy.shape) < epsilon
-    return jnp.where(explore, random, greedy)
+    def get_action_and_q(
+        self,
+        observations: Float[Array, "... d"],
+        epsilon: Float[Array, ""],
+        *,
+        key: PRNGKeyArray,
+    ) -> tuple[Int[Array, "..."], Float[Array, "... a"]]:
+        """Epsilon-greedy action selection with Q-values."""
+        key_random, key_choice = jax.random.split(key)
+        q_values = self.get_q(observations)
+
+        greedy_actions = q_values.argmax(axis=-1)
+        random_actions = jax.random.randint(key_random, greedy_actions.shape, 0, q_values.shape[-1])
+        actions = jnp.where(
+            jax.random.uniform(key_choice, greedy_actions.shape) < epsilon,
+            random_actions,
+            greedy_actions,
+        )
+
+        return actions, q_values
 
 
 class Transition(NamedTuple):
@@ -92,8 +104,7 @@ def rollout(
         rng, env_states, observations = carry
         rng, key_action, key_step = jax.random.split(rng, 3)
 
-        q_values = network(observations)
-        actions = eps_greedy_action(q_values, epsilon, key=key_action)
+        actions, q_values = network.get_action_and_q(observations, epsilon, key=key_action)
 
         next_observations, next_states, rewards, terminations, info = jax.vmap(
             env.step, in_axes=(0, 0, 0, None)
@@ -121,29 +132,23 @@ def rollout(
 
 
 def calculate_td_lambda(
-    network: QNetwork,
     rewards: Float[Array, "t n"],
     q_values: Float[Array, "t n a"],
     terminations: Bool[Array, "t n"],
     truncations: Bool[Array, "t n"],
-    last_observations: Float[Array, "n d"],
+    last_q: Float[Array, " n"],
     gamma: float,
     td_lambda: float,
 ) -> Float[Array, "t n"]:
-    """Compute TD(lambda) return targets via reversed scan over timesteps."""
+    """Compute TD(λ) return targets via reversed scan over timesteps."""
 
     # Max Q-values at each step: max_q[t] = max Q(s_t)
     max_q = q_values.max(axis=-1)
 
-    # Bootstrap from last next observations: max Q(s_T)
-    last_q = network(last_observations).max(axis=-1)
-    non_term_last = 1.0 - terminations[-1]
-    lambda_return_init = rewards[-1] + gamma * non_term_last * last_q
+    # Bootstrap from last next state
+    lambda_return_init = rewards[-1] + gamma * (1.0 - terminations[-1]) * last_q
 
-    def lambda_step(
-        lambda_return: Float[Array, " n"],
-        xs: tuple,
-    ) -> tuple[Float[Array, " n"], Float[Array, " n"]]:
+    def lambda_step(lambda_return, xs):
         reward, next_q, termination, truncation = xs
         non_termination = 1.0 - termination
         non_truncation = 1.0 - truncation
@@ -163,18 +168,6 @@ def calculate_td_lambda(
     return jnp.concatenate([targets, lambda_return_init[None]])
 
 
-def td_loss(
-    network: QNetwork,
-    observations: Float[Array, "b d"],
-    actions: Int[Array, " b"],
-    targets: Float[Array, " b"],
-) -> Float[Array, ""]:
-    """Mean squared TD-error loss."""
-    q_values = network(observations)
-    chosen_q = jnp.take_along_axis(q_values, actions[..., None], axis=-1).squeeze(-1)
-    return 0.5 * ((chosen_q - targets) ** 2).mean()
-
-
 @jax.jit
 def learn(
     network: QNetwork,
@@ -186,13 +179,13 @@ def learn(
     """Compute TD(lambda) targets then scan over minibatch updates."""
 
     # Compute lambda return targets
+    last_q = network.get_q(batch.next_observations[-1]).max(axis=-1)
     targets = calculate_td_lambda(
-        network,
         batch.rewards,
         batch.q_values,
         batch.terminations,
         batch.truncations,
-        batch.next_observations[-1],
+        last_q,
         GAMMA,
         TD_LAMBDA,
     )
@@ -208,12 +201,13 @@ def learn(
 
     def minibatch_update(carry, indices):
         network, optimizer = carry
-        loss, grads = jax.value_and_grad(td_loss)(
-            network,
-            batch.observations[indices],
-            batch.actions[indices],
-            targets[indices],
-        )
+
+        def loss_fn(network: QNetwork) -> Float[Array, ""]:
+            q_values = network.get_q(batch.observations[indices])
+            chosen_q = q_values[jnp.arange(batch.actions[indices].shape[0]), batch.actions[indices]]
+            return 0.5 * ((chosen_q - targets[indices]) ** 2).mean()
+
+        loss, grads = jax.value_and_grad(loss_fn)(network)
         network, optimizer = optimizer.update(network, grads)
         return (network, optimizer), loss
 
@@ -243,22 +237,25 @@ def train_pqn(
     )
     carry = (rng_rollout, env_states, observations)
 
-    # Epsilon schedule: linear decay over EPS_DECAY fraction of training
+    # Epsilon schedule: linear decay over EPS_FRACTION fraction of training
     total_rollouts = TOTAL_STEPS // BATCH_SIZE
-    eps_decay_rollouts = int(total_rollouts * EPS_DECAY)
+    eps_fraction_rollouts = int(total_rollouts * EPS_FRACTION)
 
     # Episode tracking
     current_returns = np.zeros(NUM_ENVS)
     recent_returns: deque[float] = deque(maxlen=100)
     checkpoints = {total_rollouts * p // 10 for p in range(1, 11)}
 
+    # Precompute RNG keys for all rollouts
+    learn_keys = jax.random.split(rng, total_rollouts)
+
     bar = tqdm(range(total_rollouts), desc=f"PQN {GYMNAX_ENV_NAME}")
     for i in bar:
-        rng, key_learn = jax.random.split(rng)
+        key_learn = learn_keys[i]
 
         # Linear epsilon decay
-        frac = jnp.minimum(1.0, i / max(eps_decay_rollouts, 1))
-        epsilon = EPS_START + (EPS_FINISH - EPS_START) * frac
+        progress = jnp.minimum(1.0, i / max(eps_fraction_rollouts, 1))
+        epsilon = EPS_START + (EPS_FINAL - EPS_START) * progress
 
         carry, transitions = rollout(network, carry, epsilon)
         network, optimizer = learn(network, optimizer, transitions, key=key_learn)
@@ -292,8 +289,8 @@ if __name__ == "__main__":
     NUM_EPOCHS = 4
     NUM_MINIBATCHES = 4
     EPS_START = 1.0
-    EPS_FINISH = 0.05
-    EPS_DECAY = 0.5
+    EPS_FINAL = 0.05
+    EPS_FRACTION = 0.5
     SEED = 42
 
     BATCH_SIZE = ROLLOUT_STEPS * NUM_ENVS
