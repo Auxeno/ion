@@ -2,7 +2,7 @@
 
   <h1><img src="https://raw.githubusercontent.com/auxeno/ion/main/assets/logo.png" alt="Ion" width="72"><br>Ion</h1>
 
-  <h3>A minimal neural network library for JAX</h3>
+  <h3>A simple neural network library for JAX</h3>
 
 [![Python](https://img.shields.io/badge/Python-3.11+-4E69FF.svg)](https://www.python.org/)
 [![PyPI](https://img.shields.io/pypi/v/ion-nn?color=8E51FF)](https://pypi.org/project/ion-nn/)
@@ -14,7 +14,7 @@
 
 ---
 
-Ion is a neural network library for JAX built on three core abstractions: `Module`, `Param`, and `Optimizer`, totalling 500 lines of code. Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html) that are called with `model(x)` and *always* work directly with `jax.grad`, `jax.jit`, `jax.vmap`. Beyond that, you just write JAX and it works.
+Ion is a neural network library for JAX built on three core abstractions: `Module`, `Param`, and `Optimizer`. Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html) that are called with `model(x)` and *always* work directly with `jax.grad`, `jax.jit`, `jax.vmap`. Beyond that, you just write JAX and it works.
 
 Ion also ships with standard neural network layers (linear, convolution, attention, normalization, recurrent, and more) built with the core.
 <br><br>
