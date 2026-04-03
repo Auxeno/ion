@@ -127,5 +127,3 @@ class TestRMSNorm:
         """Scale is initialized to all ones."""
         layer = nn.RMSNorm(8)
         npt.assert_allclose(layer.scale._value, jnp.ones(8))
-
-

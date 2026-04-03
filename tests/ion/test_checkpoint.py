@@ -13,6 +13,7 @@ from ion import checkpoint, nn, tree
 class TestSaveLoad:
     def test_roundtrip_on_module(self):
         """Saving and loading a module preserves all parameter values."""
+
         class Model(nn.Module):
             w: nn.Param
 
@@ -100,6 +101,7 @@ class TestSaveLoad:
 
     def test_param_and_plain_array_mix(self):
         """Roundtrip preserves both Param and plain array leaves."""
+
         class Model(nn.Module):
             w: nn.Param
             buf: jax.Array

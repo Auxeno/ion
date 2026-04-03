@@ -60,13 +60,9 @@ def _register_module_as_pytree(cls: type) -> Any:
 
             if isinstance(value, array_like):
                 child_info.append((name, "leaf"))
-            elif isinstance(value, (tuple, list)) and any(
-                isinstance(x, array_like) for x in value
-            ):
+            elif isinstance(value, (tuple, list)) and any(isinstance(x, array_like) for x in value):
                 child_info.append((name, type(value).__name__))
-            elif isinstance(value, dict) and any(
-                isinstance(v, array_like) for v in value.values()
-            ):
+            elif isinstance(value, dict) and any(isinstance(v, array_like) for v in value.values()):
                 child_info.append((name, "dict"))
             else:
                 static_names.append(name)
@@ -91,9 +87,7 @@ def _register_module_as_pytree(cls: type) -> Any:
                 }
                 children.append((jtu.GetAttrKey(name), wrapped))
             else:
-                wrapped = type(value)(
-                    x if isinstance(x, array_like) else _Static(x) for x in value
-                )
+                wrapped = type(value)(x if isinstance(x, array_like) else _Static(x) for x in value)
                 children.append((jtu.GetAttrKey(name), wrapped))
 
         static_values = tuple(obj.__dict__[name] for name in static_names)

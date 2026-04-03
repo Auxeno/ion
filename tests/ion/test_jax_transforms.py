@@ -67,6 +67,7 @@ class TestGrad:
 
     def test_frozen_param_gets_zero_gradient(self):
         """Frozen params receive zero gradients while trainable params get nonzero."""
+
         def loss(model):
             return jnp.sum(model.w) + jnp.sum(model.frozen)
 
@@ -91,6 +92,7 @@ class TestGrad:
 
     def test_extra_args_forwarded(self):
         """Extra positional arguments are forwarded through jax.grad."""
+
         class Model(nn.Module):
             w: nn.Param
 
@@ -106,6 +108,7 @@ class TestGrad:
 
     def test_kwargs_forwarded(self):
         """Keyword arguments are forwarded through jax.grad."""
+
         class Model(nn.Module):
             w: nn.Param
 
@@ -120,6 +123,7 @@ class TestGrad:
 
     def test_on_nested_module(self):
         """Gradients propagate correctly through nested modules."""
+
         def loss(model, x):
             h = x @ model.linear.w + model.linear.b
             return jnp.sum(h + model.extra)
@@ -244,6 +248,7 @@ class TestGradEdgeCases:
 class TestValueAndGrad:
     def test_value_matches_direct_call(self):
         """The value from value_and_grad matches a direct loss call."""
+
         class Model(nn.Module):
             w: nn.Param
 
@@ -259,6 +264,7 @@ class TestValueAndGrad:
 
     def test_grad_matches_grad_only(self):
         """Gradients from value_and_grad match those from jax.grad alone."""
+
         class Model(nn.Module):
             w: nn.Param
 
@@ -275,6 +281,7 @@ class TestValueAndGrad:
 
     def test_frozen_param_gets_zero_gradient(self):
         """Frozen params get zero gradients while returning the correct loss value."""
+
         def loss(model):
             return jnp.sum(model.w) + jnp.sum(model.frozen)
 
@@ -286,6 +293,7 @@ class TestValueAndGrad:
 
     def test_extra_args_forwarded(self):
         """Extra positional arguments are forwarded through value_and_grad."""
+
         class Model(nn.Module):
             w: nn.Param
 
@@ -303,6 +311,7 @@ class TestValueAndGrad:
 
     def test_kwargs_forwarded(self):
         """Keyword arguments are forwarded through value_and_grad."""
+
         class Model(nn.Module):
             w: nn.Param
 
@@ -319,6 +328,7 @@ class TestValueAndGrad:
 
     def test_inside_jit(self):
         """value_and_grad composed with jit produces the same results."""
+
         class Model(nn.Module):
             w: nn.Param
 

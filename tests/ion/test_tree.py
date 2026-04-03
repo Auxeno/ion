@@ -29,6 +29,7 @@ class TestFreeze:
 
     def test_freeze_on_module(self):
         """Freezing a Module sets all its Params to non-trainable."""
+
         class Model(nn.Module):
             w: nn.Param
             b: nn.Param
@@ -44,6 +45,7 @@ class TestFreeze:
 
     def test_freeze_nested_module(self):
         """Freezing recursively freezes Params in nested Modules."""
+
         class Inner(nn.Module):
             w: nn.Param
 
@@ -65,6 +67,7 @@ class TestFreeze:
 
     def test_freeze_does_not_affect_non_params(self):
         """Freezing leaves non-Param fields unchanged."""
+
         class Model(nn.Module):
             w: nn.Param
             scale: float
@@ -237,6 +240,7 @@ class TestAstype:
 
     def test_astype_on_module(self):
         """Casting a Module converts all its float Params and arrays."""
+
         class Model(nn.Module):
             w: nn.Param
             buf: jax.Array
@@ -260,6 +264,7 @@ class TestAstype:
 
     def test_astype_nested_module(self):
         """Casting recursively converts Params in nested Modules."""
+
         class Inner(nn.Module):
             w: nn.Param
 

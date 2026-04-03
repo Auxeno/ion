@@ -630,7 +630,10 @@ class TestFieldPartition:
 
         initial_loss = loss_fn(model, x, y)
         (model, optimizer), losses = jax.lax.scan(
-            scan_step, (model, optimizer), None, length=20,
+            scan_step,
+            (model, optimizer),
+            None,
+            length=20,
         )
         assert loss_fn(model, x, y) < initial_loss
         assert optimizer.step == 20
