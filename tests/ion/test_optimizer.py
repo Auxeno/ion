@@ -452,6 +452,202 @@ class TestOptimizerStructureMismatch:
             optimizer.update(other, grads_other)
 
 
+class TwoHead(nn.Module):
+    encoder: nn.Linear
+    decoder: nn.Linear
+
+    def __init__(self, key):
+        keys = jax.random.split(key, 2)
+        self.encoder = nn.Linear(4, 4, key=keys[0])
+        self.decoder = nn.Linear(4, 1, key=keys[1])
+
+    def __call__(self, x):
+        return self.decoder(self.encoder(x))
+
+
+class TestFieldPartition:
+    def test_creates_state(self):
+        """Field-partitioned optimizer initializes state for all groups."""
+        model = TwoHead(key=jax.random.key(0))
+        optimizer = ion.Optimizer(
+            {"encoder": optax.adam(1e-3), "decoder": optax.adam(1e-3)},
+            model,
+        )
+        assert optimizer.state is not None
+        assert len(jax.tree.leaves(optimizer.state)) > 0
+
+    def test_fields_stored(self):
+        """Field names are stored on the optimizer."""
+        model = TwoHead(key=jax.random.key(0))
+        optimizer = ion.Optimizer(
+            {"encoder": optax.adam(1e-3), "decoder": optax.adam(1e-3)},
+            model,
+        )
+        assert optimizer._fields == ("encoder", "decoder")
+
+    def test_fields_none_for_single_transform(self):
+        """Single transform mode has _fields=None."""
+        model = TwoHead(key=jax.random.key(0))
+        optimizer = ion.Optimizer(optax.adam(1e-3), model)
+        assert optimizer._fields is None
+
+    def test_tuple_keys(self):
+        """Tuple keys group multiple fields under one transform."""
+        model = TwoHead(key=jax.random.key(0))
+        optimizer = ion.Optimizer(
+            {("encoder", "decoder"): optax.adam(1e-3)},
+            model,
+        )
+        assert optimizer._fields == ("encoder", "decoder")
+
+    def test_decreases_loss(self):
+        """Per-field optimizer decreases loss over 10 steps."""
+        model = TwoHead(key=jax.random.key(0))
+        optimizer = ion.Optimizer(
+            {"encoder": optax.adam(1e-2), "decoder": optax.adam(1e-2)},
+            model,
+        )
+
+        x = jax.random.normal(jax.random.key(1), (8, 4))
+        y = jnp.ones((8, 1))
+
+        def loss_fn(m, x, y):
+            return jnp.mean((m(x) - y) ** 2)
+
+        initial_loss = loss_fn(model, x, y)
+        for _ in range(10):
+            grads = jax.grad(loss_fn)(model, x, y)
+            model, optimizer = optimizer.update(model, grads)
+
+        assert loss_fn(model, x, y) < initial_loss
+
+    def test_different_learning_rates(self):
+        """Different LRs produce different weight changes per field."""
+        model = TwoHead(key=jax.random.key(0))
+
+        x = jax.random.normal(jax.random.key(1), (8, 4))
+        y = jnp.ones((8, 1))
+
+        def loss_fn(m, x, y):
+            return jnp.mean((m(x) - y) ** 2)
+
+        grads = jax.grad(loss_fn)(model, x, y)
+
+        # Slow encoder, fast decoder
+        opt_split = ion.Optimizer(
+            {"encoder": optax.sgd(1e-4), "decoder": optax.sgd(1e-1)},
+            model,
+        )
+        model_split, _ = opt_split.update(model, grads)
+
+        # Same LR for both
+        opt_uniform = ion.Optimizer(optax.sgd(1e-4), model)
+        model_uniform, _ = opt_uniform.update(model, grads)
+
+        # Encoder should be the same (both 1e-4)
+        npt.assert_allclose(model_split.encoder.w._value, model_uniform.encoder.w._value)
+
+        # Decoder should differ (1e-1 vs 1e-4)
+        assert not jnp.allclose(model_split.decoder.w._value, model_uniform.decoder.w._value)
+
+    def test_frozen_params_in_field_group(self):
+        """Frozen params within a field group stay unchanged."""
+        model = TwoHead(key=jax.random.key(0))
+        model = model.replace(encoder=model.encoder.freeze())
+        frozen_w = model.encoder.w._value.copy()
+
+        optimizer = ion.Optimizer(
+            {"encoder": optax.adam(1e-2), "decoder": optax.adam(1e-2)},
+            model,
+        )
+
+        x = jax.random.normal(jax.random.key(1), (8, 4))
+        y = jnp.ones((8, 1))
+        grads = jax.grad(lambda m: jnp.mean((m(x) - y) ** 2))(model)
+        new_model, _ = optimizer.update(model, grads)
+        npt.assert_array_equal(new_model.encoder.w._value, frozen_w)
+
+    def test_uncovered_field_raises(self):
+        """Trainable field missing from the dict raises ValueError."""
+        model = TwoHead(key=jax.random.key(0))
+        with pytest.raises(ValueError, match="decoder"):
+            ion.Optimizer({"encoder": optax.adam(1e-3)}, model)
+
+    def test_duplicate_field_raises(self):
+        """Same field in two groups raises ValueError."""
+        model = TwoHead(key=jax.random.key(0))
+        with pytest.raises(ValueError, match="encoder"):
+            ion.Optimizer(
+                {("encoder", "decoder"): optax.adam(1e-3), "encoder": optax.sgd(1e-2)},
+                model,
+            )
+
+    def test_jit_compatible(self):
+        """Field-partitioned optimizer works inside jax.jit."""
+        model = TwoHead(key=jax.random.key(0))
+        optimizer = ion.Optimizer(
+            {"encoder": optax.adam(1e-2), "decoder": optax.adam(1e-2)},
+            model,
+        )
+
+        x = jax.random.normal(jax.random.key(1), (8, 4))
+        y = jnp.ones((8, 1))
+
+        def loss_fn(m, x, y):
+            return jnp.mean((m(x) - y) ** 2)
+
+        @jax.jit
+        def step(model, optimizer, x, y):
+            grads = jax.grad(loss_fn)(model, x, y)
+            return optimizer.update(model, grads)
+
+        initial_loss = loss_fn(model, x, y)
+        for _ in range(10):
+            model, optimizer = step(model, optimizer, x, y)
+
+        assert loss_fn(model, x, y) < initial_loss
+        assert optimizer.step == 10
+
+    def test_lax_scan_compatible(self):
+        """Field-partitioned optimizer works inside lax.scan."""
+        model = TwoHead(key=jax.random.key(0))
+        optimizer = ion.Optimizer(
+            {"encoder": optax.sgd(0.01), "decoder": optax.sgd(0.01)},
+            model,
+        )
+
+        x = jax.random.normal(jax.random.key(1), (8, 4))
+        y = jnp.ones((8, 1))
+
+        def loss_fn(m, x, y):
+            return jnp.mean((m(x) - y) ** 2)
+
+        def scan_step(carry, _):
+            model, optimizer = carry
+            loss, grads = jax.value_and_grad(loss_fn)(model, x, y)
+            model, optimizer = optimizer.update(model, grads)
+            return (model, optimizer), loss
+
+        initial_loss = loss_fn(model, x, y)
+        (model, optimizer), losses = jax.lax.scan(
+            scan_step, (model, optimizer), None, length=20,
+        )
+        assert loss_fn(model, x, y) < initial_loss
+        assert optimizer.step == 20
+
+    def test_repr_includes_fields(self):
+        """Repr shows field names for field-partitioned optimizer."""
+        model = TwoHead(key=jax.random.key(0))
+        optimizer = ion.Optimizer(
+            {"encoder": optax.adam(1e-3), "decoder": optax.adam(1e-3)},
+            model,
+        )
+        r = repr(optimizer)
+        assert "fields=" in r
+        assert "encoder" in r
+        assert "decoder" in r
+
+
 class TestOptimizerRepr:
     def test_repr_includes_step_and_leaves(self):
         """Repr string includes step count and state leaf count."""
