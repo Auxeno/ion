@@ -24,15 +24,13 @@ def _apply_updates(model: PyTree, updates: PyTree) -> PyTree:
     """Add optimizer deltas to trainable `Param` leaves in a model pytree."""
 
     def _apply(param: Any, update: Any) -> Any:
-        if update is None:
+        # Skip update
+        if not isinstance(param, Param) or not param.trainable or update is None:
             return param
-        if not isinstance(param, Param):
-            return param
-        if not param.trainable:
-            return param
-        # Unwrap Param updates to get the raw delta array
+
+        # Apply update and rewrap as Param
         delta = update._value if isinstance(update, Param) else update
-        return Param(param._value + delta, trainable=param.trainable)
+        return Param(param._value + delta, trainable=True)
 
     return jax.tree.map(
         _apply,
@@ -211,12 +209,8 @@ class Optimizer:
         """Minimal textual pretty printing."""
         step_val = self.step.item() if hasattr(self.step, "item") else self.step
         num_leaves = len(jax.tree.leaves(self.state))
-        if self._fields is not None:
-            return (
-                f"Optimizer(step={step_val}, state_leaves={num_leaves}, "
-                f"fields={list(self._fields)})"
-            )
-        return f"Optimizer(step={step_val}, state_leaves={num_leaves})"
+        fields_str = f", fields={list(self._fields)}" if self._fields is not None else ""
+        return f"Optimizer(step={step_val}, state_leaves={num_leaves}{fields_str})"
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
         """Hook to add color to Optimizers with Treescope."""
