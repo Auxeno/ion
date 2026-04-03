@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.2
+
+- **Per-field optimizer transforms.** `Optimizer` accepts a dict mapping field names
+  (or tuples of field names) to separate optax transforms, enabling different learning
+  rates or schedules for different parts of a model (e.g. generator vs discriminator).
+- Fixed SSM demo notebook links.
+- Improved generic test coverage (bfloat16 tests, refactored layer type grouping).
+
 ## 0.5.1
 
 - **Edge masking.** `GATConv` and `GATv2Conv` accept an optional `edge_mask` argument to
