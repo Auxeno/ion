@@ -1,6 +1,6 @@
 # Internals
 
-Everything behind the scenes in Ion. Three files and ~500 lines of code make up the whole engine. This document explains the design. Readers are encouraged to check out the source code:
+Everything behind the scenes in Ion. Three files and <1000 lines of code make up the whole engine. This document explains the design. Readers are encouraged to check out the source code:
 
 - [`ion/nn/param.py`](../ion/nn/param.py): Param wrapper, trainable/frozen distinction
 - [`ion/nn/module.py`](../ion/nn/module.py): Module base class, pytree registration
@@ -57,7 +57,28 @@ Wraps an optax `GradientTransformation` with Param-aware updates. `Optimizer` is
 
 **Step counter.** `optimizer.step` is an `int32` array that increments on each `update()` call. This is independent of any internal step tracking by optax transforms (e.g. warmup schedules).
 
-**Pytree registration.** `state` and `step` are dynamic children (traced by JAX); `_transform` is static auxiliary data (baked into the compiled program).
+**Per-field transforms.** Pass a dict instead of a single transform to route different optimizers to different top-level model fields. This is useful when different components need independent learning rates or gradient clipping, such as GANs (generator vs discriminator), actor-critic RL (separate LR and grad norm thresholds), or transfer learning (slow backbone, fast head).
+
+```python
+# gan.generator and gan.discriminator get separate optimizers
+optimizer = ion.Optimizer(
+    {"generator": optax.adam(1e-4), "discriminator": optax.adam(4e-4)},
+    gan,
+)
+
+# Tuple keys group multiple fields under one transform
+optimizer = ion.Optimizer(
+    {
+        ("actor", "std_raw"): optax.chain(optax.clip_by_global_norm(0.5), optax.adam(3e-4)),
+        "critic": optax.chain(optax.clip_by_global_norm(1.5), optax.adam(1e-3)),
+    },
+    network,
+)
+```
+
+Internally this uses `optax.partition` with labels derived from `jax.tree.map_with_path`. Every top-level field with trainable params must be covered by the dict; missing fields raise `ValueError` at construction time. Frozen params within any group are still routed to `set_to_zero()`.
+
+**Pytree registration.** `state` and `step` are dynamic children (traced by JAX); `_transform` and `_fields` are static auxiliary data (baked into the compiled program).
 
 ## 🔪 Sharp Edges
 

@@ -14,7 +14,7 @@
 
 ---
 
-Ion is a simple neural network library for JAX. The core is three concepts (`Module`, `Param`, `Optimizer`) in ~500 lines of code. Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html) that *always* work directly with `jax.grad`, `jax.jit`, and `jax.vmap`. Ion also ships with standard neural network layers (linear, convolution, attention, normalization, recurrent, and more) built on the core.
+Ion is a simple neural network library for JAX. The core is three concepts (`Module`, `Param`, `Optimizer`) in <1000 lines of code. Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html) that *always* work directly with `jax.grad`, `jax.jit`, and `jax.vmap`. Ion also ships with standard neural network layers (linear, convolution, attention, normalization, recurrent, and more) built on the core.
 
 ```bash
 pip install ion-nn
@@ -219,7 +219,7 @@ model, optimizer = ion.load("snapshot.npz", (model, optimizer))
 >
 > The core introduces three concepts, `Module`, `Param`, and `Optimizer`, and from there JAX does everything else. There are no custom transforms, no special contexts, no framework-specific calling conventions. If you already know JAX, you can learn Ion in an hour.
 >
-> Because the core is ~500 lines with not much happening behind the scenes, it's straightforward to reason about what JAX is doing. This matters most in complex training setups like multi-stage fine-tuning or custom gradient flows.
+> Because the core is <1000 lines with not much happening behind the scenes, it's straightforward to reason about what JAX is doing. This matters most in complex training setups like multi-stage fine-tuning or custom gradient flows.
 > </details>
 <br>
 
