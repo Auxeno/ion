@@ -107,7 +107,7 @@ Known gotchas to be aware of when using Ion. Some are limitations of JAX:
   logits = x @ self.embed.w.T  # shared weight, no duplication
   ```
 
-- **`save`/`load` doesn't store callables or static config.** Non-array fields (ints, strings, callables like activation functions) come from the reference tree, not the file. Array data and `trainable` flags are saved and restored. Shape mismatches between saved and reference arrays raise `ValueError`.
+- **`save`/`load` doesn't store callables or static config.** Non-array fields (ints, strings, callables like activation functions) come from the reference tree, not the file. Array data and `trainable` flags are saved and restored. Extension dtypes numpy can't store natively (`bfloat16`, `float8`) are written as raw bytes with the dtype recorded in metadata, so they round-trip exactly. Shape mismatches between saved and reference arrays raise `ValueError`.
 
 - **`replace()` can change pytree structure.** Replacing a `Param` field with a plain array or `None` changes the treedef. This is useful for model surgery, but subsequent `jax.tree.map` between the original and modified model will crash with a structure mismatch.
 

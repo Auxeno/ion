@@ -18,7 +18,7 @@ Channels-last is the most typical format for image data and is followed by Flax 
 
 ### Batch Dimensions
 
-All layers expect at least one leading batch dimension. Structural layers (Conv, Pool, RNN, LSTM, GRU, GroupNorm) require exactly the right number of dimensions and will error on incorrect rank. Pointwise layers (Linear, LayerNorm, Embedding, etc.) operate on the last dimension and naturally handle any number of leading dims.
+All layers expect at least one leading batch dimension. Structural layers (Conv, Pool, RNN, LSTM, GRU) require exactly the right number of dimensions and will error on incorrect rank. Pointwise layers (Linear, LayerNorm, Embedding, etc.) operate on the last dimension and naturally handle any number of leading dims; GroupNorm likewise operates on the trailing spatial and channel dimensions.
 
 ```python
 linear = nn.Linear(4, 8, key=key)
@@ -154,7 +154,7 @@ Each layer family uses init schemes suited to its typical activation:
 
 ## Attention Masking
 
-`SelfAttention` and `CrossAttention` accept an optional boolean `mask` where `True` means attend and `False` means ignore. Masked positions are filled with `-inf` before softmax.
+`SelfAttention` and `CrossAttention` accept an optional boolean `mask` where `True` means attend and `False` means ignore. Masked positions are filled with `-inf` before softmax. The mask may be `(s, s)` (shared across batch and heads), `(b, s, s)` (per batch, shared across heads), or `(b, h, s, s)` (per head).
 
 ```python
 attn = nn.SelfAttention(64, num_heads=8, key=key)
@@ -162,6 +162,10 @@ attn = nn.SelfAttention(64, num_heads=8, key=key)
 # Causal (autoregressive) masking via constructor flag
 attn = nn.SelfAttention(64, num_heads=8, causal=True, key=key)
 attn(x)  # lower-triangular mask applied automatically
+
+# Padding mask: each batch element attends only to its valid tokens
+mask = jnp.arange(seq_len)[None, :] < lengths[:, None]  # (b, s)
+attn(x, mask=mask[:, None, :] & mask[:, :, None])  # (b, s, s)
 
 # Sliding window attention: each token attends to its local neighborhood
 window = 32
