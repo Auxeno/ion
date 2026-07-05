@@ -89,8 +89,8 @@ def alibi(
     if num_heads & (num_heads - 1) != 0:
         raise ValueError(f"num_heads ({num_heads}) must be a power of 2")
 
-    # Geometric per-head slopes: 0.5, 0.25, 0.125, ... (h,)
-    slopes = 0.5 ** jnp.arange(1, num_heads + 1)
+    # Geometric per-head slopes from the paper: 2^(-8/h), 2^(-16/h), ..., 2^-8 (h,)
+    slopes = 0.5 ** (8.0 * jnp.arange(1, num_heads + 1) / num_heads)
 
     # Relative distances between positions (s, s)
     positions = jnp.arange(seq_len, dtype=jnp.float32)

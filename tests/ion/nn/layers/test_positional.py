@@ -104,6 +104,14 @@ class TestAlibi:
         magnitudes = jnp.abs(b[:, 0, 1])
         assert jnp.all(magnitudes[:-1] >= magnitudes[1:])
 
+    def test_slope_values(self):
+        """Slopes follow the paper's geometric sequence 2^(-8i/h)."""
+        # bias[h, 1, 0] = slope[h] * (0 - 1) = -slope[h]
+        b = nn.alibi(16, 4)
+        npt.assert_allclose(b[:, 1, 0], -(0.5 ** (8.0 * jnp.arange(1, 5) / 4)), rtol=1e-6)
+        b = nn.alibi(16, 8)
+        npt.assert_allclose(b[:, 1, 0], -(0.5 ** jnp.arange(1, 9)), rtol=1e-6)
+
     def test_non_power_of_2_raises(self):
         """Non-power-of-2 num_heads raises ValueError."""
         import pytest
