@@ -94,6 +94,24 @@ class TestGroupNorm:
         var = jnp.mean(jnp.square(y_groups - mean), axis=(1, 2, 4))
         npt.assert_allclose(var, 1.0, atol=1e-4)
 
+    def test_spatial_unbatched_matches_batched(self):
+        """A spatial input without a batch dim matches the batched result."""
+        layer = nn.GroupNorm(8, 2, num_spatial_dims=2)
+        x = jax.random.normal(jax.random.key(0), (6, 6, 8))
+        npt.assert_allclose(layer(x), layer(x[None])[0], atol=1e-6)
+
+    def test_extra_leading_dims(self):
+        """Arbitrary leading dims are normalized independently."""
+        layer = nn.GroupNorm(8, 2, num_spatial_dims=2)
+        x = jax.random.normal(jax.random.key(0), (2, 3, 6, 6, 8))
+        y = layer(x)
+        assert y.shape == x.shape
+        npt.assert_allclose(y[1, 2], layer(x[1, 2]), atol=1e-6)
+
+        layer = nn.GroupNorm(8, 2)
+        x = jax.random.normal(jax.random.key(1), (2, 5, 8))
+        npt.assert_allclose(layer(x)[0], layer(x[0]), atol=1e-6)
+
     def test_spatial_vmap_batch(self):
         """jax.vmap adds an extra batch dimension with num_spatial_dims."""
         layer = nn.GroupNorm(8, 2, num_spatial_dims=2)

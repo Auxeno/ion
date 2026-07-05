@@ -80,7 +80,7 @@ class GroupNorm(Module):
         self.num_spatial_dims = num_spatial_dims
         self.eps = eps
 
-    def __call__(self, x: Float[Array, "b ... d"]) -> Float[Array, "b ... d"]:
+    def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
 
         num_spatial = self.num_spatial_dims
 
@@ -88,7 +88,8 @@ class GroupNorm(Module):
         group_shape = (*x.shape[:-1], self.num_groups, x.shape[-1] // self.num_groups)
         x = x.reshape(group_shape)
 
-        reduce_axes = tuple(range(1, num_spatial + 1)) + (-1,)
+        # Reduce over spatial dims and within-group channels, indexed from the back
+        reduce_axes = tuple(range(-num_spatial - 2, -2)) + (-1,)
 
         mean = jnp.mean(x, axis=reduce_axes, keepdims=True)
         var = jnp.mean(jnp.square(x - mean), axis=reduce_axes, keepdims=True)
@@ -96,7 +97,7 @@ class GroupNorm(Module):
         x = (x - mean) * lax.rsqrt(var + self.eps)
 
         # Merge groups back
-        x = x.reshape(*x.shape[: num_spatial + 1], -1)
+        x = x.reshape(*x.shape[:-2], -1)
 
         return x * self.scale + self.b
 
