@@ -35,13 +35,12 @@ class TestGATConv:
         assert y.shape == (3, 16)
 
     def test_glorot_init(self):
-        """Glorot uniform initialization gives var(w) close to 2/(fan_in+fan_out)."""
-        gat = gnn.GATConv(2048, 2048, key=jax.random.key(42))
-        var = jnp.var(gat.w._value)
-        # Glorot uniform: var = 2 / (fan_in + fan_out), but for (i, h, k) shape
-        # the effective fan_in=2048, fan_out=2048
-        expected_var = 2.0 / (2048 + 2048)
-        npt.assert_allclose(var, expected_var, atol=0.05)
+        """Glorot fans come from the flat (in_dim, out_dim) projection, including multi-head."""
+        for num_heads in [1, 4]:
+            gat = gnn.GATConv(256, 128, num_heads=num_heads, key=jax.random.key(42))
+            var = jnp.var(gat.w._value)
+            expected_var = 2.0 / (256 + 128)
+            npt.assert_allclose(var, expected_var, rtol=0.1)
 
     def test_zero_bias_init(self):
         """Bias is initialized to all zeros."""
@@ -305,6 +304,14 @@ class TestGATv2Conv:
         assert gat.w_sender.dtype == jnp.float32
         assert gat.w_receiver.dtype == jnp.float32
         assert gat.att.dtype == jnp.float32
+
+    def test_glorot_init(self):
+        """Glorot fans come from the flat (in_dim, out_dim) projection, including multi-head."""
+        for num_heads in [1, 4]:
+            gat = gnn.GATv2Conv(256, 128, num_heads=num_heads, key=jax.random.key(42))
+            expected_var = 2.0 / (256 + 128)
+            npt.assert_allclose(jnp.var(gat.w_sender._value), expected_var, rtol=0.1)
+            npt.assert_allclose(jnp.var(gat.w_receiver._value), expected_var, rtol=0.1)
 
     def test_attention_changes_with_features(self, triangle_graph):
         """Different node features produce different attention-weighted outputs."""
