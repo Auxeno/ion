@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.3
+
+- **Attention mask shapes.** `SelfAttention` and `CrossAttention` masks may be `(s, t)`,
+  `(b, s, t)`, or `(b, h, s, t)`. Rank-3 masks now apply per batch element; previously they
+  broadcast over heads, silently misapplying the mask when batch size equalled head count.
+- **Correct ALiBi slopes.** `alibi` uses the paper's geometric head slopes `2^(-8i/n)`.
+  The previous fixed ratio of 0.5 was only correct for 8 heads.
+- **GroupNorm rank handling.** `GroupNorm` normalizes over trailing dimensions like
+  `LayerNorm`, supporting unbatched inputs and arbitrary leading batch dims.
+- **GAT Glorot init.** `GATConv` and `GATv2Conv` multi-head projections initialize with
+  correct Glorot fans; previously variance shrank with head count and input width.
+  Custom `w_init` now receives the flat `(in_dim, out_dim)` shape.
+- **bfloat16 checkpoints.** `save` and `load` round-trip extension dtypes (`bfloat16`,
+  `float8`) exactly; previously they were silently unrecoverable. `load` also appends
+  `.npz` to the path when missing, matching `save`.
+- **Recurrent initial state dtype.** `initial_state` on RNN, LSTM, and GRU cells follows
+  the parameter dtype instead of always returning float32.
+
 ## 0.5.2
 
 - **Per-field optimizer transforms.** `Optimizer` accepts a dict mapping field names
