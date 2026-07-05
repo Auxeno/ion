@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 
 import jax
@@ -116,6 +117,41 @@ class TestSaveLoad:
             loaded = checkpoint.load(f.name, model)
         npt.assert_array_equal(loaded.w._value, model.w._value)
         npt.assert_array_equal(loaded.buf, model.buf)
+
+    def test_bfloat16_roundtrip(self):
+        """bfloat16 params and plain arrays restore with dtype and values intact."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            buf: jax.Array
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (4,)).astype(jnp.bfloat16))
+                self.buf = jnp.array([10.0, 20.0], dtype=jnp.bfloat16)
+
+        model = Model(key=jax.random.key(0))
+        with tempfile.NamedTemporaryFile(suffix=".npz") as f:
+            checkpoint.save(f.name, model)
+            loaded = checkpoint.load(f.name, model)
+        assert loaded.w.dtype == jnp.bfloat16
+        assert loaded.buf.dtype == jnp.bfloat16
+        npt.assert_array_equal(loaded.w._value, model.w._value)
+        npt.assert_array_equal(loaded.buf, model.buf)
+
+    def test_path_without_extension(self):
+        """Both save and load append .npz when the path lacks it."""
+
+        class Model(nn.Module):
+            w: nn.Param
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (4,)))
+
+        model = Model(key=jax.random.key(0))
+        with tempfile.TemporaryDirectory() as d:
+            checkpoint.save(os.path.join(d, "model"), model)
+            loaded = checkpoint.load(os.path.join(d, "model"), model)
+        npt.assert_array_equal(loaded.w._value, model.w._value)
 
 
 class TestSaveLoadCallable:

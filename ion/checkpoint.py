@@ -58,8 +58,19 @@ def save(path: str, pytree: PyTree) -> None:
         elif isinstance(leaf, (jax.Array, np.ndarray)):
             arrays_to_save[key] = np.asarray(leaf)
 
+    # np.savez cannot round-trip extension dtypes (bfloat16, float8); store raw bytes plus name
+    extension_dtypes: dict[str, str] = {}
+    for key, array in arrays_to_save.items():
+        if array.dtype.kind == "V":
+            extension_dtypes[key] = array.dtype.name
+            arrays_to_save[key] = array.view(np.uint8)
+
     metadata = json.dumps(
-        {"format_version": _FORMAT_VERSION, "trainable": trainable_flags}
+        {
+            "format_version": _FORMAT_VERSION,
+            "trainable": trainable_flags,
+            "dtypes": extension_dtypes,
+        }
     ).encode()
     arrays_to_save[_METADATA_KEY] = np.frombuffer(metadata, dtype=np.uint8).copy()
 
@@ -72,7 +83,7 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
     Parameters
     ----------
     path : str
-        Path to a `.npz` file created by `save`.
+        Path to a `.npz` file created by `save` (`.npz` appended if missing).
     reference_pytree : PyTree
         Provides tree structure and non-array leaves; array leaves are replaced.
 
@@ -86,10 +97,15 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
     >>> model = ion.checkpoint.load("model.npz", model)
     """
     leaves_with_paths, tree_def = jtu.tree_flatten_with_path(reference_pytree, is_leaf=is_param)
+
+    # Mirror np.savez, which appends .npz to the path if missing
+    if not path.endswith(".npz"):
+        path += ".npz"
     saved_data = np.load(path)
 
     metadata: dict[str, Any] = json.loads(saved_data[_METADATA_KEY].tobytes())
     trainable_flags: dict[str, bool] = metadata.get("trainable", {})
+    extension_dtypes: dict[str, str] = metadata.get("dtypes", {})
     array_keys_in_file = {k for k in saved_data.files if k != _METADATA_KEY}
 
     expected_keys: set[str] = set()
@@ -106,6 +122,8 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
                     f"Available keys: {sorted(array_keys_in_file)}"
                 )
             saved_array = saved_data[array_key]
+            if array_key in extension_dtypes:
+                saved_array = saved_array.view(extension_dtypes[array_key])
             ref_shape = leaf._value.shape
             if saved_array.shape != ref_shape:
                 raise ValueError(
@@ -131,6 +149,8 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
                     f"Available keys: {sorted(array_keys_in_file)}"
                 )
             saved_array = saved_data[key]
+            if key in extension_dtypes:
+                saved_array = saved_array.view(extension_dtypes[key])
             ref_shape = leaf.shape
             if saved_array.shape != ref_shape:
                 raise ValueError(
