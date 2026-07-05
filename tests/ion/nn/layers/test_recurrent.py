@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import numpy.testing as npt
 
-from ion import nn
+from ion import nn, tree
 
 
 class TestRNNCell:
@@ -49,6 +49,12 @@ class TestRNNCell:
         cell = nn.RNNCell(8, 16, key=jax.random.key(0))
         h = cell.initial_state
         npt.assert_array_equal(h, jnp.zeros(16))
+
+    def test_bfloat16_dtype(self):
+        """A cell cast to bfloat16 yields a bfloat16 initial_state."""
+        cell = tree.astype(nn.RNNCell(8, 16, key=jax.random.key(0)), jnp.bfloat16)
+        assert cell.w_h.dtype == jnp.bfloat16
+        assert cell.initial_state.dtype == jnp.bfloat16
 
     def test_manual_computation(self):
         """Output matches manual computation."""
@@ -124,6 +130,14 @@ class TestRNN:
         y, h_n = rnn(x)
         assert y.shape == (1, 5, 16)
 
+    def test_bfloat16_sequence(self):
+        """An RNN cast to bfloat16 produces bfloat16 outputs from the default initial state."""
+        rnn = tree.astype(nn.RNN(8, 16, key=jax.random.key(0)), jnp.bfloat16)
+        x = jnp.ones((2, 5, 8), dtype=jnp.bfloat16)
+        y, h_n = rnn(x)
+        assert y.dtype == jnp.bfloat16
+        assert h_n.dtype == jnp.bfloat16
+
 
 class TestLSTMCell:
     def test_output_shape(self):
@@ -181,6 +195,14 @@ class TestLSTMCell:
         h, c = cell.initial_state
         npt.assert_array_equal(h, jnp.zeros(16))
         npt.assert_array_equal(c, jnp.zeros(16))
+
+    def test_bfloat16_dtype(self):
+        """A cell cast to bfloat16 yields a bfloat16 initial_state."""
+        cell = tree.astype(nn.LSTMCell(8, 16, key=jax.random.key(0)), jnp.bfloat16)
+        assert cell.w_h.dtype == jnp.bfloat16
+        h, c = cell.initial_state
+        assert h.dtype == jnp.bfloat16
+        assert c.dtype == jnp.bfloat16
 
     def test_manual_computation(self):
         """Output matches manual gate computation."""
@@ -251,6 +273,12 @@ class TestGRUCell:
         cell = nn.GRUCell(8, 16, key=jax.random.key(0))
         h = cell.initial_state
         npt.assert_array_equal(h, jnp.zeros(16))
+
+    def test_bfloat16_dtype(self):
+        """A cell cast to bfloat16 yields a bfloat16 initial_state."""
+        cell = tree.astype(nn.GRUCell(8, 16, key=jax.random.key(0)), jnp.bfloat16)
+        assert cell.w_h.dtype == jnp.bfloat16
+        assert cell.initial_state.dtype == jnp.bfloat16
 
     def test_manual_computation(self):
         """Output matches manual gate computation."""

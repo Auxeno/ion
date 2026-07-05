@@ -68,7 +68,7 @@ class RNNCell(Module):
 
     @property
     def initial_state(self) -> Float[Array, " h"]:
-        return jnp.zeros(self.w_h.shape[0])
+        return jnp.zeros(self.w_h.shape[0], dtype=self.w_h.dtype)
 
 
 class RNN(Module):
@@ -183,7 +183,7 @@ class LSTMCell(Module):
     @property
     def initial_state(self) -> tuple[Float[Array, " h"], Float[Array, " h"]]:
         hd = self.w_h.shape[0]
-        return (jnp.zeros(hd), jnp.zeros(hd))
+        return (jnp.zeros(hd, dtype=self.w_h.dtype), jnp.zeros(hd, dtype=self.w_h.dtype))
 
 
 class LSTM(Module):
@@ -295,7 +295,7 @@ class GRUCell(Module):
 
     @property
     def initial_state(self) -> Float[Array, " h"]:
-        return jnp.zeros(self.w_h.shape[0])
+        return jnp.zeros(self.w_h.shape[0], dtype=self.w_h.dtype)
 
 
 class GRU(Module):
