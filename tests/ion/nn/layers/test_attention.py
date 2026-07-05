@@ -110,13 +110,14 @@ class TestSelfAttention:
         y = layer(x, mask=mask)
         assert y.shape == (2, 4, 8)
 
-    def test_mask_hss(self):
-        """(h, s, s) mask broadcasts across batch."""
+    def test_mask_bss(self):
+        """(b, s, s) mask applies per batch, shared across heads."""
         layer = nn.SelfAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 4, 8))
+        # b == num_heads: regression for rank-3 masks broadcasting onto the head axis
         mask = jnp.ones((2, 4, 4), dtype=bool).at[0, 0, 1].set(False)
         y = layer(x, mask=mask)
-        assert y.shape == (2, 4, 8)
+        npt.assert_array_equal(y, layer(x, mask=mask[:, None]))
 
     def test_mask_bhss(self):
         """(b, h, s, s) per-head mask works with batched input."""
@@ -230,14 +231,15 @@ class TestCrossAttention:
         y = layer(x, ctx, mask=mask)
         assert y.shape == (2, 3, 8)
 
-    def test_mask_hst(self):
-        """(h, s, t) mask broadcasts across batch."""
+    def test_mask_bst(self):
+        """(b, s, t) mask applies per batch, shared across heads."""
         layer = nn.CrossAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 3, 8))
         ctx = jax.random.normal(jax.random.key(2), (2, 5, 8))
+        # b == num_heads: regression for rank-3 masks broadcasting onto the head axis
         mask = jnp.ones((2, 3, 5), dtype=bool).at[0, 0, 0].set(False)
         y = layer(x, ctx, mask=mask)
-        assert y.shape == (2, 3, 8)
+        npt.assert_array_equal(y, layer(x, ctx, mask=mask[:, None]))
 
     def test_mask_bhst(self):
         """(b, h, s, t) per-head mask works with batched input."""

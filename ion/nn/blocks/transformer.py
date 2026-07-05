@@ -67,7 +67,7 @@ class TransformerBlock(Module):
     def __call__(
         self,
         x: Float[Array, "b s d"],
-        mask: Bool[Array, "b s s"] | Bool[Array, "b 1 s s"] | None = None,
+        mask: Bool[Array, "s s"] | Bool[Array, "b s s"] | Bool[Array, "b h s s"] | None = None,
     ) -> Float[Array, "b s d"]:
 
         residual = x
@@ -90,7 +90,7 @@ class CrossTransformerBlock(Module):
 
     >>> block = CrossTransformerBlock(64, num_heads=8, key=key)
     >>> block(x, context)  # (b, s, 64), (b, t, 64) -> (b, s, 64)
-    >>> block(x, context, mask=mask)  # mask: bool (b, s, t) or (b, 1, s, t)
+    >>> block(x, context, mask=mask)  # mask: bool (s, t), (b, s, t) or (b, h, s, t)
     """
 
     att: CrossAttention
@@ -130,7 +130,7 @@ class CrossTransformerBlock(Module):
         self,
         x: Float[Array, "b s d"],
         context: Float[Array, "b t d"],
-        mask: Bool[Array, "b s t"] | Bool[Array, "b 1 s t"] | None = None,
+        mask: Bool[Array, "s t"] | Bool[Array, "b s t"] | Bool[Array, "b h s t"] | None = None,
     ) -> Float[Array, "b s d"]:
 
         residual = x

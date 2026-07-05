@@ -7,6 +7,7 @@ Modules:
 Truncated normal weight init (std=0.02), zeros for bias.
 QKV fused into a single weight matrix for self-attention.
 Optional boolean mask: True = attend, False = ignore.
+Masks may be (s, t) shared, (b, s, t) per batch, or (b, h, s, t) per head.
 """
 
 import jax
@@ -23,7 +24,7 @@ class SelfAttention(Module):
 
     >>> attn = SelfAttention(64, num_heads=8, key=key)
     >>> attn(x)  # (b, seq, 64) -> (b, seq, 64)
-    >>> attn(x, mask=mask)  # mask: bool (s, s) or (b, h, s, s)
+    >>> attn(x, mask=mask)  # mask: bool (s, s), (b, s, s) or (b, h, s, s)
     """
 
     w_qkv: Param[Float[Array, "d 3 h k"]]
@@ -58,7 +59,7 @@ class SelfAttention(Module):
     def __call__(
         self,
         x: Float[Array, "b s d"],
-        mask: Bool[Array, "s s"] | Bool[Array, "b h s s"] | None = None,
+        mask: Bool[Array, "s s"] | Bool[Array, "b s s"] | Bool[Array, "b h s s"] | None = None,
     ) -> Float[Array, "b s d"]:
 
         b, s, d = x.shape
@@ -73,6 +74,8 @@ class SelfAttention(Module):
             logits = jnp.where(causal_mask, logits, -jnp.inf)
 
         if mask is not None:
+            if mask.ndim == 3:
+                mask = mask[:, None]
             logits = jnp.where(mask, logits, -jnp.inf)
 
         attention = jax.nn.softmax(logits, axis=-1)
@@ -91,7 +94,7 @@ class CrossAttention(Module):
 
     >>> attn = CrossAttention(64, num_heads=8, key=key)
     >>> attn(x, context)  # (b, s, 64), (b, t, 64) -> (b, s, 64)
-    >>> attn(x, context, mask=mask)  # mask: bool (s, t) or (b, h, s, t)
+    >>> attn(x, context, mask=mask)  # mask: bool (s, t), (b, s, t) or (b, h, s, t)
     """
 
     w_q: Param[Float[Array, "d h k"]]
@@ -125,7 +128,7 @@ class CrossAttention(Module):
         self,
         x: Float[Array, "b s d"],
         context: Float[Array, "b t d"],
-        mask: Bool[Array, "s t"] | Bool[Array, "b h s t"] | None = None,
+        mask: Bool[Array, "s t"] | Bool[Array, "b s t"] | Bool[Array, "b h s t"] | None = None,
     ) -> Float[Array, "b s d"]:
 
         b, s, d = x.shape
@@ -137,6 +140,8 @@ class CrossAttention(Module):
         logits = jnp.einsum("bshk, bthk -> bhst", q, k) / jnp.sqrt(self.w_q.shape[-1])
 
         if mask is not None:
+            if mask.ndim == 3:
+                mask = mask[:, None]
             logits = jnp.where(mask, logits, -jnp.inf)
 
         attention = jax.nn.softmax(logits, axis=-1)
