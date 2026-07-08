@@ -664,7 +664,7 @@ class TestOptimizerRepr:
 class TestMixedPrecision:
     def test_mixed_precision_step(self):
         """bf16 compute in the loss keeps float32 grads and float32 master params."""
-        model = nn.MLP(8, 1, 16, 1, key=jax.random.key(0))
+        model = nn.MLP([8, 16, 1], key=jax.random.key(0))
         x = jnp.ones((4, 8), dtype=jnp.bfloat16)
         y = jnp.ones((4, 1), dtype=jnp.bfloat16)
 

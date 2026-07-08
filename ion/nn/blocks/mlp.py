@@ -1,13 +1,13 @@
 """Multi-layer perceptron blocks.
 
 Modules:
-    MLP  Fully connected network with configurable depth and activation.
+    MLP  Fully connected network with configurable layer dimensions and activation.
 
 He normal weight init, zeros for bias. Assumes ReLU activation.
 No activation on the final layer by default.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 import jax
 from jax.nn.initializers import Initializer
@@ -18,9 +18,12 @@ from ..module import Module
 
 
 class MLP(Module):
-    """Multi-layer perceptron with configurable hidden layers and activation.
+    """Multi-layer perceptron with configurable layer dimensions and activation.
 
-    >>> mlp = MLP(3, 1, hidden_dim=64, num_hidden_layers=2, key=key)
+    `dims` lists every layer width from input to output: `[3, 64, 64, 1]` is a
+    network with two hidden layers of 64, and `[3, 1]` is a single linear layer.
+
+    >>> mlp = MLP([3, 64, 64, 1], key=key)
     >>> mlp(x)  # (*, 3) -> (*, 1)
     """
 
@@ -30,10 +33,7 @@ class MLP(Module):
 
     def __init__(
         self,
-        in_dim: int,
-        out_dim: int,
-        hidden_dim: int,
-        num_hidden_layers: int,
+        dims: Sequence[int],
         activation: Callable[[Array], Array] = jax.nn.relu,
         final_activation: Callable[[Array], Array] | None = None,
         bias: bool = True,
@@ -43,21 +43,16 @@ class MLP(Module):
         key: PRNGKeyArray,
     ) -> None:
 
-        if num_hidden_layers < 0:
-            raise ValueError(f"num_hidden_layers ({num_hidden_layers}) must be >= 0")
+        if len(dims) < 2:
+            raise ValueError(
+                f"dims must contain at least an input and output dim, got {list(dims)}"
+            )
 
-        if num_hidden_layers == 0:
-            keys = jax.random.split(key, 1)
-            layers = [Linear(in_dim, out_dim, bias, w_init, b_init, key=keys[0])]
-        else:
-            keys = jax.random.split(key, num_hidden_layers + 1)
-            layers = []
-            layers.append(Linear(in_dim, hidden_dim, bias, w_init, b_init, key=keys[0]))
-            for i in range(num_hidden_layers - 1):
-                layers.append(Linear(hidden_dim, hidden_dim, bias, w_init, b_init, key=keys[i + 1]))
-            layers.append(Linear(hidden_dim, out_dim, bias, w_init, b_init, key=keys[-1]))
-
-        self.layers = tuple(layers)
+        keys = jax.random.split(key, len(dims) - 1)
+        self.layers = tuple(
+            Linear(d_in, d_out, bias, w_init, b_init, key=layer_key)
+            for d_in, d_out, layer_key in zip(dims[:-1], dims[1:], keys)
+        )
         self.activation = activation
         self.final_activation = final_activation
 

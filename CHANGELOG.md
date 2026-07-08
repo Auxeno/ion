@@ -14,6 +14,13 @@
 - SSM layers (LRU, S4D, S5) keep their `complex64` recurrent state, and the `sinusoidal`,
   `alibi`, and `rope` positional-encoding functions keep their `dtype` argument (they build
   arrays rather than parameters).
+- **Breaking: `MLP` takes a single `dims` sequence.** `MLP(in_dim, out_dim, hidden_dim,
+  num_hidden_layers, ...)` is now `MLP(dims, ...)` where `dims` lists every layer width
+  from input to output: `MLP([3, 64, 64, 1], key=key)` builds two hidden layers of 64.
+  Hidden widths may now vary per layer (`MLP([784, 512, 128, 10], key=key)`), and a single
+  linear layer is `MLP([3, 1], key=key)`.
+- **Migration.** `MLP(i, o, h, n, ...)` becomes `MLP([i, *[h] * n, o], ...)`. All other
+  arguments (`activation`, `final_activation`, `bias`, initializers, `key`) are unchanged.
 
 ## 0.5.3
 

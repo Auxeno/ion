@@ -23,8 +23,8 @@ class ActorCritic(nn.Module):
 
     def __init__(self, obs_dim: int, action_dim: int, *, key: PRNGKeyArray) -> None:
         key_a, key_c = jax.random.split(key)
-        self.actor = nn.MLP(obs_dim, action_dim, 64, 2, activation=jax.nn.tanh, key=key_a)
-        self.critic = nn.MLP(obs_dim, 1, 64, 2, activation=jax.nn.tanh, key=key_c)
+        self.actor = nn.MLP([obs_dim, 64, 64, action_dim], activation=jax.nn.tanh, key=key_a)
+        self.critic = nn.MLP([obs_dim, 64, 64, 1], activation=jax.nn.tanh, key=key_c)
 
     def get_action(
         self,
