@@ -57,7 +57,6 @@ class LRUCell(Module):
         r_min: float = 0.0,
         r_max: float = 1.0,
         max_phase: float = 2 * pi,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.glorot_normal(),
         d_init: Initializer = jax.nn.initializers.zeros,
         *,
@@ -71,7 +70,7 @@ class LRUCell(Module):
         self.C = Param(w_init(shape=(hidden_dim, in_dim), dtype=jnp.complex64, key=key_c))
 
         # Skip connection: maps input directly to output, bypassing the recurrence
-        self.D = Param(d_init(shape=(in_dim,), dtype=dtype, key=key_d))
+        self.D = Param(d_init(shape=(in_dim,), key=key_d))
 
         # Eigenvalue magnitudes sampled uniformly on annulus [r_min, r_max]
         u1 = jax.random.uniform(key_nu, shape=(hidden_dim,))
@@ -80,10 +79,10 @@ class LRUCell(Module):
         theta_log = jnp.log(max_phase * u2)
 
         # Diagonal eigenvalues: nu decay magnitude, theta phase rotation, gamma normalization
-        self.nu_log = Param(nu_log.astype(dtype))
-        self.theta_log = Param(theta_log.astype(dtype))
+        self.nu_log = Param(nu_log)
+        self.theta_log = Param(theta_log)
         A = jnp.exp(-jnp.exp(self.nu_log) + 1j * jnp.exp(self.theta_log))
-        self.gamma_log = Param(jnp.log(jnp.sqrt(1 - jnp.abs(A) ** 2)).astype(dtype))
+        self.gamma_log = Param(jnp.log(jnp.sqrt(1 - jnp.abs(A) ** 2)))
 
     @property
     def initial_state(self) -> Complex[Array, " h"]:
@@ -119,16 +118,13 @@ class LRU(Module):
         r_min: float = 0.0,
         r_max: float = 1.0,
         max_phase: float = 2 * pi,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.glorot_normal(),
         d_init: Initializer = jax.nn.initializers.zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
 
-        self.cell = LRUCell(
-            in_dim, hidden_dim, r_min, r_max, max_phase, dtype, w_init, d_init, key=key
-        )
+        self.cell = LRUCell(in_dim, hidden_dim, r_min, r_max, max_phase, w_init, d_init, key=key)
 
     def __call__(
         self,
@@ -173,7 +169,6 @@ class S4DCell(Module):
         state_dim: int,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.glorot_normal(),
         d_init: Initializer = jax.nn.initializers.zeros,
         *,
@@ -186,20 +181,20 @@ class S4DCell(Module):
         h = state_dim // 2
 
         # Eigenvalues at harmonics (-1/2 + i*pi*n) so each state captures a different frequency
-        self.A_log_re = Param(jnp.full((in_dim, h), jnp.log(0.5), dtype=dtype))
-        self.A_im = Param(jnp.broadcast_to((pi * jnp.arange(h)).astype(dtype), (in_dim, h)).copy())
+        self.A_log_re = Param(jnp.full((in_dim, h), jnp.log(0.5)))
+        self.A_im = Param(jnp.broadcast_to(pi * jnp.arange(h), (in_dim, h)).copy())
 
         # C projects each feature's hidden state to a scalar output
         self.C = Param(w_init(shape=(in_dim, h), dtype=jnp.complex64, key=key_c))
 
         # Skip connection
-        self.D = Param(d_init(shape=(in_dim,), dtype=dtype, key=key_d))
+        self.D = Param(d_init(shape=(in_dim,), key=key_d))
 
         # Learnable timestep controlling how finely each feature samples continuous dynamics
         log_dt = jax.random.uniform(
             shape=(in_dim,), minval=jnp.log(dt_min), maxval=jnp.log(dt_max), key=key_dt
         )
-        self.log_dt = Param(log_dt.astype(dtype))
+        self.log_dt = Param(log_dt)
 
     @property
     def initial_state(self) -> Complex[Array, "i h"]:
@@ -241,14 +236,13 @@ class S4D(Module):
         state_dim: int,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.glorot_normal(),
         d_init: Initializer = jax.nn.initializers.zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
 
-        self.cell = S4DCell(in_dim, state_dim, dt_min, dt_max, dtype, w_init, d_init, key=key)
+        self.cell = S4DCell(in_dim, state_dim, dt_min, dt_max, w_init, d_init, key=key)
 
     def __call__(
         self,
@@ -296,7 +290,6 @@ class S5Cell(Module):
         state_dim: int,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.glorot_normal(),
         d_init: Initializer = jax.nn.initializers.zeros,
         *,
@@ -309,21 +302,21 @@ class S5Cell(Module):
         h = state_dim // 2
 
         # Eigenvalues at harmonics (-1/2 + i*pi*n) so each state captures a different frequency
-        self.A_log_re = Param(jnp.full(h, jnp.log(0.5), dtype=dtype))
-        self.A_im = Param((pi * jnp.arange(h)).astype(dtype))
+        self.A_log_re = Param(jnp.full(h, jnp.log(0.5)))
+        self.A_im = Param(pi * jnp.arange(h))
 
         # Dense complex projections: B maps input to shared state, C maps state to output
         self.B = Param(w_init(shape=(in_dim, h), dtype=jnp.complex64, key=key_b))
         self.C = Param(w_init(shape=(h, in_dim), dtype=jnp.complex64, key=key_c))
 
         # Skip connection
-        self.D = Param(d_init(shape=(in_dim,), dtype=dtype, key=key_d))
+        self.D = Param(d_init(shape=(in_dim,), key=key_d))
 
         # Learnable timestep controlling how finely each state samples continuous dynamics
         log_dt = jax.random.uniform(
             shape=(h,), minval=jnp.log(dt_min), maxval=jnp.log(dt_max), key=key_dt
         )
-        self.log_dt = Param(log_dt.astype(dtype))
+        self.log_dt = Param(log_dt)
 
     @property
     def initial_state(self) -> Complex[Array, " h"]:
@@ -365,14 +358,13 @@ class S5(Module):
         state_dim: int,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.glorot_normal(),
         d_init: Initializer = jax.nn.initializers.zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
 
-        self.cell = S5Cell(in_dim, state_dim, dt_min, dt_max, dtype, w_init, d_init, key=key)
+        self.cell = S5Cell(in_dim, state_dim, dt_min, dt_max, w_init, d_init, key=key)
 
     def __call__(
         self,

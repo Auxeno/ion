@@ -56,9 +56,9 @@ class TestSelfAttention:
         # Truncated normal: no values beyond 2 sigma
         assert jnp.all(jnp.abs(layer.w_qkv._value) <= 0.04 + 1e-6)
 
-    def test_weight_dtype(self):
-        """Weights match the requested dtype."""
-        layer = nn.SelfAttention(8, num_heads=2, dtype=jnp.float32, key=jax.random.key(0))
+    def test_default_dtype(self):
+        """Weights default to float32."""
+        layer = nn.SelfAttention(8, num_heads=2, key=jax.random.key(0))
         assert layer.w_qkv.dtype == jnp.float32
         assert layer.w_out.dtype == jnp.float32
 
@@ -186,9 +186,9 @@ class TestCrossAttention:
         y2 = layer(x, ctx2)
         assert not jnp.allclose(y1, y2)
 
-    def test_weight_dtype(self):
-        """Weights match the requested dtype."""
-        layer = nn.CrossAttention(8, num_heads=2, dtype=jnp.float32, key=jax.random.key(0))
+    def test_default_dtype(self):
+        """Weights default to float32."""
+        layer = nn.CrossAttention(8, num_heads=2, key=jax.random.key(0))
         assert layer.w_q.dtype == jnp.float32
         assert layer.w_kv.dtype == jnp.float32
         assert layer.w_out.dtype == jnp.float32

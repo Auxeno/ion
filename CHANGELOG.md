@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.0
+
+- **Breaking: `dtype` removed from all layer and block constructors.** Parameters are now
+  created in JAX's default float dtype (`float32`, or `float64` under `jax_enable_x64`).
+  Control precision with `model.astype(...)` / `ion.astype(...)` instead: keep float32 master
+  params and cast to `bfloat16` inside the loss for mixed-precision training, or cast once for
+  full low-precision inference. See the new precision section in
+  [internals.md](docs/internals.md).
+- **Migration.** Drop any `dtype=...` argument from layer construction. Because `dtype` was a
+  positional parameter (before the initializer arguments), code passing later arguments
+  positionally must drop the `dtype` slot too; keyword arguments are unaffected.
+- SSM layers (LRU, S4D, S5) keep their `complex64` recurrent state, and the `sinusoidal`,
+  `alibi`, and `rope` positional-encoding functions keep their `dtype` argument (they build
+  arrays rather than parameters).
+
 ## 0.5.3
 
 - **Attention mask shapes.** `SelfAttention` and `CrossAttention` masks may be `(s, t)`,

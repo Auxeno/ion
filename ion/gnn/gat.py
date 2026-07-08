@@ -43,7 +43,6 @@ class GATConv(Module):
         edge_dim: int | None = None,
         negative_slope: float = 0.2,
         bias: bool = True,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.glorot_uniform(),
         att_init: Initializer = jax.nn.initializers.glorot_uniform(),
         b_init: Initializer = jax.nn.initializers.zeros,
@@ -58,16 +57,16 @@ class GATConv(Module):
         head_dim = out_dim // num_heads
 
         # Initialize projections flat so Glorot fans are (in_dim, out_dim), then split heads
-        w = w_init(shape=(in_dim, out_dim), dtype=dtype, key=key_w)
+        w = w_init(shape=(in_dim, out_dim), key=key_w)
         self.w = Param(w.reshape(in_dim, num_heads, head_dim))
-        self.att_sender = Param(att_init(shape=(num_heads, head_dim), dtype=dtype, key=key_att_s))
-        self.att_receiver = Param(att_init(shape=(num_heads, head_dim), dtype=dtype, key=key_att_r))
-        self.b = Param(b_init(shape=(out_dim,), dtype=dtype, key=key_b)) if bias else None
+        self.att_sender = Param(att_init(shape=(num_heads, head_dim), key=key_att_s))
+        self.att_receiver = Param(att_init(shape=(num_heads, head_dim), key=key_att_r))
+        self.b = Param(b_init(shape=(out_dim,), key=key_b)) if bias else None
 
         if edge_dim is not None:
-            w_edge = w_init(shape=(edge_dim, out_dim), dtype=dtype, key=key_w_e)
+            w_edge = w_init(shape=(edge_dim, out_dim), key=key_w_e)
             self.w_edge = Param(w_edge.reshape(edge_dim, num_heads, head_dim))
-            self.att_edge = Param(att_init(shape=(num_heads, head_dim), dtype=dtype, key=key_att_e))
+            self.att_edge = Param(att_init(shape=(num_heads, head_dim), key=key_att_e))
         else:
             self.w_edge = None
             self.att_edge = None
@@ -150,7 +149,6 @@ class GATv2Conv(Module):
         edge_dim: int | None = None,
         negative_slope: float = 0.2,
         bias: bool = True,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.glorot_uniform(),
         att_init: Initializer = jax.nn.initializers.glorot_uniform(),
         b_init: Initializer = jax.nn.initializers.zeros,
@@ -165,15 +163,15 @@ class GATv2Conv(Module):
         head_dim = out_dim // num_heads
 
         # Initialize projections flat so Glorot fans are (in_dim, out_dim), then split heads
-        w_sender = w_init(shape=(in_dim, out_dim), dtype=dtype, key=key_ws)
+        w_sender = w_init(shape=(in_dim, out_dim), key=key_ws)
         self.w_sender = Param(w_sender.reshape(in_dim, num_heads, head_dim))
-        w_receiver = w_init(shape=(in_dim, out_dim), dtype=dtype, key=key_wr)
+        w_receiver = w_init(shape=(in_dim, out_dim), key=key_wr)
         self.w_receiver = Param(w_receiver.reshape(in_dim, num_heads, head_dim))
-        self.att = Param(att_init(shape=(num_heads, head_dim), dtype=dtype, key=key_att))
-        self.b = Param(b_init(shape=(out_dim,), dtype=dtype, key=key_b)) if bias else None
+        self.att = Param(att_init(shape=(num_heads, head_dim), key=key_att))
+        self.b = Param(b_init(shape=(out_dim,), key=key_b)) if bias else None
 
         if edge_dim is not None:
-            w_edge = w_init(shape=(edge_dim, out_dim), dtype=dtype, key=key_we)
+            w_edge = w_init(shape=(edge_dim, out_dim), key=key_we)
             self.w_edge = Param(w_edge.reshape(edge_dim, num_heads, head_dim))
         else:
             self.w_edge = None

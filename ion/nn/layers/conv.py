@@ -44,7 +44,6 @@ class Conv(Module):
         dilation: int | tuple[int, ...] = 1,
         groups: int = 1,
         bias: bool = True,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.he_normal(),
         b_init: Initializer = jax.nn.initializers.zeros,
         *,
@@ -80,11 +79,9 @@ class Conv(Module):
 
         key_w, key_b = jax.random.split(key)
         self.w = Param(
-            w_init(
-                shape=(*kernel_shape, in_channels // groups, out_channels), dtype=dtype, key=key_w
-            )
+            w_init(shape=(*kernel_shape, in_channels // groups, out_channels), key=key_w)
         )
-        self.b = Param(b_init(shape=(out_channels,), dtype=dtype, key=key_b)) if bias else None
+        self.b = Param(b_init(shape=(out_channels,), key=key_b)) if bias else None
 
     def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
 
@@ -136,7 +133,6 @@ class ConvTranspose(Module):
         dilation: int | tuple[int, ...] = 1,
         groups: int = 1,
         bias: bool = True,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.he_normal(),
         b_init: Initializer = jax.nn.initializers.zeros,
         *,
@@ -199,11 +195,9 @@ class ConvTranspose(Module):
 
         key_w, key_b = jax.random.split(key)
         self.w = Param(
-            w_init(
-                shape=(*kernel_shape, in_channels // groups, out_channels), dtype=dtype, key=key_w
-            )
+            w_init(shape=(*kernel_shape, in_channels // groups, out_channels), key=key_w)
         )
-        self.b = Param(b_init(shape=(out_channels,), dtype=dtype, key=key_b)) if bias else None
+        self.b = Param(b_init(shape=(out_channels,), key=key_b)) if bias else None
 
     def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
 

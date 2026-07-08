@@ -47,6 +47,16 @@ class TestLRUCell:
         cell = nn.LRUCell(8, 16, key=jax.random.key(0))
         assert cell.initial_state.dtype == jnp.complex64
 
+    def test_x64_complex_stays_complex64(self):
+        """Under x64, B/C stay complex64 while real params become float64."""
+        with jax.enable_x64(True):
+            cell = nn.LRUCell(4, 8, key=jax.random.key(0))
+            assert cell.B.dtype == jnp.complex64
+            assert cell.C.dtype == jnp.complex64
+            assert cell.D.dtype == jnp.float64
+            assert cell.nu_log.dtype == jnp.float64
+            assert cell.gamma_log.dtype == jnp.float64
+
     def test_eigenvalue_magnitude_bounds(self):
         """Eigenvalue magnitudes lie in [r_min, r_max] after initialization."""
         r_min, r_max = 0.5, 0.9
@@ -327,6 +337,15 @@ class TestS5Cell:
         """initial_state has complex64 dtype."""
         cell = nn.S5Cell(8, 8, key=jax.random.key(0))
         assert cell.initial_state.dtype == jnp.complex64
+
+    def test_x64_complex_stays_complex64(self):
+        """Under x64, B/C stay complex64 while real params become float64."""
+        with jax.enable_x64(True):
+            cell = nn.S5Cell(4, 8, key=jax.random.key(0))
+            assert cell.B.dtype == jnp.complex64
+            assert cell.A_log_re.dtype == jnp.float64
+            assert cell.A_im.dtype == jnp.float64
+            assert cell.log_dt.dtype == jnp.float64
 
     def test_stability(self):
         """Continuous A has strictly negative real parts (stable dynamics)."""

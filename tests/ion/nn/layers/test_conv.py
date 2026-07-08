@@ -65,9 +65,9 @@ class TestConv:
         layer = nn.Conv(3, 8, kernel_shape=(3,), key=jax.random.key(0))
         assert jnp.all(layer.b == 0)
 
-    def test_1d_weight_dtype(self):
-        """Weights match the requested dtype."""
-        layer = nn.Conv(3, 8, kernel_shape=(3,), dtype=jnp.float32, key=jax.random.key(0))
+    def test_1d_default_dtype(self):
+        """Weights default to float32."""
+        layer = nn.Conv(3, 8, kernel_shape=(3,), key=jax.random.key(0))
         assert layer.w.dtype == jnp.float32
 
     def test_1d_groups_output_shape(self):
@@ -151,9 +151,9 @@ class TestConv:
         layer = nn.Conv(3, 8, kernel_shape=(3, 3), key=jax.random.key(0))
         assert jnp.all(layer.b == 0)
 
-    def test_2d_weight_dtype(self):
-        """Weights match the requested dtype."""
-        layer = nn.Conv(3, 8, kernel_shape=(3, 3), dtype=jnp.float32, key=jax.random.key(0))
+    def test_2d_default_dtype(self):
+        """Weights default to float32."""
+        layer = nn.Conv(3, 8, kernel_shape=(3, 3), key=jax.random.key(0))
         assert layer.w.dtype == jnp.float32
 
     def test_2d_groups_output_shape(self):
@@ -267,9 +267,9 @@ class TestConvTranspose:
         layer = nn.ConvTranspose(3, 8, kernel_shape=(3,), key=jax.random.key(0))
         assert jnp.all(layer.b == 0)
 
-    def test_1d_weight_dtype(self):
-        """Weights match the requested dtype."""
-        layer = nn.ConvTranspose(3, 8, kernel_shape=(3,), dtype=jnp.float32, key=jax.random.key(0))
+    def test_1d_default_dtype(self):
+        """Weights default to float32."""
+        layer = nn.ConvTranspose(3, 8, kernel_shape=(3,), key=jax.random.key(0))
         assert layer.w.dtype == jnp.float32
 
     def test_1d_groups_output_shape(self):
@@ -373,11 +373,9 @@ class TestConvTranspose:
         layer = nn.ConvTranspose(3, 8, kernel_shape=(3, 3), key=jax.random.key(0))
         assert jnp.all(layer.b == 0)
 
-    def test_2d_weight_dtype(self):
-        """Weights match the requested dtype."""
-        layer = nn.ConvTranspose(
-            3, 8, kernel_shape=(3, 3), dtype=jnp.float32, key=jax.random.key(0)
-        )
+    def test_2d_default_dtype(self):
+        """Weights default to float32."""
+        layer = nn.ConvTranspose(3, 8, kernel_shape=(3, 3), key=jax.random.key(0))
         assert layer.w.dtype == jnp.float32
 
     def test_2d_groups_output_shape(self):

@@ -10,7 +10,6 @@ No activation on the final layer by default.
 from collections.abc import Callable
 
 import jax
-import jax.numpy as jnp
 from jax.nn.initializers import Initializer
 from jaxtyping import Array, Float, PRNGKeyArray
 
@@ -38,7 +37,6 @@ class MLP(Module):
         activation: Callable[[Array], Array] = jax.nn.relu,
         final_activation: Callable[[Array], Array] | None = None,
         bias: bool = True,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.he_normal(),
         b_init: Initializer = jax.nn.initializers.zeros,
         *,
@@ -50,16 +48,14 @@ class MLP(Module):
 
         if num_hidden_layers == 0:
             keys = jax.random.split(key, 1)
-            layers = [Linear(in_dim, out_dim, bias, dtype, w_init, b_init, key=keys[0])]
+            layers = [Linear(in_dim, out_dim, bias, w_init, b_init, key=keys[0])]
         else:
             keys = jax.random.split(key, num_hidden_layers + 1)
             layers = []
-            layers.append(Linear(in_dim, hidden_dim, bias, dtype, w_init, b_init, key=keys[0]))
+            layers.append(Linear(in_dim, hidden_dim, bias, w_init, b_init, key=keys[0]))
             for i in range(num_hidden_layers - 1):
-                layers.append(
-                    Linear(hidden_dim, hidden_dim, bias, dtype, w_init, b_init, key=keys[i + 1])
-                )
-            layers.append(Linear(hidden_dim, out_dim, bias, dtype, w_init, b_init, key=keys[-1]))
+                layers.append(Linear(hidden_dim, hidden_dim, bias, w_init, b_init, key=keys[i + 1]))
+            layers.append(Linear(hidden_dim, out_dim, bias, w_init, b_init, key=keys[-1]))
 
         self.layers = tuple(layers)
         self.activation = activation

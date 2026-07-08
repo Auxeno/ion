@@ -30,13 +30,12 @@ class LearnedPositionalEmbedding(Module):
         self,
         max_len: int,
         dim: int,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.truncated_normal(0.02),
         *,
         key: PRNGKeyArray,
     ) -> None:
 
-        self.w = Param(w_init(shape=(max_len, dim), dtype=dtype, key=key))
+        self.w = Param(w_init(shape=(max_len, dim), key=key))
 
     def __call__(self, x: Float[Array, "... s d"]) -> Float[Array, "... s d"]:
 

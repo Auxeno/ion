@@ -39,10 +39,10 @@ class TestLinear:
         layer = nn.Linear(8, 16, key=key)
         assert jnp.all(layer.b == 0)
 
-    def test_weight_dtype(self):
-        """Weights match the requested dtype."""
+    def test_default_dtype(self):
+        """Weights default to float32."""
         key = jax.random.key(0)
-        layer = nn.Linear(8, 16, dtype=jnp.float32, key=key)
+        layer = nn.Linear(8, 16, key=key)
         assert layer.w.dtype == jnp.float32
 
 

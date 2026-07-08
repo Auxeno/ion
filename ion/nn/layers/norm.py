@@ -28,10 +28,10 @@ class LayerNorm(Module):
     b: Param[Float[Array, " d"]]
     eps: float
 
-    def __init__(self, dim: int, eps: float = 1e-5, dtype: jnp.dtype = jnp.float32) -> None:
+    def __init__(self, dim: int, eps: float = 1e-5) -> None:
 
-        self.scale = Param(jnp.ones(dim, dtype=dtype))
-        self.b = Param(jnp.zeros(dim, dtype=dtype))
+        self.scale = Param(jnp.ones(dim))
+        self.b = Param(jnp.zeros(dim))
 
         self.eps = eps
 
@@ -67,14 +67,13 @@ class GroupNorm(Module):
         num_groups: int,
         num_spatial_dims: int = 0,
         eps: float = 1e-5,
-        dtype: jnp.dtype = jnp.float32,
     ) -> None:
 
         if dim % num_groups != 0:
             raise ValueError(f"dim ({dim}) must be divisible by num_groups ({num_groups})")
 
-        self.scale = Param(jnp.ones(dim, dtype=dtype))
-        self.b = Param(jnp.zeros(dim, dtype=dtype))
+        self.scale = Param(jnp.ones(dim))
+        self.b = Param(jnp.zeros(dim))
 
         self.num_groups = num_groups
         self.num_spatial_dims = num_spatial_dims
@@ -112,9 +111,9 @@ class RMSNorm(Module):
     scale: Param[Float[Array, " d"]]
     eps: float
 
-    def __init__(self, dim: int, eps: float = 1e-5, dtype: jnp.dtype = jnp.float32) -> None:
+    def __init__(self, dim: int, eps: float = 1e-5) -> None:
 
-        self.scale = Param(jnp.ones(dim, dtype=dtype))
+        self.scale = Param(jnp.ones(dim))
         self.eps = eps
 
     def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:

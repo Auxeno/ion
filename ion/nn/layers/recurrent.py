@@ -41,7 +41,6 @@ class RNNCell(Module):
         in_dim: int,
         hidden_dim: int,
         bias: bool = True,
-        dtype: jnp.dtype = jnp.float32,
         w_i_init: Initializer = jax.nn.initializers.glorot_uniform(),
         w_h_init: Initializer = jax.nn.initializers.orthogonal(),
         b_init: Initializer = jax.nn.initializers.zeros,
@@ -50,9 +49,9 @@ class RNNCell(Module):
     ) -> None:
 
         key_wi, key_wh, key_b = jax.random.split(key, 3)
-        self.w_i = Param(w_i_init(shape=(in_dim, hidden_dim), dtype=dtype, key=key_wi))
-        self.w_h = Param(w_h_init(shape=(hidden_dim, hidden_dim), dtype=dtype, key=key_wh))
-        self.b = Param(b_init(shape=(hidden_dim,), dtype=dtype, key=key_b)) if bias else None
+        self.w_i = Param(w_i_init(shape=(in_dim, hidden_dim), key=key_wi))
+        self.w_h = Param(w_h_init(shape=(hidden_dim, hidden_dim), key=key_wh))
+        self.b = Param(b_init(shape=(hidden_dim,), key=key_b)) if bias else None
 
     def __call__(
         self,
@@ -85,7 +84,6 @@ class RNN(Module):
         in_dim: int,
         hidden_dim: int,
         bias: bool = True,
-        dtype: jnp.dtype = jnp.float32,
         w_i_init: Initializer = jax.nn.initializers.glorot_uniform(),
         w_h_init: Initializer = jax.nn.initializers.orthogonal(),
         b_init: Initializer = jax.nn.initializers.zeros,
@@ -93,7 +91,7 @@ class RNN(Module):
         key: PRNGKeyArray,
     ) -> None:
 
-        self.cell = RNNCell(in_dim, hidden_dim, bias, dtype, w_i_init, w_h_init, b_init, key=key)
+        self.cell = RNNCell(in_dim, hidden_dim, bias, w_i_init, w_h_init, b_init, key=key)
 
     def __call__(
         self,
@@ -136,7 +134,6 @@ class LSTMCell(Module):
         in_dim: int,
         hidden_dim: int,
         bias: bool = True,
-        dtype: jnp.dtype = jnp.float32,
         w_i_init: Initializer = jax.nn.initializers.glorot_uniform(),
         w_h_init: Initializer = jax.nn.initializers.orthogonal(),
         b_init: Initializer = jax.nn.initializers.zeros,
@@ -146,10 +143,10 @@ class LSTMCell(Module):
 
         key_wi, key_wh, key_b = jax.random.split(key, 3)
         gate_dim = 4 * hidden_dim
-        self.w_i = Param(w_i_init(shape=(in_dim, gate_dim), dtype=dtype, key=key_wi))
-        self.w_h = Param(w_h_init(shape=(hidden_dim, gate_dim), dtype=dtype, key=key_wh))
+        self.w_i = Param(w_i_init(shape=(in_dim, gate_dim), key=key_wi))
+        self.w_h = Param(w_h_init(shape=(hidden_dim, gate_dim), key=key_wh))
         if bias:
-            b = b_init(shape=(gate_dim,), dtype=dtype, key=key_b)
+            b = b_init(shape=(gate_dim,), key=key_b)
 
             # Initialise forget gate weights to 1.0
             i, f, g, o = jnp.split(b, 4)
@@ -200,7 +197,6 @@ class LSTM(Module):
         in_dim: int,
         hidden_dim: int,
         bias: bool = True,
-        dtype: jnp.dtype = jnp.float32,
         w_i_init: Initializer = jax.nn.initializers.glorot_uniform(),
         w_h_init: Initializer = jax.nn.initializers.orthogonal(),
         b_init: Initializer = jax.nn.initializers.zeros,
@@ -208,7 +204,7 @@ class LSTM(Module):
         key: PRNGKeyArray,
     ) -> None:
 
-        self.cell = LSTMCell(in_dim, hidden_dim, bias, dtype, w_i_init, w_h_init, b_init, key=key)
+        self.cell = LSTMCell(in_dim, hidden_dim, bias, w_i_init, w_h_init, b_init, key=key)
 
     def __call__(
         self,
@@ -253,7 +249,6 @@ class GRUCell(Module):
         in_dim: int,
         hidden_dim: int,
         bias: bool = True,
-        dtype: jnp.dtype = jnp.float32,
         w_i_init: Initializer = jax.nn.initializers.glorot_uniform(),
         w_h_init: Initializer = jax.nn.initializers.orthogonal(),
         b_init: Initializer = jax.nn.initializers.zeros,
@@ -263,10 +258,10 @@ class GRUCell(Module):
 
         key_wi, key_wh, key_b, key_bh = jax.random.split(key, 4)
         gate_dim = 3 * hidden_dim
-        self.w_i = Param(w_i_init(shape=(in_dim, gate_dim), dtype=dtype, key=key_wi))
-        self.w_h = Param(w_h_init(shape=(hidden_dim, gate_dim), dtype=dtype, key=key_wh))
-        self.b = Param(b_init(shape=(gate_dim,), dtype=dtype, key=key_b)) if bias else None
-        self.b_h = Param(b_init(shape=(gate_dim,), dtype=dtype, key=key_bh)) if bias else None
+        self.w_i = Param(w_i_init(shape=(in_dim, gate_dim), key=key_wi))
+        self.w_h = Param(w_h_init(shape=(hidden_dim, gate_dim), key=key_wh))
+        self.b = Param(b_init(shape=(gate_dim,), key=key_b)) if bias else None
+        self.b_h = Param(b_init(shape=(gate_dim,), key=key_bh)) if bias else None
 
     def __call__(
         self,
@@ -312,7 +307,6 @@ class GRU(Module):
         in_dim: int,
         hidden_dim: int,
         bias: bool = True,
-        dtype: jnp.dtype = jnp.float32,
         w_i_init: Initializer = jax.nn.initializers.glorot_uniform(),
         w_h_init: Initializer = jax.nn.initializers.orthogonal(),
         b_init: Initializer = jax.nn.initializers.zeros,
@@ -320,7 +314,7 @@ class GRU(Module):
         key: PRNGKeyArray,
     ) -> None:
 
-        self.cell = GRUCell(in_dim, hidden_dim, bias, dtype, w_i_init, w_h_init, b_init, key=key)
+        self.cell = GRUCell(in_dim, hidden_dim, bias, w_i_init, w_h_init, b_init, key=key)
 
     def __call__(
         self,

@@ -58,9 +58,9 @@ class TestGCNConv:
         gcn = gnn.GCNConv(8, 16, key=jax.random.key(0))
         assert jnp.all(gcn.b == 0)
 
-    def test_weight_dtype(self):
-        """Weights match the requested dtype."""
-        gcn = gnn.GCNConv(8, 16, dtype=jnp.float32, key=jax.random.key(0))
+    def test_default_dtype(self):
+        """Weights default to float32."""
+        gcn = gnn.GCNConv(8, 16, key=jax.random.key(0))
         assert gcn.w.dtype == jnp.float32
 
     def test_isolated_node_gets_only_bias(self):

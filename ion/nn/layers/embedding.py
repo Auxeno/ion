@@ -7,7 +7,6 @@ Truncated normal weight init (std=0.02).
 """
 
 import jax
-import jax.numpy as jnp
 from jax.nn.initializers import Initializer
 from jaxtyping import Array, Float, Int, PRNGKeyArray
 
@@ -28,13 +27,12 @@ class Embedding(Module):
         self,
         num_embeddings: int,
         dim: int,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.truncated_normal(0.02),
         *,
         key: PRNGKeyArray,
     ) -> None:
 
-        self.w = Param(w_init(shape=(num_embeddings, dim), dtype=dtype, key=key))
+        self.w = Param(w_init(shape=(num_embeddings, dim), key=key))
 
     def __call__(self, x: Int[Array, "..."]) -> Float[Array, "... d"]:
 

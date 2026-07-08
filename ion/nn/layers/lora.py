@@ -8,7 +8,6 @@ Output scaled by alpha/rank (default alpha=rank for neutral scaling).
 """
 
 import jax
-import jax.numpy as jnp
 from jax.nn.initializers import Initializer
 from jaxtyping import Array, Float, PRNGKeyArray
 
@@ -36,7 +35,6 @@ class LoRALinear(Module):
         linear: Linear,
         rank: int = 8,
         alpha: float | None = None,
-        dtype: jnp.dtype = jnp.float32,
         a_init: Initializer = jax.nn.initializers.he_normal(),
         b_init: Initializer = jax.nn.initializers.zeros,
         *,
@@ -47,8 +45,8 @@ class LoRALinear(Module):
 
         key_a, key_b = jax.random.split(key)
         in_dim, out_dim = linear.w.shape
-        self.a = Param(a_init(shape=(in_dim, rank), dtype=dtype, key=key_a))
-        self.b = Param(b_init(shape=(rank, out_dim), dtype=dtype, key=key_b))
+        self.a = Param(a_init(shape=(in_dim, rank), key=key_a))
+        self.b = Param(b_init(shape=(rank, out_dim), key=key_b))
 
         self.alpha = float(rank) if alpha is None else float(alpha)
         self.rank = rank

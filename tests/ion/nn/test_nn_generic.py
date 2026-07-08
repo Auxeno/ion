@@ -614,7 +614,16 @@ def test_ssm_cell_params_property(ssm_cell_and_input):
         assert hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact)
 
 
-# bfloat16 tests (standard layers, seq layers, cells -- not SSMs)
+def test_x64_default_dtype():
+    """Under jax_enable_x64, real params take float64 (the default float)."""
+    with jax.enable_x64(True):
+        linear = nn.Linear(8, 16, key=jax.random.key(0))
+        rnn = nn.RNNCell(8, 16, key=jax.random.key(0))
+        assert linear.b is not None
+        assert linear.w.dtype == jnp.float64
+        assert linear.b.dtype == jnp.float64
+        assert rnn.w_i.dtype == jnp.float64
+        assert rnn.w_h.dtype == jnp.float64
 
 
 def _cast_bf16(layer, x):

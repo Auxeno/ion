@@ -80,6 +80,16 @@ Internally this uses `optax.partition` with labels derived from `jax.tree.map_wi
 
 **Pytree registration.** `state` and `step` are dynamic children (traced by JAX); `_transform` and `_fields` are static auxiliary data (baked into the compiled program).
 
+## Precision
+
+Layer constructors take no `dtype` argument. Parameters are created in JAX's default float dtype (`float32`, or `float64` when `jax_enable_x64` is set), and precision is controlled entirely through `astype`. There are three patterns:
+
+- **Default (float32).** Build and train with no dtype handling.
+- **Mixed precision.** Keep float32 master params and cast the model to `bfloat16` *inside* the loss with `ion.astype(model, jnp.bfloat16)`. The cast is differentiable, so gradients return in float32 to match the master params and the optimizer state; only the forward/backward math runs in bfloat16. This mirrors Keras `mixed_bfloat16`, PyTorch AMP, and Flax's `param_dtype`/`dtype` split. See [`examples/gpt_tinystories.ipynb`](../examples/gpt_tinystories.ipynb) for a worked example.
+- **Full bfloat16 inference.** Cast once after construction with `model.astype(jnp.bfloat16)`.
+
+Two things to know. First, the promotion footgun: a bfloat16 model applied to float32 inputs silently upcasts the result to float32, so cast *both* the model and its inputs. Second, `ion.astype` casts by dtype family: a float target only touches float leaves, so the `complex64` state in SSM layers (LRU, S4D, S5) is preserved through a `bfloat16` cast.
+
 ## 🔪 Sharp Edges
 
 Known gotchas to be aware of when using Ion. Some are limitations of JAX:

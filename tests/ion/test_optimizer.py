@@ -659,3 +659,25 @@ class TestOptimizerRepr:
         r = repr(optimizer)
         assert "step=0" in r
         assert "state_leaves=" in r
+
+
+class TestMixedPrecision:
+    def test_mixed_precision_step(self):
+        """bf16 compute in the loss keeps float32 grads and float32 master params."""
+        model = nn.MLP(8, 1, 16, 1, key=jax.random.key(0))
+        x = jnp.ones((4, 8), dtype=jnp.bfloat16)
+        y = jnp.ones((4, 1), dtype=jnp.bfloat16)
+
+        def loss_fn(model, x, y):
+            pred = model.astype(jnp.bfloat16)(x)
+            return jnp.mean((pred - y) ** 2)
+
+        grads = jax.grad(loss_fn)(model, x, y)
+        grad_w = jnp.asarray(grads.layers[0].w)
+        assert grad_w.dtype == jnp.float32
+        assert jnp.all(jnp.isfinite(grad_w))
+        assert jnp.any(grad_w != 0)
+
+        optimizer = ion.Optimizer(optax.adam(1e-3), model)
+        model, optimizer = optimizer.update(model, grads)
+        assert model.layers[0].w.dtype == jnp.float32

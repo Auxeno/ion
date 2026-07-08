@@ -13,7 +13,6 @@ No dropout is included to match modern conventions, apply externally if needed.
 from collections.abc import Callable
 
 import jax
-import jax.numpy as jnp
 from jax.nn.initializers import Initializer
 from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
@@ -45,7 +44,6 @@ class TransformerBlock(Module):
         bias: bool = False,
         causal: bool = False,
         activation: Callable[[Array], Array] = jax.nn.gelu,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.truncated_normal(0.02),
         b_init: Initializer = jax.nn.initializers.zeros,
         *,
@@ -56,11 +54,11 @@ class TransformerBlock(Module):
             ff_dim = 4 * dim
 
         key_att, key_ff_1, key_ff_2 = jax.random.split(key, 3)
-        self.att = SelfAttention(dim, num_heads, bias, causal, dtype, w_init, b_init, key=key_att)
-        self.norm_att = LayerNorm(dim, dtype=dtype)
-        self.norm_ff = LayerNorm(dim, dtype=dtype)
-        self.ff_1 = Linear(dim, ff_dim, bias, dtype, w_init, b_init, key=key_ff_1)
-        self.ff_2 = Linear(ff_dim, dim, bias, dtype, w_init, b_init, key=key_ff_2)
+        self.att = SelfAttention(dim, num_heads, bias, causal, w_init, b_init, key=key_att)
+        self.norm_att = LayerNorm(dim)
+        self.norm_ff = LayerNorm(dim)
+        self.ff_1 = Linear(dim, ff_dim, bias, w_init, b_init, key=key_ff_1)
+        self.ff_2 = Linear(ff_dim, dim, bias, w_init, b_init, key=key_ff_2)
 
         self.activation = activation
 
@@ -107,7 +105,6 @@ class CrossTransformerBlock(Module):
         ff_dim: int | None = None,
         bias: bool = False,
         activation: Callable[[Array], Array] = jax.nn.gelu,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.truncated_normal(0.02),
         b_init: Initializer = jax.nn.initializers.zeros,
         *,
@@ -118,11 +115,11 @@ class CrossTransformerBlock(Module):
             ff_dim = 4 * dim
 
         key_att, key_ff_1, key_ff_2 = jax.random.split(key, 3)
-        self.att = CrossAttention(dim, num_heads, bias, dtype, w_init, b_init, key=key_att)
-        self.norm_att = LayerNorm(dim, dtype=dtype)
-        self.norm_ff = LayerNorm(dim, dtype=dtype)
-        self.ff_1 = Linear(dim, ff_dim, bias, dtype, w_init, b_init, key=key_ff_1)
-        self.ff_2 = Linear(ff_dim, dim, bias, dtype, w_init, b_init, key=key_ff_2)
+        self.att = CrossAttention(dim, num_heads, bias, w_init, b_init, key=key_att)
+        self.norm_att = LayerNorm(dim)
+        self.norm_ff = LayerNorm(dim)
+        self.ff_1 = Linear(dim, ff_dim, bias, w_init, b_init, key=key_ff_1)
+        self.ff_2 = Linear(ff_dim, dim, bias, w_init, b_init, key=key_ff_2)
 
         self.activation = activation
 

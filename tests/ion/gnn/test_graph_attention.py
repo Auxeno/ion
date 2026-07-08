@@ -47,9 +47,9 @@ class TestGATConv:
         gat = gnn.GATConv(8, 16, key=jax.random.key(0))
         assert jnp.all(gat.b == 0)
 
-    def test_weight_dtype(self):
-        """Weights match the requested dtype."""
-        gat = gnn.GATConv(8, 16, dtype=jnp.float32, key=jax.random.key(0))
+    def test_default_dtype(self):
+        """Weights default to float32."""
+        gat = gnn.GATConv(8, 16, key=jax.random.key(0))
         assert gat.w.dtype == jnp.float32
         assert gat.att_sender.dtype == jnp.float32
         assert gat.att_receiver.dtype == jnp.float32
@@ -298,9 +298,9 @@ class TestGATv2Conv:
         y = gat(x, senders, receivers)
         assert y.shape == (3, 16)
 
-    def test_weight_dtype(self):
-        """Weights match the requested dtype."""
-        gat = gnn.GATv2Conv(8, 16, dtype=jnp.float32, key=jax.random.key(0))
+    def test_default_dtype(self):
+        """Weights default to float32."""
+        gat = gnn.GATv2Conv(8, 16, key=jax.random.key(0))
         assert gat.w_sender.dtype == jnp.float32
         assert gat.w_receiver.dtype == jnp.float32
         assert gat.att.dtype == jnp.float32

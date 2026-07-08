@@ -42,10 +42,10 @@ class TestEmbedding:
         emb = nn.Embedding(20, 64, key=key)
         assert emb.w.shape == (20, 64)
 
-    def test_weight_dtype(self):
-        """Weights match the requested dtype."""
+    def test_default_dtype(self):
+        """Weights default to float32."""
         key = jax.random.key(0)
-        emb = nn.Embedding(10, 8, dtype=jnp.float32, key=key)
+        emb = nn.Embedding(10, 8, key=key)
         assert emb.w.dtype == jnp.float32
 
     def test_different_keys(self):

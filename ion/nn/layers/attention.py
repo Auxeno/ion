@@ -38,7 +38,6 @@ class SelfAttention(Module):
         num_heads: int = 1,
         bias: bool = False,
         causal: bool = False,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.truncated_normal(0.02),
         b_init: Initializer = jax.nn.initializers.zeros,
         *,
@@ -50,9 +49,9 @@ class SelfAttention(Module):
 
         key_w_qkv, key_w_out, key_b_out = jax.random.split(key, 3)
         head_dim = dim // num_heads
-        self.w_qkv = Param(w_init(shape=(dim, 3, num_heads, head_dim), dtype=dtype, key=key_w_qkv))
-        self.w_out = Param(w_init(shape=(num_heads, head_dim, dim), dtype=dtype, key=key_w_out))
-        self.b_out = Param(b_init(shape=(dim,), dtype=dtype, key=key_b_out)) if bias else None
+        self.w_qkv = Param(w_init(shape=(dim, 3, num_heads, head_dim), key=key_w_qkv))
+        self.w_out = Param(w_init(shape=(num_heads, head_dim, dim), key=key_w_out))
+        self.b_out = Param(b_init(shape=(dim,), key=key_b_out)) if bias else None
 
         self.causal = causal
 
@@ -107,7 +106,6 @@ class CrossAttention(Module):
         dim: int,
         num_heads: int = 1,
         bias: bool = False,
-        dtype: jnp.dtype = jnp.float32,
         w_init: Initializer = jax.nn.initializers.truncated_normal(0.02),
         b_init: Initializer = jax.nn.initializers.zeros,
         *,
@@ -119,10 +117,10 @@ class CrossAttention(Module):
 
         key_w_q, key_w_kv, key_w_out, key_b_out = jax.random.split(key, 4)
         head_dim = dim // num_heads
-        self.w_q = Param(w_init(shape=(dim, num_heads, head_dim), dtype=dtype, key=key_w_q))
-        self.w_kv = Param(w_init(shape=(dim, 2, num_heads, head_dim), dtype=dtype, key=key_w_kv))
-        self.w_out = Param(w_init(shape=(num_heads, head_dim, dim), dtype=dtype, key=key_w_out))
-        self.b_out = Param(b_init(shape=(dim,), dtype=dtype, key=key_b_out)) if bias else None
+        self.w_q = Param(w_init(shape=(dim, num_heads, head_dim), key=key_w_q))
+        self.w_kv = Param(w_init(shape=(dim, 2, num_heads, head_dim), key=key_w_kv))
+        self.w_out = Param(w_init(shape=(num_heads, head_dim, dim), key=key_w_out))
+        self.b_out = Param(b_init(shape=(dim,), key=key_b_out)) if bias else None
 
     def __call__(
         self,
