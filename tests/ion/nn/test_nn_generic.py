@@ -113,6 +113,7 @@ def test_params_property(layer_and_input):
             nn.MaxPool,
             nn.AvgPool,
             nn.Dropout,
+            nn.RoPE,
         ),
     ):
         return  # No params expected

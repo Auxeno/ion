@@ -9,7 +9,7 @@ from .layers.linear import Identity, Linear
 from .layers.lora import LoRALinear
 from .layers.norm import GroupNorm, LayerNorm, RMSNorm
 from .layers.pool import AvgPool, MaxPool
-from .layers.positional import LearnedPositionalEmbedding, alibi, apply_rope, rope, sinusoidal
+from .layers.positional import LearnedPositionalEmbedding, RoPE, alibi, sinusoidal
 from .layers.recurrent import GRU, LSTM, RNN, GRUCell, LSTMCell, RNNCell
 from .layers.ssm import LRU, S4D, S5, LRUCell, S4DCell, S5Cell
 from .module import Module
@@ -42,6 +42,7 @@ __all__ = [
     "RMSNorm",
     "RNN",
     "RNNCell",
+    "RoPE",
     "S4D",
     "S4DCell",
     "S5",
@@ -50,7 +51,5 @@ __all__ = [
     "Sequential",
     "TransformerBlock",
     "alibi",
-    "apply_rope",
-    "rope",
     "sinusoidal",
 ]

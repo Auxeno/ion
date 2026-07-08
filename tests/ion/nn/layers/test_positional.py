@@ -120,50 +120,64 @@ class TestAlibi:
             nn.alibi(16, 3)
 
 
-class TestRope:
-    def test_output_shapes(self):
-        """Returns two arrays of shape (seq_len, head_dim)."""
-        cos, sin = nn.rope(128, 64)
-        assert cos.shape == (128, 64)
-        assert sin.shape == (128, 64)
+class TestRoPE:
+    def test_output_manual(self):
+        """Output matches a hand-rolled per-pair 2D rotation."""
+        import numpy as np
 
-    def test_values_bounded(self):
-        """Cos and sin values are in [-1, 1]."""
-        cos, sin = nn.rope(128, 64)
-        assert jnp.all(cos >= -1.0) and jnp.all(cos <= 1.0)
-        assert jnp.all(sin >= -1.0) and jnp.all(sin <= 1.0)
+        rope = nn.RoPE()
+        x = jax.random.normal(jax.random.key(0), (4, 6))
+        expected = np.zeros((4, 6))
+        for m in range(4):
+            for i in range(3):
+                angle = m / (10_000.0 ** (2 * i / 6))
+                x0, x1 = x[m, 2 * i], x[m, 2 * i + 1]
+                expected[m, 2 * i] = x0 * np.cos(angle) - x1 * np.sin(angle)
+                expected[m, 2 * i + 1] = x0 * np.sin(angle) + x1 * np.cos(angle)
+        npt.assert_allclose(rope(x), expected, atol=1e-6)
 
-    def test_position_zero(self):
-        """At position 0, cos=1 and sin=0 for all dimensions."""
-        cos, sin = nn.rope(128, 64)
-        npt.assert_allclose(cos[0], 1.0, atol=1e-6)
-        npt.assert_allclose(sin[0], 0.0, atol=1e-6)
-
-    def test_odd_head_dim_raises(self):
-        """Odd head_dim raises ValueError."""
-        import pytest
-
-        with pytest.raises(ValueError):
-            nn.rope(128, 63)
-
-
-class TestApplyRope:
     def test_output_shape(self):
-        """Output shape matches input shape."""
-        cos, sin = nn.rope(16, 8)
-        x = jnp.ones((16, 8))
-        assert nn.apply_rope(x, cos, sin).shape == (16, 8)
+        """Output shape matches input shape, including leading batch dims."""
+        rope = nn.RoPE()
+        assert rope(jnp.ones((16, 8))).shape == (16, 8)
+        assert rope(jnp.ones((2, 3, 16, 8))).shape == (2, 3, 16, 8)
 
     def test_identity_at_position_zero(self):
-        """At position 0 (cos=1, sin=0), output equals input."""
-        cos, sin = nn.rope(16, 8)
+        """At position 0 the rotation angle is zero, so output equals input."""
+        rope = nn.RoPE()
         x = jax.random.normal(jax.random.key(0), (16, 8))
-        y = nn.apply_rope(x, cos, sin)
-        npt.assert_allclose(y[0], x[0], atol=1e-6)
+        npt.assert_allclose(rope(x)[0], x[0], atol=1e-6)
 
     def test_preserves_norm(self):
         """RoPE is a rotation, so it preserves vector norms."""
-        cos, sin = nn.rope(16, 8)
+        rope = nn.RoPE()
         x = jax.random.normal(jax.random.key(0), (16, 8))
-        y = nn.apply_rope(x, cos, sin)
-        npt.assert_allclose(jnp.linalg.norm(y, axis=-1), jnp.linalg.norm(x, axis=-1), atol=1e-5)
+        npt.assert_allclose(
+            jnp.linalg.norm(rope(x), axis=-1), jnp.linalg.norm(x, axis=-1), atol=1e-5
+        )
+
+    def test_relative_positions(self):
+        """Dot products between rotated Q and K depend only on relative offset."""
+        rope = nn.RoPE()
+        keys = jax.random.split(jax.random.key(0))
+        u = jax.random.normal(keys[0], (8,))
+        v = jax.random.normal(keys[1], (8,))
+        q = rope(jnp.tile(u, (16, 1)))
+        k = rope(jnp.tile(v, (16, 1)))
+        # Offset of 3 at two different absolute positions
+        npt.assert_allclose(q[2] @ k[5], q[9] @ k[12], atol=1e-5)
+
+    def test_theta(self):
+        """Different theta values produce different rotations."""
+        x = jax.random.normal(jax.random.key(0), (16, 8))
+        assert not jnp.allclose(nn.RoPE()(x), nn.RoPE(theta=500.0)(x))
+
+    def test_no_params(self):
+        """RoPE has no trainable parameters."""
+        assert nn.RoPE().num_params == 0
+
+    def test_input_dtype(self):
+        """Output dtype follows input dtype."""
+        rope = nn.RoPE()
+        assert rope(jnp.ones((16, 8), dtype=jnp.bfloat16)).dtype == jnp.bfloat16
+        assert rope(jnp.ones((16, 8))).dtype == jnp.float32

@@ -2,9 +2,8 @@
 
 Modules:
     LearnedPositionalEmbedding  Trainable lookup table added to input.
+    RoPE                        Rotary position embedding for Q or K.  (Su et al., 2021)
     sinusoidal                  Fixed sin/cos encodings.               (Vaswani et al., 2017)
-    rope                        Rotary position embedding frequencies. (Su et al., 2021)
-    apply_rope                  Apply rotary embeddings to Q or K.
     alibi                       Linear attention bias.                 (Press et al., 2022)
 """
 
@@ -47,6 +46,41 @@ class LearnedPositionalEmbedding(Module):
         x = x + self.w[:seq_len]
 
         return x
+
+
+class RoPE(Module):
+    """Rotary positional embeddings applied to query or key vectors.
+
+    >>> rope = RoPE()
+    >>> rope(q)  # (*, s, d) -> (*, s, d)
+    >>> rope(k)  # (*, s, d) -> (*, s, d)
+    """
+
+    theta: float
+
+    def __init__(self, theta: float = 10_000.0) -> None:
+
+        self.theta = theta
+
+    def __call__(self, x: Float[Array, "... s d"]) -> Float[Array, "... s d"]:
+
+        seq_len, head_dim = x.shape[-2], x.shape[-1]
+
+        # Inverse frequencies for feature pairs (d / 2,)
+        freq_indices = jnp.arange(0, head_dim, 2, dtype=jnp.float32)
+        inv_freqs = 1.0 / (self.theta ** (freq_indices / head_dim))
+
+        # Phase angles from positions and frequencies, duplicated per feature pair (s, d)
+        positions = jnp.arange(seq_len, dtype=jnp.float32)
+        freqs = jnp.repeat(jnp.outer(positions, inv_freqs), 2, axis=-1)
+        cos = jnp.cos(freqs).astype(x.dtype)
+        sin = jnp.sin(freqs).astype(x.dtype)
+
+        # Swap and negate adjacent pairs: [x0, x1, x2, x3] -> [-x1, x0, -x3, x2]
+        x_pairs = x.reshape(x.shape[:-1] + (-1, 2))
+        x_rotated = jnp.stack((-x_pairs[..., 1], x_pairs[..., 0]), axis=-1).reshape(x.shape)
+
+        return (x * cos) + (x_rotated * sin)
 
 
 def sinusoidal(
@@ -99,49 +133,3 @@ def alibi(
     bias = slopes[:, None, None] * rel_pos[None, :, :]
 
     return bias.astype(dtype)
-
-
-def rope(
-    seq_len: int,
-    head_dim: int,
-    theta: float = 10_000.0,
-    dtype: jnp.dtype = jnp.float32,
-) -> tuple[Float[Array, "s d"], Float[Array, "s d"]]:
-    """Cosine and sine frequency tables for Rotary Positional Embeddings.
-
-    >>> cos, sin = rope(128, 64)  # (128, 64), (128, 64)
-    """
-
-    if head_dim % 2 != 0:
-        raise ValueError(f"head_dim ({head_dim}) must be even")
-
-    # Inverse frequencies for feature pairs (d / 2,)
-    freq_indices = jnp.arange(0, head_dim, 2, dtype=jnp.float32)
-    inv_freqs = 1.0 / (theta ** (freq_indices / head_dim))
-
-    # Outer product of positions and frequencies (s, d / 2)
-    t = jnp.arange(seq_len, dtype=jnp.float32)
-    freqs = jnp.outer(t, inv_freqs)
-
-    # Duplicate for each feature pair (s, d)
-    freqs = jnp.repeat(freqs, 2, axis=-1)
-
-    return jnp.cos(freqs).astype(dtype), jnp.sin(freqs).astype(dtype)
-
-
-def apply_rope(
-    x: Float[Array, "... s d"],
-    cos: Float[Array, "s d"],
-    sin: Float[Array, "s d"],
-) -> Float[Array, "... s d"]:
-    """Apply rotary positional embeddings to query or key vectors.
-
-    >>> cos, sin = rope(128, 64)
-    >>> apply_rope(q, cos, sin)  # (*, 128, 64) -> (*, 128, 64)
-    """
-
-    # Swap and negate adjacent pairs: [x0, x1, x2, x3] -> [-x1, x0, -x3, x2]
-    x_pairs = x.reshape(x.shape[:-1] + (-1, 2))
-    x_rotated = jnp.stack((-x_pairs[..., 1], x_pairs[..., 0]), axis=-1).reshape(x.shape)
-
-    return (x * cos) + (x_rotated * sin)
