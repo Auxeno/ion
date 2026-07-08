@@ -49,6 +49,22 @@ class TestSegmentSoftmax:
             npt.assert_allclose(result[:3, head].sum(), 1.0, atol=1e-5)
             npt.assert_allclose(result[3:, head].sum(), 1.0, atol=1e-5)
 
+    def test_sums_to_one_exact(self):
+        """Per-segment sums hit 1.0 to float32 roundoff; the old +1e-6 epsilon biased them low."""
+        data = jnp.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        segment_ids = jnp.array([0, 0, 0, 1, 1])
+        result = segment_softmax(data, segment_ids, num_segments=2)
+        npt.assert_allclose(result[:3].sum(), 1.0, atol=2e-7)
+        npt.assert_allclose(result[3:].sum(), 1.0, atol=2e-7)
+
+    def test_empty_segment(self):
+        """Segments with no members produce no NaNs and leave other segments exact."""
+        data = jnp.array([1.0, 2.0])
+        segment_ids = jnp.array([0, 0])
+        result = segment_softmax(data, segment_ids, num_segments=3)
+        assert jnp.all(jnp.isfinite(result))
+        npt.assert_allclose(result.sum(), 1.0, atol=2e-7)
+
     def test_jit_compatible(self):
         """segment_softmax works under jax.jit."""
         data = jnp.array([1.0, 2.0, 3.0])

@@ -8,6 +8,7 @@ Truncated normal weight init (std=0.02), zeros for bias.
 QKV fused into a single weight matrix for self-attention.
 Optional boolean mask: True = attend, False = ignore.
 Masks may be (s, t) shared, (b, s, t) per batch, or (b, h, s, t) per head.
+A query row with no attendable positions outputs zeros.
 """
 
 import jax
@@ -68,16 +69,16 @@ class SelfAttention(Module):
 
         logits = jnp.einsum("bshk, bthk -> bhst", q, k) / jnp.sqrt(self.w_qkv.shape[-1])
 
+        attend = None
         if self.causal:
-            causal_mask = jnp.tril(jnp.ones(logits.shape[-2:], dtype=bool))
-            logits = jnp.where(causal_mask, logits, -jnp.inf)
+            attend = jnp.tril(jnp.ones(logits.shape[-2:], dtype=bool))
 
         if mask is not None:
             if mask.ndim == 3:
                 mask = mask[:, None]
-            logits = jnp.where(mask, logits, -jnp.inf)
+            attend = mask if attend is None else attend & mask
 
-        attention = jax.nn.softmax(logits, axis=-1)
+        attention = jax.nn.softmax(logits, axis=-1, where=attend)
         x = jnp.einsum("bhst, bthk -> bshk", attention, v)
 
         x = jnp.einsum("bshk, hkd -> bsd", x, self.w_out)
@@ -140,9 +141,8 @@ class CrossAttention(Module):
         if mask is not None:
             if mask.ndim == 3:
                 mask = mask[:, None]
-            logits = jnp.where(mask, logits, -jnp.inf)
 
-        attention = jax.nn.softmax(logits, axis=-1)
+        attention = jax.nn.softmax(logits, axis=-1, where=mask)
         x = jnp.einsum("bhst, bthk -> bshk", attention, v)
 
         x = jnp.einsum("bshk, hkd -> bsd", x, self.w_out)

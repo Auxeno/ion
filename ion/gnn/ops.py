@@ -24,9 +24,9 @@ def segment_softmax(
     maxes = jnp.where(jnp.isinf(maxes), 0.0, maxes)
     data = jnp.exp(data - maxes[segment_ids])
 
-    # Normalize by per-segment sum
+    # Normalize by per-segment sum; guard empty segments (never indexed) against 0 / 0
     sums = jax.ops.segment_sum(data, segment_ids, num_segments)
-    return data / (sums[segment_ids] + 1e-6)
+    return data / jnp.where(sums == 0, 1.0, sums)[segment_ids]
 
 
 def add_self_loops(

@@ -127,6 +127,43 @@ class TestSelfAttention:
         y = layer(x, mask=mask)
         assert y.shape == (2, 4, 8)
 
+    def test_fully_masked_row_outputs_zeros(self):
+        """A query row with no attendable positions outputs zeros, not NaN."""
+        layer = nn.SelfAttention(8, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (2, 4, 8))
+        mask = jnp.ones((2, 4, 4), dtype=bool).at[0, 2].set(False)
+        y = layer(x, mask=mask)
+        npt.assert_array_equal(y[0, 2], 0.0)
+        assert jnp.all(jnp.isfinite(y))
+
+    def test_fully_masked_row_other_rows_unchanged(self):
+        """Rows with attendable positions are unaffected by a fully masked row."""
+        layer = nn.SelfAttention(8, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (2, 4, 8))
+        mask = jnp.ones((2, 4, 4), dtype=bool).at[0, 2].set(False)
+        y = layer(x, mask=mask)
+        y_full = layer(x)
+        npt.assert_allclose(y[0, :2], y_full[0, :2], atol=1e-6)
+        npt.assert_allclose(y[0, 3], y_full[0, 3], atol=1e-6)
+        npt.assert_allclose(y[1], y_full[1], atol=1e-6)
+
+    def test_fully_masked_row_with_causal(self):
+        """Fully masked query row outputs zeros when combined with causal masking."""
+        layer = nn.SelfAttention(8, num_heads=2, causal=True, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (2, 4, 8))
+        mask = jnp.ones((2, 4, 4), dtype=bool).at[0, 2].set(False)
+        y = layer(x, mask=mask)
+        npt.assert_array_equal(y[0, 2], 0.0)
+        assert jnp.all(jnp.isfinite(y))
+
+    def test_fully_masked_row_gradients_finite(self):
+        """Gradients stay finite when a query row is fully masked."""
+        layer = nn.SelfAttention(8, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (2, 4, 8))
+        mask = jnp.ones((2, 4, 4), dtype=bool).at[0, 2].set(False)
+        grads = jax.grad(lambda x: layer(x, mask=mask).sum())(x)
+        assert jnp.all(jnp.isfinite(grads))
+
 
 class TestSelfAttentionValidation:
     def test_dim_not_divisible_by_num_heads_raises(self):
@@ -249,6 +286,37 @@ class TestCrossAttention:
         mask = jnp.ones((2, 2, 3, 5), dtype=bool).at[0, 0, 0, 0].set(False)
         y = layer(x, ctx, mask=mask)
         assert y.shape == (2, 3, 8)
+
+    def test_fully_masked_row_outputs_zeros(self):
+        """A query row with no attendable context positions outputs zeros, not NaN."""
+        layer = nn.CrossAttention(8, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (2, 3, 8))
+        ctx = jax.random.normal(jax.random.key(2), (2, 5, 8))
+        mask = jnp.ones((2, 3, 5), dtype=bool).at[0, 1].set(False)
+        y = layer(x, ctx, mask=mask)
+        npt.assert_array_equal(y[0, 1], 0.0)
+        assert jnp.all(jnp.isfinite(y))
+
+    def test_fully_masked_row_other_rows_unchanged(self):
+        """Rows with attendable positions are unaffected by a fully masked row."""
+        layer = nn.CrossAttention(8, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (2, 3, 8))
+        ctx = jax.random.normal(jax.random.key(2), (2, 5, 8))
+        mask = jnp.ones((2, 3, 5), dtype=bool).at[0, 1].set(False)
+        y = layer(x, ctx, mask=mask)
+        y_full = layer(x, ctx)
+        npt.assert_allclose(y[0, 0], y_full[0, 0], atol=1e-6)
+        npt.assert_allclose(y[0, 2], y_full[0, 2], atol=1e-6)
+        npt.assert_allclose(y[1], y_full[1], atol=1e-6)
+
+    def test_fully_masked_row_gradients_finite(self):
+        """Gradients stay finite when a query row is fully masked."""
+        layer = nn.CrossAttention(8, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (2, 3, 8))
+        ctx = jax.random.normal(jax.random.key(2), (2, 5, 8))
+        mask = jnp.ones((2, 3, 5), dtype=bool).at[0, 1].set(False)
+        grads = jax.grad(lambda c: layer(x, c, mask=mask).sum())(ctx)
+        assert jnp.all(jnp.isfinite(grads))
 
 
 class TestCrossAttentionValidation:

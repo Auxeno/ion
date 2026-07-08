@@ -40,6 +40,7 @@ def _build_layers(key):
             jnp.ones((2, 6, 6, 3)),
         ),
         (nn.LearnedPositionalEmbedding(16, 8, key=next(keys)), jnp.ones((2, 10, 8))),
+        (nn.RoPE(), jnp.ones((2, 10, 8))),
     ]
 
 
@@ -65,6 +66,7 @@ _PARAM_NAMES = [
     "conv_transpose_1d",
     "conv_transpose_2d",
     "learned_positional_embedding",
+    "rope",
 ]
 
 

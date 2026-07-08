@@ -114,8 +114,8 @@ SSM hidden states are complex-valued. S4D and S5 use conjugate-pair structure: `
 
 | Label | Meaning | Used in |
 |-------|---------|---------|
-| `s` | sequence position | sinusoidal, learned, rope |
-| `d` | feature dimension | sinusoidal, learned, rope |
+| `s` | sequence position | sinusoidal, learned, RoPE |
+| `d` | feature dimension | sinusoidal, learned, RoPE |
 | `h` | number of heads | alibi |
 
 ## Spatial Layers

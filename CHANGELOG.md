@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.1
+
+- **Breaking: `rope` and `apply_rope` replaced by the `RoPE` module.** `nn.RoPE(theta)`
+  applies rotary embeddings directly to query or key tensors. Frequency tables are computed
+  on the fly from the input shape and constant-folded under `jit`, so there is no `max_len`,
+  no stored tables, and no `key`. Tables are computed in float32 and cast to the input dtype.
+- **Migration.** `cos, sin = nn.rope(s, d)` followed by `nn.apply_rope(q, cos, sin)` becomes
+  `rope = nn.RoPE()` then `rope(q)`.
+- **Fully masked attention rows output zeros.** `SelfAttention` and `CrossAttention` now mask
+  via `jax.nn.softmax(..., where=)`: a query position with no attendable positions outputs
+  zeros instead of NaN. Rows with at least one attendable position are unchanged.
+- **Exact `segment_softmax` normalization.** Removed the `1e-6` denominator epsilon, which
+  biased every attention weight slightly low; per-segment weights now sum to exactly 1.
+
 ## 0.6.0
 
 - **Breaking: `dtype` removed from all layer and block constructors.** Parameters are now
