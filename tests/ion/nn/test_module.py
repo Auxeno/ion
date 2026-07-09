@@ -1,6 +1,7 @@
 import copy
 import dataclasses
 from collections.abc import Callable
+from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -624,6 +625,77 @@ class TestContainerFields:
         eager = m(x)
         jitted = jax.jit(m)(x)
         npt.assert_allclose(jitted, eager)
+
+
+class EncoderDecoder(NamedTuple):
+    encoder: nn.Linear
+    decoder: nn.Linear
+
+
+class WithNamedTuple(nn.Module):
+    pair: EncoderDecoder
+
+    def __init__(self, key):
+        keys = jax.random.split(key, 2)
+        self.pair = EncoderDecoder(nn.Linear(4, 8, key=keys[0]), nn.Linear(8, 4, key=keys[1]))
+
+    def __call__(self, x):
+        return self.pair.decoder(self.pair.encoder(x))
+
+
+class TestNamedTupleFields:
+    def test_jit_matches_eager(self):
+        """Module with a NamedTuple of sub-modules works under jit."""
+        m = WithNamedTuple(key=jax.random.key(0))
+        x = jnp.ones((1, 4))
+        eager = m(x)
+        jitted = jax.jit(m)(x)
+        npt.assert_allclose(jitted, eager, rtol=1e-5, atol=1e-5)
+
+    def test_pytree_roundtrip(self):
+        """Flatten/unflatten preserves the NamedTuple type and param values."""
+        m = WithNamedTuple(key=jax.random.key(0))
+        leaves, treedef = jtu.tree_flatten(m)
+        rebuilt = jtu.tree_unflatten(treedef, leaves)
+        assert type(rebuilt.pair) is EncoderDecoder
+        npt.assert_array_equal(rebuilt.pair.encoder.w._value, m.pair.encoder.w._value)
+        npt.assert_array_equal(rebuilt.pair.decoder.w._value, m.pair.decoder.w._value)
+
+    def test_grad_flows(self):
+        """Gradients flow to Params inside a NamedTuple field."""
+        m = WithNamedTuple(key=jax.random.key(0))
+        x = jnp.ones((1, 4))
+        grads = jax.grad(lambda m: jnp.sum(m(x) ** 2))(m)
+        assert jnp.any(grads.pair.encoder.w._value != 0)
+        assert jnp.any(grads.pair.decoder.w._value != 0)
+
+    def test_freeze_through_namedtuple(self):
+        """freeze() reaches Params inside a NamedTuple field."""
+        m = WithNamedTuple(key=jax.random.key(0)).freeze()
+        assert not m.pair.encoder.w.trainable
+        assert not m.pair.decoder.w.trainable
+
+    def test_mixed_static_element(self):
+        """NamedTuple mixing a Module and a plain callable works under jit."""
+
+        class Block(NamedTuple):
+            linear: nn.Linear
+            act: Callable
+
+        class Container(nn.Module):
+            block: Block
+
+            def __init__(self, key):
+                self.block = Block(nn.Linear(4, 4, key=key), jax.nn.relu)
+
+            def __call__(self, x):
+                return self.block.act(self.block.linear(x))
+
+        m = Container(key=jax.random.key(0))
+        x = jnp.ones((1, 4))
+        eager = m(x)
+        jitted = jax.jit(m)(x)
+        npt.assert_allclose(jitted, eager, rtol=1e-5, atol=1e-5)
 
 
 class TestReplaceEdgeCases:

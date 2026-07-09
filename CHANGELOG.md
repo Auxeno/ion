@@ -13,6 +13,10 @@
   zeros instead of NaN. Rows with at least one attendable position are unchanged.
 - **Exact `segment_softmax` normalization.** Removed the `1e-6` denominator epsilon, which
   biased every attention weight slightly low; per-segment weights now sum to exactly 1.
+- **NamedTuple Module fields work.** A Module field holding a NamedTuple of array-like
+  elements (Params, Modules, arrays) previously crashed on flatten/unflatten because
+  containers were rebuilt by passing an iterable to the constructor; NamedTuples are now
+  rebuilt with positional fields.
 - **`Optimizer.update` rejects trainability changes with a clear error.** The
   frozen/trainable partition is baked into the optimizer state at construction, so calling
   `freeze()`/`unfreeze()` on the model and reusing the old optimizer previously failed with a

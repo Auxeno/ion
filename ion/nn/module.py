@@ -87,7 +87,8 @@ def _register_module_as_pytree(cls: type) -> Any:
                 }
                 children.append((jtu.GetAttrKey(name), wrapped))
             else:
-                wrapped = type(value)(x if isinstance(x, array_like) else _Static(x) for x in value)
+                items = [x if isinstance(x, array_like) else _Static(x) for x in value]
+                wrapped = type(value)(*items) if hasattr(value, "_fields") else type(value)(items)
                 children.append((jtu.GetAttrKey(name), wrapped))
 
         static_values = tuple(obj.__dict__[name] for name in static_names)
@@ -102,7 +103,8 @@ def _register_module_as_pytree(cls: type) -> Any:
             if kind == "dict":
                 value = {k: v.value if isinstance(v, _Static) else v for k, v in value.items()}
             elif kind != "leaf":
-                value = type(value)(x.value if isinstance(x, _Static) else x for x in value)
+                items = [x.value if isinstance(x, _Static) else x for x in value]
+                value = type(value)(*items) if hasattr(value, "_fields") else type(value)(items)
             object.__setattr__(new_instance, name, value)
 
         # Restore static fields directly
