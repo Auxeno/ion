@@ -58,6 +58,12 @@ class MaxPool(Module):
         else:
             self.padding = tuple((p, p) for p in padding)
 
+        # A window landing entirely in padding has no real elements to reduce over
+        if not isinstance(self.padding, str) and any(
+            lo >= k or hi >= k for (lo, hi), k in zip(self.padding, self.kernel_shape)
+        ):
+            raise ValueError(f"padding must be smaller than kernel_shape, got {self.padding} vs {self.kernel_shape}")
+
     def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
 
         padding = self.padding if isinstance(self.padding, str) else ((0, 0), *self.padding, (0, 0))
@@ -116,6 +122,12 @@ class AvgPool(Module):
             self.padding = tuple((padding, padding) for _ in range(num_spatial_dims))
         else:
             self.padding = tuple((p, p) for p in padding)
+
+        # A window landing entirely in padding has no real elements to reduce over
+        if not isinstance(self.padding, str) and any(
+            lo >= k or hi >= k for (lo, hi), k in zip(self.padding, self.kernel_shape)
+        ):
+            raise ValueError(f"padding must be smaller than kernel_shape, got {self.padding} vs {self.kernel_shape}")
 
     def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
 

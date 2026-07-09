@@ -83,6 +83,11 @@ class TestMaxPoolConstructor:
         y = pool(x)
         assert y.shape[1] > 0 and y.shape[2] > 0
 
+    def test_padding_not_smaller_than_kernel_raises(self):
+        """Padding equal to the kernel would give an all-padding window."""
+        with pytest.raises(ValueError, match="smaller than kernel_shape"):
+            nn.MaxPool(kernel_shape=(2,), padding=2)
+
 
 class TestAvgPool:
     def test_int_kernel_shape_raises(self):
@@ -177,3 +182,8 @@ class TestAvgPoolConstructor:
         x = jnp.ones((1, 4, 4, 3))
         y = pool(x)
         assert y.shape[1] > 0 and y.shape[2] > 0
+
+    def test_padding_not_smaller_than_kernel_raises(self):
+        """Padding equal to the kernel would give an all-padding window (0/0 NaN)."""
+        with pytest.raises(ValueError, match="smaller than kernel_shape"):
+            nn.AvgPool(kernel_shape=(2,), padding=2)
