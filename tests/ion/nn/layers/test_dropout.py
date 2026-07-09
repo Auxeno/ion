@@ -21,6 +21,18 @@ class TestDropout:
         y = layer(x, deterministic=True, key=jax.random.key(0))
         npt.assert_allclose(y, x, rtol=0, atol=0)
 
+    def test_p_out_of_range_raises(self):
+        """p outside [0, 1] raises ValueError at construction."""
+        with pytest.raises(ValueError, match="must be in"):
+            nn.Dropout(p=-0.3)
+        with pytest.raises(ValueError, match="must be in"):
+            nn.Dropout(p=1.5)
+
+    def test_p_boundaries_construct(self):
+        """p=0 and p=1 are valid."""
+        assert nn.Dropout(p=0.0).p == 0.0
+        assert nn.Dropout(p=1.0).p == 1.0
+
     def test_p_zero_is_identity(self):
         """p=0 returns input unchanged even in stochastic mode."""
         layer = nn.Dropout(p=0.0)
@@ -85,13 +97,6 @@ class TestDropout:
     def test_p_one_returns_zeros(self):
         """p=1.0 drops everything, returning zeros instead of NaN."""
         layer = nn.Dropout(p=1.0)
-        x = jnp.ones((4, 8))
-        y = layer(x, key=jax.random.key(0))
-        npt.assert_allclose(y, jnp.zeros_like(x), rtol=0, atol=0)
-
-    def test_p_above_one_returns_zeros(self):
-        """p > 1.0 is clamped to full dropout."""
-        layer = nn.Dropout(p=1.5)
         x = jnp.ones((4, 8))
         y = layer(x, key=jax.random.key(0))
         npt.assert_allclose(y, jnp.zeros_like(x), rtol=0, atol=0)
