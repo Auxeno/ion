@@ -22,19 +22,20 @@ def triangle_graph_no_self_loops():
 
 
 def _build_gnn_layers(key):
-    keys = iter(jax.random.split(key, 14))
+    keys = iter(jax.random.split(key, 15))
     senders = jnp.array([0, 1, 1, 2, 0, 2, 0, 1, 2])
     receivers = jnp.array([1, 0, 2, 1, 2, 0, 0, 1, 2])
     x = jax.random.normal(next(keys), (3, 8))
+    x_edge = jax.random.normal(next(keys), (9, 4))
     return [
-        (gnn.GCNConv(8, 16, key=next(keys)), x, senders, receivers),
-        (gnn.GCNConv(8, 16, bias=False, key=next(keys)), x, senders, receivers),
-        (gnn.GATConv(8, 16, num_heads=2, key=next(keys)), x, senders, receivers),
-        (gnn.GATConv(8, 16, num_heads=4, key=next(keys)), x, senders, receivers),
-        (gnn.GATConv(8, 16, num_heads=2, bias=False, key=next(keys)), x, senders, receivers),
-        (gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=next(keys)), x, senders, receivers),
-        (gnn.GATv2Conv(8, 16, num_heads=2, key=next(keys)), x, senders, receivers),
-        (gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=next(keys)), x, senders, receivers),
+        (gnn.GCNConv(8, 16, key=next(keys)), x, senders, receivers, None),
+        (gnn.GCNConv(8, 16, bias=False, key=next(keys)), x, senders, receivers, None),
+        (gnn.GATConv(8, 16, num_heads=2, key=next(keys)), x, senders, receivers, None),
+        (gnn.GATConv(8, 16, num_heads=4, key=next(keys)), x, senders, receivers, None),
+        (gnn.GATConv(8, 16, num_heads=2, bias=False, key=next(keys)), x, senders, receivers, None),
+        (gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=next(keys)), x, senders, receivers, x_edge),
+        (gnn.GATv2Conv(8, 16, num_heads=2, key=next(keys)), x, senders, receivers, None),
+        (gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=next(keys)), x, senders, receivers, x_edge),
     ]
 
 

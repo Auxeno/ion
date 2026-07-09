@@ -84,6 +84,12 @@ class GATConv(Module):
         edge_mask: Bool[Array, " e"] | None = None,
     ) -> Float[Array, "n o"]:
 
+        # Guard silent edge-feature mismatches between construction and call
+        if x_edge is None and self.edge_dim is not None:
+            raise ValueError(f"edge_dim={self.edge_dim} set at init but no x_edge passed at call")
+        if x_edge is not None and self.edge_dim is None:
+            raise ValueError("x_edge passed at call but edge_dim not set at init")
+
         n, i = x.shape
 
         # Project input features into multi-head space
@@ -188,6 +194,12 @@ class GATv2Conv(Module):
         x_edge: Float[Array, "e f"] | None = None,
         edge_mask: Bool[Array, " e"] | None = None,
     ) -> Float[Array, "n o"]:
+
+        # Guard silent edge-feature mismatches between construction and call
+        if x_edge is None and self.edge_dim is not None:
+            raise ValueError(f"edge_dim={self.edge_dim} set at init but no x_edge passed at call")
+        if x_edge is not None and self.edge_dim is None:
+            raise ValueError("x_edge passed at call but edge_dim not set at init")
 
         n, i = x.shape
 

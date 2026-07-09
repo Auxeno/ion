@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.2
+
+- **Dropout validates `p` at construction.** `p` outside `[0, 1]` now raises `ValueError`;
+  previously out-of-range values silently corrupted outputs (negative `p` rescaled
+  activations with no mask applied).
+- **GAT layers require `x_edge` and `edge_dim` together.** `GATConv` and `GATv2Conv` now
+  raise `ValueError` when one is provided without the other; previously an edge-aware layer
+  called without `x_edge` silently ignored its edge parameters, and passing `x_edge` to a
+  non-edge layer failed with a cryptic shape error.
+- **Pooling padding must be smaller than the kernel.** `MaxPool` and `AvgPool` now raise
+  `ValueError` at construction when a `padding` value is greater than or equal to the
+  corresponding `kernel_shape` entry; previously such a config produced a window landing
+  entirely in padding, which gave `AvgPool` a `0 / 0 = NaN` output and `MaxPool` a `-inf`
+  output. String paddings (`'SAME'`, `'VALID'`) are unaffected.
+
 ## 0.6.1
 
 - **Breaking: `rope` and `apply_rope` replaced by the `RoPE` module.** `nn.RoPE(theta)`

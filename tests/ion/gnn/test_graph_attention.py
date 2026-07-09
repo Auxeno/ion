@@ -153,14 +153,13 @@ class TestGATConvEdgeFeatures:
         npt.assert_allclose(grads.w_edge._value, jnp.zeros_like(grads.w_edge._value), atol=1e-7)
         npt.assert_allclose(grads.att_edge._value, jnp.zeros_like(grads.att_edge._value), atol=1e-7)
 
-    def test_edge_dim_without_x_edge(self, triangle_graph):
-        """edge_dim set but x_edge omitted still produces valid output (ignores edge path)."""
+    def test_edge_dim_without_x_edge_raises(self, triangle_graph):
+        """edge_dim set but x_edge omitted raises instead of silently skipping edge features."""
         senders, receivers = triangle_graph
         gat = gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 8))
-        y = gat(x, senders, receivers)
-        assert y.shape == (3, 16)
-        assert jnp.all(jnp.isfinite(y))
+        with pytest.raises(ValueError):
+            gat(x, senders, receivers)
 
     def test_x_edge_without_edge_dim_raises(self, triangle_graph):
         """Passing x_edge to a layer without edge_dim raises."""
@@ -169,7 +168,7 @@ class TestGATConvEdgeFeatures:
         gat = gnn.GATConv(8, 16, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             gat(x, senders, receivers, x_edge)
 
     def test_edge_jit(self, triangle_graph):
@@ -396,14 +395,13 @@ class TestGATv2ConvEdgeFeatures:
         grads = jax.grad(lambda m: m(x, senders, receivers, x_edge).sum())(frozen)
         npt.assert_allclose(grads.w_edge._value, jnp.zeros_like(grads.w_edge._value), atol=1e-7)
 
-    def test_edge_dim_without_x_edge(self, triangle_graph):
-        """edge_dim set but x_edge omitted still produces valid output."""
+    def test_edge_dim_without_x_edge_raises(self, triangle_graph):
+        """edge_dim set but x_edge omitted raises instead of silently skipping edge features."""
         senders, receivers = triangle_graph
         gat = gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 8))
-        y = gat(x, senders, receivers)
-        assert y.shape == (3, 16)
-        assert jnp.all(jnp.isfinite(y))
+        with pytest.raises(ValueError):
+            gat(x, senders, receivers)
 
     def test_x_edge_without_edge_dim_raises(self, triangle_graph):
         """Passing x_edge to a layer without edge_dim raises."""
@@ -412,7 +410,7 @@ class TestGATv2ConvEdgeFeatures:
         gat = gnn.GATv2Conv(8, 16, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             gat(x, senders, receivers, x_edge)
 
     def test_edge_jit(self, triangle_graph):
