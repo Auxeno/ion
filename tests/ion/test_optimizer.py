@@ -437,7 +437,7 @@ class TestOptimizerStructureMismatch:
         optimizer = ion.Optimizer(optax.adam(1e-3), model_a)
         grads_b = jax.grad(lambda m: jnp.mean(m(jnp.ones((2, 4))) ** 2))(model_b)
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError, match="create a new Optimizer"):
             optimizer.update(model_b, grads_b)
 
     def test_different_model_type_raises(self):
@@ -448,8 +448,60 @@ class TestOptimizerStructureMismatch:
         other = WithBareArray(key=jax.random.key(1))
         grads_other = jax.grad(lambda m: jnp.sum(m(jnp.ones(4))))(other)
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError, match="create a new Optimizer"):
             optimizer.update(other, grads_other)
+
+    def test_freeze_after_init_raises(self):
+        """Freezing params after optimizer construction raises a clear error."""
+        model = nn.Linear(4, 2, key=jax.random.key(0))
+        optimizer = ion.Optimizer(optax.adam(1e-3), model)
+
+        frozen = model.freeze()
+        grads = jax.grad(lambda m: jnp.mean(m(jnp.ones((2, 4))) ** 2))(frozen)
+
+        with pytest.raises(ValueError, match="create a new Optimizer"):
+            optimizer.update(frozen, grads)
+
+    def test_unfreeze_after_init_raises_stateless(self):
+        """Unfreezing after construction raises even for stateless transforms like plain SGD."""
+        model = nn.Linear(4, 2, key=jax.random.key(0)).freeze()
+        optimizer = ion.Optimizer(optax.sgd(1e-2), model)
+
+        unfrozen = model.unfreeze()
+        grads = jax.grad(lambda m: jnp.mean(m(jnp.ones((2, 4))) ** 2))(unfrozen)
+
+        with pytest.raises(ValueError, match="create a new Optimizer"):
+            optimizer.update(unfrozen, grads)
+
+    def test_freeze_after_init_raises_under_jit(self):
+        """The trainability check also raises at trace time inside jax.jit."""
+        model = nn.Linear(4, 2, key=jax.random.key(0))
+        optimizer = ion.Optimizer(optax.adam(1e-3), model)
+        frozen = model.freeze()
+
+        @jax.jit
+        def train_step(model, optimizer):
+            grads = jax.grad(lambda m: jnp.mean(m(jnp.ones((2, 4))) ** 2))(model)
+            return optimizer.update(model, grads)
+
+        with pytest.raises(ValueError, match="create a new Optimizer"):
+            train_step(frozen, optimizer)
+
+    def test_new_optimizer_after_freeze_trains(self):
+        """The remedy works: recreating the optimizer after freezing trains correctly."""
+        model = TwoHead(key=jax.random.key(0))
+        optimizer = ion.Optimizer(optax.adam(1e-2), model)
+
+        model = model.replace(encoder=model.encoder.freeze())
+        optimizer = ion.Optimizer(optax.adam(1e-2), model)
+
+        frozen_w = model.encoder.w._value
+        grads = jax.grad(lambda m: jnp.mean(m(jnp.ones((2, 4))) ** 2))(model)
+        new_model, optimizer = optimizer.update(model, grads)
+
+        npt.assert_array_equal(new_model.encoder.w._value, frozen_w)
+        assert not jnp.array_equal(new_model.decoder.w._value, model.decoder.w._value)
+        assert optimizer.step == 1
 
 
 class TwoHead(nn.Module):

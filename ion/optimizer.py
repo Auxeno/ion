@@ -132,7 +132,7 @@ class Optimizer:
     ... )
     """
 
-    __slots__ = ("_transform", "_fields", "state", "step")
+    __slots__ = ("_transform", "_fields", "_structure", "state", "step")
 
     def __init__(
         self,
@@ -145,6 +145,7 @@ class Optimizer:
         else:
             self._transform = _auto_partition(tx, model)
             self._fields = None
+        self._structure = jax.tree.structure(model)
         self.state = self._transform.init(model)
         self.step = jnp.array(0, dtype=jnp.int32)
 
@@ -165,6 +166,9 @@ class Optimizer:
         tuple[PyTree, Optimizer]
             Updated model and optimizer.
         """
+        if jax.tree.structure(model) != self._structure:
+            raise ValueError("Model structure or trainability changed, create a new Optimizer.")
+
         updates, new_state = self._transform.update(
             grads,
             self.state,
@@ -175,6 +179,7 @@ class Optimizer:
         return new_model, Optimizer._new(
             self._transform,
             self._fields,
+            self._structure,
             new_state,
             self.step + 1,
         )
@@ -184,6 +189,7 @@ class Optimizer:
         cls,
         tx: optax.GradientTransformation,
         fields: tuple[str, ...] | None,
+        structure: Any,
         state: optax.OptState,
         step: jax.Array,
     ) -> "Optimizer":
@@ -191,18 +197,19 @@ class Optimizer:
         obj = object.__new__(cls)
         obj._transform = tx
         obj._fields = fields
+        obj._structure = structure
         obj.state = state
         obj.step = step
         return obj
 
     def tree_flatten(self) -> tuple[tuple, tuple]:
-        return (self.state, self.step), (self._transform, self._fields)
+        return (self.state, self.step), (self._transform, self._fields, self._structure)
 
     @classmethod
     def tree_unflatten(cls, aux: tuple, children: tuple) -> "Optimizer":
-        tx, fields = aux
+        tx, fields, structure = aux
         state, step = children
-        return cls._new(tx, fields, state, step)
+        return cls._new(tx, fields, structure, state, step)
 
     def __repr__(self) -> str:
         """Minimal textual pretty printing."""

@@ -13,6 +13,12 @@
   zeros instead of NaN. Rows with at least one attendable position are unchanged.
 - **Exact `segment_softmax` normalization.** Removed the `1e-6` denominator epsilon, which
   biased every attention weight slightly low; per-segment weights now sum to exactly 1.
+- **`Optimizer.update` rejects trainability changes with a clear error.** The
+  frozen/trainable partition is baked into the optimizer state at construction, so calling
+  `freeze()`/`unfreeze()` on the model and reusing the old optimizer previously failed with a
+  cryptic pytree mismatch (or, for stateless transforms, silently left unfrozen params
+  untrained). `update()` now checks the model structure against the one recorded at
+  construction and raises `ValueError` telling you to create a new Optimizer.
 
 ## 0.6.0
 
