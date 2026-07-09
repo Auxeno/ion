@@ -627,6 +627,56 @@ class TestContainerFields:
         npt.assert_allclose(jitted, eager)
 
 
+class TestClassDefaultFields:
+    def test_unassigned_default_field_works(self):
+        """Custom __init__ can rely on a class-level default without assigning it."""
+
+        class MyNorm(nn.Module):
+            w: nn.Param
+            eps: float = 1e-5
+
+            def __init__(self, dim, *, key):
+                self.w = nn.Param(jax.random.normal(key, (dim,)))
+
+            def __call__(self, x):
+                return self.w * x / (jnp.linalg.norm(x) + self.eps)
+
+        m = MyNorm(4, key=jax.random.key(0))
+        assert m.eps == 1e-5
+        x = jnp.ones(4)
+        eager = m(x)
+        jitted = jax.jit(m)(x)
+        npt.assert_allclose(jitted, eager, rtol=1e-5, atol=1e-5)
+
+    def test_default_field_survives_pytree_roundtrip(self):
+        """Class-default fields are preserved through flatten/unflatten."""
+
+        class WithDefault(nn.Module):
+            w: nn.Param
+            eps: float = 1e-5
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (4,)))
+
+        m = WithDefault(key=jax.random.key(0))
+        leaves, treedef = jtu.tree_flatten(m)
+        rebuilt = jtu.tree_unflatten(treedef, leaves)
+        assert rebuilt.eps == 1e-5
+
+    def test_missing_field_raises_clear_error(self):
+        """A field with no default that __init__ never assigns raises at construction."""
+
+        class NoDefault(nn.Module):
+            w: nn.Param
+            eps: float
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (4,)))
+
+        with pytest.raises(AttributeError, match="'eps'.*never assigned"):
+            NoDefault(key=jax.random.key(0))
+
+
 class EncoderDecoder(NamedTuple):
     encoder: nn.Linear
     decoder: nn.Linear

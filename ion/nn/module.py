@@ -56,7 +56,14 @@ def _register_module_as_pytree(cls: type) -> Any:
         static_names: list[str] = []
 
         for name in field_names:
-            value = obj.__dict__[name]
+            # getattr falls back to class-level defaults for fields not assigned in __init__
+            try:
+                value = getattr(obj, name)
+            except AttributeError:
+                raise AttributeError(
+                    f"Field '{name}' of {type(obj).__name__} was never assigned "
+                    f"in __init__ and has no default."
+                ) from None
 
             if isinstance(value, array_like):
                 child_info.append((name, "leaf"))
@@ -78,7 +85,7 @@ def _register_module_as_pytree(cls: type) -> Any:
 
         children = []
         for name, kind in child_info:
-            value = obj.__dict__[name]
+            value = getattr(obj, name)
             if kind == "leaf":
                 children.append((jtu.GetAttrKey(name), value))
             elif kind == "dict":
@@ -91,7 +98,7 @@ def _register_module_as_pytree(cls: type) -> Any:
                 wrapped = type(value)(*items) if hasattr(value, "_fields") else type(value)(items)
                 children.append((jtu.GetAttrKey(name), wrapped))
 
-        static_values = tuple(obj.__dict__[name] for name in static_names)
+        static_values = tuple(getattr(obj, name) for name in static_names)
         return children, (child_info, static_names, static_values)
 
     def unflatten(aux: tuple, children: Iterable[Any]) -> Any:

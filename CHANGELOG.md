@@ -13,6 +13,10 @@
   zeros instead of NaN. Rows with at least one attendable position are unchanged.
 - **Exact `segment_softmax` normalization.** Removed the `1e-6` denominator epsilon, which
   biased every attention weight slightly low; per-segment weights now sum to exactly 1.
+- **Class-level field defaults work with custom `__init__`.** A Module field with a class
+  default (`eps: float = 1e-5`) no longer needs to be assigned in a custom `__init__`;
+  construction previously crashed with a bare `KeyError`. A field with no default that is
+  never assigned now raises a clear `AttributeError` naming the field instead.
 - **NamedTuple Module fields work.** A Module field holding a NamedTuple of array-like
   elements (Params, Modules, arrays) previously crashed on flatten/unflatten because
   containers were rebuilt by passing an iterable to the constructor; NamedTuples are now
