@@ -1,14 +1,13 @@
 """Multi-head attention layers from Vaswani et al., 2017.
 
 Modules:
-    SelfAttention   Fused QKV projection for self-attention.
-    CrossAttention  Separate Q and KV projections for cross-attention.
+    SelfAttention   Multi-head self-attention.
+    CrossAttention  Multi-head cross-attention.
 
 Truncated normal weight init (std=0.02), zeros for bias.
-QKV fused into a single weight matrix for self-attention.
+Grouped-query and multi-query attention use fewer key/value heads than query heads.
 Optional boolean mask: True = attend, False = ignore.
 Masks may be (s, t) shared, (b, s, t) per batch, or (b, h, s, t) per head.
-A query row with no attendable positions outputs zeros.
 """
 
 import jax
@@ -28,33 +27,45 @@ class SelfAttention(Module):
     >>> attn(x, mask=mask)  # mask: bool (s, s), (b, s, s) or (b, h, s, s)
     """
 
-    w_qkv: Param[Float[Array, "d 3 h k"]]
+    w_q: Param[Float[Array, "d h k"]]
+    w_kv: Param[Float[Array, "2 d j k"]]
     w_out: Param[Float[Array, "h k d"]]
     b_out: Param[Float[Array, " d"]] | None
     causal: bool
+    window: int | tuple[int, int] | None
 
     def __init__(
         self,
         dim: int,
         num_heads: int = 1,
+        num_kv_heads: int | None = None,
         bias: bool = False,
         causal: bool = False,
+        window: int | tuple[int, int] | None = None,
         w_init: Initializer = jax.nn.initializers.truncated_normal(0.02),
         b_init: Initializer = jax.nn.initializers.zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
 
+        if num_kv_heads is None:
+            num_kv_heads = num_heads
         if dim % num_heads != 0:
             raise ValueError(f"dim ({dim}) must be divisible by num_heads ({num_heads})")
+        if num_heads % num_kv_heads != 0:
+            raise ValueError(
+                f"num_heads ({num_heads}) must be divisible by num_kv_heads ({num_kv_heads})"
+            )
 
-        key_w_qkv, key_w_out, key_b_out = jax.random.split(key, 3)
+        key_q, key_kv, key_out, key_b = jax.random.split(key, 4)
         head_dim = dim // num_heads
-        self.w_qkv = Param(w_init(shape=(dim, 3, num_heads, head_dim), key=key_w_qkv))
-        self.w_out = Param(w_init(shape=(num_heads, head_dim, dim), key=key_w_out))
-        self.b_out = Param(b_init(shape=(dim,), key=key_b_out)) if bias else None
+        self.w_q = Param(w_init(shape=(dim, num_heads, head_dim), key=key_q))
+        self.w_kv = Param(w_init(shape=(2, dim, num_kv_heads, head_dim), key=key_kv))
+        self.w_out = Param(w_init(shape=(num_heads, head_dim, dim), key=key_out))
+        self.b_out = Param(b_init(shape=(dim,), key=key_b)) if bias else None
 
         self.causal = causal
+        self.window = window
 
     def __call__(
         self,
@@ -62,24 +73,15 @@ class SelfAttention(Module):
         mask: Bool[Array, "s s"] | Bool[Array, "b s s"] | Bool[Array, "b h s s"] | None = None,
     ) -> Float[Array, "b s d"]:
 
-        b, s, d = x.shape
+        q = jnp.einsum("bsd, dhk -> bshk", x, self.w_q)
+        k, v = jnp.einsum("bsd, idjk -> ibsjk", x, self.w_kv)
 
-        qkv = jnp.einsum("bsd, dihk -> bsihk", x, self.w_qkv)
-        q, k, v = jnp.moveaxis(qkv, -3, 0)
+        if mask is not None and mask.ndim == 3:
+            mask = mask[:, None]
 
-        logits = jnp.einsum("bshk, bthk -> bhst", q, k) / jnp.sqrt(self.w_qkv.shape[-1])
-
-        attend = None
-        if self.causal:
-            attend = jnp.tril(jnp.ones(logits.shape[-2:], dtype=bool))
-
-        if mask is not None:
-            if mask.ndim == 3:
-                mask = mask[:, None]
-            attend = mask if attend is None else attend & mask
-
-        attention = jax.nn.softmax(logits, axis=-1, where=attend)
-        x = jnp.einsum("bhst, bthk -> bshk", attention, v)
+        x = jax.nn.dot_product_attention(
+            q, k, v, mask=mask, is_causal=self.causal, local_window_size=self.window
+        )
 
         x = jnp.einsum("bshk, hkd -> bsd", x, self.w_out)
 
@@ -98,7 +100,7 @@ class CrossAttention(Module):
     """
 
     w_q: Param[Float[Array, "d h k"]]
-    w_kv: Param[Float[Array, "d 2 h k"]]
+    w_kv: Param[Float[Array, "2 d h k"]]
     w_out: Param[Float[Array, "h k d"]]
     b_out: Param[Float[Array, " d"]] | None
 
@@ -116,12 +118,12 @@ class CrossAttention(Module):
         if dim % num_heads != 0:
             raise ValueError(f"dim ({dim}) must be divisible by num_heads ({num_heads})")
 
-        key_w_q, key_w_kv, key_w_out, key_b_out = jax.random.split(key, 4)
+        key_q, key_kv, key_out, key_b = jax.random.split(key, 4)
         head_dim = dim // num_heads
-        self.w_q = Param(w_init(shape=(dim, num_heads, head_dim), key=key_w_q))
-        self.w_kv = Param(w_init(shape=(dim, 2, num_heads, head_dim), key=key_w_kv))
-        self.w_out = Param(w_init(shape=(num_heads, head_dim, dim), key=key_w_out))
-        self.b_out = Param(b_init(shape=(dim,), key=key_b_out)) if bias else None
+        self.w_q = Param(w_init(shape=(dim, num_heads, head_dim), key=key_q))
+        self.w_kv = Param(w_init(shape=(2, dim, num_heads, head_dim), key=key_kv))
+        self.w_out = Param(w_init(shape=(num_heads, head_dim, dim), key=key_out))
+        self.b_out = Param(b_init(shape=(dim,), key=key_b)) if bias else None
 
     def __call__(
         self,
@@ -130,20 +132,13 @@ class CrossAttention(Module):
         mask: Bool[Array, "s t"] | Bool[Array, "b s t"] | Bool[Array, "b h s t"] | None = None,
     ) -> Float[Array, "b s d"]:
 
-        b, s, d = x.shape
-
         q = jnp.einsum("bsd, dhk -> bshk", x, self.w_q)
-        kv = jnp.einsum("btd, dihk -> btihk", context, self.w_kv)
-        k, v = jnp.moveaxis(kv, -3, 0)
+        k, v = jnp.einsum("btd, idhk -> ibthk", context, self.w_kv)
 
-        logits = jnp.einsum("bshk, bthk -> bhst", q, k) / jnp.sqrt(self.w_q.shape[-1])
+        if mask is not None and mask.ndim == 3:
+            mask = mask[:, None]
 
-        if mask is not None:
-            if mask.ndim == 3:
-                mask = mask[:, None]
-
-        attention = jax.nn.softmax(logits, axis=-1, where=mask)
-        x = jnp.einsum("bhst, bthk -> bshk", attention, v)
+        x = jax.nn.dot_product_attention(q, k, v, mask=mask)
 
         x = jnp.einsum("bshk, hkd -> bsd", x, self.w_out)
 

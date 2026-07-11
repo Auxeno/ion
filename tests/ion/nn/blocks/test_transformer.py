@@ -93,7 +93,7 @@ class TestTransformerBlock:
         custom = nn.TransformerBlock(
             32, num_heads=4, w_init=jax.nn.initializers.ones, key=jax.random.key(0)
         )
-        assert not jnp.allclose(default.att.w_qkv._value, custom.att.w_qkv._value)
+        assert not jnp.allclose(default.att.w_q._value, custom.att.w_q._value)
         assert not jnp.allclose(default.ff_1.w._value, custom.ff_1.w._value)
         assert not jnp.allclose(default.ff_2.w._value, custom.ff_2.w._value)
 

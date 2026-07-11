@@ -51,15 +51,16 @@ class TestSelfAttention:
     def test_truncated_normal_init(self):
         """Truncated normal init gives std close to 0.02 with no values beyond 2 sigma."""
         layer = nn.SelfAttention(256, num_heads=4, key=jax.random.key(42))
-        std = jnp.std(layer.w_qkv._value)
+        std = jnp.std(layer.w_q._value)
         npt.assert_allclose(std, 0.02, atol=0.005)
         # Truncated normal: no values beyond 2 sigma
-        assert jnp.all(jnp.abs(layer.w_qkv._value) <= 0.04 + 1e-6)
+        assert jnp.all(jnp.abs(layer.w_q._value) <= 0.04 + 1e-6)
 
     def test_default_dtype(self):
         """Weights default to float32."""
         layer = nn.SelfAttention(8, num_heads=2, key=jax.random.key(0))
-        assert layer.w_qkv.dtype == jnp.float32
+        assert layer.w_q.dtype == jnp.float32
+        assert layer.w_kv.dtype == jnp.float32
         assert layer.w_out.dtype == jnp.float32
 
     def test_mask_blocks_positions(self):
@@ -127,13 +128,12 @@ class TestSelfAttention:
         y = layer(x, mask=mask)
         assert y.shape == (2, 4, 8)
 
-    def test_fully_masked_row_outputs_zeros(self):
-        """A query row with no attendable positions outputs zeros, not NaN."""
+    def test_fully_masked_row_finite(self):
+        """A query row with no attendable positions stays finite (mean of values, not NaN)."""
         layer = nn.SelfAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 4, 8))
         mask = jnp.ones((2, 4, 4), dtype=bool).at[0, 2].set(False)
         y = layer(x, mask=mask)
-        npt.assert_array_equal(y[0, 2], 0.0)
         assert jnp.all(jnp.isfinite(y))
 
     def test_fully_masked_row_other_rows_unchanged(self):
@@ -148,12 +148,11 @@ class TestSelfAttention:
         npt.assert_allclose(y[1], y_full[1], atol=1e-6)
 
     def test_fully_masked_row_with_causal(self):
-        """Fully masked query row outputs zeros when combined with causal masking."""
+        """Fully masked query row stays finite when combined with causal masking."""
         layer = nn.SelfAttention(8, num_heads=2, causal=True, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 4, 8))
         mask = jnp.ones((2, 4, 4), dtype=bool).at[0, 2].set(False)
         y = layer(x, mask=mask)
-        npt.assert_array_equal(y[0, 2], 0.0)
         assert jnp.all(jnp.isfinite(y))
 
     def test_fully_masked_row_gradients_finite(self):
@@ -165,11 +164,43 @@ class TestSelfAttention:
         assert jnp.all(jnp.isfinite(grads))
 
 
+    def test_grouped_query_attention(self):
+        """num_kv_heads below num_heads (GQA) gives fewer kv heads and correct output shape."""
+        layer = nn.SelfAttention(8, num_heads=4, num_kv_heads=2, key=jax.random.key(0))
+        assert layer.w_q.shape == (8, 4, 2)  # (dim, num_heads, head_dim)
+        assert layer.w_kv.shape == (2, 8, 2, 2)  # (2, dim, num_kv_heads, head_dim)
+        x = jax.random.normal(jax.random.key(1), (2, 5, 8))
+        assert layer(x).shape == (2, 5, 8)
+
+    def test_multi_query_attention(self):
+        """num_kv_heads=1 (MQA) shares a single kv head across all query heads."""
+        layer = nn.SelfAttention(8, num_heads=4, num_kv_heads=1, key=jax.random.key(0))
+        assert layer.w_kv.shape == (2, 8, 1, 2)
+        x = jnp.ones((2, 5, 8))
+        assert layer(x).shape == (2, 5, 8)
+
+    def test_sliding_window(self):
+        """Sliding window blocks attention between positions farther apart than the window."""
+        layer = nn.SelfAttention(8, num_heads=1, window=1, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (1, 5, 8))
+        jac = jax.jacobian(layer)(x)  # (1, 5, 8, 1, 5, 8)
+        jac_seq = jnp.sum(jnp.abs(jac), axis=(0, 2, 3, 5))  # (5, 5)
+        # Positions more than 1 apart cannot influence each other
+        ids = jnp.arange(5)
+        far = jnp.abs(ids[:, None] - ids[None, :]) > 1
+        npt.assert_allclose(jac_seq * far, 0.0, atol=1e-5)
+
+
 class TestSelfAttentionValidation:
     def test_dim_not_divisible_by_num_heads_raises(self):
         """dim must be divisible by num_heads."""
         with pytest.raises(ValueError, match="divisible"):
             nn.SelfAttention(dim=7, num_heads=3, key=jax.random.key(0))
+
+    def test_num_heads_not_divisible_by_num_kv_heads_raises(self):
+        """num_heads must be divisible by num_kv_heads."""
+        with pytest.raises(ValueError, match="divisible"):
+            nn.SelfAttention(dim=8, num_heads=4, num_kv_heads=3, key=jax.random.key(0))
 
 
 class TestCrossAttention:
@@ -287,14 +318,13 @@ class TestCrossAttention:
         y = layer(x, ctx, mask=mask)
         assert y.shape == (2, 3, 8)
 
-    def test_fully_masked_row_outputs_zeros(self):
-        """A query row with no attendable context positions outputs zeros, not NaN."""
+    def test_fully_masked_row_finite(self):
+        """A query row with no attendable context positions stays finite (not NaN)."""
         layer = nn.CrossAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 3, 8))
         ctx = jax.random.normal(jax.random.key(2), (2, 5, 8))
         mask = jnp.ones((2, 3, 5), dtype=bool).at[0, 1].set(False)
         y = layer(x, ctx, mask=mask)
-        npt.assert_array_equal(y[0, 1], 0.0)
         assert jnp.all(jnp.isfinite(y))
 
     def test_fully_masked_row_other_rows_unchanged(self):

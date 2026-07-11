@@ -40,6 +40,7 @@ class TransformerBlock(Module):
         self,
         dim: int,
         num_heads: int = 8,
+        num_kv_heads: int | None = None,
         ff_dim: int | None = None,
         bias: bool = False,
         causal: bool = False,
@@ -54,7 +55,9 @@ class TransformerBlock(Module):
             ff_dim = 4 * dim
 
         key_att, key_ff_1, key_ff_2 = jax.random.split(key, 3)
-        self.att = SelfAttention(dim, num_heads, bias, causal, w_init, b_init, key=key_att)
+        self.att = SelfAttention(
+            dim, num_heads, num_kv_heads, bias, causal, w_init=w_init, b_init=b_init, key=key_att
+        )
         self.norm_att = LayerNorm(dim)
         self.norm_ff = LayerNorm(dim)
         self.ff_1 = Linear(dim, ff_dim, bias, w_init, b_init, key=key_ff_1)
