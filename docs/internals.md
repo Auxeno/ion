@@ -121,6 +121,19 @@ Known gotchas to be aware of when using Ion. Some are limitations of JAX:
 
 - **`replace()` can change pytree structure.** Replacing a `Param` field with a plain array or `None` changes the treedef. This is useful for model surgery, but subsequent `jax.tree.map` between the original and modified model will crash with a structure mismatch.
 
+- **Optimizer state is bound to the model at construction.** `ion.Optimizer` snapshots the model's pytree structure when created, including each `Param`'s `trainable` flag, and allocates no state buffers for frozen params. Changing the model afterwards, whether by `freeze()`/`unfreeze()` or by restructuring with `replace()`, invalidates that state, and the next `update()` raises `ValueError: Model structure or trainability changed, create a new Optimizer.` The fix is one line: build a fresh optimizer from the updated model. This resets momentum buffers, which is the correct semantics, as newly unfrozen params have no gradient history and staged-unfreezing schedules conventionally restart optimizer state at each stage.
+
+  ```python
+  optimizer = ion.Optimizer(optax.adam(3e-4), model)
+  model = model.unfreeze()
+  optimizer.update(model, grads)  # ValueError
+
+  # Fix: rebuild the optimizer after changing the model
+  optimizer = ion.Optimizer(optax.adam(3e-4), model)
+  ```
+
+  One case slips past the check: swapping a `Param` for one with a different shape leaves the treedef unchanged, so the mismatch surfaces as a shape error inside optax rather than Ion's `ValueError`. The same one-line fix applies.
+
 - **Some lower-level LAX functions don't accept `Param` directly.** Most `jnp` operations accept `Param` transparently (it appears as a `jax.Array` subclass to type checkers and implements `__jax_array__` for runtime conversion). However, lower-level functions like `lax.conv_general_dilated` require plain arrays. Use `jnp.asarray(param)` to convert. This calls `__jax_array__`, which applies `stop_gradient` for frozen params, so autograd correctness is preserved. **Do not use `param._value`**, which bypasses `stop_gradient` entirely: frozen params would receive gradients during the backward pass (wasting compute). The `_value` field is private and reserved for internal code that deliberately needs the raw array.
 
 - **Module immutability is shallow.** `_frozen` prevents field reassignment, but mutable containers (lists, dicts, numpy arrays) in fields can still be mutated in-place. For example, `model.layers.append(...)` bypasses the freeze. Worse, in-place mutation of a static field (like a list of ints) will **not** trigger JIT recompilation because JAX identifies the pytree aux data by object identity, so the same mutated list still hits the stale cached trace with the old value baked in. Use `replace()` to create a new module with the updated field instead.
