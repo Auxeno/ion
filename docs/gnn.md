@@ -77,6 +77,14 @@ y = gat(x, senders, receivers, x_edge)  # x_edge shape: (e, 8)
 
 When `edge_dim` is None (default), no extra parameters are created and behavior is identical to the standard GATConv. If `edge_dim` is set but `x_edge` is not passed at call time, the edge path is skipped. Passing `x_edge` without setting `edge_dim` will raise an error.
 
+**Edge masking.** Pass a boolean `edge_mask` of shape `(e,)` to disable individual edges. Edges marked `False` get `-inf` attention logits (zero attention weight) and their edge features are zeroed:
+
+```python
+y = gat(x, senders, receivers, x_edge, edge_mask)  # edge_mask shape: (e,) bool
+```
+
+This is useful for padded batches (mask out dummy edges) or dropping edges at inference without rebuilding the edge index.
+
 ### GATv2Conv
 
 Dynamic Graph Attention Network (Brody et al., 2022). Fixes a theoretical limitation of GATConv where attention rankings are "static" (identical for all query nodes). GATv2 applies LeakyReLU *after* combining sender and receiver features, making attention scores depend on both nodes:
@@ -95,7 +103,7 @@ y = gat(x, senders, receivers)  # (n, 16) -> (n, 32)
 
 Structural differences from GATConv: two weight matrices (`w_sender`, `w_receiver`) instead of one, and a single attention vector (`att`) instead of two. This means attention must be computed per-edge rather than decomposed to node-level scores.
 
-**Edge features.** Same `edge_dim` / `x_edge` interface as GATConv. The difference is that edge features are added *inside* the LeakyReLU (before the attention dot product), so the nonlinearity mixes node and edge information:
+**Edge features.** Same `edge_dim` / `x_edge` / `edge_mask` interface as GATConv (`False` edges get zero attention). The difference is that edge features are added *inside* the LeakyReLU (before the attention dot product), so the nonlinearity mixes node and edge information:
 
 ```python
 gat = gnn.GATv2Conv(in_dim=16, out_dim=32, num_heads=4, edge_dim=8, key=key)
