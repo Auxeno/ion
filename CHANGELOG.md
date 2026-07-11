@@ -1,7 +1,20 @@
 # Changelog
 
-## 0.6.3
+## 0.7.0
 
+- **Nested containers in Module fields are now pytree children.** Field classification
+  previously looked only one level deep, so a `list[list[Module]]` or `dict[str, list[Module]]`
+  field was silently treated as static metadata: its params were invisible to `jax.grad`,
+  skipped by `ion.Optimizer`, and baked into `jit` traces as compile-time constants, meaning
+  such models silently did not train. Containers are now classified by their contents at any
+  depth. Containers holding only modules and arrays traverse natively; mixed containers wrap
+  non-array elements (callables, strings) as static metadata at any nesting depth. Flatten of
+  flat all-module containers is also slightly faster. Empty containers remain static.
+- **Tree calls migrated to the `jax.tree` namespace.** All `jax.tree_util.tree_*` operation
+  calls (`tree_leaves`, `tree_flatten_with_path`) now use their `jax.tree` equivalents, which
+  JAX documents as the current API (the `tree_util` spellings are listed as legacy).
+  Registration APIs (`register_dataclass`, `register_pytree_with_keys`) remain on
+  `jax.tree_util`, their supported home. No user-facing change.
 - **Attention rebuilt on `jax.nn.dot_product_attention`.** `SelfAttention` and `CrossAttention`
   delegate the scaled-dot-product core to JAX's kernel. The softmax now runs in float32 even
   under `bfloat16` (previously it ran in the input dtype, losing precision in mixed-precision
@@ -16,7 +29,7 @@
   separate query projection `w_q` `(dim, num_heads, head_dim)` and a fused key/value projection
   `w_kv` `(2, dim, num_kv_heads, head_dim)`, required to let key/value heads differ from query
   heads. `CrossAttention.w_kv` likewise moves its split axis first. Total parameter count is
-  unchanged, but checkpoints saved before 0.6.3 no longer load into the new layers.
+  unchanged, but checkpoints saved before 0.7.0 no longer load into the new layers.
 - **Breaking: `SelfAttention` constructor argument order.** `num_kv_heads` is inserted after
   `num_heads` and `window` after `causal`, so positional arguments past `num_heads` shift.
 - **Fully masked attention rows output the mean of the value vectors.** A query position with
@@ -25,7 +38,7 @@
   these positions out of the loss as usual.
 - **Migration.** Access attention weights via `w_q` / `w_kv` instead of `w_qkv`, and pass
   `bias`, `causal`, and initializers by keyword (or update positional calls for the new
-  `num_kv_heads` and `window` slots). Re-save any checkpoints written before 0.6.3.
+  `num_kv_heads` and `window` slots). Re-save any checkpoints written before 0.7.0.
 
 ## 0.6.2
 

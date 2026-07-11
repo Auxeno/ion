@@ -16,7 +16,6 @@ from typing import Any
 
 import jax
 import jax.numpy as jnp
-import jax.tree_util as jtu
 import numpy as np
 from jaxtyping import PyTree
 
@@ -45,7 +44,7 @@ def save(path: str, pytree: PyTree) -> None:
     --------
     >>> ion.checkpoint.save("model.npz", model)
     """
-    leaves_with_paths = jtu.tree_flatten_with_path(pytree, is_leaf=is_param)[0]
+    leaves_with_paths = jax.tree.flatten_with_path(pytree, is_leaf=is_param)[0]
 
     arrays_to_save: dict[str, np.ndarray] = {}
     trainable_flags: dict[str, bool] = {}
@@ -96,7 +95,7 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
     --------
     >>> model = ion.checkpoint.load("model.npz", model)
     """
-    leaves_with_paths, tree_def = jtu.tree_flatten_with_path(reference_pytree, is_leaf=is_param)
+    leaves_with_paths, tree_def = jax.tree.flatten_with_path(reference_pytree, is_leaf=is_param)
 
     # Mirror np.savez, which appends .npz to the path if missing
     if not path.endswith(".npz"):

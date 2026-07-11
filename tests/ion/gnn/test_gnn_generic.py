@@ -2,7 +2,6 @@ import tempfile
 
 import jax
 import jax.numpy as jnp
-import jax.tree_util as jtu
 import numpy.testing as npt
 
 import ion
@@ -74,9 +73,9 @@ def test_output_dtype(gnn_layer_and_graph):
 def test_pytree_roundtrip(gnn_layer_and_graph):
     """Flatten then unflatten reconstructs the layer exactly."""
     layer, _, _, _, _ = gnn_layer_and_graph
-    leaves, treedef = jtu.tree_flatten(layer)
-    reconstructed = jtu.tree_unflatten(treedef, leaves)
-    for a, b in zip(jtu.tree_leaves(layer), jtu.tree_leaves(reconstructed)):
+    leaves, treedef = jax.tree.flatten(layer)
+    reconstructed = jax.tree.unflatten(treedef, leaves)
+    for a, b in zip(jax.tree.leaves(layer), jax.tree.leaves(reconstructed)):
         if isinstance(a, jnp.ndarray):
             npt.assert_allclose(a, b, rtol=0, atol=0)
 

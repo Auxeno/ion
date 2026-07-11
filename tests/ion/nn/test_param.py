@@ -4,7 +4,6 @@ import tempfile
 
 import jax
 import jax.numpy as jnp
-import jax.tree_util as jtu
 import numpy.testing as npt
 import pytest
 
@@ -15,7 +14,7 @@ class TestPytreeRegistration:
     def test_flatten_unflatten_roundtrip(self):
         """Param survives pytree flatten/unflatten."""
         p = nn.Param(jnp.array([1.0, 2.0, 3.0]))
-        leaves, treedef = jtu.tree_flatten(p)
+        leaves, treedef = jax.tree.flatten(p)
         assert len(leaves) == 1
         npt.assert_array_equal(leaves[0], jnp.array([1.0, 2.0, 3.0]))
         reconstructed = treedef.unflatten(leaves)
@@ -26,7 +25,7 @@ class TestPytreeRegistration:
     def test_trainable_preserved_as_static(self):
         """trainable flag is preserved through flatten/unflatten as aux data."""
         p = nn.Param(jnp.array(1.0), trainable=False)
-        leaves, treedef = jtu.tree_flatten(p)
+        leaves, treedef = jax.tree.flatten(p)
         reconstructed = treedef.unflatten(leaves)
         assert reconstructed.trainable is False
 

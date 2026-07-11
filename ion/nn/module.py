@@ -67,10 +67,14 @@ def _register_module_as_pytree(cls: type) -> Any:
 
             if isinstance(value, array_like):
                 child_info.append((name, "leaf"))
-            elif isinstance(value, (tuple, list)) and any(isinstance(x, array_like) for x in value):
-                child_info.append((name, type(value).__name__))
-            elif isinstance(value, dict) and any(isinstance(v, array_like) for v in value.values()):
-                child_info.append((name, "dict"))
+            elif isinstance(value, (tuple, list, dict)):
+                leaves = jax.tree.leaves(value, is_leaf=lambda x: isinstance(x, array_like))
+                arrays = sum(isinstance(x, array_like) for x in leaves)
+                if arrays:
+                    # Pure containers traverse natively, mixed ones need _Static wrapping
+                    child_info.append((name, "container" if arrays == len(leaves) else "mixed"))
+                else:
+                    static_names.append(name)
             else:
                 static_names.append(name)
 
@@ -86,17 +90,13 @@ def _register_module_as_pytree(cls: type) -> Any:
         children = []
         for name, kind in child_info:
             value = getattr(obj, name)
-            if kind == "leaf":
-                children.append((jtu.GetAttrKey(name), value))
-            elif kind == "dict":
-                wrapped = {
-                    k: v if isinstance(v, array_like) else _Static(v) for k, v in value.items()
-                }
-                children.append((jtu.GetAttrKey(name), wrapped))
-            else:
-                items = [x if isinstance(x, array_like) else _Static(x) for x in value]
-                wrapped = type(value)(*items) if hasattr(value, "_fields") else type(value)(items)
-                children.append((jtu.GetAttrKey(name), wrapped))
+            if kind == "mixed":
+                value = jax.tree.map(
+                    lambda x: x if isinstance(x, array_like) else _Static(x),
+                    value,
+                    is_leaf=lambda x: isinstance(x, array_like),
+                )
+            children.append((jtu.GetAttrKey(name), value))
 
         static_values = tuple(getattr(obj, name) for name in static_names)
         return children, (child_info, static_names, static_values)
@@ -107,11 +107,12 @@ def _register_module_as_pytree(cls: type) -> Any:
 
         # Restore dynamic children, unwrapping _Static in mixed containers
         for (name, kind), value in zip(child_info, children):
-            if kind == "dict":
-                value = {k: v.value if isinstance(v, _Static) else v for k, v in value.items()}
-            elif kind != "leaf":
-                items = [x.value if isinstance(x, _Static) else x for x in value]
-                value = type(value)(*items) if hasattr(value, "_fields") else type(value)(items)
+            if kind == "mixed":
+                value = jax.tree.map(
+                    lambda x: x.value if isinstance(x, _Static) else x,
+                    value,
+                    is_leaf=lambda x: isinstance(x, (_Static, *array_like)),
+                )
             object.__setattr__(new_instance, name, value)
 
         # Restore static fields directly
@@ -319,7 +320,7 @@ class Module:
 
         >>> model.params  # Param leaves only, rest is None
         """
-        params = jtu.tree_map(
+        params = jax.tree.map(
             lambda leaf: leaf if tree.is_param(leaf) else None,
             self,
             is_leaf=tree.is_param,
@@ -332,5 +333,5 @@ class Module:
 
         >>> model.num_params  # e.g. 101770
         """
-        leaves = jtu.tree_leaves(self, is_leaf=tree.is_param)
+        leaves = jax.tree.leaves(self, is_leaf=tree.is_param)
         return sum(p._value.size for p in leaves if tree.is_param(p))
