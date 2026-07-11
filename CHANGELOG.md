@@ -102,7 +102,7 @@
 
 ## 0.5.0
 
-- **State Space Models.** New `S4D` (Gu et al., 2022), `S5` (Smith et al., 2023), and `LRU` (Orvieto et al., 2023) layers with matching cell variants. `LRU` uses `lax.associative_scan` for parallel sequence processing; `S4D` and `S5` use `lax.scan`.
+- **State Space Models.** New `S4D` (Gu et al., 2022), `S5` (Smith et al., 2023), and `LRU` (Orvieto et al., 2023) layers with matching cell variants. All three use `lax.associative_scan` for parallel sequence processing.
 - **Vanilla RNN.** New `RNN` and `RNNCell` layers alongside the existing LSTM and GRU.
 - **Type checker compatibility.** `Param` now exposes JAX array type information so static type checkers correctly resolve array operations.
 - **Pathfinder demo.** New example notebook training an S4D model on the Pathfinder-128 long-range task.
