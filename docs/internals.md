@@ -5,7 +5,6 @@ Everything behind the scenes in Ion. Three files and <1000 lines of code make up
 - [`ion/nn/param.py`](../ion/nn/param.py): Param wrapper, trainable/frozen distinction
 - [`ion/nn/module.py`](../ion/nn/module.py): Module base class, pytree registration
 - [`ion/optimizer.py`](../ion/optimizer.py): Optimizer wrapper, auto-partitioning for frozen params
-- [`ion/tree.py`](../ion/tree.py): freeze/unfreeze, astype utilities
 
 ## Param (`ion/nn/param.py`)
 
@@ -36,8 +35,8 @@ Three things happen in `__init_subclass__` when a class inherits from `Module`:
 2. **Pytree registration.** The class is registered with `register_pytree_with_keys`. Each field is classified once at construction time (via `isinstance` checks) and the result is cached on the instance:
 
    - **Array-like** (`Param`, `Module`, `jax.Array`, `np.ndarray`) → dynamic child, passed to JAX as-is.
-   - **Container with array-like elements** (e.g. a tuple of `Module`s in `Sequential`) → dynamic child. Non-array elements in the container are wrapped in `_Static` so JAX treats them as compile-time constants.
-   - **Everything else** (int, float, str, callable, None, ...) → static auxiliary data, stored in the treedef directly. No wrapping needed.
+   - **Container with array-like content at any depth** (a tuple of `Module`s in `Sequential`, a `list[list[Module]]`) → dynamic child. Containers are inspected recursively via `jax.tree.leaves`. Pure containers (only modules and arrays) traverse natively; mixed containers have their non-array elements wrapped in `_Static` at any nesting depth so JAX treats them as compile-time constants.
+   - **Everything else** (int, float, str, callable, None, containers with no arrays anywhere, ...) → static auxiliary data, stored in the treedef directly. No wrapping needed.
 
    Since modules are frozen after `__init__`, the classification never changes and subsequent flatten calls skip the `isinstance` checks entirely. Unflatten restores the cached classification from the treedef's auxiliary data so reconstructed instances are equally fast.
 
@@ -88,58 +87,96 @@ Layer constructors take no `dtype` argument. Parameters are created in JAX's def
 - **Mixed precision.** Keep float32 master params and cast the model to `bfloat16` *inside* the loss with `ion.astype(model, jnp.bfloat16)`. The cast is differentiable, so gradients return in float32 to match the master params and the optimizer state; only the forward/backward math runs in bfloat16. This mirrors Keras `mixed_bfloat16`, PyTorch AMP, and Flax's `param_dtype`/`dtype` split. See [`examples/gpt_tinystories.ipynb`](../examples/gpt_tinystories.ipynb) for a worked example.
 - **Full bfloat16 inference.** Cast once after construction with `model.astype(jnp.bfloat16)`.
 
-Two things to know. First, the promotion footgun: a bfloat16 model applied to float32 inputs silently upcasts the result to float32, so cast *both* the model and its inputs. Second, `ion.astype` casts by dtype family: a float target only touches float leaves, so the `complex64` state in SSM layers (LRU, S4D, S5) is preserved through a `bfloat16` cast.
-
 ## 🔪 Sharp Edges
 
-Known gotchas to be aware of when using Ion. Some are limitations of JAX:
+Known gotchas when using Ion. Some are JAX limitations, others follow from Ion's design.
 
-- **Python ints, floats, and strings are static, not dynamic.** When stored as module fields, plain Python scalars are placed in the treedef as static auxiliary data and baked into the compiled program. JAX cannot trace through them, so they are invisible to `jax.grad` and fixed at `jax.jit` compile time. Changing a static value (including `Param.trainable`) triggers JIT recompilation since every unique combination compiles a separate trace. If you need a value to be dynamic at runtime (e.g. a temperature parameter, a step counter), store it as a `jnp.array` or `Param` instead. Similarly, avoid calling `freeze()`/`unfreeze()` inside a training loop as it recompiles on every step. Set trainability once and keep it fixed.
+### Python scalars are compile-time constants
 
-  ```python
-  # Static: recompiles if temperature changes
-  self.temperature = 0.5
+Plain Python scalars (ints, floats, strings) stored as module fields go into the treedef as static auxiliary data. JAX cannot trace them: they are invisible to `jax.grad` and fixed at `jax.jit` compile time. If a value needs to change at runtime (a temperature, a step counter), store it as a `jnp.array` or `Param`.
 
-  # Dynamic: traced by JAX, no recompilation
-  self.temperature = jnp.array(0.5)
-  ```
+```python
+# Static: recompiles if temperature changes
+self.temperature = 0.5
 
-- **Pytrees cannot share references to the same object.** JAX pytrees are trees, not graphs. If two fields point to the same `Module` or `Param`, JAX duplicates the object during flatten/unflatten and updates to one copy won't affect the other. For weight tying (e.g. shared embedding and output projection), reference the underlying array directly instead of storing the same module twice:
+# Dynamic: traced by JAX, no recompilation
+self.temperature = jnp.array(0.5)
+```
 
-  ```python
-  # Don't do this, the two fields become independent copies
-  self.embed = Embedding(vocab, dim, key=key)
-  self.output_proj = self.embed  # silent duplication
+Every distinct set of static values compiles a separate trace, so changing one triggers recompilation. `Param.trainable` is static too: set trainability once, before training. Calling `freeze()`/`unfreeze()` inside a training loop recompiles every step.
 
-  # Do this instead, reference the weight explicitly
-  self.embed = Embedding(vocab, dim, key=key)
-  # In __call__:
-  logits = x @ self.embed.w.T  # shared weight, no duplication
-  ```
+### Pytrees cannot share references
 
-- **`save`/`load` doesn't store callables or static config.** Non-array fields (ints, strings, callables like activation functions) come from the reference tree, not the file. Array data and `trainable` flags are saved and restored. Extension dtypes numpy can't store natively (`bfloat16`, `float8`) are written as raw bytes with the dtype recorded in metadata, so they round-trip exactly. Shape mismatches between saved and reference arrays raise `ValueError`.
+JAX pytrees are trees, not graphs. If two fields point to the same `Module` or `Param`, JAX silently duplicates the object during flatten/unflatten, and updates to one copy stop affecting the other. For weight tying (e.g. shared embedding and output projection), reference the underlying array instead of storing the module twice:
 
-- **`replace()` can change pytree structure.** Replacing a `Param` field with a plain array or `None` changes the treedef. This is useful for model surgery, but subsequent `jax.tree.map` between the original and modified model will crash with a structure mismatch.
+```python
+# Don't: the two fields become independent copies
+self.embed = Embedding(vocab, dim, key=key)
+self.output_proj = self.embed
 
-- **Optimizer state is bound to the model at construction.** `ion.Optimizer` snapshots the model's pytree structure when created, including each `Param`'s `trainable` flag, and allocates no state buffers for frozen params. Changing the model afterwards, whether by `freeze()`/`unfreeze()` or by restructuring with `replace()`, invalidates that state, and the next `update()` raises `ValueError: Model structure or trainability changed, create a new Optimizer.` The fix is one line: build a fresh optimizer from the updated model. This resets momentum buffers, which is the correct semantics, as newly unfrozen params have no gradient history and staged-unfreezing schedules conventionally restart optimizer state at each stage.
+# Do: reference the weight explicitly
+self.embed = Embedding(vocab, dim, key=key)
+# In __call__:
+logits = x @ self.embed.w.T
+```
 
-  ```python
-  optimizer = ion.Optimizer(optax.adam(3e-4), model)
-  model = model.unfreeze()
-  optimizer.update(model, grads)  # ValueError
+### `save`/`load` doesn't store callables or static config
 
-  # Fix: rebuild the optimizer after changing the model
-  optimizer = ion.Optimizer(optax.adam(3e-4), model)
-  ```
+Non-array fields (ints, strings, activation functions) come from the reference tree passed to `load`, not from the file. If you change an activation in code and load an old checkpoint, you get the new activation with the old weights, with no warning. Array data and `trainable` flags do round-trip exactly, including `bfloat16`/`float8` (stored as raw bytes with the dtype in metadata); shape mismatches raise `ValueError`.
 
-  One case slips past the check: swapping a `Param` for one with a different shape leaves the treedef unchanged, so the mismatch surfaces as a shape error inside optax rather than Ion's `ValueError`. The same one-line fix applies.
+### `replace()` can change pytree structure
 
-- **Some lower-level LAX functions don't accept `Param` directly.** Most `jnp` operations accept `Param` transparently (it appears as a `jax.Array` subclass to type checkers and implements `__jax_array__` for runtime conversion). However, lower-level functions like `lax.conv_general_dilated` require plain arrays. Use `jnp.asarray(param)` to convert. This calls `__jax_array__`, which applies `stop_gradient` for frozen params, so autograd correctness is preserved. **Do not use `param._value`**, which bypasses `stop_gradient` entirely: frozen params would receive gradients during the backward pass (wasting compute). The `_value` field is private and reserved for internal code that deliberately needs the raw array.
+Replacing a `Param` field with a plain array or `None` changes the treedef. That is useful for model surgery, but a later `jax.tree.map` between the original and modified model crashes with a structure mismatch.
 
-- **Module immutability is shallow.** `_frozen` prevents field reassignment, but mutable containers (lists, dicts, numpy arrays) in fields can still be mutated in-place. For example, `model.layers.append(...)` bypasses the freeze. Worse, in-place mutation of a static field (like a list of ints) will **not** trigger JIT recompilation because JAX identifies the pytree aux data by object identity, so the same mutated list still hits the stale cached trace with the old value baked in. Use `replace()` to create a new module with the updated field instead.
+### Optimizer state is bound to the model at construction
 
-- **`Param.__eq__` returns a JAX array, not a bool.** `param in list` can raise `ValueError` for multi-element params because Python calls `bool()` on the array result, which is ambiguous for arrays with more than one element.
+`ion.Optimizer` snapshots the model's pytree structure when created, including each `Param`'s `trainable` flag, and allocates no state for frozen params. If you then change the model, whether by `freeze()`/`unfreeze()` or by restructuring with `replace()`, the next `update()` raises `ValueError: Model structure or trainability changed, create a new Optimizer.` The fix is one line: rebuild the optimizer from the updated model.
 
-- **Nested `jax.grad(jax.grad(f))` on `Param` raises `ValueError`.** JAX triggers `__jax_array__()` during abstractification of the intermediate gradient `Param`, which is no longer supported. In practice this rarely matters: `jax.grad(jax.grad(f))` only works on scalar-to-scalar functions even with plain arrays (the inner `grad` of `f: R^n -> R` returns a vector, which the outer `grad` rejects). Use `jax.hessian` for second-order derivatives, which works correctly with both `Param` and `Module`.
+```python
+optimizer = ion.Optimizer(optax.adam(3e-4), model)
+model = model.unfreeze()
+optimizer.update(model, grads)  # ValueError
 
-- **`Module.params` preserves static fields alongside `Param` leaves.** Plain arrays become `None`, while non-array fields (ints, floats, strings, callables) remain unchanged. This is by design: static fields are structural metadata stored in the treedef, not pytree leaves, so they are naturally unaffected when `params` replaces non-`Param` leaves with `None`.
+# Fix: rebuild the optimizer after changing the model
+optimizer = ion.Optimizer(optax.adam(3e-4), model)
+```
+
+Rebuilding resets momentum buffers, which is what you want: newly unfrozen params have no gradient history. One case slips past the check: swapping a `Param` for one with a different shape leaves the treedef unchanged, so the mismatch surfaces as a shape error inside optax rather than Ion's `ValueError`. The same fix applies.
+
+### Some lower-level LAX functions don't accept `Param` directly
+
+Most `jnp` operations accept `Param` transparently. Lower-level functions like `lax.conv_general_dilated` require plain arrays: convert with `jnp.asarray(param)`, which goes through `__jax_array__` and applies `stop_gradient` for frozen params, so autograd correctness is preserved. **Never use `param._value` for this.** It bypasses `stop_gradient`, so frozen params receive real gradients during the backward pass, breaking the guarantee that frozen params produce zero gradients. The field is private, reserved for internal code that deliberately needs the raw array.
+
+### A `bfloat16` model with `float32` inputs promotes back to `float32`
+
+Casting the model alone buys you nothing: under JAX type promotion, `bfloat16` weights applied to `float32` inputs silently upcast every result back to `float32`. Cast both the model and its inputs.
+
+```python
+model = model.astype(jnp.bfloat16)
+y = model(x.astype(jnp.bfloat16))
+```
+
+### Module immutability is shallow
+
+`_frozen` prevents field reassignment, but mutable containers (lists, dicts, numpy arrays) stored in fields can still be mutated in place: `model.layers.append(...)` bypasses the freeze. Worse, mutating a static field in place does **not** trigger JIT recompilation, because JAX identifies pytree aux data by object identity, so the mutated list still hits the stale cached trace with the old value baked in. Use `replace()` to create a new module with the updated field.
+
+### `Param.__eq__` returns a JAX array, not a bool
+
+`param in list` can raise `ValueError` for multi-element params, because Python calls `bool()` on the array result, and truthiness is ambiguous for arrays with more than one element.
+
+### Nested `jax.grad(jax.grad(f))` on `Param` raises `ValueError`
+
+Differentiating with respect to a `Param` (or a `Module`, whose leaves are `Param`s) works fine with a single `jax.grad`, but nesting two fails:
+
+```python
+p = Param(jnp.array(2.0))
+jax.grad(f)(p)            # works, gradient comes back as a Param
+jax.grad(jax.grad(f))(p)  # ValueError
+jax.hessian(f)(p)         # works, use this for second derivatives
+```
+
+The inner `grad` returns its gradient wrapped as a `Param`, and abstractifying that intermediate `Param` in the outer trace triggers `__jax_array__`, which JAX no longer supports during abstractification. In practice this rarely matters: nested `grad` is only valid for scalar-to-scalar functions anyway, even with plain arrays (the inner `grad` of `f: R^n -> R` returns a vector, which the outer `grad` rejects).
+
+### `Module.params` preserves static fields
+
+`model.params` replaces plain array leaves with `None`, while non-array fields (ints, floats, strings, callables) remain unchanged. This is by design: static fields are structural metadata stored in the treedef, not pytree leaves, so they are naturally unaffected when leaves are replaced.

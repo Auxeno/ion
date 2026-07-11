@@ -5,7 +5,6 @@ from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
-import jax.tree_util as jtu
 import numpy as np
 import numpy.testing as npt
 import pytest
@@ -127,7 +126,7 @@ class TestPytreeRegistration:
                 self.b = nn.Param(jnp.zeros(4))
 
         m = Model(key=jax.random.key(0))
-        leaves, treedef = jtu.tree_flatten(m)
+        leaves, treedef = jax.tree.flatten(m)
         reconstructed = treedef.unflatten(leaves)
         npt.assert_array_equal(reconstructed.w._value, m.w._value)
         npt.assert_array_equal(reconstructed.b._value, m.b._value)
@@ -149,7 +148,7 @@ class TestPytreeRegistration:
         leaves = jax.tree.leaves(m)
         assert leaves == []
         # Roundtrip preserves field values
-        reconstructed = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        reconstructed = jax.tree.unflatten(*reversed(jax.tree.flatten(m)))
         assert reconstructed.first == 1
         assert reconstructed.second == 2
         assert reconstructed.third == 3
@@ -164,7 +163,7 @@ class TestPytreeRegistration:
                 self.w = nn.Param(jax.random.normal(key, (in_dim, out_dim)))
 
         m = Model(3, 4, key=jax.random.key(0))
-        leaves, treedef = jtu.tree_flatten(m)
+        leaves, treedef = jax.tree.flatten(m)
         # This would fail if unflatten tried to call __init__(in_dim, out_dim, key)
         reconstructed = treedef.unflatten(leaves)
         npt.assert_array_equal(reconstructed.w._value, m.w._value)
@@ -569,7 +568,7 @@ class TestNoneField:
     def test_none_field_survives_pytree_roundtrip(self):
         """None field is preserved through flatten/unflatten."""
         linear = nn.Linear(4, 8, bias=False, key=jax.random.key(0))
-        leaves, treedef = jtu.tree_flatten(linear)
+        leaves, treedef = jax.tree.flatten(linear)
         reconstructed = treedef.unflatten(leaves)
         assert reconstructed.b is None
         npt.assert_array_equal(reconstructed.w._value, linear.w._value)
@@ -659,8 +658,8 @@ class TestClassDefaultFields:
                 self.w = nn.Param(jax.random.normal(key, (4,)))
 
         m = WithDefault(key=jax.random.key(0))
-        leaves, treedef = jtu.tree_flatten(m)
-        rebuilt = jtu.tree_unflatten(treedef, leaves)
+        leaves, treedef = jax.tree.flatten(m)
+        rebuilt = jax.tree.unflatten(treedef, leaves)
         assert rebuilt.eps == 1e-5
 
     def test_missing_field_raises_clear_error(self):
@@ -705,8 +704,8 @@ class TestNamedTupleFields:
     def test_pytree_roundtrip(self):
         """Flatten/unflatten preserves the NamedTuple type and param values."""
         m = WithNamedTuple(key=jax.random.key(0))
-        leaves, treedef = jtu.tree_flatten(m)
-        rebuilt = jtu.tree_unflatten(treedef, leaves)
+        leaves, treedef = jax.tree.flatten(m)
+        rebuilt = jax.tree.unflatten(treedef, leaves)
         assert type(rebuilt.pair) is EncoderDecoder
         npt.assert_array_equal(rebuilt.pair.encoder.w._value, m.pair.encoder.w._value)
         npt.assert_array_equal(rebuilt.pair.decoder.w._value, m.pair.decoder.w._value)
@@ -781,11 +780,11 @@ class TestReplaceEdgeCases:
                 self.w = nn.Param(jnp.ones(3))
 
         m = Model()
-        original_def = jtu.tree_flatten(m)[1]
+        original_def = jax.tree.flatten(m)[1]
 
         # Replace Param with plain array
         m2 = m.replace(w=jnp.ones(3))
-        new_def = jtu.tree_flatten(m2)[1]
+        new_def = jax.tree.flatten(m2)[1]
 
         # The tree structures are different!
         assert original_def != new_def
@@ -847,7 +846,7 @@ class TestInheritance:
         with pytest.raises(AttributeError, match="frozen"):
             c.x = 3
         # Pytree roundtrip
-        leaves, treedef = jtu.tree_flatten(c)
+        leaves, treedef = jax.tree.flatten(c)
         reconstructed = treedef.unflatten(leaves)
         assert reconstructed.x == 1
         assert reconstructed.y == 2
@@ -929,7 +928,7 @@ class TestInheritance:
                 self.b = nn.Param(jnp.zeros(4))
 
         m = Child(jax.random.key(0))
-        leaves, treedef = jtu.tree_flatten(m)
+        leaves, treedef = jax.tree.flatten(m)
         m2 = treedef.unflatten(leaves)
         npt.assert_array_equal(m2.w._value, m.w._value)
         npt.assert_array_equal(m2.b._value, m.b._value)
@@ -1018,7 +1017,7 @@ class TestDeepNesting:
         leaves = jax.tree.leaves(m)
         assert len(leaves) == 1
         # Roundtrip
-        reconstructed = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        reconstructed = jax.tree.unflatten(*reversed(jax.tree.flatten(m)))
         npt.assert_array_equal(reconstructed.middle.inner.w._value, m.middle.inner.w._value)
         # jit
         result = jax.jit(lambda m: jnp.sum(m.middle.inner.w))(m)
@@ -1130,7 +1129,7 @@ class TestModuleInheritanceEdgeCases:
 
         m = Empty()
         assert jax.tree.leaves(m) == []
-        reconstructed = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        reconstructed = jax.tree.unflatten(*reversed(jax.tree.flatten(m)))
         assert isinstance(reconstructed, Empty)
 
     def test_abstract_base_then_concrete(self):
@@ -1151,7 +1150,7 @@ class TestModuleInheritanceEdgeCases:
 
         m = ConcreteLayer(key=jax.random.key(0))
         assert m.w.shape == (4,)
-        leaves, treedef = jtu.tree_flatten(m)
+        leaves, treedef = jax.tree.flatten(m)
         m2 = treedef.unflatten(leaves)
         npt.assert_array_equal(m2.w._value, m.w._value)
 
@@ -1258,7 +1257,7 @@ class TestModuleWrappingEdgeCases:
         m = Model(key=jax.random.key(0))
         leaves = jax.tree.leaves(m)
         assert len(leaves) == 1
-        reconstructed = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        reconstructed = jax.tree.unflatten(*reversed(jax.tree.flatten(m)))
         assert reconstructed.config.lr == 0.001
 
     def test_dict_field_with_arrays_are_dynamic(self):
@@ -1291,7 +1290,7 @@ class TestModuleWrappingEdgeCases:
         leaves = jax.tree.leaves(m)
         assert len(leaves) == 2
 
-        reconstructed = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        reconstructed = jax.tree.unflatten(*reversed(jax.tree.flatten(m)))
         assert reconstructed.config["lr"] == 0.001
 
 
@@ -1474,7 +1473,7 @@ class TestPytreeSharedReferences:
         model = Shared(layer)
         assert model.a is model.b
 
-        rebuilt = jtu.tree_unflatten(*reversed(jtu.tree_flatten(model)))
+        rebuilt = jax.tree.unflatten(*reversed(jax.tree.flatten(model)))
         assert rebuilt.a is not rebuilt.b
         npt.assert_array_equal(rebuilt.a.w._value, rebuilt.b.w._value)
 
@@ -1493,7 +1492,7 @@ class TestPytreeSharedReferences:
         model = SharedParam(p)
         assert model.a is model.b
 
-        rebuilt = jtu.tree_unflatten(*reversed(jtu.tree_flatten(model)))
+        rebuilt = jax.tree.unflatten(*reversed(jax.tree.flatten(model)))
         assert rebuilt.a is not rebuilt.b
 
     def test_weight_tying_via_array_reference(self):
@@ -1585,10 +1584,10 @@ class TestFieldPartitioning:
     def test_replace_param_with_none_changes_treedef(self):
         """Replacing a Param field with None moves it from dynamic child to static aux."""
         model = nn.Linear(3, 4, key=jax.random.key(0))
-        _, treedef_with_bias = jtu.tree_flatten(model)
+        _, treedef_with_bias = jax.tree.flatten(model)
 
         model_no_bias = model.replace(b=None)
-        leaves, treedef_no_bias = jtu.tree_flatten(model_no_bias)
+        leaves, treedef_no_bias = jax.tree.flatten(model_no_bias)
 
         # Different treedef (b moved from child to static aux)
         assert treedef_with_bias != treedef_no_bias
@@ -1664,7 +1663,7 @@ class TestFieldPartitioning:
 
         m = Model()
         assert len(jax.tree.leaves(m)) == 1
-        rebuilt = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        rebuilt = jax.tree.unflatten(*reversed(jax.tree.flatten(m)))
         assert rebuilt.items == ()
 
     def test_empty_list_field_is_static(self):
@@ -1680,7 +1679,7 @@ class TestFieldPartitioning:
 
         m = Model()
         assert len(jax.tree.leaves(m)) == 1
-        rebuilt = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        rebuilt = jax.tree.unflatten(*reversed(jax.tree.flatten(m)))
         assert rebuilt.items == []
 
     def test_empty_dict_field_is_static(self):
@@ -1696,7 +1695,7 @@ class TestFieldPartitioning:
 
         m = Model()
         assert len(jax.tree.leaves(m)) == 1
-        rebuilt = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        rebuilt = jax.tree.unflatten(*reversed(jax.tree.flatten(m)))
         assert rebuilt.meta == {}
 
     def test_none_field_is_static(self):
@@ -1712,6 +1711,6 @@ class TestFieldPartitioning:
 
         m = Model()
         assert len(jax.tree.leaves(m)) == 1
-        rebuilt = jtu.tree_unflatten(*reversed(jtu.tree_flatten(m)))
+        rebuilt = jax.tree.unflatten(*reversed(jax.tree.flatten(m)))
         assert rebuilt.optional is None
         npt.assert_allclose(jax.jit(lambda m: jnp.sum(m.w))(m), 3.0)

@@ -2,7 +2,6 @@ import tempfile
 
 import jax
 import jax.numpy as jnp
-import jax.tree_util as jtu
 import numpy.testing as npt
 import pytest
 
@@ -92,10 +91,10 @@ def test_different_keys():
 def test_pytree_roundtrip(layer_and_input):
     """Flatten then unflatten reconstructs the layer exactly."""
     layer, _ = layer_and_input
-    leaves, treedef = jtu.tree_flatten(layer)
-    reconstructed = jtu.tree_unflatten(treedef, leaves)
-    orig_leaves = jtu.tree_leaves(layer)
-    recon_leaves = jtu.tree_leaves(reconstructed)
+    leaves, treedef = jax.tree.flatten(layer)
+    reconstructed = jax.tree.unflatten(treedef, leaves)
+    orig_leaves = jax.tree.leaves(layer)
+    recon_leaves = jax.tree.leaves(reconstructed)
     for a, b in zip(orig_leaves, recon_leaves):
         if isinstance(a, jnp.ndarray):
             npt.assert_allclose(a, b, rtol=0, atol=0)
@@ -224,10 +223,10 @@ def test_seq_determinism(seq_layer_and_input):
 def test_seq_pytree_roundtrip(seq_layer_and_input):
     """Flatten then unflatten reconstructs the layer exactly."""
     layer, _ = seq_layer_and_input
-    leaves, treedef = jtu.tree_flatten(layer)
-    reconstructed = jtu.tree_unflatten(treedef, leaves)
-    orig_leaves = jtu.tree_leaves(layer)
-    recon_leaves = jtu.tree_leaves(reconstructed)
+    leaves, treedef = jax.tree.flatten(layer)
+    reconstructed = jax.tree.unflatten(treedef, leaves)
+    orig_leaves = jax.tree.leaves(layer)
+    recon_leaves = jax.tree.leaves(reconstructed)
     for a, b in zip(orig_leaves, recon_leaves):
         if isinstance(a, jnp.ndarray):
             npt.assert_allclose(a, b, rtol=0, atol=0)
@@ -353,10 +352,10 @@ def test_cell_determinism(cell_and_input):
 def test_cell_pytree_roundtrip(cell_and_input):
     """Flatten then unflatten reconstructs the cell exactly."""
     cell, _ = cell_and_input
-    leaves, treedef = jtu.tree_flatten(cell)
-    reconstructed = jtu.tree_unflatten(treedef, leaves)
-    orig_leaves = jtu.tree_leaves(cell)
-    recon_leaves = jtu.tree_leaves(reconstructed)
+    leaves, treedef = jax.tree.flatten(cell)
+    reconstructed = jax.tree.unflatten(treedef, leaves)
+    orig_leaves = jax.tree.leaves(cell)
+    recon_leaves = jax.tree.leaves(reconstructed)
     for a, b in zip(orig_leaves, recon_leaves):
         if isinstance(a, jnp.ndarray):
             npt.assert_allclose(a, b, rtol=0, atol=0)
@@ -452,10 +451,10 @@ def test_ssm_determinism(ssm_layer_and_input):
 def test_ssm_pytree_roundtrip(ssm_layer_and_input):
     """Flatten then unflatten reconstructs the layer exactly."""
     layer, _ = ssm_layer_and_input
-    leaves, treedef = jtu.tree_flatten(layer)
-    reconstructed = jtu.tree_unflatten(treedef, leaves)
-    orig_leaves = jtu.tree_leaves(layer)
-    recon_leaves = jtu.tree_leaves(reconstructed)
+    leaves, treedef = jax.tree.flatten(layer)
+    reconstructed = jax.tree.unflatten(treedef, leaves)
+    orig_leaves = jax.tree.leaves(layer)
+    recon_leaves = jax.tree.leaves(reconstructed)
     for a, b in zip(orig_leaves, recon_leaves):
         if isinstance(a, jnp.ndarray):
             npt.assert_allclose(a, b, rtol=0, atol=0)
@@ -583,10 +582,10 @@ def test_ssm_cell_determinism(ssm_cell_and_input):
 def test_ssm_cell_pytree_roundtrip(ssm_cell_and_input):
     """Flatten then unflatten reconstructs the cell exactly."""
     cell, _ = ssm_cell_and_input
-    leaves, treedef = jtu.tree_flatten(cell)
-    reconstructed = jtu.tree_unflatten(treedef, leaves)
-    orig_leaves = jtu.tree_leaves(cell)
-    recon_leaves = jtu.tree_leaves(reconstructed)
+    leaves, treedef = jax.tree.flatten(cell)
+    reconstructed = jax.tree.unflatten(treedef, leaves)
+    orig_leaves = jax.tree.leaves(cell)
+    recon_leaves = jax.tree.leaves(reconstructed)
     for a, b in zip(orig_leaves, recon_leaves):
         if isinstance(a, jnp.ndarray):
             npt.assert_allclose(a, b, rtol=0, atol=0)
