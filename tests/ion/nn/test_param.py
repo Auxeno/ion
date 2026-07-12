@@ -368,6 +368,13 @@ class TestComparisons:
         result = p != jnp.array([1.0, 3.0])
         npt.assert_array_equal(result, jnp.array([False, True]))
 
+    def test_hash_is_identity(self):
+        """Params hash by identity, so sets and dict keys work."""
+        p1 = nn.Param(jnp.array([1.0]))
+        p2 = nn.Param(jnp.array([1.0]))
+        assert p1 in {p1, p2}
+        assert {p1: "a", p2: "b"}[p1] == "a"
+
     def test_lt(self):
         """Less-than comparison returns an element-wise boolean array."""
         p = nn.Param(jnp.array([1.0, 3.0]))
