@@ -41,6 +41,9 @@ class LoRALinear(Module):
         key: PRNGKeyArray,
     ) -> None:
 
+        if rank < 1:
+            raise ValueError(f"rank ({rank}) must be >= 1")
+
         self.linear = freeze(linear)
 
         key_a, key_b = jax.random.split(key)

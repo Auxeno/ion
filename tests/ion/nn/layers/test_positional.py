@@ -121,6 +121,13 @@ class TestAlibi:
 
 
 class TestRoPE:
+    def test_odd_head_dim_raises(self):
+        """Odd head_dim raises ValueError."""
+        import pytest
+
+        with pytest.raises(ValueError, match="even"):
+            nn.RoPE()(jnp.ones((4, 7)))
+
     def test_output_manual(self):
         """Output matches a hand-rolled per-pair 2D rotation."""
         import numpy as np
