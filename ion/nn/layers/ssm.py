@@ -175,6 +175,9 @@ class S4DCell(Module):
         key: PRNGKeyArray,
     ) -> None:
 
+        if state_dim < 2 or state_dim % 2 != 0:
+            raise ValueError(f"state_dim ({state_dim}) must be a positive even number")
+
         key_c, key_d, key_dt = jax.random.split(key, 3)
 
         # Halve for conjugate pairs
@@ -295,6 +298,9 @@ class S5Cell(Module):
         *,
         key: PRNGKeyArray,
     ) -> None:
+
+        if state_dim < 2 or state_dim % 2 != 0:
+            raise ValueError(f"state_dim ({state_dim}) must be a positive even number")
 
         key_b, key_c, key_d, key_dt = jax.random.split(key, 4)
 

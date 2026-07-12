@@ -154,6 +154,15 @@ class TestLRU:
 
 
 class TestS4DCell:
+    def test_odd_state_dim_raises(self):
+        """Odd or sub-2 state_dim raises ValueError."""
+        import pytest
+
+        with pytest.raises(ValueError, match="even"):
+            nn.S4DCell(8, 7, key=jax.random.key(0))
+        with pytest.raises(ValueError, match="even"):
+            nn.S4D(8, 1, key=jax.random.key(0))
+
     def test_output_shape(self):
         """Output y has shape (in_dim,), hx has shape (in_dim, hidden_dim//2) complex."""
         cell = nn.S4DCell(8, 8, key=jax.random.key(0))
@@ -299,6 +308,15 @@ class TestS4D:
 
 
 class TestS5Cell:
+    def test_odd_state_dim_raises(self):
+        """Odd or sub-2 state_dim raises ValueError."""
+        import pytest
+
+        with pytest.raises(ValueError, match="even"):
+            nn.S5Cell(8, 7, key=jax.random.key(0))
+        with pytest.raises(ValueError, match="even"):
+            nn.S5(8, 1, key=jax.random.key(0))
+
     def test_output_shape(self):
         """Output y has shape (in_dim,), hx has shape (hidden_dim//2,) complex."""
         cell = nn.S5Cell(8, 8, key=jax.random.key(0))

@@ -65,6 +65,8 @@ class RoPE(Module):
     def __call__(self, x: Float[Array, "... s d"]) -> Float[Array, "... s d"]:
 
         seq_len, head_dim = x.shape[-2], x.shape[-1]
+        if head_dim % 2 != 0:
+            raise ValueError(f"head_dim ({head_dim}) must be even")
 
         # Inverse frequencies for feature pairs (d / 2,)
         freq_indices = jnp.arange(0, head_dim, 2, dtype=jnp.float32)
