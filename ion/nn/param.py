@@ -151,6 +151,9 @@ class Param(_ParamBase[T]):
     def __ge__(self, other: Any) -> Array:
         return jnp.asarray(self) >= _unwrap(other)
 
+    def __hash__(self) -> int:
+        return id(self)
+
     def __bool__(self) -> bool:
         return bool(self._value)
 
