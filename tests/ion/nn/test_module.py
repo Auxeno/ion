@@ -68,6 +68,19 @@ class TestSubclassTransformation:
         assert p.x == 1
         assert p.y == 2
 
+    def test_unannotated_field_raises(self):
+        """Assigning an unannotated attribute in __init__ raises AttributeError."""
+
+        class Model(nn.Module):
+            x: int
+
+            def __init__(self):
+                self.x = 1
+                self.scale = 2.0
+
+        with pytest.raises(AttributeError, match="scale"):
+            Model()
+
 
 class TestImmutability:
     def test_setattr_raises_after_init(self):

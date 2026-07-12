@@ -160,6 +160,7 @@ class Module:
 
         # Intercept the constructor to inject post-initialization freezing
         original_constructor = cls.__init__
+        allowed = {f.name for f in dataclasses.fields(cls)}  # type: ignore[arg-type]
 
         @functools.wraps(original_constructor)
         def _constructor_with_freeze(self: Any, *args: Any, **kwargs: Any) -> None:
@@ -173,6 +174,10 @@ class Module:
             original_constructor(self, *args, **kwargs)
             object.__setattr__(self, "_init_depth", depth)
             if depth == 0:
+                # Unannotated attributes would silently vanish on the first unflatten
+                undeclared = vars(self).keys() - allowed - {"_frozen", "_init_depth"}
+                if undeclared:
+                    raise AttributeError(f"Unannotated field(s) {sorted(undeclared)} in __init__")
                 child_info, static_names = _classify(self)
                 object.__setattr__(self, "_child_info", child_info)
                 object.__setattr__(self, "_static_names", static_names)
