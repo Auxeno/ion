@@ -112,7 +112,7 @@ class TestGATConvEdgeFeatures:
         x = jax.random.normal(jax.random.key(1), (3, 8))
         y1 = gat(x, senders, receivers)
         y2 = gat(x, senders, receivers, x_edge=None)
-        npt.assert_allclose(y1, y2, rtol=0, atol=0)
+        npt.assert_array_equal(y1, y2)
 
     def test_edge_features_change_output(self, triangle_graph):
         """Providing different edge features changes the output."""
@@ -191,7 +191,7 @@ class TestGATConvEdgeFeatures:
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
         y1 = gat(x, senders, receivers, x_edge)
         y2 = gat(x, senders, receivers, x_edge)
-        npt.assert_allclose(y1, y2, rtol=0, atol=0)
+        npt.assert_array_equal(y1, y2)
 
 
 class TestGATConvEdgeMask:
@@ -433,7 +433,7 @@ class TestGATv2ConvEdgeFeatures:
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
         y1 = gat(x, senders, receivers, x_edge)
         y2 = gat(x, senders, receivers, x_edge)
-        npt.assert_allclose(y1, y2, rtol=0, atol=0)
+        npt.assert_array_equal(y1, y2)
 
 
 class TestGATv2ConvEdgeMask:

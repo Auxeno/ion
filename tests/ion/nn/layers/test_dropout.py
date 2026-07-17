@@ -12,14 +12,14 @@ class TestDropout:
         layer = nn.Dropout(p=0.5, deterministic=True)
         x = jnp.ones((4, 8))
         y = layer(x, key=jax.random.key(0))
-        npt.assert_allclose(y, x, rtol=0, atol=0)
+        npt.assert_array_equal(y, x)
 
     def test_deterministic_override(self):
         """Call-time deterministic flag overrides init-time flag."""
         layer = nn.Dropout(p=0.5, deterministic=False)
         x = jnp.ones((4, 8))
         y = layer(x, deterministic=True, key=jax.random.key(0))
-        npt.assert_allclose(y, x, rtol=0, atol=0)
+        npt.assert_array_equal(y, x)
 
     def test_p_out_of_range_raises(self):
         """p outside [0, 1] raises ValueError at construction."""
@@ -38,7 +38,7 @@ class TestDropout:
         layer = nn.Dropout(p=0.0)
         x = jnp.ones((4, 8))
         y = layer(x, key=jax.random.key(0))
-        npt.assert_allclose(y, x, rtol=0, atol=0)
+        npt.assert_array_equal(y, x)
 
     def test_drops_some_values(self):
         """Stochastic mode zeros out some elements."""
@@ -70,7 +70,7 @@ class TestDropout:
         x = jnp.ones((100,))
         y1 = layer(x, key=jax.random.key(0))
         y2 = layer(x, key=jax.random.key(1))
-        assert not jnp.array_equal(y1, y2)
+        assert not jnp.allclose(y1, y2)
 
     def test_output_shape_preserved(self):
         """Output shape matches input shape."""
@@ -99,7 +99,7 @@ class TestDropout:
         layer = nn.Dropout(p=1.0)
         x = jnp.ones((4, 8))
         y = layer(x, key=jax.random.key(0))
-        npt.assert_allclose(y, jnp.zeros_like(x), rtol=0, atol=0)
+        npt.assert_array_equal(y, jnp.zeros_like(x))
 
     def test_missing_key_raises(self):
         """Calling without a key in stochastic mode raises ValueError."""

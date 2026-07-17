@@ -23,7 +23,7 @@ class SelfAttention(Module):
     """Multi-head self-attention.
 
     >>> attn = SelfAttention(64, num_heads=8, key=key)
-    >>> attn(x)  # (b, seq, 64) -> (b, seq, 64)
+    >>> attn(x)  # (b, s, 64) -> (b, s, 64)
     >>> attn(x, mask=mask)  # mask: bool (s, s), (b, s, s) or (b, h, s, s)
     """
 

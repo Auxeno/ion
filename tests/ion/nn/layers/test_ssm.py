@@ -3,6 +3,7 @@ from math import pi
 import jax
 import jax.numpy as jnp
 import numpy.testing as npt
+import pytest
 
 from ion import nn
 
@@ -156,8 +157,6 @@ class TestLRU:
 class TestS4DCell:
     def test_odd_state_dim_raises(self):
         """Odd or sub-2 state_dim raises ValueError."""
-        import pytest
-
         with pytest.raises(ValueError, match="even"):
             nn.S4DCell(8, 7, key=jax.random.key(0))
         with pytest.raises(ValueError, match="even"):
@@ -310,8 +309,6 @@ class TestS4D:
 class TestS5Cell:
     def test_odd_state_dim_raises(self):
         """Odd or sub-2 state_dim raises ValueError."""
-        import pytest
-
         with pytest.raises(ValueError, match="even"):
             nn.S5Cell(8, 7, key=jax.random.key(0))
         with pytest.raises(ValueError, match="even"):

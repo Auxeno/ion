@@ -163,7 +163,6 @@ class TestSelfAttention:
         grads = jax.grad(lambda x: layer(x, mask=mask).sum())(x)
         assert jnp.all(jnp.isfinite(grads))
 
-
     def test_grouped_query_attention(self):
         """num_kv_heads below num_heads (GQA) gives fewer kv heads and correct output shape."""
         layer = nn.SelfAttention(8, num_heads=4, num_kv_heads=2, key=jax.random.key(0))

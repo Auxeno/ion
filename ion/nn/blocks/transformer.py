@@ -62,7 +62,6 @@ class TransformerBlock(Module):
         self.norm_ff = LayerNorm(dim)
         self.ff_1 = Linear(dim, ff_dim, bias, w_init, b_init, key=key_ff_1)
         self.ff_2 = Linear(ff_dim, dim, bias, w_init, b_init, key=key_ff_2)
-
         self.activation = activation
 
     def __call__(
@@ -123,7 +122,6 @@ class CrossTransformerBlock(Module):
         self.norm_ff = LayerNorm(dim)
         self.ff_1 = Linear(dim, ff_dim, bias, w_init, b_init, key=key_ff_1)
         self.ff_2 = Linear(ff_dim, dim, bias, w_init, b_init, key=key_ff_2)
-
         self.activation = activation
 
     def __call__(

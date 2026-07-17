@@ -1,3 +1,5 @@
+"""Neural network modules: base classes, layers, and blocks."""
+
 from .blocks.mlp import MLP
 from .blocks.sequential import Sequential
 from .blocks.transformer import CrossTransformerBlock, TransformerBlock

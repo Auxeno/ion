@@ -86,7 +86,7 @@ def freeze(pytree: PyTree) -> PyTree:
     >>> frozen_model = ion.tree.freeze(model)
     """
 
-    def _freeze_leaf(leaf):
+    def _freeze_leaf(leaf: Any) -> Any:
         if isinstance(leaf, Param) and leaf.trainable:
             return Param(leaf._value, trainable=False)
         return leaf
@@ -100,7 +100,7 @@ def unfreeze(pytree: PyTree) -> PyTree:
     >>> unfrozen_model = ion.tree.unfreeze(model)
     """
 
-    def _unfreeze_leaf(leaf):
+    def _unfreeze_leaf(leaf: Any) -> Any:
         if isinstance(leaf, Param) and not leaf.trainable:
             return Param(leaf._value, trainable=True)
         return leaf

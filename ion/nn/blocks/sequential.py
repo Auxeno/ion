@@ -3,12 +3,11 @@
 Modules:
     Sequential  Chains layers, calling each in order.
 
-Accepts any callable (modules, functions like jax.nn.relu, lambdas).
+Accepts any callable (modules, functions like `jax.nn.relu`, lambdas).
 Supports indexing, slicing, and iteration.
 """
 
-from collections.abc import Iterator
-from typing import Callable
+from collections.abc import Callable, Iterator
 
 from jaxtyping import Array
 
@@ -17,6 +16,7 @@ from ..module import Module
 
 class Sequential(Module):
     """Container that chains layers, calling each in order.
+
     Each layer must be a callable that accepts a single positional argument only.
 
     >>> model = Sequential(Linear(3, 16, key=keys[0]), jax.nn.relu, Linear(16, 1, key=keys[1]))
@@ -26,6 +26,7 @@ class Sequential(Module):
     layers: tuple[Callable, ...]
 
     def __init__(self, *layers: Callable) -> None:
+
         for layer in layers:
             if not callable(layer):
                 raise TypeError(f"Sequential expects callable layers, got {type(layer).__name__}")
@@ -38,7 +39,7 @@ class Sequential(Module):
 
         return x
 
-    def __getitem__(self, i: int | slice) -> Callable | "Sequential":
+    def __getitem__(self, i: int | slice) -> "Callable | Sequential":
         if isinstance(i, slice):
             return Sequential(*self.layers[i])
         return self.layers[i]

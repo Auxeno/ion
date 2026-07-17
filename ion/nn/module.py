@@ -61,8 +61,7 @@ def _register_module_as_pytree(cls: type) -> Any:
                 value = getattr(obj, name)
             except AttributeError:
                 raise AttributeError(
-                    f"Field '{name}' of {type(obj).__name__} was never assigned "
-                    f"in __init__ and has no default."
+                    f"Field '{name}' of {type(obj).__name__} was never assigned and has no default"
                 ) from None
 
             if isinstance(value, array_like):
@@ -192,12 +191,12 @@ class Module:
             object.__setattr__(self, name, value)
         else:
             raise AttributeError(
-                f"Cannot set attribute '{name}', {type(self).__name__} is frozen after __init__."
+                f"Cannot set attribute '{name}', {type(self).__name__} is frozen after __init__"
             )
 
     def __delattr__(self, name: str) -> None:
         """Prevent attribute deletion to maintain a consistent PyTree structure."""
-        raise AttributeError(f"Cannot delete attribute '{name}', {type(self).__name__} is frozen.")
+        raise AttributeError(f"Cannot delete attribute '{name}', {type(self).__name__} is frozen")
 
     def __iter__(self) -> Iterator[Any]:
         """Iterate over dataclass field values."""

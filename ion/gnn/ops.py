@@ -3,11 +3,11 @@
 Functions:
     segment_softmax  Softmax normalized within segments (e.g. per-node neighborhoods).
     segment_mean     Mean reduction within segments.
-    add_self_loops   Append identity edges so every node sends a message to itself.
     mean_pool        Average node features within each graph (graph-level readout).
     sum_pool         Sum node features within each graph.
     max_pool         Maximum node features within each graph.
     batch_graphs     Pack graphs into one disconnected graph for batched message passing.
+    add_self_loops   Append identity edges so every node sends a message to itself.
 
 `segment_sum`, `segment_max`, `segment_min` and `segment_prod` are re-exported from
 `jax.ops` in `ion.gnn`, so all segment reductions share one namespace.

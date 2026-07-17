@@ -145,7 +145,7 @@ class TestPytreeRegistration:
         npt.assert_array_equal(reconstructed.b._value, m.b._value)
 
     def test_children_follow_field_order(self):
-        """Non-array fields become static aux, so leaves are empty, but roundtrip preserves values."""
+        """Non-array fields become static aux; leaves are empty but roundtrip preserves values."""
 
         class Model(nn.Module):
             first: int
@@ -781,7 +781,7 @@ class TestReplaceEdgeCases:
         replaced = linear.replace(w=new_w)
         npt.assert_array_equal(replaced.w._value, jnp.zeros_like(linear.w._value))
         # Original unchanged
-        assert not jnp.array_equal(linear.w._value, replaced.w._value)
+        assert not jnp.allclose(linear.w._value, replaced.w._value)
 
     def test_replace_param_with_non_param_breaks_tree_ops(self):
         """Replacing a Param field with a plain value creates a structurally different pytree."""
@@ -1434,9 +1434,7 @@ class TestStaticFieldTypes:
         npt.assert_allclose(jitted, eager)
 
     def test_mutating_static_list_uses_stale_cache(self):
-        """Sharp edge: mutating a mutable field in-place does NOT trigger retrace.
-        JAX caches by object identity, so the same list object (now mutated)
-        still hits the cached trace with the old value baked in."""
+        """Sharp edge: in-place mutation of a static list hits the stale trace, no retrace."""
 
         class Model(nn.Module):
             w: nn.Param
@@ -1463,7 +1461,7 @@ class TestStaticFieldTypes:
 
 
 class TestPytreeSharedReferences:
-    """internals.md: 'JAX pytrees are trees, not graphs'.'"""
+    """internals.md: 'JAX pytrees are trees, not graphs'."""
 
     def test_shared_module_is_duplicated_through_flatten_unflatten(self):
         """Shared sub-module reference becomes two independent copies after roundtrip."""
@@ -1552,8 +1550,7 @@ class TestParamsPropertyEdgeCases:
         assert p.scale == 2.0
 
     def test_params_with_callable_field(self):
-        """internals.md: 'Module.params preserves static fields alongside Param leaves.
-        Non-array fields remain unchanged.'"""
+        """internals.md: 'Module.params preserves static fields alongside Param leaves'."""
 
         class Model(nn.Module):
             w: nn.Param

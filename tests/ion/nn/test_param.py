@@ -4,6 +4,7 @@ import tempfile
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import numpy.testing as npt
 import pytest
 
@@ -500,8 +501,6 @@ class TestScalarReverseArithmetic:
 
     def test_rmatmul_ndarray(self):
         """numpy array @ Param triggers __rmatmul__."""
-        import numpy as np
-
         x = np.ones((2, 3))
         p = nn.Param(jnp.ones((3, 4)))
         result = x @ p
@@ -576,8 +575,7 @@ class TestRepr:
 
 class TestParamGetattr:
     def test_getattr_bare_new_still_recurses_for_non_dunder(self):
-        """Param created via object.__new__ without __init__ still causes RecursionError
-        for non-dunder attrs, because _value doesn't exist and __getattr__ loops."""
+        """object.__new__ Param recurses on non-dunder attrs: missing _value loops __getattr__."""
         p = object.__new__(nn.Param)
         with pytest.raises(RecursionError):
             _ = p.shape
@@ -612,8 +610,7 @@ class TestParamInOperator:
         assert p in [p]
 
     def test_param_in_list_different_object_multi_element(self):
-        """Param `in` list with different Param of same multi-element value
-        crashes because __eq__ returns an array and bool() on multi-element array raises."""
+        """Param `in` list with equal multi-element Param raises: bool() of array is ambiguous."""
         p1 = nn.Param(jnp.array([1.0, 2.0]))
         p2 = nn.Param(jnp.array([1.0, 2.0]))
         # Identity check passes, but p1 == p2 returns an array;

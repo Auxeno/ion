@@ -29,7 +29,7 @@ from ..module import Module
 from ..param import Param
 
 
-def _binary_op(a, b):
+def _binary_op(a: tuple[Array, Array], b: tuple[Array, Array]) -> tuple[Array, Array]:
     """Binary operator for parallel scan of diagonal linear recurrence."""
     a_lambda, a_hidden = a
     b_lambda, b_hidden = b
@@ -72,7 +72,7 @@ class LRUCell(Module):
         # Skip connection: maps input directly to output, bypassing the recurrence
         self.D = Param(d_init(shape=(in_dim,), key=key_d))
 
-        # Eigenvalue magnitudes sampled uniformly on annulus [r_min, r_max]
+        # Eigenvalue magnitudes uniform on annulus [r_min, r_max], phases uniform on [0, max_phase]
         u1 = jax.random.uniform(key_nu, shape=(hidden_dim,))
         u2 = jax.random.uniform(key_theta, shape=(hidden_dim,))
         nu_log = jnp.log(-0.5 * jnp.log(u1 * (r_max**2 - r_min**2) + r_min**2))
@@ -83,10 +83,6 @@ class LRUCell(Module):
         self.theta_log = Param(theta_log)
         A = jnp.exp(-jnp.exp(self.nu_log) + 1j * jnp.exp(self.theta_log))
         self.gamma_log = Param(jnp.log(jnp.sqrt(1 - jnp.abs(A) ** 2)))
-
-    @property
-    def initial_state(self) -> Complex[Array, " h"]:
-        return jnp.zeros(self.nu_log.shape[0], dtype=self.B.dtype)
 
     def __call__(
         self,
@@ -100,6 +96,10 @@ class LRUCell(Module):
         x = jnp.real(h @ self.C) + self.D * x
 
         return x, h
+
+    @property
+    def initial_state(self) -> Complex[Array, " h"]:
+        return jnp.zeros(self.nu_log.shape[0], dtype=self.B.dtype)
 
 
 class LRU(Module):
@@ -154,7 +154,7 @@ class S4DCell(Module):
     """Single-step per-feature SISO S4D cell.
 
     >>> cell = S4DCell(3, 8, key=key)
-    >>> x, h = cell(x, h)  # (*, 3), (*, 3, 4) -> (*, 3), (*, 3, 4)
+    >>> y, h = cell(x, h)  # (*, 3), (*, 3, 4) -> (*, 3), (*, 3, 4)
     """
 
     A_log_re: Param[Float[Array, "i h"]]
@@ -195,13 +195,9 @@ class S4DCell(Module):
 
         # Learnable timestep controlling how finely each feature samples continuous dynamics
         log_dt = jax.random.uniform(
-            shape=(in_dim,), minval=jnp.log(dt_min), maxval=jnp.log(dt_max), key=key_dt
+            key_dt, shape=(in_dim,), minval=jnp.log(dt_min), maxval=jnp.log(dt_max)
         )
         self.log_dt = Param(log_dt)
-
-    @property
-    def initial_state(self) -> Complex[Array, "i h"]:
-        return jnp.zeros(self.A_log_re.shape, dtype=self.C.dtype)
 
     def __call__(
         self,
@@ -222,6 +218,10 @@ class S4DCell(Module):
         x = 2.0 * jnp.real(jnp.sum(self.C * h, axis=-1)) + self.D * x
 
         return x, h
+
+    @property
+    def initial_state(self) -> Complex[Array, "i h"]:
+        return jnp.zeros(self.A_log_re.shape, dtype=self.C.dtype)
 
 
 class S4D(Module):
@@ -277,7 +277,7 @@ class S5Cell(Module):
     """Single-step MIMO S5 cell with shared diagonal state.
 
     >>> cell = S5Cell(3, 8, key=key)
-    >>> x, h = cell(x, h)  # (*, 3), (*, 4) -> (*, 3), (*, 4)
+    >>> y, h = cell(x, h)  # (*, 3), (*, 4) -> (*, 3), (*, 4)
     """
 
     A_log_re: Param[Float[Array, " h"]]
@@ -320,13 +320,9 @@ class S5Cell(Module):
 
         # Learnable timestep controlling how finely each state samples continuous dynamics
         log_dt = jax.random.uniform(
-            shape=(h,), minval=jnp.log(dt_min), maxval=jnp.log(dt_max), key=key_dt
+            key_dt, shape=(h,), minval=jnp.log(dt_min), maxval=jnp.log(dt_max)
         )
         self.log_dt = Param(log_dt)
-
-    @property
-    def initial_state(self) -> Complex[Array, " h"]:
-        return jnp.zeros(self.A_log_re.shape[0], dtype=self.B.dtype)
 
     def __call__(
         self,
@@ -347,6 +343,10 @@ class S5Cell(Module):
         x = 2.0 * jnp.real(h @ self.C) + self.D * x
 
         return x, h
+
+    @property
+    def initial_state(self) -> Complex[Array, " h"]:
+        return jnp.zeros(self.A_log_re.shape[0], dtype=self.B.dtype)
 
 
 class S5(Module):
