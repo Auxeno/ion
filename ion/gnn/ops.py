@@ -2,8 +2,18 @@
 
 Functions:
     segment_softmax  Softmax normalized within segments (e.g. per-node neighborhoods).
+    segment_mean     Mean reduction within segments.
     add_self_loops   Append identity edges so every node sends a message to itself.
+    mean_pool        Average node features within each graph (graph-level readout).
+    sum_pool         Sum node features within each graph.
+    max_pool         Maximum node features within each graph.
+    batch_graphs     Pack graphs into one disconnected graph for batched message passing.
+
+`segment_sum`, `segment_max`, `segment_min` and `segment_prod` are re-exported from
+`jax.ops` in `ion.gnn`, so all segment reductions share one namespace.
 """
+
+from collections.abc import Sequence
 
 import jax
 import jax.numpy as jnp
@@ -27,6 +37,89 @@ def segment_softmax(
     # Normalize by per-segment sum; guard empty segments (never indexed) against 0 / 0
     sums = jax.ops.segment_sum(data, segment_ids, num_segments)
     return data / jnp.where(sums == 0, 1.0, sums)[segment_ids]
+
+
+def segment_mean(
+    data: Float[Array, "e ..."],
+    segment_ids: Int[Array, " e"],
+    num_segments: int,
+) -> Float[Array, "s ..."]:
+    """Mean of data within each segment; empty segments give zeros.
+
+    >>> means = segment_mean(messages, receivers, num_nodes)
+    """
+    sums = jax.ops.segment_sum(data, segment_ids, num_segments)
+
+    # Count segment members; guard empty segments against 0 / 0
+    counts = jax.ops.segment_sum(
+        jnp.ones_like(segment_ids, dtype=data.dtype), segment_ids, num_segments
+    )
+    counts = jnp.maximum(counts, 1)
+    return sums / counts.reshape(-1, *(1,) * (data.ndim - 1))
+
+
+def mean_pool(
+    x: Float[Array, "n d"],
+    graph_ids: Int[Array, " n"],
+    num_graphs: int,
+) -> Float[Array, "g d"]:
+    """Average node features within each graph.
+
+    >>> g = mean_pool(x, graph_ids, num_graphs)  # (n, d) -> (g, d)
+    """
+    return segment_mean(x, graph_ids, num_graphs)
+
+
+def sum_pool(
+    x: Float[Array, "n d"],
+    graph_ids: Int[Array, " n"],
+    num_graphs: int,
+) -> Float[Array, "g d"]:
+    """Sum node features within each graph.
+
+    >>> g = sum_pool(x, graph_ids, num_graphs)  # (n, d) -> (g, d)
+    """
+    return jax.ops.segment_sum(x, graph_ids, num_graphs)
+
+
+def max_pool(
+    x: Float[Array, "n d"],
+    graph_ids: Int[Array, " n"],
+    num_graphs: int,
+) -> Float[Array, "g d"]:
+    """Maximum of node features within each graph; empty graphs give zeros.
+
+    >>> g = max_pool(x, graph_ids, num_graphs)  # (n, d) -> (g, d)
+    """
+    maxes = jax.ops.segment_max(x, graph_ids, num_graphs)
+
+    # segment_max fills empty segments with -inf
+    return jnp.where(jnp.isneginf(maxes), 0.0, maxes)
+
+
+def batch_graphs(
+    xs: Sequence[Float[Array, "_ d"]],
+    senders: Sequence[Int[Array, " _"]],
+    receivers: Sequence[Int[Array, " _"]],
+) -> tuple[
+    Float[Array, "n d"],
+    Int[Array, " e"],
+    Int[Array, " e"],
+    Int[Array, " n"],
+]:
+    """Pack graphs into one disconnected graph for batched message passing.
+
+    >>> x, senders, receivers, graph_ids = batch_graphs(xs, senders_list, receivers_list)
+    """
+    sizes = [x.shape[0] for x in xs]
+    offsets = jnp.cumsum(jnp.array([0] + sizes[:-1]))
+    graph_ids = jnp.repeat(jnp.arange(len(xs)), jnp.array(sizes))
+    return (
+        jnp.concatenate(xs),
+        jnp.concatenate([s + o for s, o in zip(senders, offsets)]),
+        jnp.concatenate([r + o for r, o in zip(receivers, offsets)]),
+        graph_ids,
+    )
 
 
 def add_self_loops(

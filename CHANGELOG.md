@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.8.0
+
+- **`GINConv`.** Graph Isomorphism Network layer (Xu et al., 2019): sum-aggregates neighbor
+  features and applies a caller-supplied MLP to `(1 + eps) * x + aggregated`. `eps` defaults
+  to a fixed `0.0`; `train_eps=True` makes it a learnable scalar. Takes no `key` since the
+  update network is built by the caller. Do not add self-loops; own features enter through
+  the `(1 + eps)` term.
+- **Graph-level readout pooling.** `ion.gnn` gains `mean_pool`, `sum_pool` and `max_pool`,
+  which pool node features `(n, d)` into per-graph vectors `(g, d)` via a `graph_ids`
+  assignment array, enabling graph classification. `max_pool` returns zeros for empty graphs
+  rather than `segment_max`'s `-inf` fill; `mean_pool` likewise guards empty graphs to zeros.
+- **`segment_mean` and a coherent segment namespace.** New `segment_mean` (per-segment mean;
+  JAX ships sum/max/min/prod but no mean), and `segment_sum`, `segment_max`, `segment_min`
+  and `segment_prod` re-exported from `jax.ops`, so every segment reduction is reachable as
+  `gnn.segment_*` alongside the existing `segment_softmax`.
+- **`batch_graphs`.** Packs a list of graphs into one disconnected graph: node features are
+  concatenated, edge indices offset by cumulative node counts, and a `graph_ids` array is
+  returned for the pooling functions. Message passing on the union is exactly equivalent to
+  processing each graph separately. Call it outside `jit`; per-batch shapes vary and each new
+  shape recompiles.
+
 ## 0.7.0
 
 - **Nested containers in Module fields are now pytree children.** Field classification
