@@ -2,8 +2,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from ion import gnn
-from ion.nn import MLP
+from ion import gnn, nn
 
 
 @pytest.fixture
@@ -34,11 +33,29 @@ def _build_gnn_layers(key):
         (gnn.GATConv(8, 16, num_heads=2, key=next(keys)), x, senders, receivers, None),
         (gnn.GATConv(8, 16, num_heads=4, key=next(keys)), x, senders, receivers, None),
         (gnn.GATConv(8, 16, num_heads=2, bias=False, key=next(keys)), x, senders, receivers, None),
-        (gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=next(keys)), x, senders, receivers, x_edge),
+        (
+            gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=next(keys)),
+            x,
+            senders,
+            receivers,
+            x_edge,
+        ),
         (gnn.GATv2Conv(8, 16, num_heads=2, key=next(keys)), x, senders, receivers, None),
-        (gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=next(keys)), x, senders, receivers, x_edge),
-        (gnn.GINConv(MLP([8, 16, 16], key=next(keys))), x, senders, receivers, None),
-        (gnn.GINConv(MLP([8, 16, 16], key=next(keys)), train_eps=True), x, senders, receivers, None),
+        (
+            gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=next(keys)),
+            x,
+            senders,
+            receivers,
+            x_edge,
+        ),
+        (gnn.GINConv(nn.MLP([8, 16, 16], key=next(keys))), x, senders, receivers, None),
+        (
+            gnn.GINConv(nn.MLP([8, 16, 16], key=next(keys)), train_eps=True),
+            x,
+            senders,
+            receivers,
+            None,
+        ),
     ]
 
 

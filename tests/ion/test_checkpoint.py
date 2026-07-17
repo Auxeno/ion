@@ -1,6 +1,8 @@
 import json
 import os
 import tempfile
+import warnings
+from collections.abc import Callable
 
 import jax
 import jax.numpy as jnp
@@ -157,7 +159,6 @@ class TestSaveLoad:
 class TestSaveLoadCallable:
     def test_callable_comes_from_reference_not_file(self):
         """Callable fields are restored from the reference tree, not the saved file."""
-        from collections.abc import Callable
 
         class ModelWithAct(nn.Module):
             w: nn.Param
@@ -423,8 +424,6 @@ class TestSaveLoadStructureMismatch:
 
         with tempfile.NamedTemporaryFile(suffix=".npz") as f:
             checkpoint.save(f.name, model)
-            import warnings
-
             with warnings.catch_warnings():
                 warnings.simplefilter("error")
                 loaded = checkpoint.load(f.name, model)

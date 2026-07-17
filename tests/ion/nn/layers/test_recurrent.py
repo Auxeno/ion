@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import numpy.testing as npt
 
-from ion import nn, tree
+from ion import nn
 
 
 class TestRNNCell:
@@ -52,7 +52,7 @@ class TestRNNCell:
 
     def test_bfloat16_dtype(self):
         """A cell cast to bfloat16 yields a bfloat16 initial_state."""
-        cell = tree.astype(nn.RNNCell(8, 16, key=jax.random.key(0)), jnp.bfloat16)
+        cell = nn.RNNCell(8, 16, key=jax.random.key(0)).astype(jnp.bfloat16)
         assert cell.w_h.dtype == jnp.bfloat16
         assert cell.initial_state.dtype == jnp.bfloat16
 
@@ -132,7 +132,7 @@ class TestRNN:
 
     def test_bfloat16_sequence(self):
         """An RNN cast to bfloat16 produces bfloat16 outputs from the default initial state."""
-        rnn = tree.astype(nn.RNN(8, 16, key=jax.random.key(0)), jnp.bfloat16)
+        rnn = nn.RNN(8, 16, key=jax.random.key(0)).astype(jnp.bfloat16)
         x = jnp.ones((2, 5, 8), dtype=jnp.bfloat16)
         y, h_n = rnn(x)
         assert y.dtype == jnp.bfloat16
@@ -198,7 +198,7 @@ class TestLSTMCell:
 
     def test_bfloat16_dtype(self):
         """A cell cast to bfloat16 yields a bfloat16 initial_state."""
-        cell = tree.astype(nn.LSTMCell(8, 16, key=jax.random.key(0)), jnp.bfloat16)
+        cell = nn.LSTMCell(8, 16, key=jax.random.key(0)).astype(jnp.bfloat16)
         assert cell.w_h.dtype == jnp.bfloat16
         h, c = cell.initial_state
         assert h.dtype == jnp.bfloat16
@@ -276,7 +276,7 @@ class TestGRUCell:
 
     def test_bfloat16_dtype(self):
         """A cell cast to bfloat16 yields a bfloat16 initial_state."""
-        cell = tree.astype(nn.GRUCell(8, 16, key=jax.random.key(0)), jnp.bfloat16)
+        cell = nn.GRUCell(8, 16, key=jax.random.key(0)).astype(jnp.bfloat16)
         assert cell.w_h.dtype == jnp.bfloat16
         assert cell.initial_state.dtype == jnp.bfloat16
 

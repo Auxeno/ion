@@ -2,16 +2,16 @@ import jax
 import jax.numpy as jnp
 import numpy.testing as npt
 import optax
+import pytest
 
 import ion
 from ion import nn
+from ion.optimizer import _apply_updates
 
 
 class TestLoRALinear:
     def test_rank_zero_raises(self):
         """rank < 1 raises ValueError."""
-        import pytest
-
         keys = jax.random.split(jax.random.key(0), 2)
         with pytest.raises(ValueError, match="rank"):
             nn.LoRALinear(nn.Linear(8, 16, key=keys[0]), rank=0, key=keys[1])
@@ -190,8 +190,6 @@ class TestXLAOptimization:
 
         @jax.jit
         def step_head(model, state, x, y):
-            from ion.optimizer import _apply_updates
-
             grads = jax.grad(loss_fn)(model, x, y)
             updates, state = opt_head_raw.update((grads.a, grads.b), state)
             return model.replace(

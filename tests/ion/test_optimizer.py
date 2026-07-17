@@ -1,3 +1,6 @@
+import os
+import tempfile
+
 import jax
 import jax.numpy as jnp
 import numpy.testing as npt
@@ -161,7 +164,7 @@ class TestOptimizerUpdate:
         optimizer = ion.Optimizer(optax.adamw(1e-3), model)
 
         grads = jax.grad(lambda m: jnp.mean(m(jnp.ones((2, 4))) ** 2))(model)
-        # Should not raise -- adamw accepts params as 3rd arg
+        # Should not raise; adamw accepts params as 3rd arg
         _, new_optimizer = optimizer.update(model, grads)
         assert new_optimizer.step == 1
 
@@ -192,7 +195,7 @@ class TestOptimizerUpdate:
 
         # scale=1 should change weights
         model_one, _ = optimizer.update(model, grads, scale=1.0)
-        assert not jnp.array_equal(model_one.w._value, model.w._value)
+        assert not jnp.allclose(model_one.w._value, model.w._value)
 
 
 class TestOptimizerPytree:
@@ -389,9 +392,6 @@ class TestOptimizerCheckpoint:
         grads = jax.grad(lambda m: jnp.sum(m(jnp.ones((1, 4)))))(model)
         model, optimizer = optimizer.update(model, grads)
 
-        import os
-        import tempfile
-
         path = os.path.join(tempfile.gettempdir(), "opt_test.npz")
         try:
             ion.save(path, optimizer)
@@ -500,7 +500,7 @@ class TestOptimizerStructureMismatch:
         new_model, optimizer = optimizer.update(model, grads)
 
         npt.assert_array_equal(new_model.encoder.w._value, frozen_w)
-        assert not jnp.array_equal(new_model.decoder.w._value, model.decoder.w._value)
+        assert not jnp.allclose(new_model.decoder.w._value, model.decoder.w._value)
         assert optimizer.step == 1
 
 

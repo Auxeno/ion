@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 import jax
 import jax.numpy as jnp
 import numpy.testing as npt
@@ -168,7 +170,6 @@ class Test_Static:
 class TestJaxJit:
     def test_jax_jit_with_mixed_leaves(self):
         """jax.jit works with modules that have mixed array/non-array fields."""
-        from collections.abc import Callable
 
         class MixedLeaves(nn.Module):
             w: nn.Param

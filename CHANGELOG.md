@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.1
+
+- **Style consistency pass.** Source, tests and vault docs audited against the house style
+  (docstring formats, RNG key naming, import ordering, doctest shape comments); newer code
+  brought in line with the established layers. No behavioural changes.
+- **Error messages compacted and unified.** Every `raise` is now at most three lines with a
+  single-line message, shaped `name (value) must be ...` with no trailing period. Some
+  messages were reworded to fit (e.g. checkpoint mismatch errors no longer list the file's
+  available keys).
+- **`MLP.__call__` annotation fixed.**
+- **Line length enforced.** Ruff now checks `E501` with a 100 character limit.
+
 ## 0.8.0
 
 - **`GINConv`.** Graph Isomorphism Network layer (Xu et al., 2019): sum-aggregates neighbor

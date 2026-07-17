@@ -1,12 +1,12 @@
 """Recurrent layers and cells.
 
 Modules:
-    RNNCell   Single-step vanilla RNN with tanh activation.                 (Elman, 1990)
-    RNN       Vanilla RNN over a full sequence via lax.scan.                (Elman, 1990)
-    LSTMCell  Single-step LSTM with input, forget, cell, and output gates.  (Hochreiter & Schmidhuber, 1997)
-    LSTM      LSTM over a full sequence via lax.scan.                       (Hochreiter & Schmidhuber, 1997)
-    GRUCell   Single-step GRU with reset, update, and new gates.            (Cho et al., 2014)
-    GRU       GRU over a full sequence via lax.scan.                        (Cho et al., 2014)
+    RNNCell   Single-step vanilla RNN with tanh activation.       (Elman, 1990)
+    RNN       Vanilla RNN over a full sequence via lax.scan.      (Elman, 1990)
+    LSTMCell  Single-step LSTM with input, forget, output gates.  (Hochreiter & Schmidhuber, 1997)
+    LSTM      LSTM over a full sequence via lax.scan.             (Hochreiter & Schmidhuber, 1997)
+    GRUCell   Single-step GRU with reset, update, new gates.      (Cho et al., 2014)
+    GRU       GRU over a full sequence via lax.scan.              (Cho et al., 2014)
 
 Sequence layers use sequential scan for O(T) parallel time complexity.
 Glorot uniform for input weights, orthogonal for hidden weights.
@@ -148,7 +148,7 @@ class LSTMCell(Module):
         if bias:
             b = b_init(shape=(gate_dim,), key=key_b)
 
-            # Initialise forget gate weights to 1.0
+            # Initialize forget gate bias to 1.0
             i, f, g, o = jnp.split(b, 4)
             self.b = Param(jnp.concatenate((i, jnp.ones_like(f), g, o)))
         else:
@@ -175,7 +175,7 @@ class LSTMCell(Module):
         c = f * c + i * g
         h = o * jnp.tanh(c)
 
-        return (h, c)
+        return h, c
 
     @property
     def initial_state(self) -> tuple[Float[Array, " h"], Float[Array, " h"]]:

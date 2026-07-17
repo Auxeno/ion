@@ -14,7 +14,7 @@ from ..module import Module
 
 
 class Dropout(Module):
-    """Stochastic dropout.
+    """Stochastic dropout layer.
 
     >>> drop = Dropout(0.5)
     >>> drop(x, key=key)  # (*, d) -> (*, d)
@@ -24,6 +24,7 @@ class Dropout(Module):
     deterministic: bool
 
     def __init__(self, p: float, deterministic: bool = False) -> None:
+
         if not 0.0 <= p <= 1.0:
             raise ValueError(f"p ({p}) must be in [0, 1]")
 

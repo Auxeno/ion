@@ -21,8 +21,8 @@ from ..param import Param
 class Conv(Module):
     """N-dimensional convolution layer.
 
-    >>> Conv(3, 16, kernel_shape=(5,), padding="SAME", key=key)   # Conv1d
-    >>> Conv(3, 16, kernel_shape=(3, 3), padding=1, key=key)      # Conv2d
+    >>> conv = Conv(3, 16, kernel_shape=(5,), padding="SAME", key=key)  # Conv1d
+    >>> conv = Conv(3, 16, kernel_shape=(3, 3), padding=1, key=key)     # Conv2d
     >>> conv(x)  # (b, h, w, 3) -> (b, h, w, 16)
     """
 
@@ -51,9 +51,7 @@ class Conv(Module):
     ) -> None:
 
         if isinstance(kernel_shape, int):
-            raise TypeError(
-                f"kernel_shape must be a tuple of ints (e.g. (3,) or (3, 3)), got int {kernel_shape}"
-            )
+            raise TypeError(f"kernel_shape must be a tuple of ints, got int {kernel_shape}")
         if len(kernel_shape) < 1:
             raise ValueError("kernel_shape must have at least one element")
         if in_channels % groups != 0:
@@ -109,8 +107,8 @@ class Conv(Module):
 class ConvTranspose(Module):
     """N-dimensional transposed convolution layer.
 
-    >>> ConvTranspose(3, 16, kernel_shape=(5,), padding=2, key=key)          # ConvTranspose1d
-    >>> ConvTranspose(3, 16, kernel_shape=(3, 3), padding="VALID", key=key)  # ConvTranspose2d
+    >>> conv_t = ConvTranspose(3, 16, kernel_shape=(5,), padding=2, key=key)          # 1d
+    >>> conv_t = ConvTranspose(3, 16, kernel_shape=(3, 3), padding="VALID", key=key)  # 2d
     >>> conv_t(x)  # (b, h, w, 3) -> (b, h, w, 16)
     """
 
@@ -140,9 +138,7 @@ class ConvTranspose(Module):
     ) -> None:
 
         if isinstance(kernel_shape, int):
-            raise TypeError(
-                f"kernel_shape must be a tuple of ints (e.g. (3,) or (3, 3)), got int {kernel_shape}"
-            )
+            raise TypeError(f"kernel_shape must be a tuple of ints, got int {kernel_shape}")
         if len(kernel_shape) < 1:
             raise ValueError("kernel_shape must have at least one element")
         if in_channels % groups != 0:
@@ -162,8 +158,7 @@ class ConvTranspose(Module):
         for s, o in zip(stride, output_padding):
             if o >= s:
                 raise ValueError(
-                    f"output_padding ({output_padding}) must be less than "
-                    f"stride ({stride}) elementwise"
+                    f"output_padding ({output_padding}) must be less than stride ({stride})"
                 )
 
         self.kernel_shape = kernel_shape

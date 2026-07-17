@@ -59,7 +59,7 @@ def test_determinism(gnn_layer_and_graph):
     args = (senders, receivers) if x_edge is None else (senders, receivers, x_edge)
     y1 = layer(x, *args)
     y2 = layer(x, *args)
-    npt.assert_allclose(y1, y2, rtol=0, atol=0)
+    npt.assert_array_equal(y1, y2)
 
 
 def test_output_dtype(gnn_layer_and_graph):
@@ -77,7 +77,7 @@ def test_pytree_roundtrip(gnn_layer_and_graph):
     reconstructed = jax.tree.unflatten(treedef, leaves)
     for a, b in zip(jax.tree.leaves(layer), jax.tree.leaves(reconstructed)):
         if isinstance(a, jnp.ndarray):
-            npt.assert_allclose(a, b, rtol=0, atol=0)
+            npt.assert_array_equal(a, b)
 
 
 def test_serialization(gnn_layer_and_graph):
@@ -89,7 +89,7 @@ def test_serialization(gnn_layer_and_graph):
         loaded = ion.load(f.name, layer)
     y_orig = layer(x, *args)
     y_loaded = loaded(x, *args)
-    npt.assert_allclose(y_orig, y_loaded, rtol=0, atol=0)
+    npt.assert_array_equal(y_orig, y_loaded)
 
 
 def test_different_graph_different_output(gnn_layer_and_graph):
@@ -103,7 +103,7 @@ def test_different_graph_different_output(gnn_layer_and_graph):
     args = () if x_edge is None else (jax.random.normal(jax.random.key(2), (2, x_edge.shape[1])),)
     y1 = layer(x, s1, r1, *args)
     y2 = layer(x, s2, r2, *args)
-    assert not jnp.array_equal(y1, y2)
+    assert not jnp.allclose(y1, y2)
 
 
 # bfloat16 tests

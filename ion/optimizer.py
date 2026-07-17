@@ -95,8 +95,7 @@ def _field_partition(
         field_name = path[0].name
         if field_name not in field_to_label:
             raise ValueError(
-                f"Field '{field_name}' has trainable params but no transform. "
-                f"Covered fields: {sorted(field_to_label)}"
+                f"Field '{field_name}' has no transform, transforms cover {sorted(field_to_label)}"
             )
         return Param(field_to_label[field_name], trainable=True)  # type: ignore[arg-type]
 
@@ -167,7 +166,7 @@ class Optimizer:
             Updated model and optimizer.
         """
         if jax.tree.structure(model) != self._structure:
-            raise ValueError("Model structure or trainability changed, create a new Optimizer.")
+            raise ValueError("Model structure or trainability changed, create a new Optimizer")
 
         updates, new_state = self._transform.update(
             grads,

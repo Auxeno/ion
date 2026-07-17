@@ -3,8 +3,12 @@
 Modules:
     LearnedPositionalEmbedding  Trainable lookup table added to input.
     RoPE                        Rotary position embedding for Q or K.  (Su et al., 2021)
-    sinusoidal                  Fixed sin/cos encodings.               (Vaswani et al., 2017)
-    alibi                       Linear attention bias.                 (Press et al., 2022)
+
+Functions:
+    sinusoidal  Fixed sin/cos encodings.  (Vaswani et al., 2017)
+    alibi       Linear attention bias.    (Press et al., 2022)
+
+Truncated normal weight init (std=0.02) for the learned embedding table.
 """
 
 import jax
@@ -41,7 +45,7 @@ class LearnedPositionalEmbedding(Module):
         seq_len = x.shape[-2]
         max_len = self.w.shape[0]
         if seq_len > max_len:
-            raise ValueError(f"Input sequence length ({seq_len}) exceeds max_len ({max_len})")
+            raise ValueError(f"input seq_len ({seq_len}) exceeds max_len ({max_len})")
 
         x = x + self.w[:seq_len]
 

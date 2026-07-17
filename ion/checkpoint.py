@@ -116,9 +116,7 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
             expected_keys.add(array_key)
             if array_key not in saved_data:
                 raise ValueError(
-                    f"Structure mismatch: reference tree expects key '{array_key}', "
-                    f"but it was not found in the file. "
-                    f"Available keys: {sorted(array_keys_in_file)}"
+                    f"Structure mismatch: reference key '{array_key}' not found in file"
                 )
             saved_array = saved_data[array_key]
             if array_key in extension_dtypes:
@@ -126,8 +124,7 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
             ref_shape = leaf._value.shape
             if saved_array.shape != ref_shape:
                 raise ValueError(
-                    f"Shape mismatch for '{array_key}': "
-                    f"saved {saved_array.shape} vs reference {ref_shape}"
+                    f"Shape mismatch for '{array_key}': saved {saved_array.shape} vs {ref_shape}"
                 )
             ref_dtype = leaf._value.dtype
             if saved_array.dtype != ref_dtype:
@@ -142,19 +139,14 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
         elif isinstance(leaf, (jax.Array, np.ndarray)):
             expected_keys.add(key)
             if key not in saved_data:
-                raise ValueError(
-                    f"Structure mismatch: reference tree expects key '{key}', "
-                    f"but it was not found in the file. "
-                    f"Available keys: {sorted(array_keys_in_file)}"
-                )
+                raise ValueError(f"Structure mismatch: reference key '{key}' not found in file")
             saved_array = saved_data[key]
             if key in extension_dtypes:
                 saved_array = saved_array.view(extension_dtypes[key])
             ref_shape = leaf.shape
             if saved_array.shape != ref_shape:
                 raise ValueError(
-                    f"Shape mismatch for '{key}': "
-                    f"saved {saved_array.shape} vs reference {ref_shape}"
+                    f"Shape mismatch for '{key}': saved {saved_array.shape} vs {ref_shape}"
                 )
             if saved_array.dtype != leaf.dtype:
                 warnings.warn(

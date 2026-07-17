@@ -20,7 +20,7 @@ from .linear import Linear
 class LoRALinear(Module):
     """Low-rank adaptation wrapper around a frozen Linear layer.
 
-    >>> lora = LoRALinear(Linear(64, 128, key=key_1), rank=8, key=key_2)
+    >>> lora = LoRALinear(Linear(64, 128, key=keys[0]), rank=8, key=keys[1])
     >>> lora(x)  # (*, 64) -> (*, 128)
     """
 

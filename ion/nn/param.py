@@ -13,6 +13,7 @@ See docs/internals.md for implementation details.
 
 import dataclasses
 import functools
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 import jax
@@ -160,7 +161,7 @@ class Param(_ParamBase[T]):
     def __len__(self) -> int:
         return len(self._value)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         return iter(self._value)
 
     @staticmethod

@@ -13,7 +13,7 @@ class TestEmbedding:
         x = jnp.array([0, 3, 9])
         y = emb(x)
         expected = emb.w[x]
-        npt.assert_allclose(y, expected, rtol=0, atol=0)
+        npt.assert_array_equal(y, expected)
 
     def test_output_shape(self):
         """Output shape is (*input_shape, dim)."""
@@ -52,4 +52,4 @@ class TestEmbedding:
         """Different PRNG keys produce different weights."""
         e1 = nn.Embedding(10, 8, key=jax.random.key(0))
         e2 = nn.Embedding(10, 8, key=jax.random.key(1))
-        assert not jnp.array_equal(e1.w._value, e2.w._value)
+        assert not jnp.allclose(e1.w._value, e2.w._value)

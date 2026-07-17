@@ -1,11 +1,13 @@
 """Graph Attention Network layers.
 
 Modules:
-    GATConv    Multi-head graph attention (Velickovic et al., 2018).
-    GATv2Conv  Multi-head dynamic graph attention (Brody et al., 2022).
+    GATConv    Multi-head graph attention.          (Velickovic et al., 2018)
+    GATv2Conv  Multi-head dynamic graph attention.  (Brody et al., 2022)
 
 Glorot uniform weight init to match original papers, zeros for bias.
 Self-loops are the caller's responsibility, see `gnn.add_self_loops`.
+Optional edge features require `edge_dim` at init and `x_edge` at call.
+Optional boolean edge mask: True = keep edge, False = ignore.
 """
 
 import jax
@@ -23,6 +25,7 @@ class GATConv(Module):
 
     >>> gat = GATConv(16, 32, num_heads=4, key=key)
     >>> gat(x, senders, receivers)  # (n, 16) -> (n, 32)
+    >>> gat(x, senders, receivers, edge_mask=mask)  # mask: bool (e,)
     """
 
     w: Param[Float[Array, "i h k"]]
@@ -104,7 +107,6 @@ class GATConv(Module):
         if x_edge is not None:
             if edge_mask is not None:
                 x_edge = x_edge * edge_mask[:, None]
-            e_edge, f = x_edge.shape
             edge_proj = jnp.einsum("ef, fhk -> ehk", x_edge, self.w_edge)
             logits_edge = jnp.einsum("ehk, hk -> eh", edge_proj, self.att_edge)
             logits = logits + logits_edge
@@ -136,6 +138,7 @@ class GATv2Conv(Module):
 
     >>> gat = GATv2Conv(16, 32, num_heads=4, key=key)
     >>> gat(x, senders, receivers)  # (n, 16) -> (n, 32)
+    >>> gat(x, senders, receivers, edge_mask=mask)  # mask: bool (e,)
     """
 
     w_sender: Param[Float[Array, "i h k"]]
@@ -165,19 +168,19 @@ class GATv2Conv(Module):
         if out_dim % num_heads != 0:
             raise ValueError(f"out_dim ({out_dim}) must be divisible by num_heads ({num_heads})")
 
-        key_ws, key_wr, key_att, key_b, key_we = jax.random.split(key, 5)
+        key_w_s, key_w_r, key_att, key_b, key_w_e = jax.random.split(key, 5)
         head_dim = out_dim // num_heads
 
         # Initialize projections flat so Glorot fans are (in_dim, out_dim), then split heads
-        w_sender = w_init(shape=(in_dim, out_dim), key=key_ws)
+        w_sender = w_init(shape=(in_dim, out_dim), key=key_w_s)
         self.w_sender = Param(w_sender.reshape(in_dim, num_heads, head_dim))
-        w_receiver = w_init(shape=(in_dim, out_dim), key=key_wr)
+        w_receiver = w_init(shape=(in_dim, out_dim), key=key_w_r)
         self.w_receiver = Param(w_receiver.reshape(in_dim, num_heads, head_dim))
         self.att = Param(att_init(shape=(num_heads, head_dim), key=key_att))
         self.b = Param(b_init(shape=(out_dim,), key=key_b)) if bias else None
 
         if edge_dim is not None:
-            w_edge = w_init(shape=(edge_dim, out_dim), key=key_we)
+            w_edge = w_init(shape=(edge_dim, out_dim), key=key_w_e)
             self.w_edge = Param(w_edge.reshape(edge_dim, num_heads, head_dim))
         else:
             self.w_edge = None
@@ -231,12 +234,12 @@ class GATv2Conv(Module):
 
         # Aggregate sender features weighted by attention
         messages = x_s[senders] * attention[..., None]
-        x_out = jax.ops.segment_sum(messages, receivers, n)
+        x = jax.ops.segment_sum(messages, receivers, n)
 
         # Concatenate heads into a flat feature vector
-        x_out = x_out.reshape(n, -1)
+        x = x.reshape(n, -1)
 
         if self.b is not None:
-            x_out = x_out + self.b
+            x = x + self.b
 
-        return x_out
+        return x

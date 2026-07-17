@@ -71,7 +71,7 @@ class TestSequential:
         """Empty Sequential returns input unchanged."""
         model = nn.Sequential()
         x = jnp.ones((4,))
-        npt.assert_allclose(model(x), x, rtol=0, atol=0)
+        npt.assert_array_equal(model(x), x)
         assert len(model) == 0
 
     def test_non_callable_raises(self):

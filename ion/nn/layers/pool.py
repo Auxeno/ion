@@ -34,27 +34,25 @@ class MaxPool(Module):
     ) -> None:
 
         if isinstance(kernel_shape, int):
-            raise TypeError(
-                f"kernel_shape must be a tuple of ints (e.g. (2,) or (2, 2)), got int {kernel_shape}"
-            )
+            raise TypeError(f"kernel_shape must be a tuple of ints, got int {kernel_shape}")
         if len(kernel_shape) < 1:
             raise ValueError("kernel_shape must have at least one element")
 
         self.kernel_shape = kernel_shape
 
-        num_spatial_dims = len(kernel_shape)
+        num_spatial = len(kernel_shape)
 
         if stride is None:
             self.stride = self.kernel_shape
         elif isinstance(stride, int):
-            self.stride = (stride,) * num_spatial_dims
+            self.stride = (stride,) * num_spatial
         else:
             self.stride = stride
 
         if isinstance(padding, str):
             self.padding = padding
         elif isinstance(padding, int):
-            self.padding = tuple((padding, padding) for _ in range(num_spatial_dims))
+            self.padding = tuple((padding, padding) for _ in range(num_spatial))
         else:
             self.padding = tuple((p, p) for p in padding)
 
@@ -62,7 +60,9 @@ class MaxPool(Module):
         if not isinstance(self.padding, str) and any(
             lo >= k or hi >= k for (lo, hi), k in zip(self.padding, self.kernel_shape)
         ):
-            raise ValueError(f"padding must be smaller than kernel_shape, got {self.padding} vs {self.kernel_shape}")
+            raise ValueError(
+                f"padding ({self.padding}) must be smaller than kernel_shape ({self.kernel_shape})"
+            )
 
     def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
 
@@ -99,27 +99,25 @@ class AvgPool(Module):
     ) -> None:
 
         if isinstance(kernel_shape, int):
-            raise TypeError(
-                f"kernel_shape must be a tuple of ints (e.g. (2,) or (2, 2)), got int {kernel_shape}"
-            )
+            raise TypeError(f"kernel_shape must be a tuple of ints, got int {kernel_shape}")
         if len(kernel_shape) < 1:
             raise ValueError("kernel_shape must have at least one element")
 
         self.kernel_shape = kernel_shape
 
-        num_spatial_dims = len(kernel_shape)
+        num_spatial = len(kernel_shape)
 
         if stride is None:
             self.stride = self.kernel_shape
         elif isinstance(stride, int):
-            self.stride = (stride,) * num_spatial_dims
+            self.stride = (stride,) * num_spatial
         else:
             self.stride = stride
 
         if isinstance(padding, str):
             self.padding = padding
         elif isinstance(padding, int):
-            self.padding = tuple((padding, padding) for _ in range(num_spatial_dims))
+            self.padding = tuple((padding, padding) for _ in range(num_spatial))
         else:
             self.padding = tuple((p, p) for p in padding)
 
@@ -127,7 +125,9 @@ class AvgPool(Module):
         if not isinstance(self.padding, str) and any(
             lo >= k or hi >= k for (lo, hi), k in zip(self.padding, self.kernel_shape)
         ):
-            raise ValueError(f"padding must be smaller than kernel_shape, got {self.padding} vs {self.kernel_shape}")
+            raise ValueError(
+                f"padding ({self.padding}) must be smaller than kernel_shape ({self.kernel_shape})"
+            )
 
     def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
 

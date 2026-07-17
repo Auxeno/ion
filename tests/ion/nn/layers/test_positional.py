@@ -1,6 +1,8 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
 import numpy.testing as npt
+import pytest
 
 from ion import nn
 
@@ -30,7 +32,7 @@ class TestLearnedPositionalEmbedding:
         x_short = jnp.ones((5, 64))
         x_long = jnp.ones((10, 64))
         # First 5 positions should get the same embeddings
-        npt.assert_allclose(pos(x_short), pos(x_long)[:5], rtol=0, atol=0)
+        npt.assert_array_equal(pos(x_short), pos(x_long)[:5])
 
     def test_weight_shape(self):
         """Weight matrix has shape (max_len, dim)."""
@@ -44,8 +46,6 @@ class TestLearnedPositionalEmbedding:
 
     def test_sequence_exceeds_max_len_raises(self):
         """Input longer than max_len raises ValueError."""
-        import pytest
-
         pos = nn.LearnedPositionalEmbedding(10, 64, key=jax.random.key(0))
         x = jnp.ones((20, 64))
         with pytest.raises(ValueError, match="exceeds max_len"):
@@ -55,14 +55,12 @@ class TestLearnedPositionalEmbedding:
         """Different PRNG keys produce different weights."""
         p1 = nn.LearnedPositionalEmbedding(128, 64, key=jax.random.key(0))
         p2 = nn.LearnedPositionalEmbedding(128, 64, key=jax.random.key(1))
-        assert not jnp.array_equal(p1.w._value, p2.w._value)
+        assert not jnp.allclose(p1.w._value, p2.w._value)
 
 
 class TestSinusoidal:
     def test_odd_dim_raises(self):
         """Odd dim raises ValueError."""
-        import pytest
-
         with pytest.raises(ValueError, match="even"):
             nn.sinusoidal(128, 63)
 
@@ -114,8 +112,6 @@ class TestAlibi:
 
     def test_non_power_of_2_raises(self):
         """Non-power-of-2 num_heads raises ValueError."""
-        import pytest
-
         with pytest.raises(ValueError):
             nn.alibi(16, 3)
 
@@ -123,15 +119,11 @@ class TestAlibi:
 class TestRoPE:
     def test_odd_head_dim_raises(self):
         """Odd head_dim raises ValueError."""
-        import pytest
-
         with pytest.raises(ValueError, match="even"):
             nn.RoPE()(jnp.ones((4, 7)))
 
     def test_output_manual(self):
         """Output matches a hand-rolled per-pair 2D rotation."""
-        import numpy as np
-
         rope = nn.RoPE()
         x = jax.random.normal(jax.random.key(0), (4, 6))
         expected = np.zeros((4, 6))

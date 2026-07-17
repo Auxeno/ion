@@ -44,9 +44,7 @@ class MLP(Module):
     ) -> None:
 
         if len(dims) < 2:
-            raise ValueError(
-                f"dims must contain at least an input and output dim, got {list(dims)}"
-            )
+            raise ValueError(f"dims must have at least an input and output dim, got {list(dims)}")
 
         keys = jax.random.split(key, len(dims) - 1)
         self.layers = tuple(
@@ -56,7 +54,7 @@ class MLP(Module):
         self.activation = activation
         self.final_activation = final_activation
 
-    def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
+    def __call__(self, x: Float[Array, "... i"]) -> Float[Array, "... o"]:
 
         for layer in self.layers[:-1]:
             x = layer(x)

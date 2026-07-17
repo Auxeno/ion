@@ -78,14 +78,14 @@ def test_determinism(layer_and_input):
     layer, x = layer_and_input
     y1 = layer(x)
     y2 = layer(x)
-    npt.assert_allclose(y1, y2, rtol=0, atol=0)
+    npt.assert_array_equal(y1, y2)
 
 
 def test_different_keys():
     """Different PRNG keys produce different weights."""
     l1 = nn.Linear(8, 8, key=jax.random.key(0))
     l2 = nn.Linear(8, 8, key=jax.random.key(1))
-    assert not jnp.array_equal(l1.w._value, l2.w._value)
+    assert not jnp.allclose(l1.w._value, l2.w._value)
 
 
 def test_pytree_roundtrip(layer_and_input):
@@ -97,7 +97,7 @@ def test_pytree_roundtrip(layer_and_input):
     recon_leaves = jax.tree.leaves(reconstructed)
     for a, b in zip(orig_leaves, recon_leaves):
         if isinstance(a, jnp.ndarray):
-            npt.assert_allclose(a, b, rtol=0, atol=0)
+            npt.assert_array_equal(a, b)
         else:
             assert a == b
 
@@ -147,7 +147,7 @@ def test_serialization(layer_and_input):
         loaded = ion.load(f.name, layer)
     y_orig = layer(x)
     y_loaded = loaded(x)
-    npt.assert_allclose(y_orig, y_loaded, rtol=0, atol=0)
+    npt.assert_array_equal(y_orig, y_loaded)
 
 
 def _assert_trees_close(a, b, rtol=1e-5, atol=1e-5):
@@ -217,7 +217,7 @@ def test_seq_determinism(seq_layer_and_input):
     layer, x = seq_layer_and_input
     y1, _ = layer(x)
     y2, _ = layer(x)
-    npt.assert_allclose(y1, y2, rtol=0, atol=0)
+    npt.assert_array_equal(y1, y2)
 
 
 def test_seq_pytree_roundtrip(seq_layer_and_input):
@@ -229,7 +229,7 @@ def test_seq_pytree_roundtrip(seq_layer_and_input):
     recon_leaves = jax.tree.leaves(reconstructed)
     for a, b in zip(orig_leaves, recon_leaves):
         if isinstance(a, jnp.ndarray):
-            npt.assert_allclose(a, b, rtol=0, atol=0)
+            npt.assert_array_equal(a, b)
         else:
             assert a == b
 
@@ -242,7 +242,7 @@ def test_seq_serialization(seq_layer_and_input):
         loaded = ion.load(f.name, layer)
     y_orig, _ = layer(x)
     y_loaded, _ = loaded(x)
-    npt.assert_allclose(y_orig, y_loaded, rtol=0, atol=0)
+    npt.assert_array_equal(y_orig, y_loaded)
 
 
 def test_seq_params_property(seq_layer_and_input):
@@ -358,7 +358,7 @@ def test_cell_pytree_roundtrip(cell_and_input):
     recon_leaves = jax.tree.leaves(reconstructed)
     for a, b in zip(orig_leaves, recon_leaves):
         if isinstance(a, jnp.ndarray):
-            npt.assert_allclose(a, b, rtol=0, atol=0)
+            npt.assert_array_equal(a, b)
         else:
             assert a == b
 
@@ -445,7 +445,7 @@ def test_ssm_determinism(ssm_layer_and_input):
     layer, x = ssm_layer_and_input
     y1, _ = layer(x)
     y2, _ = layer(x)
-    npt.assert_allclose(y1, y2, rtol=0, atol=0)
+    npt.assert_array_equal(y1, y2)
 
 
 def test_ssm_pytree_roundtrip(ssm_layer_and_input):
@@ -457,7 +457,7 @@ def test_ssm_pytree_roundtrip(ssm_layer_and_input):
     recon_leaves = jax.tree.leaves(reconstructed)
     for a, b in zip(orig_leaves, recon_leaves):
         if isinstance(a, jnp.ndarray):
-            npt.assert_allclose(a, b, rtol=0, atol=0)
+            npt.assert_array_equal(a, b)
         else:
             assert a == b
 
@@ -470,7 +470,7 @@ def test_ssm_serialization(ssm_layer_and_input):
         loaded = ion.load(f.name, layer)
     y_orig, _ = layer(x)
     y_loaded, _ = loaded(x)
-    npt.assert_allclose(y_orig, y_loaded, rtol=0, atol=0)
+    npt.assert_array_equal(y_orig, y_loaded)
 
 
 def test_ssm_params_property(ssm_layer_and_input):
@@ -588,7 +588,7 @@ def test_ssm_cell_pytree_roundtrip(ssm_cell_and_input):
     recon_leaves = jax.tree.leaves(reconstructed)
     for a, b in zip(orig_leaves, recon_leaves):
         if isinstance(a, jnp.ndarray):
-            npt.assert_allclose(a, b, rtol=0, atol=0)
+            npt.assert_array_equal(a, b)
         else:
             assert a == b
 

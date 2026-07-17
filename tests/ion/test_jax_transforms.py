@@ -539,7 +539,7 @@ class TestNewJaxTransforms:
         npt.assert_allclose(per_example_grads.w._value, xs)
 
     def test_training_loop_loss_decreases(self):
-        """10-step loop: jax.value_and_grad -> Optimizer.update, assert final loss < initial loss."""
+        """10-step loop: jax.value_and_grad -> Optimizer.update, final loss < initial loss."""
         model = nn.Linear(4, 1, key=jax.random.key(0))
         optimizer = ion.Optimizer(optax.adam(1e-2), model)
 
@@ -654,9 +654,8 @@ class TestNewJaxTransforms:
         npt.assert_allclose(grads.b._value, jnp.zeros_like(model.b._value))
 
     def test_grad_of_grad_raises(self):
-        """Nested jax.grad(jax.grad(f)) on Param raises because __jax_array__
-        is triggered during abstractification of the intermediate gradient Param.
-        Use jax.hessian instead for second-order derivatives."""
+        """jax.grad(jax.grad(f)) raises: __jax_array__ fires on the intermediate gradient Param."""
+        # Use jax.hessian instead for second-order derivatives
         p = nn.Param(jnp.array([1.0, 2.0]))
 
         def f(p):
