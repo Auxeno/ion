@@ -23,7 +23,7 @@ receivers = jnp.array([1, 0, 2, 1, 2, 0])
 
 This is a COO (coordinate) sparse format. Storage is O(edges), not O(nodes^2). All operations use `jax.ops.segment_sum` for aggregation, which is JIT-friendly and efficient.
 
-All GNN layers expect unbatched inputs. Passing a batched `(b, n, d)` tensor or a 2D edge index `(e, 2)` will raise immediately via tuple unpacking at the top of each `__call__`. For batching multiple graphs, see the section below on concatenating disconnected subgraphs.
+All GNN layers expect unbatched inputs. Passing a batched `(b, n, d)` tensor or a 2D edge index `(e, 2)` will raise immediately via tuple unpacking at the top of each `__call__`. For batching multiple graphs, see [Batching Multiple Graphs](#batching-multiple-graphs) below.
 
 ## Self-Loops
 
@@ -35,7 +35,7 @@ from ion.gnn import add_self_loops
 senders, receivers = add_self_loops(senders, receivers, num_nodes)
 ```
 
-Without self-loops, a node's output depends only on its neighbors, not itself. This is almost never what you want for GCNConv. For GATConv, self-loops allow the node to attend to its own features.
+Without self-loops, a node's output depends only on its neighbors, not itself. This is almost never what you want for GCNConv. For GATConv, self-loops allow the node to attend to its own features. GINConv is the exception: do not add self-loops, since a node's own features enter through its `(1 + eps)` term.
 
 ## Layers
 
@@ -110,14 +110,35 @@ gat = gnn.GATv2Conv(in_dim=16, out_dim=32, num_heads=4, edge_dim=8, key=key)
 y = gat(x, senders, receivers, x_edge)  # x_edge shape: (e, 8)
 ```
 
+### GINConv
+
+Graph Isomorphism Network (Xu et al., 2019). Sum-aggregates neighbor features and applies an MLP to `(1 + eps) * x + aggregated`. Sum aggregation preserves neighbor multiplicity, making GIN as discriminative as the Weisfeiler-Lehman graph isomorphism test.
+
+```python
+from ion import nn, gnn
+
+gin = gnn.GINConv(nn.MLP([16, 32, 32], key=key))
+y = gin(x, senders, receivers)  # (n, 16) -> (n, 32)
+```
+
+The update network is supplied by the caller, so `GINConv` takes no `key` and creates no weights of its own. `eps` weights a node's own features against its aggregated neighbors. It defaults to a fixed `0.0`; set `train_eps=True` to make it a learnable scalar:
+
+```python
+gin = gnn.GINConv(nn.MLP([16, 32, 32], key=key), train_eps=True)
+```
+
+Do not add self-loops: own features enter through the `(1 + eps)` term.
+
 ## Shape Annotations
 
 | Label | Meaning | Used in |
 |-------|---------|---------|
 | `n` | number of nodes | everywhere |
 | `e` | number of edges | everywhere |
-| `i` | input features | GCNConv, GATConv, GATv2Conv |
-| `o` | output features | GCNConv, GATConv, GATv2Conv |
+| `g` | number of graphs | mean_pool, sum_pool, max_pool, batch_graphs |
+| `d` | node feature dimension | pooling, batch_graphs |
+| `i` | input features | GCNConv, GATConv, GATv2Conv, GINConv |
+| `o` | output features | GCNConv, GATConv, GATv2Conv, GINConv |
 | `h` | number of attention heads | GATConv, GATv2Conv |
 | `k` | per-head dimension | GATConv, GATv2Conv |
 | `f` | edge feature dimension | GATConv, GATv2Conv (edge_dim) |
@@ -137,6 +158,8 @@ y = gat(x, senders, receivers, x_edge)  # x_edge shape: (e, 8)
 
 GCNConv defaults to He normal, matching `Linear`, since it is typically followed by ReLU. GATConv and GATv2Conv use Glorot uniform (activation-agnostic) since the projections feed into a LeakyReLU attention mechanism.
 
+GINConv creates no weights of its own; initialization is determined by the update network the caller supplies. With `train_eps=True` its only parameter is the scalar `eps`, initialized to the `eps` argument (default `0.0`).
+
 ## Operations
 
 ### segment_softmax
@@ -149,6 +172,30 @@ from ion.gnn import segment_softmax
 # Normalize scores so they sum to 1 per receiver node
 weights = segment_softmax(scores, receivers, num_nodes)
 ```
+
+### segment_mean
+
+Mean of data within each segment. JAX ships `segment_sum`, `segment_max`, `segment_min` and `segment_prod` but no mean; this fills the gap. Empty segments give zeros, not NaN.
+
+```python
+from ion.gnn import segment_mean
+
+means = segment_mean(messages, receivers, num_nodes)
+```
+
+The four `jax.ops` segment reductions are also re-exported from `ion.gnn`, so every segment reduction is reachable as `gnn.segment_*` alongside `segment_softmax` and `segment_mean`.
+
+### Pooling: mean_pool, sum_pool, max_pool
+
+Graph-level readout for graph classification. Each pools node features `(n, d)` into per-graph vectors `(g, d)` using a `graph_ids` array that maps each node to its graph (see [Batching Multiple Graphs](#batching-multiple-graphs) below).
+
+```python
+from ion.gnn import mean_pool
+
+g = mean_pool(x, graph_ids, num_graphs)  # (n, d) -> (g, d)
+```
+
+`max_pool` returns zeros for empty graphs rather than `segment_max`'s `-inf` fill; `mean_pool` likewise guards empty graphs to zeros. Sum pooling is the readout used in the GIN paper, since it preserves node counts.
 
 ### add_self_loops
 
@@ -163,19 +210,25 @@ senders, receivers = add_self_loops(senders, receivers, num_nodes)
 
 ## Batching Multiple Graphs
 
-Ion does not provide a graph batching utility. For a batch of graphs with different sizes, the standard approach is to concatenate them into a single disconnected graph and offset the edge indices:
+For a batch of graphs with different sizes, the standard approach is to pack them into a single disconnected graph. `batch_graphs` concatenates node features, offsets the edge indices of each graph by the cumulative node count, and returns a `graph_ids` array mapping each node to its source graph:
 
 ```python
-# Graph 1: 3 nodes, edges (0->1, 1->2)
-# Graph 2: 2 nodes, edges (0->1)
-x = jnp.concatenate([x1, x2])              # (5, d)
-senders = jnp.concatenate([s1, s2 + 3])    # offset by num_nodes_1
-receivers = jnp.concatenate([r1, r2 + 3])  # offset by num_nodes_1
+xs = [x1, x2]                    # (3, d) and (2, d)
+senders_list = [s1, s2]
+receivers_list = [r1, r2]
+
+x, senders, receivers, graph_ids = gnn.batch_graphs(xs, senders_list, receivers_list)
+# x: (5, d), edges of graph 2 offset by 3, graph_ids: [0, 0, 0, 1, 1]
 ```
 
-Since the two subgraphs are disconnected, GNN layers process them independently. For graph-level predictions, aggregate node features per graph using `jax.ops.segment_sum` with a graph membership array.
+Since the subgraphs are disconnected, message passing on the union is exactly equivalent to processing each graph separately. For graph-level predictions, pool node features per graph with `graph_ids`:
 
-For JIT compatibility, pad the concatenated arrays to a fixed maximum number of nodes and edges so the shapes remain static across batches. Dummy padding nodes are disconnected (no edges), so they do not affect the output. Mask them out when computing losses or metrics.
+```python
+h = conv(x, senders, receivers)
+y = gnn.mean_pool(h, graph_ids, num_graphs=len(xs))  # (g, d)
+```
+
+Call `batch_graphs` outside `jit`: per-batch shapes vary, and each new shape triggers recompilation. For static shapes across batches, pad the batched arrays to a fixed maximum number of nodes and edges. Dummy padding nodes are disconnected (no edges), so they do not affect the output. Mask them out when computing losses or metrics.
 
 ## Examples
 
