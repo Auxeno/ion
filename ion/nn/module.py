@@ -13,7 +13,7 @@ import dataclasses
 import functools
 import zlib
 from collections.abc import Iterable, Iterator
-from typing import Any, Self
+from typing import Any, Generic, Self, TypeVar
 
 import jax
 import jax.tree_util as jtu
@@ -22,6 +22,8 @@ from jaxtyping import PyTree
 
 from .. import tree
 from .param import Param
+
+_M = TypeVar("_M")
 
 
 @jtu.register_pytree_node_class
@@ -43,6 +45,58 @@ class _Static:
     @classmethod
     def tree_unflatten(cls, aux, children):
         return cls(aux)
+
+
+class _At(Generic[_M]):
+    """Records an attribute/index path into a model and rebuilds it on `set`.
+
+    Returned by `Module.at`. Each attribute or index access appends one step to the
+    path; `set` reconstructs the modules and containers along it and shares every
+    untouched subtree with the original.
+    """
+
+    __slots__ = ("_target", "_path")
+
+    def __init__(self, target: _M, path: tuple = ()) -> None:
+        self._target = target
+        self._path = path
+
+    def __getattr__(self, name: str) -> "_At[_M]":
+        return _At(self._target, (*self._path, name))
+
+    def __getitem__(self, key: Any) -> "_At[_M]":
+        return _At(self._target, (*self._path, key))
+
+    def set(self, value: Any) -> _M:
+        """Return a copy of the target with `value` stored at this path."""
+
+        def rebuild(node: Any, path: tuple) -> Any:
+            if not path:
+                return value
+            step, rest = path[0], path[1:]
+            if isinstance(node, Module):
+                fields = dataclasses.fields(node)  # type: ignore[reportArgumentType]
+                if step not in (field.name for field in fields):
+                    raise AttributeError(f"{type(node).__name__} has no field '{step}'")
+                # Copy fields onto a blank instance to avoid re-running __init__
+                new_node = object.__new__(type(node))
+                for field in fields:
+                    object.__setattr__(new_node, field.name, getattr(node, field.name))
+                object.__setattr__(new_node, step, rebuild(getattr(node, step), rest))
+                object.__setattr__(new_node, "_frozen", True)
+                return new_node
+            if isinstance(node, (tuple, list)):
+                # Namedtuples rebuild by position and accept field-name steps
+                names = getattr(node, "_fields", None)
+                index = names.index(step) if names and isinstance(step, str) else step
+                items = list(node)
+                items[index] = rebuild(items[index], rest)
+                return type(node)(*items) if names else type(node)(items)
+            if isinstance(node, dict):
+                return {**node, step: rebuild(node[step], rest)}
+            raise TypeError(f"Cannot set '{step}' inside {type(node).__name__}")
+
+        return rebuild(self._target, self._path)
 
 
 def _register_module_as_pytree(cls: type) -> Any:
@@ -133,13 +187,13 @@ class Module:
     Notes
     -----
     Subclasses are auto-converted to frozen dataclasses and registered as JAX pytrees.
-    Instances are immutable after `__init__`; use `replace` for modified copies.
+    Instances are immutable after `__init__`; use `at` for modified copies.
     Non-array fields are wrapped as static pytree metadata automatically.
 
     Examples
     --------
     >>> model = Linear(3, 16, key=key)
-    >>> new_model = model.replace(b=None)  # modified copy
+    >>> new_model = model.at.b.set(None)  # modified copy
     """
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
@@ -259,43 +313,21 @@ class Module:
             color=color,
         )
 
-    def replace(self, **field_updates: Any) -> Self:
-        """Return a new instance with the specified fields replaced.
+    @property
+    def at(self) -> _At[Self]:
+        """Path-based model surgery. Navigate to any field, index, or key, then `set`.
 
-        Parameters
-        ----------
-        **field_updates
-            Field names and their new values. Must be existing dataclass fields.
-
-        Returns
-        -------
-        Self
-            Frozen copy with the specified fields replaced.
+        Rebuilds only the nodes along the path; untouched subtrees are shared with
+        the original. Works uniformly for arrays, `Param`s, sub-modules, static
+        values, and structural changes like `None`.
 
         Examples
         --------
-        >>> new_model = model.replace(b=None)  # remove bias
+        >>> model = model.at.blocks[2].attn.w_q.set(new_w)  # swap a deep leaf
+        >>> model = model.at.b.set(None)                    # remove bias
+        >>> model = model.at.encoder.set(model.encoder.freeze())
         """
-
-        # Ensure field exists in self
-        valid_names = {field.name for field in dataclasses.fields(self)}  # type: ignore[reportArgumentType]
-        unknown = field_updates.keys() - valid_names
-        if unknown:
-            raise ValueError(
-                f"Unknown field(s) {unknown} for {type(self).__name__}. Valid fields: {valid_names}"
-            )
-
-        # Allocate a blank instance to avoid running initialization logic again
-        new_instance = object.__new__(type(self))
-
-        for field in dataclasses.fields(self):  # type: ignore[reportArgumentType]
-            # Apply provided updates or fall back to the existing attribute values
-            new_value = field_updates.get(field.name, getattr(self, field.name))
-            object.__setattr__(new_instance, field.name, new_value)
-
-        # Ensure the newly created copy is also immutable
-        object.__setattr__(new_instance, "_frozen", True)
-        return new_instance
+        return _At(self)
 
     def freeze(self) -> Self:
         """Return a copy with all parameters frozen (non-trainable). Wraps `ion.freeze`.

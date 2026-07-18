@@ -116,13 +116,14 @@ for x, y in data:
 `nn.Module` provides convenience methods and properties for common operations. Methods return new instances, as modules are immutable.
 
 ```python
-model.replace(activation=jax.nn.tanh)    # create a modified copy
-model.freeze()                           # freeze all params
-model.unfreeze()                         # unfreeze all params
-model.replace(base=model.base.freeze())  # freeze a sub-module
-model.astype(jax.numpy.bfloat16)         # cast params to a different dtype
-model.params                             # pytree of Param leaves
-model.num_params                         # total parameter count
+model.at.activation.set(jax.nn.tanh)       # create a modified copy
+model.freeze()                             # freeze all params
+model.unfreeze()                           # unfreeze all params
+model.at.base.set(model.base.freeze())     # freeze a sub-module
+model.at.blocks[2].attn.w_q.set(new_w)     # set a leaf deep in the tree
+model.astype(jax.numpy.bfloat16)           # cast params to a different dtype
+model.params                               # pytree of Param leaves
+model.num_params                           # total parameter count
 ```
 
 ## Layers

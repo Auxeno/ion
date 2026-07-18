@@ -59,7 +59,7 @@ class TestOptimizerInit:
     def test_bare_array_with_frozen_param(self):
         """Partition handles models with both frozen Params and non-Param arrays."""
         model = WithBareArray(key=jax.random.key(0))
-        frozen = model.replace(w=nn.Param(model.w._value, trainable=False))
+        frozen = model.at.w.set(nn.Param(model.w._value, trainable=False))
         optimizer = ion.Optimizer(optax.adam(1e-3), frozen)
         assert optimizer.state is not None
 
@@ -129,7 +129,7 @@ class TestOptimizerUpdate:
     def test_bare_array_with_frozen_param_update(self):
         """Update works with frozen Params and non-Param arrays together."""
         model = WithBareArray(key=jax.random.key(0))
-        frozen = model.replace(w=nn.Param(model.w._value, trainable=False))
+        frozen = model.at.w.set(nn.Param(model.w._value, trainable=False))
         frozen_w = frozen.w._value.copy()
         buf_before = frozen.buf.copy()
         optimizer = ion.Optimizer(optax.adam(1e-2), frozen)
@@ -311,7 +311,7 @@ class TestOptimizerAutoPartition:
                 self.decoder = nn.Linear(4, 1, key=keys[1])
 
         model = Model(key=jax.random.key(0))
-        model = model.replace(encoder=model.encoder.freeze())
+        model = model.at.encoder.set(model.encoder.freeze())
         frozen_w = model.encoder.w._value.copy()
 
         optimizer = ion.Optimizer(optax.adam(1e-2), model)
@@ -492,7 +492,7 @@ class TestOptimizerStructureMismatch:
         model = TwoHead(key=jax.random.key(0))
         optimizer = ion.Optimizer(optax.adam(1e-2), model)
 
-        model = model.replace(encoder=model.encoder.freeze())
+        model = model.at.encoder.set(model.encoder.freeze())
         optimizer = ion.Optimizer(optax.adam(1e-2), model)
 
         frozen_w = model.encoder.w._value
@@ -605,7 +605,7 @@ class TestFieldPartition:
     def test_frozen_params_in_field_group(self):
         """Frozen params within a field group stay unchanged."""
         model = TwoHead(key=jax.random.key(0))
-        model = model.replace(encoder=model.encoder.freeze())
+        model = model.at.encoder.set(model.encoder.freeze())
         frozen_w = model.encoder.w._value.copy()
 
         optimizer = ion.Optimizer(

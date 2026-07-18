@@ -192,10 +192,9 @@ class TestXLAOptimization:
         def step_head(model, state, x, y):
             grads = jax.grad(loss_fn)(model, x, y)
             updates, state = opt_head_raw.update((grads.a, grads.b), state)
-            return model.replace(
-                a=_apply_updates(model.a, updates[0]),  # type: ignore[index]
-                b=_apply_updates(model.b, updates[1]),  # type: ignore[index]
-            ), state
+            model = model.at.a.set(_apply_updates(model.a, updates[0]))  # type: ignore[index]
+            model = model.at.b.set(_apply_updates(model.b, updates[1]))  # type: ignore[index]
+            return model, state
 
         naive = jax.jit(step_naive).lower(lora, opt_naive, x, y).compile()
         head_only = jax.jit(step_head).lower(lora, state_head, x, y).compile()

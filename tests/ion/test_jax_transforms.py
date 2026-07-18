@@ -219,7 +219,7 @@ class TestGradEdgeCases:
                 self.decoder = Linear(3, 1, key=keys[1])
 
         model = Model(key=jax.random.key(0))
-        model = model.replace(encoder=model.encoder.freeze())
+        model = model.at.encoder.set(model.encoder.freeze())
 
         def loss(model, x):
             h = x @ model.encoder.w + model.encoder.b
@@ -571,7 +571,7 @@ class TestNewJaxTransforms:
                 self.decoder = nn.Linear(4, 1, key=keys[1])
 
         model = Model(key=jax.random.key(0))
-        model = model.replace(encoder=model.encoder.freeze())
+        model = model.at.encoder.set(model.encoder.freeze())
         frozen_w = model.encoder.w._value.copy()
 
         optimizer = ion.Optimizer(optax.adam(1e-2), model)
@@ -702,7 +702,7 @@ class TestNewJaxTransforms:
                 self.decoder = Linear(3, 1, key=keys[1])
 
         model = Model(key=jax.random.key(0))
-        model = model.replace(encoder=model.encoder.freeze())
+        model = model.at.encoder.set(model.encoder.freeze())
 
         def loss(model, x):
             h = x @ model.encoder.w + model.encoder.b
@@ -769,7 +769,7 @@ class TestNewJaxTransforms:
                 self.decoder = nn.Linear(4, 1, key=keys[1])
 
         model = Model(key=jax.random.key(0))
-        model = model.replace(encoder=model.encoder.freeze())
+        model = model.at.encoder.set(model.encoder.freeze())
         frozen_w = model.encoder.w._value.copy()
 
         optimizer = ion.Optimizer(optax.adam(1e-2), model)
