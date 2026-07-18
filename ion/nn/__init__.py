@@ -2,7 +2,6 @@
 
 from .blocks.mlp import MLP
 from .blocks.sequential import Sequential
-from .blocks.transformer import CrossTransformerBlock, TransformerBlock
 from .layers.attention import CrossAttention, SelfAttention
 from .layers.conv import Conv, ConvTranspose
 from .layers.dropout import Dropout
@@ -24,7 +23,6 @@ __all__ = [
     "Conv",
     "ConvTranspose",
     "CrossAttention",
-    "CrossTransformerBlock",
     "Dropout",
     "Embedding",
     "GroupNorm",
@@ -51,7 +49,6 @@ __all__ = [
     "S5Cell",
     "SelfAttention",
     "Sequential",
-    "TransformerBlock",
     "alibi",
     "sinusoidal",
 ]
