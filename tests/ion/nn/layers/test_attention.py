@@ -177,17 +177,17 @@ class TestSelfAttention:
     def test_grouped_query_attention(self):
         """num_kv_heads below num_heads (GQA) gives fewer kv heads and correct output shape."""
         layer = nn.SelfAttention(8, num_heads=4, num_kv_heads=2, key=jax.random.key(0))
-        assert layer.w_q.shape == (8, 4, 2)  # (dim, num_heads, head_dim)
-        assert layer.w_k.shape == (8, 2, 2)  # (dim, num_kv_heads, head_dim)
-        assert layer.w_v.shape == (8, 2, 2)
+        assert layer.w_q.shape == (8, 8)  # (dim, num_heads * head_dim)
+        assert layer.w_k.shape == (8, 4)  # (dim, num_kv_heads * head_dim)
+        assert layer.w_v.shape == (8, 4)
         x = jax.random.normal(jax.random.key(1), (2, 5, 8))
         assert layer(x).shape == (2, 5, 8)
 
     def test_multi_query_attention(self):
         """num_kv_heads=1 (MQA) shares a single kv head across all query heads."""
         layer = nn.SelfAttention(8, num_heads=4, num_kv_heads=1, key=jax.random.key(0))
-        assert layer.w_k.shape == (8, 1, 2)
-        assert layer.w_v.shape == (8, 1, 2)
+        assert layer.w_k.shape == (8, 2)
+        assert layer.w_v.shape == (8, 2)
         x = jnp.ones((2, 5, 8))
         assert layer(x).shape == (2, 5, 8)
 
@@ -259,8 +259,8 @@ class TestCrossAttention:
     def test_context_dim(self):
         """context_dim lets context have a different feature dim than the query input."""
         layer = nn.CrossAttention(8, num_heads=2, context_dim=12, key=jax.random.key(0))
-        assert layer.w_k.shape == (12, 2, 4)
-        assert layer.w_v.shape == (12, 2, 4)
+        assert layer.w_k.shape == (12, 8)  # (context_dim, num_heads * head_dim)
+        assert layer.w_v.shape == (12, 8)
         x = jnp.ones((1, 4, 8))
         context = jnp.ones((1, 6, 12))
         y = layer(x, context)
@@ -269,8 +269,8 @@ class TestCrossAttention:
     def test_context_dim_defaults_to_dim(self):
         """context_dim=None gives the same kv shapes as context_dim=dim."""
         layer = nn.CrossAttention(8, num_heads=2, key=jax.random.key(0))
-        assert layer.w_k.shape == (8, 2, 4)
-        assert layer.w_v.shape == (8, 2, 4)
+        assert layer.w_k.shape == (8, 8)
+        assert layer.w_v.shape == (8, 8)
 
     def test_context_influences_output(self):
         """Changing context changes the output (verifies cross-attention wiring)."""

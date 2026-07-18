@@ -11,7 +11,6 @@ Masks may be (s, t) shared, (b, s, t) per batch, or (b, h, s, t) per head.
 """
 
 import jax
-import jax.numpy as jnp
 from jax.nn.initializers import Initializer
 from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
@@ -27,11 +26,13 @@ class SelfAttention(Module):
     >>> attn(x, mask=mask)  # mask: bool (s, s), (b, s, s) or (b, h, s, s)
     """
 
-    w_q: Param[Float[Array, "d h k"]]
-    w_k: Param[Float[Array, "d j k"]]
-    w_v: Param[Float[Array, "d j k"]]
-    w_out: Param[Float[Array, "h k d"]]
+    w_q: Param[Float[Array, "d hk"]]
+    w_k: Param[Float[Array, "d jk"]]
+    w_v: Param[Float[Array, "d jk"]]
+    w_out: Param[Float[Array, "hk d"]]
     b_out: Param[Float[Array, " d"]] | None
+    num_heads: int
+    num_kv_heads: int
     causal: bool
     window: int | tuple[int, int] | None
 
@@ -60,17 +61,15 @@ class SelfAttention(Module):
 
         key_q, key_k, key_v, key_out, key_b = jax.random.split(key, 5)
         head_dim = dim // num_heads
-        w_q = w_init(shape=(dim, num_heads * head_dim), key=key_q)
-        w_k = w_init(shape=(dim, num_kv_heads * head_dim), key=key_k)
-        w_v = w_init(shape=(dim, num_kv_heads * head_dim), key=key_v)
-        w_out = w_init(shape=(num_heads * head_dim, dim), key=key_out)
 
-        self.w_q = Param(w_q.reshape(dim, num_heads, head_dim))
-        self.w_k = Param(w_k.reshape(dim, num_kv_heads, head_dim))
-        self.w_v = Param(w_v.reshape(dim, num_kv_heads, head_dim))
-        self.w_out = Param(w_out.reshape(num_heads, head_dim, dim))
+        self.w_q = Param(w_init(shape=(dim, num_heads * head_dim), key=key_q))
+        self.w_k = Param(w_init(shape=(dim, num_kv_heads * head_dim), key=key_k))
+        self.w_v = Param(w_init(shape=(dim, num_kv_heads * head_dim), key=key_v))
+        self.w_out = Param(w_init(shape=(num_heads * head_dim, dim), key=key_out))
         self.b_out = Param(b_init(shape=(dim,), key=key_b)) if bias else None
 
+        self.num_heads = num_heads
+        self.num_kv_heads = num_kv_heads
         self.causal = causal
         self.window = window
 
@@ -80,9 +79,11 @@ class SelfAttention(Module):
         mask: Bool[Array, "s s"] | Bool[Array, "b s s"] | Bool[Array, "b h s s"] | None = None,
     ) -> Float[Array, "b s d"]:
 
-        q = jnp.einsum("bsd, dhk -> bshk", x, self.w_q)
-        k = jnp.einsum("bsd, djk -> bsjk", x, self.w_k)
-        v = jnp.einsum("bsd, djk -> bsjk", x, self.w_v)
+        b, s, d = x.shape
+
+        q = (x @ self.w_q).reshape(b, s, self.num_heads, -1)
+        k = (x @ self.w_k).reshape(b, s, self.num_kv_heads, -1)
+        v = (x @ self.w_v).reshape(b, s, self.num_kv_heads, -1)
 
         if mask is not None and mask.ndim == 3:
             mask = mask[:, None]
@@ -91,7 +92,7 @@ class SelfAttention(Module):
             q, k, v, mask=mask, is_causal=self.causal, local_window_size=self.window
         )
 
-        x = jnp.einsum("bshk, hkd -> bsd", x, self.w_out)
+        x = x.reshape(b, s, -1) @ self.w_out
 
         if self.b_out is not None:
             x = x + self.b_out
@@ -107,11 +108,12 @@ class CrossAttention(Module):
     >>> attn(x, context, mask=mask)  # mask: bool (s, t), (b, s, t) or (b, h, s, t)
     """
 
-    w_q: Param[Float[Array, "d h k"]]
-    w_k: Param[Float[Array, "c h k"]]
-    w_v: Param[Float[Array, "c h k"]]
-    w_out: Param[Float[Array, "h k d"]]
+    w_q: Param[Float[Array, "d hk"]]
+    w_k: Param[Float[Array, "c hk"]]
+    w_v: Param[Float[Array, "c hk"]]
+    w_out: Param[Float[Array, "hk d"]]
     b_out: Param[Float[Array, " d"]] | None
+    num_heads: int
 
     def __init__(
         self,
@@ -132,16 +134,14 @@ class CrossAttention(Module):
 
         key_q, key_k, key_v, key_out, key_b = jax.random.split(key, 5)
         head_dim = dim // num_heads
-        w_q = w_init(shape=(dim, num_heads * head_dim), key=key_q)
-        w_k = w_init(shape=(context_dim, num_heads * head_dim), key=key_k)
-        w_v = w_init(shape=(context_dim, num_heads * head_dim), key=key_v)
-        w_out = w_init(shape=(num_heads * head_dim, dim), key=key_out)
 
-        self.w_q = Param(w_q.reshape(dim, num_heads, head_dim))
-        self.w_k = Param(w_k.reshape(context_dim, num_heads, head_dim))
-        self.w_v = Param(w_v.reshape(context_dim, num_heads, head_dim))
-        self.w_out = Param(w_out.reshape(num_heads, head_dim, dim))
+        self.w_q = Param(w_init(shape=(dim, num_heads * head_dim), key=key_q))
+        self.w_k = Param(w_init(shape=(context_dim, num_heads * head_dim), key=key_k))
+        self.w_v = Param(w_init(shape=(context_dim, num_heads * head_dim), key=key_v))
+        self.w_out = Param(w_init(shape=(num_heads * head_dim, dim), key=key_out))
         self.b_out = Param(b_init(shape=(dim,), key=key_b)) if bias else None
+
+        self.num_heads = num_heads
 
     def __call__(
         self,
@@ -150,16 +150,19 @@ class CrossAttention(Module):
         mask: Bool[Array, "s t"] | Bool[Array, "b s t"] | Bool[Array, "b h s t"] | None = None,
     ) -> Float[Array, "b s d"]:
 
-        q = jnp.einsum("bsd, dhk -> bshk", x, self.w_q)
-        k = jnp.einsum("btc, chk -> bthk", context, self.w_k)
-        v = jnp.einsum("btc, chk -> bthk", context, self.w_v)
+        b, s, d = x.shape
+        t = context.shape[1]
+
+        q = (x @ self.w_q).reshape(b, s, self.num_heads, -1)
+        k = (context @ self.w_k).reshape(b, t, self.num_heads, -1)
+        v = (context @ self.w_v).reshape(b, t, self.num_heads, -1)
 
         if mask is not None and mask.ndim == 3:
             mask = mask[:, None]
 
         x = jax.nn.dot_product_attention(q, k, v, mask=mask)
 
-        x = jnp.einsum("bshk, hkd -> bsd", x, self.w_out)
+        x = x.reshape(b, s, -1) @ self.w_out
 
         if self.b_out is not None:
             x = x + self.b_out

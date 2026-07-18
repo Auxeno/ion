@@ -19,17 +19,17 @@
 - **`GATConv`/`GATv2Conv` take `x_edge` and `edge_mask` as keyword-only.** Both are
   per-edge arrays and easy to confuse positionally; call sites now name them, e.g.
   `gat(x, senders, receivers, x_edge=x_edge, edge_mask=mask)`.
-- **Attention weight init computes correct fans.** `SelfAttention`/`CrossAttention`
-  projections are now initialised at their flat 2D shapes and reshaped to the head-split
-  layout, so variance-scaling initialisers passed as `w_init` (He, Glorot) see the true
-  `(dim, features)` fans. Previously the fused 3D/4D shapes inflated `fan_in` by the head
-  count (e.g. He normal on `dim=64, num_heads=8` gave std 0.063 instead of 0.177). The
-  default `truncated_normal(0.02)` is shape-independent and unaffected.
-- **Attention `w_kv` split into `w_k` and `w_v`.** Both attention layers now store separate
-  key and value projections instead of a stacked `(2, ...)` weight. The forward pass reads
-  as one plain einsum per projection, and per-projection surgery becomes natural: freeze or
-  swap `w_v` alone, LoRA-target q and v. Checkpoints keyed on `w_kv` do not load (already
-  true this cycle via the `.ion` format change).
+- **Attention weights stored flat 2D with separate `w_k` and `w_v`.** `SelfAttention` and
+  `CrossAttention` replace the stacked `w_kv` weight with separate key and value
+  projections and store all weights at their flat 2D shapes (`w_q` is
+  `(dim, num_heads * head_dim)`); the forward pass projects with plain matmuls and splits
+  heads by reshape. Variance-scaling initialisers passed as `w_init` (He, Glorot) now
+  compute the true `(dim, features)` fans, where the old head-split shapes inflated
+  `fan_in` by the head count (He normal on `dim=64, num_heads=8` gave std 0.063 instead of
+  0.177; the default `truncated_normal(0.02)` is shape-independent and was unaffected).
+  Per-projection surgery becomes natural: freeze or swap `w_v` alone, LoRA-target q and v.
+  `num_heads` (and `num_kv_heads`) are now stored as static fields. Checkpoints keyed on
+  `w_kv` or the 3D/4D shapes do not load (already true this cycle via the `.ion` change).
 - **`CrossAttention` takes `context_dim`.** Keys and values may now come from a context
   with a different feature dim than the query input (encoder-decoder with mismatched
   widths, conditioning embeddings); `None` (default) matches `dim`. Breaking: positional
