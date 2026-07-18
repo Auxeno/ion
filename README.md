@@ -142,7 +142,7 @@ Ion ships with standard neural network layers. Each is a `Module` with trainable
 | Embedding       | `Embedding`, `LearnedPositionalEmbedding`                                 |
 | Positional      | `RoPE`, `sinusoidal`, `alibi`                                             |
 | Regularization  | `Dropout`                                                                 |
-| Blocks          | `Sequential`, `MLP`, `TransformerBlock`, `CrossTransformerBlock`          |
+| Blocks          | `Sequential`, `MLP`                                                       |
 | GNN             | `GCNConv`, `GATConv`, `GATv2Conv`, `GINConv`                              |
 
 See [Layer Conventions](https://github.com/auxeno/ion/blob/main/docs/layers.md) for data format, weight init, spatial layer usage, and SSM conventions. See [GNN Conventions](https://github.com/auxeno/ion/blob/main/docs/gnn.md) for graph layer usage.
@@ -178,15 +178,17 @@ MLP(
 
 ## Serialization
 
-Save and load any pytree as `.npz` files. Works with models, optimizers, or any other pytree. `load` requires a reference pytree as a template to reconstruct the tree structure.
+Save and load any pytree as `.ion` files. Works with models, optimizers, or any other pytree. `load` requires a reference pytree as a template to reconstruct the tree structure.
 
 ```python
-ion.save("model.npz", model)
-model = ion.load("model.npz", model)
+ion.save("model.ion", model)
+model = ion.load("model.ion", model)
 
-ion.save("snapshot.npz", (model, optimizer))
-model, optimizer = ion.load("snapshot.npz", (model, optimizer))
+ion.save("snapshot.ion", (model, optimizer))
+model, optimizer = ion.load("snapshot.ion", (model, optimizer))
 ```
+
+The `.ion` format is [safetensors](https://huggingface.co/docs/safetensors)-style, with JAX dtypes like `bfloat16`, `float8` and `complex64` stored natively. Safetensors tools can read Ion checkpoints directly.
 
 ## Examples
 

@@ -79,6 +79,14 @@ Internally this uses `optax.partition` with labels derived from `jax.tree.map_wi
 
 **Pytree registration.** `state` and `step` are dynamic children (traced by JAX); `_transform` and `_fields` are static auxiliary data (baked into the compiled program).
 
+## Serialization (`ion/checkpoint.py`)
+
+`ion.save` and `ion.load` persist any pytree (models, optimizer states, tuples of both) to `.ion` files. The format is [safetensors](https://huggingface.co/docs/safetensors)-style: an 8-byte little-endian header length, a JSON header mapping tensor names to `{dtype, shape, data_offsets}`, then raw little-endian tensor bytes. Safetensors tools can read Ion checkpoints directly.
+
+Tensor names are tree paths (`blocks[2].attn.w_q`), the same paths used by `Module.at`. Ion-specific state lives in the header's `__metadata__` entry: a format version and a JSON map of `Param` trainable flags. All JAX dtypes are stored natively, including `bfloat16`, `float8` and `complex64` (via `ml_dtypes`); `complex128` is not representable in the format and raises on save.
+
+`load` takes a reference pytree that supplies the tree structure and all non-array leaves; arrays and trainable flags come from the file. Loading validates the container (header size, tensor offsets must exactly tile the data section) and the structure (missing or extra keys and shape mismatches raise `ValueError`, dtype mismatches warn and keep the saved dtype).
+
 ## Precision
 
 Layer constructors take no `dtype` argument. Parameters are created in JAX's default float dtype (`float32`, or `float64` when `jax_enable_x64` is set), and precision is controlled entirely through `astype`. There are three patterns:
@@ -122,7 +130,7 @@ logits = x @ self.embed.w.T
 
 ### `save`/`load` doesn't store callables or static config
 
-Non-array fields (ints, strings, activation functions) come from the reference tree passed to `load`, not from the file. If you change an activation in code and load an old checkpoint, you get the new activation with the old weights, with no warning. Array data and `trainable` flags do round-trip exactly, including `bfloat16`/`float8` (stored as raw bytes with the dtype in metadata); shape mismatches raise `ValueError`.
+Non-array fields (ints, strings, activation functions) come from the reference tree passed to `load`, not from the file. If you change an activation in code and load an old checkpoint, you get the new activation with the old weights, with no warning. Array data and `trainable` flags do round-trip exactly, including `bfloat16`, `float8` and `complex64`; shape mismatches raise `ValueError`.
 
 ### `at` can change pytree structure
 

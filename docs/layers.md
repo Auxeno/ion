@@ -69,15 +69,15 @@ The same letter can mean different things in different layers. Meaning is determ
 | `k` | per-head dimension (`d_k`) | from "Attention Is All You Need" |
 | `s` | query (source) sequence position | |
 | `t` | key/value (target) sequence position | distinct from `s` in cross-attention |
-| `i` | QKV index | literal 3 (self-attn) or 2 (cross-attn KV) |
 
 Einsum patterns:
 
 ```
-QKV projection:     bd, dihk -> bihk
+Q projection:       bsd, dhk -> bshk
+K/V projection:     bsd, djk -> bsjk
 Attention logits:   bshk, bthk -> bhst
 Attention output:   bhst, bthk -> bshk
-Output projection:  bhk, hkd -> bd
+Output projection:  bshk, hkd -> bsd
 ```
 
 ### Recurrent
@@ -148,7 +148,7 @@ Each layer family uses init schemes suited to its typical activation:
 
 **Linear, Conv, and MLP** default to He normal, which assumes ReLU activation. If using a different activation (tanh, GELU, sigmoid, etc.), pass a different `w_init` like `jax.nn.initializers.glorot_uniform()` for tanh/sigmoid or `jax.nn.initializers.lecun_normal()` for SELU. Using He normal with non-ReLU activations can cause vanishing signals.
 
-**Attention and Embedding** use truncated normal with a small std (0.02), standard practice from GPT-2 and BERT. This is activation-agnostic since attention weights are followed by softmax, not a pointwise activation.
+**Attention and Embedding** use truncated normal with a small std (0.02), standard practice from GPT-2 and BERT. This is activation-agnostic since attention weights are followed by softmax, not a pointwise activation. Attention projections are initialized at their flat 2D shapes before the head split, so a custom variance-scaling `w_init` computes the true fans.
 
 **Recurrent** layers use Glorot uniform for input-to-hidden weights and orthogonal for hidden-to-hidden weights. Orthogonal init preserves gradient norms across time steps, reducing vanishing/exploding gradients in long sequences. LSTM forget gate bias is initialized to 1 to encourage remembering early in training.
 
@@ -223,11 +223,11 @@ hx = cell.initial_state  # (zeros(16), zeros(16))
 
 ## GroupNorm Spatial Dimensions
 
-By default, `GroupNorm` normalizes over channels only (`num_spatial_dims=0`). For spatial data like images, set `num_spatial_dims` so the spatial dimensions are included in the group statistics.
+`GroupNorm` requires `num_spatial_dims`, the number of trailing spatial dimensions included in the group statistics. For spatial data like images this should match the data's spatial rank (the standard GroupNorm of Wu & He, 2018); `num_spatial_dims=0` normalizes each position over its channel groups only.
 
 ```python
 # Channels only (e.g. after a linear layer)
-norm = nn.GroupNorm(64, num_groups=8)
+norm = nn.GroupNorm(64, num_groups=8, num_spatial_dims=0)
 norm(x)  # (b, 64) -> (b, 64)
 
 # With 2D spatial dims (e.g. after a conv layer)
