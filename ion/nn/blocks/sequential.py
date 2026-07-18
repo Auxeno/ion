@@ -5,22 +5,23 @@ Modules:
 
 Accepts any callable (modules, functions like `jax.nn.relu`, lambdas).
 Supports indexing, slicing, and iteration.
+Layers accepting a `key` kwarg receive a per-layer key.
 """
 
+import inspect
 from collections.abc import Callable, Iterator
 
-from jaxtyping import Array
+import jax
+from jaxtyping import Array, PRNGKeyArray
 
 from ..module import Module
 
 
 class Sequential(Module):
-    """Container that chains layers, calling each in order.
+    """Chains single-argument layers in order, forwarding an optional key to layers that accept one.
 
-    Each layer must be a callable that accepts a single positional argument only.
-
-    >>> model = Sequential(Linear(3, 16, key=keys[0]), jax.nn.relu, Linear(16, 1, key=keys[1]))
-    >>> model(x)  # (*, 3) -> (*, 1)
+    >>> model = Sequential(Linear(3, 16, key=keys[0]), Dropout(0.1), Linear(16, 1, key=keys[1]))
+    >>> model(x, key=key)  # (*, 3) -> (*, 1)
     """
 
     layers: tuple[Callable, ...]
@@ -32,10 +33,15 @@ class Sequential(Module):
                 raise TypeError(f"Sequential expects callable layers, got {type(layer).__name__}")
         self.layers = layers
 
-    def __call__(self, x: Array) -> Array:
+    def __call__(self, x: Array, *, key: PRNGKeyArray | None = None) -> Array:
 
-        for layer in self.layers:
-            x = layer(x)
+        keys = [None] * len(self.layers) if key is None else jax.random.split(key, len(self.layers))
+
+        for layer, key_layer in zip(self.layers, keys):
+            if "key" in inspect.signature(layer).parameters:
+                x = layer(x, key=key_layer)
+            else:
+                x = layer(x)
 
         return x
 
