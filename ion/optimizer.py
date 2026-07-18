@@ -24,11 +24,8 @@ def _apply_updates(model: PyTree, updates: PyTree) -> PyTree:
     """Add optimizer deltas to trainable `Param` leaves in a model pytree."""
 
     def _apply(param: Any, update: Any) -> Any:
-        # Skip update
         if not isinstance(param, Param) or not param.trainable or update is None:
             return param
-
-        # Apply update and rewrap as Param
         delta = update._value if isinstance(update, Param) else update
         return Param(param._value + delta, trainable=True)
 
@@ -168,47 +165,21 @@ class Optimizer:
         if jax.tree.structure(model) != self._structure:
             raise ValueError("Model structure or trainability changed, create a new Optimizer")
 
-        updates, new_state = self._transform.update(
-            grads,
-            self.state,
-            model,
-            **kwargs,
-        )
+        updates, new_state = self._transform.update(grads, self.state, model, **kwargs)
         new_model = _apply_updates(model, updates)
-        return new_model, Optimizer._new(
-            self._transform,
-            self._fields,
-            self._structure,
-            new_state,
-            self.step + 1,
-        )
-
-    @classmethod
-    def _new(
-        cls,
-        tx: optax.GradientTransformation,
-        fields: tuple[str, ...] | None,
-        structure: Any,
-        state: optax.OptState,
-        step: jax.Array,
-    ) -> "Optimizer":
-        """Construct without running `__init__` (for unflatten and update)."""
-        obj = object.__new__(cls)
-        obj._transform = tx
-        obj._fields = fields
-        obj._structure = structure
-        obj.state = state
-        obj.step = step
-        return obj
+        aux = (self._transform, self._fields, self._structure)
+        return new_model, Optimizer.tree_unflatten(aux, (new_state, self.step + 1))
 
     def tree_flatten(self) -> tuple[tuple, tuple]:
         return (self.state, self.step), (self._transform, self._fields, self._structure)
 
     @classmethod
     def tree_unflatten(cls, aux: tuple, children: tuple) -> "Optimizer":
-        tx, fields, structure = aux
-        state, step = children
-        return cls._new(tx, fields, structure, state, step)
+        """Construct without running `__init__` (also used by `update`)."""
+        obj = object.__new__(cls)
+        obj._transform, obj._fields, obj._structure = aux
+        obj.state, obj.step = children
+        return obj
 
     def __repr__(self) -> str:
         """Minimal textual pretty printing."""

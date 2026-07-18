@@ -23,16 +23,12 @@ from jaxtyping import PyTree
 from .. import tree
 from .param import Param
 
-_M = TypeVar("_M")
+M = TypeVar("M")
 
 
 @jtu.register_pytree_node_class
 class _Static:
-    """Wraps a value so JAX treats it as static metadata, not a traced array.
-
-    Used internally by _register_module_as_pytree for non-array elements inside mixed containers
-    (e.g. a callable sitting alongside Modules in a tuple).
-    """
+    """Wraps a non-array value so JAX treats it as static metadata, not a traced array."""
 
     __slots__ = ("value",)
 
@@ -47,27 +43,22 @@ class _Static:
         return cls(aux)
 
 
-class _At(Generic[_M]):
-    """Records an attribute/index path into a model and rebuilds it on `set`.
-
-    Returned by `Module.at`. Each attribute or index access appends one step to the
-    path; `set` reconstructs the modules and containers along it and shares every
-    untouched subtree with the original.
-    """
+class _At(Generic[M]):
+    """Records a path into a model; `set` rebuilds along it, sharing untouched subtrees."""
 
     __slots__ = ("_target", "_path")
 
-    def __init__(self, target: _M, path: tuple = ()) -> None:
+    def __init__(self, target: M, path: tuple = ()) -> None:
         self._target = target
         self._path = path
 
-    def __getattr__(self, name: str) -> "_At[_M]":
+    def __getattr__(self, name: str) -> "_At[M]":
         return _At(self._target, (*self._path, name))
 
-    def __getitem__(self, key: Any) -> "_At[_M]":
+    def __getitem__(self, key: Any) -> "_At[M]":
         return _At(self._target, (*self._path, key))
 
-    def set(self, value: Any) -> _M:
+    def set(self, value: Any) -> M:
         """Return a copy of the target with `value` stored at this path."""
 
         def rebuild(node: Any, path: tuple) -> Any:
@@ -105,7 +96,7 @@ def _register_module_as_pytree(cls: type) -> Any:
     field_names = tuple(field.name for field in dataclasses.fields(cls))
 
     def _classify(obj: Any) -> tuple[tuple[tuple[str, str], ...], tuple[str, ...]]:
-        """Classify each field as a dynamic child or static aux. Returns cached info."""
+        """Split fields into dynamic children (with their kind) and static names."""
         child_info: list[tuple[str, str]] = []
         static_names: list[str] = []
 
@@ -134,11 +125,8 @@ def _register_module_as_pytree(cls: type) -> Any:
         return tuple(child_info), tuple(static_names)
 
     def flatten_with_keys(obj: Any) -> tuple[list[tuple[Any, Any]], tuple]:
-        child_info = obj.__dict__.get("_child_info")
-        if child_info is None:
-            child_info, static_names = _classify(obj)
-        else:
-            static_names = obj._static_names
+        # Instances built without __init__ (e.g. by _At.set) have no cache and reclassify here
+        child_info, static_names = obj.__dict__.get("_flatten_info") or _classify(obj)
 
         children = []
         for name, kind in child_info:
@@ -172,8 +160,7 @@ def _register_module_as_pytree(cls: type) -> Any:
         for name, value in zip(static_names, static_values):
             object.__setattr__(new_instance, name, value)
 
-        object.__setattr__(new_instance, "_child_info", child_info)
-        object.__setattr__(new_instance, "_static_names", static_names)
+        object.__setattr__(new_instance, "_flatten_info", (child_info, static_names))
         object.__setattr__(new_instance, "_frozen", True)
         return new_instance
 
@@ -205,8 +192,7 @@ class Module:
         super().__init_subclass__(**kwargs)
 
         # Apply dataclass decorator, only generate __init__ if one doesn't exist
-        has_custom_constructor = "__init__" in cls.__dict__
-        dataclasses.dataclass(init=not has_custom_constructor, repr=False, eq=False)(cls)
+        dataclasses.dataclass(init="__init__" not in cls.__dict__, repr=False, eq=False)(cls)
 
         # Register as pytree first so _classify is available to the constructor
         _classify = _register_module_as_pytree(cls)
@@ -217,24 +203,20 @@ class Module:
 
         @functools.wraps(original_constructor)
         def _constructor_with_freeze(self: Any, *args: Any, **kwargs: Any) -> None:
-            """Temporarily unfreeze, run subclass constructor and refreeze."""
+            """Run the constructor unfrozen, then classify fields and freeze."""
 
-            # A nesting depth counter ensures we only freeze at the outermost level
-            depth = getattr(self, "_init_depth", 0)
-            if depth == 0:
-                object.__setattr__(self, "_frozen", False)
-            object.__setattr__(self, "_init_depth", depth + 1)
+            # Nested super().__init__() calls run plainly; the outermost call freezes
+            if type(self) is not cls:
+                original_constructor(self, *args, **kwargs)
+                return
+            object.__setattr__(self, "_frozen", False)
             original_constructor(self, *args, **kwargs)
-            object.__setattr__(self, "_init_depth", depth)
-            if depth == 0:
-                # Unannotated attributes would silently vanish on the first unflatten
-                undeclared = vars(self).keys() - allowed - {"_frozen", "_init_depth"}
-                if undeclared:
-                    raise AttributeError(f"Unannotated field(s) {sorted(undeclared)} in __init__")
-                child_info, static_names = _classify(self)
-                object.__setattr__(self, "_child_info", child_info)
-                object.__setattr__(self, "_static_names", static_names)
-                object.__setattr__(self, "_frozen", True)
+            # Unannotated attributes would silently vanish on the first unflatten
+            undeclared = vars(self).keys() - allowed - {"_frozen"}
+            if undeclared:
+                raise AttributeError(f"Unannotated field(s) {sorted(undeclared)} in __init__")
+            object.__setattr__(self, "_flatten_info", _classify(self))
+            object.__setattr__(self, "_frozen", True)
 
         cls.__init__ = _constructor_with_freeze
 
@@ -271,15 +253,12 @@ class Module:
             elif hasattr(value, "shape") and hasattr(value, "dtype"):
                 dtype = Param.short_dtype(value.dtype.name)
                 parts.append(f"  {field.name}={dtype}{list(value.shape)},")
-            elif (
-                isinstance(value, (tuple, list))
-                and value
-                and any(isinstance(item, Module) for item in value)
-            ):
+            elif isinstance(value, (tuple, list)) and any(isinstance(x, Module) for x in value):
                 open_b, close_b = ("(", ")") if isinstance(value, tuple) else ("[", "]")
                 parts.append(f"  {field.name}={open_b}")
                 for item in value:
-                    parts.append(f"    {repr(item).replace(chr(10), chr(10) + '    ')},")
+                    item_repr = repr(item).replace("\n", "\n    ")
+                    parts.append(f"    {item_repr},")
                 parts.append(f"  {close_b},")
             elif callable(value) and hasattr(value, "__name__"):
                 parts.append(f"  {field.name}={value.__name__},")
@@ -298,12 +277,9 @@ class Module:
             for field in dataclasses.fields(self)  # type: ignore[reportArgumentType]
         }
 
-        # Generate color from class name
-        qualname = type(self).__qualname__
-        salt = "5g157w"
-        h = zlib.crc32(f"{salt}:{qualname}".encode())
-        hue = (h % 10_000) / 10_000 * 360
-        color = f"oklch(0.8 0.1 {hue:.1f})"
+        # Hue derived from a salted hash of the class name; the salt tunes the palette
+        h = zlib.crc32(f"5g157w:{type(self).__qualname__}".encode())
+        color = f"oklch(0.8 0.1 {h % 10_000 / 10_000 * 360:.1f})"
 
         return treescope.repr_lib.render_object_constructor(
             object_type=type(self),
@@ -356,12 +332,9 @@ class Module:
 
         >>> model.params  # Param leaves only, rest is None
         """
-        params = jax.tree.map(
-            lambda leaf: leaf if tree.is_param(leaf) else None,
-            self,
-            is_leaf=tree.is_param,
+        return jax.tree.map(
+            lambda leaf: leaf if tree.is_param(leaf) else None, self, is_leaf=tree.is_param
         )
-        return params
 
     @property
     def num_params(self) -> int:

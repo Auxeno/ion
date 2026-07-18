@@ -110,54 +110,31 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
     expected_keys: set[str] = set()
     loaded_leaves: list[Any] = []
     for key_path, leaf in leaves_with_paths:
-        key = _path_key(key_path)
-        if isinstance(leaf, Param):
-            array_key = key + "._value"
-            expected_keys.add(array_key)
-            if array_key not in saved_data:
-                raise ValueError(
-                    f"Structure mismatch: reference key '{array_key}' not found in file"
-                )
-            saved_array = saved_data[array_key]
-            if array_key in extension_dtypes:
-                saved_array = saved_array.view(extension_dtypes[array_key])
-            ref_shape = leaf._value.shape
-            if saved_array.shape != ref_shape:
-                raise ValueError(
-                    f"Shape mismatch for '{array_key}': saved {saved_array.shape} vs {ref_shape}"
-                )
-            ref_dtype = leaf._value.dtype
-            if saved_array.dtype != ref_dtype:
-                warnings.warn(
-                    f"Dtype mismatch for '{array_key}': "
-                    f"saved {saved_array.dtype} vs reference {ref_dtype}. "
-                    f"Using saved dtype.",
-                    stacklevel=2,
-                )
-            trainable = trainable_flags.get(key, leaf.trainable)
-            loaded_leaves.append(Param(jnp.array(saved_array), trainable=trainable))
-        elif isinstance(leaf, (jax.Array, np.ndarray)):
-            expected_keys.add(key)
-            if key not in saved_data:
-                raise ValueError(f"Structure mismatch: reference key '{key}' not found in file")
-            saved_array = saved_data[key]
-            if key in extension_dtypes:
-                saved_array = saved_array.view(extension_dtypes[key])
-            ref_shape = leaf.shape
-            if saved_array.shape != ref_shape:
-                raise ValueError(
-                    f"Shape mismatch for '{key}': saved {saved_array.shape} vs {ref_shape}"
-                )
-            if saved_array.dtype != leaf.dtype:
-                warnings.warn(
-                    f"Dtype mismatch for '{key}': "
-                    f"saved {saved_array.dtype} vs reference {leaf.dtype}. "
-                    f"Using saved dtype.",
-                    stacklevel=2,
-                )
-            loaded_leaves.append(jnp.array(saved_array))
-        else:
+        if not isinstance(leaf, (Param, jax.Array, np.ndarray)):
             loaded_leaves.append(leaf)
+            continue
+        key = _path_key(key_path)
+        is_p = isinstance(leaf, Param)
+        array_key = key + "._value" if is_p else key
+        ref = leaf._value if is_p else leaf
+        expected_keys.add(array_key)
+        if array_key not in saved_data:
+            raise ValueError(f"Structure mismatch: reference key '{array_key}' not found in file")
+        arr = saved_data[array_key]
+        if array_key in extension_dtypes:
+            arr = arr.view(extension_dtypes[array_key])
+        if arr.shape != ref.shape:
+            raise ValueError(f"Shape mismatch for '{array_key}': saved {arr.shape} vs {ref.shape}")
+        if arr.dtype != ref.dtype:
+            warnings.warn(
+                f"Dtype mismatch for '{array_key}': saved {arr.dtype} vs {ref.dtype}, using saved",
+                stacklevel=2,
+            )
+        if is_p:
+            trainable = trainable_flags.get(key, leaf.trainable)
+            loaded_leaves.append(Param(jnp.array(arr), trainable=trainable))
+        else:
+            loaded_leaves.append(jnp.array(arr))
 
     extra_keys = array_keys_in_file - expected_keys
     if extra_keys:
