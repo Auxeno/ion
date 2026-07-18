@@ -44,7 +44,7 @@ class _Static:
 
 
 class _At(Generic[M]):
-    """Records a path into a model; `set` rebuilds along it, sharing untouched subtrees."""
+    """Records a path into a model. `set` rebuilds along it. A class selects all its instances."""
 
     __slots__ = ("_target", "_path")
 
@@ -65,6 +65,19 @@ class _At(Generic[M]):
             if not path:
                 return value
             step, rest = path[0], path[1:]
+            if isinstance(step, type):
+                # A type step fans out: the rest of the path applies to every matching node
+                is_match = lambda x: isinstance(x, step)
+                flat = jtu.tree_leaves_with_path(node, is_leaf=is_match)
+                found = [keys for keys, x in flat if is_match(x)]
+                if not found:
+                    raise ValueError(f"No {step.__name__} found along this path")
+                for keys in found:
+                    steps = tuple(
+                        getattr(k, "name", getattr(k, "idx", getattr(k, "key", None))) for k in keys
+                    )
+                    node = rebuild(node, (*steps, *rest))
+                return node
             if isinstance(node, Module):
                 fields = dataclasses.fields(node)  # type: ignore[reportArgumentType]
                 if step not in (field.name for field in fields):
@@ -293,15 +306,12 @@ class Module:
     def at(self) -> _At[Self]:
         """Path-based model surgery. Navigate to any field, index, or key, then `set`.
 
-        Rebuilds only the nodes along the path; untouched subtrees are shared with
-        the original. Works uniformly for arrays, `Param`s, sub-modules, static
-        values, and structural changes like `None`.
-
         Examples
         --------
-        >>> model = model.at.blocks[2].attn.w_q.set(new_w)  # swap a deep leaf
-        >>> model = model.at.b.set(None)                    # remove bias
-        >>> model = model.at.encoder.set(model.encoder.freeze())
+        >>> model = model.at.blocks[2].attn.w_q.set(new_w)        # swap a deep leaf
+        >>> model = model.at.b.set(None)                          # remove bias
+        >>> model = model.at.encoder.set(model.encoder.freeze())  # freeze encoder
+        >>> model = model.at[nn.Dropout].p.set(0.5)               # modify every dropout layer
         """
         return _At(self)
 

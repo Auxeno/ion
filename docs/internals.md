@@ -44,7 +44,7 @@ Three things happen in `__init_subclass__` when a class inherits from `Module`:
 
    The result is that `jax.jit` and `jax.grad` work natively with models without special wrappers.
 
-3. **Freeze after init.** `__init__` is wrapped to set `_frozen` once construction completes. Subsequent attribute assignment raises `AttributeError`, because mutation would silently break JAX tracing. Use `model.at.field.set(new_value)` to create a modified copy: `at` returns a path-recording proxy, and `set` rebuilds the modules and containers along the recorded path (sharing all untouched subtrees) via the same `object.__new__` + `object.__setattr__` mechanism as unflatten.
+3. **Freeze after init.** `__init__` is wrapped to set `_frozen` once construction completes. Subsequent attribute assignment raises `AttributeError`, because mutation would silently break JAX tracing. Use `model.at.field.set(new_value)` to create a modified copy: `at` returns a path-recording proxy, and `set` rebuilds the modules and containers along the recorded path (sharing all untouched subtrees) via the same `object.__new__` + `object.__setattr__` mechanism as unflatten. A type as a step fans out: matching nodes are located with `tree_leaves_with_path` and the rest of the path is rebuilt at each match (`model.at[nn.Dropout].p.set(0.5)`). Zero matches raise `ValueError`.
 
 ## Optimizer (`ion/optimizer.py`)
 
@@ -135,6 +135,10 @@ Non-array fields (ints, strings, activation functions) come from the reference t
 ### `at` can change pytree structure
 
 Setting a `Param` field to a plain array or `None` changes the treedef. That is useful for model surgery, but a later `jax.tree.map` between the original and modified model crashes with a structure mismatch.
+
+### `at` type steps match outermost instances only
+
+A type step stops descending at each match, so instances nested inside another match are not selected: `model.at[Sequential]` on a Sequential that contains another Sequential only touches the outer one. Each match also receives the same `value` object, so array values are shared across matches, not re-initialized per match.
 
 ### Optimizer state is bound to the model at construction
 
