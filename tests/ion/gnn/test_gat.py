@@ -102,7 +102,7 @@ class TestGATConvEdgeFeatures:
         gat = gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
-        y = gat(x, senders, receivers, x_edge)
+        y = gat(x, senders, receivers, x_edge=x_edge)
         assert y.shape == (3, 16)
 
     def test_edge_dim_none_matches_no_edge(self, triangle_graph):
@@ -122,8 +122,8 @@ class TestGATConvEdgeFeatures:
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge1 = jax.random.normal(jax.random.key(2), (num_edges, 4))
         x_edge2 = jax.random.normal(jax.random.key(3), (num_edges, 4))
-        y1 = gat(x, senders, receivers, x_edge1)
-        y2 = gat(x, senders, receivers, x_edge2)
+        y1 = gat(x, senders, receivers, x_edge=x_edge1)
+        y2 = gat(x, senders, receivers, x_edge=x_edge2)
         assert not jnp.allclose(y1, y2)
 
     def test_edge_dim_grad(self, triangle_graph):
@@ -134,7 +134,7 @@ class TestGATConvEdgeFeatures:
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
 
-        grads = jax.grad(lambda m: m(x, senders, receivers, x_edge).sum())(gat)
+        grads = jax.grad(lambda m: m(x, senders, receivers, x_edge=x_edge).sum())(gat)
         assert jnp.all(jnp.isfinite(grads.w_edge._value))
         assert jnp.all(jnp.isfinite(grads.att_edge._value))
         assert jnp.any(grads.w_edge._value != 0)
@@ -149,7 +149,7 @@ class TestGATConvEdgeFeatures:
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
 
-        grads = jax.grad(lambda m: m(x, senders, receivers, x_edge).sum())(frozen)
+        grads = jax.grad(lambda m: m(x, senders, receivers, x_edge=x_edge).sum())(frozen)
         npt.assert_allclose(grads.w_edge._value, jnp.zeros_like(grads.w_edge._value), atol=1e-7)
         npt.assert_allclose(grads.att_edge._value, jnp.zeros_like(grads.att_edge._value), atol=1e-7)
 
@@ -169,7 +169,7 @@ class TestGATConvEdgeFeatures:
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
         with pytest.raises(ValueError):
-            gat(x, senders, receivers, x_edge)
+            gat(x, senders, receivers, x_edge=x_edge)
 
     def test_edge_jit(self, triangle_graph):
         """jax.jit with edge features produces the same output as eager."""
@@ -178,8 +178,8 @@ class TestGATConvEdgeFeatures:
         gat = gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
-        expected = gat(x, senders, receivers, x_edge)
-        result = jax.jit(gat)(x, senders, receivers, x_edge)
+        expected = gat(x, senders, receivers, x_edge=x_edge)
+        result = jax.jit(gat)(x, senders, receivers, x_edge=x_edge)
         npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
 
     def test_edge_determinism(self, triangle_graph):
@@ -189,8 +189,8 @@ class TestGATConvEdgeFeatures:
         gat = gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
-        y1 = gat(x, senders, receivers, x_edge)
-        y2 = gat(x, senders, receivers, x_edge)
+        y1 = gat(x, senders, receivers, x_edge=x_edge)
+        y2 = gat(x, senders, receivers, x_edge=x_edge)
         npt.assert_array_equal(y1, y2)
 
 
@@ -238,7 +238,7 @@ class TestGATConvEdgeMask:
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
         mask = jnp.ones(num_edges, dtype=bool).at[0].set(False)
-        y_masked = gat(x, senders, receivers, x_edge, edge_mask=mask)
+        y_masked = gat(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
         assert y_masked.shape == (3, 16)
         assert jnp.all(jnp.isfinite(y_masked))
 
@@ -356,7 +356,7 @@ class TestGATv2ConvEdgeFeatures:
         gat = gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
-        y = gat(x, senders, receivers, x_edge)
+        y = gat(x, senders, receivers, x_edge=x_edge)
         assert y.shape == (3, 16)
 
     def test_edge_features_change_output(self, triangle_graph):
@@ -367,8 +367,8 @@ class TestGATv2ConvEdgeFeatures:
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge1 = jax.random.normal(jax.random.key(2), (num_edges, 4))
         x_edge2 = jax.random.normal(jax.random.key(3), (num_edges, 4))
-        y1 = gat(x, senders, receivers, x_edge1)
-        y2 = gat(x, senders, receivers, x_edge2)
+        y1 = gat(x, senders, receivers, x_edge=x_edge1)
+        y2 = gat(x, senders, receivers, x_edge=x_edge2)
         assert not jnp.allclose(y1, y2)
 
     def test_edge_dim_grad(self, triangle_graph):
@@ -379,7 +379,7 @@ class TestGATv2ConvEdgeFeatures:
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
 
-        grads = jax.grad(lambda m: m(x, senders, receivers, x_edge).sum())(gat)
+        grads = jax.grad(lambda m: m(x, senders, receivers, x_edge=x_edge).sum())(gat)
         assert jnp.all(jnp.isfinite(grads.w_edge._value))
         assert jnp.any(grads.w_edge._value != 0)
 
@@ -392,7 +392,7 @@ class TestGATv2ConvEdgeFeatures:
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
 
-        grads = jax.grad(lambda m: m(x, senders, receivers, x_edge).sum())(frozen)
+        grads = jax.grad(lambda m: m(x, senders, receivers, x_edge=x_edge).sum())(frozen)
         npt.assert_allclose(grads.w_edge._value, jnp.zeros_like(grads.w_edge._value), atol=1e-7)
 
     def test_edge_dim_without_x_edge_raises(self, triangle_graph):
@@ -411,7 +411,7 @@ class TestGATv2ConvEdgeFeatures:
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
         with pytest.raises(ValueError):
-            gat(x, senders, receivers, x_edge)
+            gat(x, senders, receivers, x_edge=x_edge)
 
     def test_edge_jit(self, triangle_graph):
         """jax.jit with edge features produces the same output as eager."""
@@ -420,8 +420,8 @@ class TestGATv2ConvEdgeFeatures:
         gat = gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
-        expected = gat(x, senders, receivers, x_edge)
-        result = jax.jit(gat)(x, senders, receivers, x_edge)
+        expected = gat(x, senders, receivers, x_edge=x_edge)
+        result = jax.jit(gat)(x, senders, receivers, x_edge=x_edge)
         npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
 
     def test_edge_determinism(self, triangle_graph):
@@ -431,8 +431,8 @@ class TestGATv2ConvEdgeFeatures:
         gat = gnn.GATv2Conv(8, 16, num_heads=2, edge_dim=4, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
-        y1 = gat(x, senders, receivers, x_edge)
-        y2 = gat(x, senders, receivers, x_edge)
+        y1 = gat(x, senders, receivers, x_edge=x_edge)
+        y2 = gat(x, senders, receivers, x_edge=x_edge)
         npt.assert_array_equal(y1, y2)
 
 
@@ -477,7 +477,7 @@ class TestGATv2ConvEdgeMask:
         x = jax.random.normal(jax.random.key(1), (3, 8))
         x_edge = jax.random.normal(jax.random.key(2), (num_edges, 4))
         mask = jnp.ones(num_edges, dtype=bool).at[0].set(False)
-        y_masked = gat(x, senders, receivers, x_edge, edge_mask=mask)
+        y_masked = gat(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
         assert y_masked.shape == (3, 16)
         assert jnp.all(jnp.isfinite(y_masked))
 

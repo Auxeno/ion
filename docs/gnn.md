@@ -72,15 +72,15 @@ y = gat(x, senders, receivers)  # (n, 16) -> (n, 32)
 
 ```python
 gat = gnn.GATConv(in_dim=16, out_dim=32, num_heads=4, edge_dim=8, key=key)
-y = gat(x, senders, receivers, x_edge)  # x_edge shape: (e, 8)
+y = gat(x, senders, receivers, x_edge=x_edge)  # x_edge shape: (e, 8)
 ```
 
-When `edge_dim` is None (default), no extra parameters are created and behavior is identical to the standard GATConv. If `edge_dim` is set but `x_edge` is not passed at call time, the edge path is skipped. Passing `x_edge` without setting `edge_dim` will raise an error.
+When `edge_dim` is None (default), no extra parameters are created and behavior is identical to the standard GATConv. `edge_dim` and `x_edge` must be used together: setting one without the other raises an error. Both `x_edge` and `edge_mask` are keyword-only.
 
 **Edge masking.** Pass a boolean `edge_mask` of shape `(e,)` to disable individual edges. Edges marked `False` get `-inf` attention logits (zero attention weight) and their edge features are zeroed:
 
 ```python
-y = gat(x, senders, receivers, x_edge, edge_mask)  # edge_mask shape: (e,) bool
+y = gat(x, senders, receivers, x_edge=x_edge, edge_mask=edge_mask)  # edge_mask shape: (e,) bool
 ```
 
 This is useful for padded batches (mask out dummy edges) or dropping edges at inference without rebuilding the edge index.
@@ -107,7 +107,7 @@ Structural differences from GATConv: two weight matrices (`w_sender`, `w_receive
 
 ```python
 gat = gnn.GATv2Conv(in_dim=16, out_dim=32, num_heads=4, edge_dim=8, key=key)
-y = gat(x, senders, receivers, x_edge)  # x_edge shape: (e, 8)
+y = gat(x, senders, receivers, x_edge=x_edge)  # x_edge shape: (e, 8)
 ```
 
 ### GINConv
