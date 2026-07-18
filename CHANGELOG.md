@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.1
 
 - **Type steps in `model.at`.** Indexing the `at` proxy with a layer type selects every
   matching node in the subtree and applies the rest of the path to each:
@@ -8,6 +8,9 @@
   `model.at.encoder[nn.Dropout].p.set(0.5)` scopes the sweep to a subtree. A type step
   that matches nothing raises `ValueError`. Untouched subtrees are shared with the
   original, as with ordinary path steps.
+- **`Sequential` takes an optional `key`.** `model(x, key=key)` splits the key per layer
+  and forwards a subkey to any layer whose signature accepts `key` (e.g. `Dropout`);
+  other layers are called with `x` alone.
 
 ## 0.10.0
 
