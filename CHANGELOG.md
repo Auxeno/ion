@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Type steps in `model.at`.** Indexing the `at` proxy with a layer type selects every
+  matching node in the subtree and applies the rest of the path to each:
+  `model.at[nn.Dropout].p.set(0.5)` sets the rate on all dropout layers, and
+  `model.at.encoder[nn.Dropout].p.set(0.5)` scopes the sweep to a subtree. A type step
+  that matches nothing raises `ValueError`. Untouched subtrees are shared with the
+  original, as with ordinary path steps.
+
 ## 0.10.0
 
 - **New `.ion` checkpoint format.** `ion.save`/`ion.load` now write `.ion` files, a

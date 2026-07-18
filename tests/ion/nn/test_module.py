@@ -363,6 +363,115 @@ class TestAt:
         m2 = m.at.x.set(2)
         assert type(m2) is Child
 
+    def test_type_step_sets_all_matches(self):
+        """A type step applies the rest of the path to every matching node."""
+
+        class Encoder(nn.Module):
+            drop: nn.Dropout
+            linear: nn.Linear
+
+            def __init__(self, key):
+                self.drop = nn.Dropout(0.1)
+                self.linear = nn.Linear(4, 4, key=key)
+
+        class Model(nn.Module):
+            encoder: Encoder
+            drops: tuple
+
+            def __init__(self, key):
+                self.encoder = Encoder(key=key)
+                self.drops = (nn.Dropout(0.2), nn.Dropout(0.3))
+
+        m = Model(key=jax.random.key(0))
+        m2 = m.at[nn.Dropout].p.set(0.5)
+        assert m2.encoder.drop.p == 0.5
+        assert m2.drops[0].p == 0.5
+        assert m2.drops[1].p == 0.5
+        assert m2.encoder.linear is m.encoder.linear
+
+    def test_type_step_scoped_to_prefix(self):
+        """A type step after a path prefix only touches matches inside that subtree."""
+
+        class Block(nn.Module):
+            drop: nn.Dropout
+
+            def __init__(self):
+                self.drop = nn.Dropout(0.1)
+
+        class Model(nn.Module):
+            encoder: Block
+            drop: nn.Dropout
+
+            def __init__(self):
+                self.encoder = Block()
+                self.drop = nn.Dropout(0.1)
+
+        m = Model()
+        m2 = m.at.encoder[nn.Dropout].p.set(0.5)
+        assert m2.encoder.drop.p == 0.5
+        assert m2.drop is m.drop
+
+    def test_type_step_replaces_whole_node(self):
+        """A type step with no further path replaces each matching node wholesale."""
+
+        class Model(nn.Module):
+            drops: tuple
+
+            def __init__(self):
+                self.drops = (nn.Dropout(0.2), nn.Dropout(0.3))
+
+        m = Model()
+        m2 = m.at[nn.Dropout].set(nn.Dropout(0.9))
+        assert m2.drops[0].p == 0.9
+        assert m2.drops[1].p == 0.9
+
+    def test_type_step_in_dict(self):
+        """A type step finds matches inside dict fields; the original is unchanged."""
+
+        class Model(nn.Module):
+            heads: dict
+
+            def __init__(self):
+                self.heads = {"a": nn.Dropout(0.1), "b": nn.Dropout(0.2)}
+
+        m = Model()
+        m2 = m.at[nn.Dropout].p.set(0.5)
+        assert m2.heads["a"].p == 0.5
+        assert m2.heads["b"].p == 0.5
+        assert m.heads["a"].p == 0.1
+
+    def test_chained_type_steps(self):
+        """A second type step fans out inside each match of the first."""
+
+        class Block(nn.Module):
+            drop: nn.Dropout
+
+            def __init__(self):
+                self.drop = nn.Dropout(0.1)
+
+        class Model(nn.Module):
+            blocks: tuple
+
+            def __init__(self):
+                self.blocks = (Block(), Block())
+
+        m = Model()
+        m2 = m.at[Block][nn.Dropout].p.set(0.5)
+        assert m2.blocks[0].drop.p == 0.5
+        assert m2.blocks[1].drop.p == 0.5
+
+    def test_type_step_matches_root(self):
+        """A type step matching the model itself applies the rest of the path to it."""
+        drop = nn.Dropout(0.1)
+        drop2 = drop.at[nn.Dropout].p.set(0.5)
+        assert drop2.p == 0.5
+
+    def test_type_step_no_match_raises(self):
+        """A type step matching nothing raises ValueError."""
+        linear = nn.Linear(4, 8, key=jax.random.key(0))
+        with pytest.raises(ValueError, match="No Dropout found"):
+            linear.at[nn.Dropout].p.set(0.5)
+
 
 class TestParams:
     def test_filters_non_param_leaves(self):
