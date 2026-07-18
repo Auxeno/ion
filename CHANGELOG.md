@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.10.0
+
+- **New `.ion` checkpoint format.** `ion.save`/`ion.load` now write `.ion` files, a
+  [safetensors](https://huggingface.co/docs/safetensors)-style container replacing `.npz`.
+  The implementation stays fully in-house (stdlib + numpy + `ml_dtypes`, no new
+  dependencies), and safetensors tools can read Ion checkpoints directly. `bfloat16`,
+  `float8` and `complex64` are stored natively, removing the raw-bytes workaround npz
+  needed for extension dtypes. Tensor names are clean tree paths (`blocks[2].attn.w_q`, no `._value`
+  suffix); trainable flags and the format version live in the header's `__metadata__` entry,
+  and the version is now checked on load. Loading validates the container (header size,
+  offsets must exactly tile the data section) with the same strict structure and shape checks
+  as before. Old `.npz` checkpoints are incompatible.
+- **`GroupNorm` requires `num_spatial_dims`.** The previous default of `0` silently
+  diverged from the standard GroupNorm (Wu & He, 2018) on spatial data: statistics were
+  computed per position instead of over spatial dims and group channels jointly. The
+  argument is now required; pass `num_spatial_dims=0` for the old per-position behaviour.
+- **`GATConv`/`GATv2Conv` take `x_edge` and `edge_mask` as keyword-only.** Both are
+  per-edge arrays and easy to confuse positionally; call sites now name them, e.g.
+  `gat(x, senders, receivers, x_edge=x_edge, edge_mask=mask)`.
+- **Attention weight init computes correct fans.** `SelfAttention`/`CrossAttention`
+  projections are now initialised at their flat 2D shapes and reshaped to the head-split
+  layout, so variance-scaling initialisers passed as `w_init` (He, Glorot) see the true
+  `(dim, features)` fans. Previously the fused 3D/4D shapes inflated `fan_in` by the head
+  count (e.g. He normal on `dim=64, num_heads=8` gave std 0.063 instead of 0.177). The
+  default `truncated_normal(0.02)` is shape-independent and unaffected.
+- **Attention `w_kv` split into `w_k` and `w_v`.** Both attention layers now store separate
+  key and value projections instead of a stacked `(2, ...)` weight. The forward pass reads
+  as one plain einsum per projection, and per-projection surgery becomes natural: freeze or
+  swap `w_v` alone, LoRA-target q and v. Checkpoints keyed on `w_kv` do not load (already
+  true this cycle via the `.ion` format change).
+- **`CrossAttention` takes `context_dim`.** Keys and values may now come from a context
+  with a different feature dim than the query input (encoder-decoder with mismatched
+  widths, conditioning embeddings); `None` (default) matches `dim`. Breaking: positional
+  arguments after `num_heads` shift by one.
+- **`TransformerBlock` and `CrossTransformerBlock` removed.** Ion ships primitives, not
+  architecture opinions: a block hard-codes choices (pre-norm, FFN ratio, activation,
+  dropout placement) that are exactly the axes research varies, and keeping it complete
+  would mean mirroring every attention feature through a second API. Compose blocks from
+  `SelfAttention`/`CrossAttention`, `LayerNorm` and `Linear` instead; the TinyStories GPT
+  example shows the pattern in about twenty lines.
+
 ## 0.9.0
 
 - **Path-based model surgery with `Module.at`.** New `at` property, the model version of
