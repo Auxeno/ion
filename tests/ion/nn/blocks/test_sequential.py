@@ -74,6 +74,45 @@ class TestSequential:
         npt.assert_array_equal(model(x), x)
         assert len(model) == 0
 
+    def test_dropout_deterministic(self):
+        """Deterministic Dropout layers pass through unchanged, no key needed."""
+        key = jax.random.key(0)
+        linear = nn.Linear(4, 4, key=key)
+        model = nn.Sequential(linear, nn.Dropout(0.5, deterministic=True))
+        x = jnp.ones((4,))
+        npt.assert_allclose(model(x), linear(x), rtol=1e-5, atol=1e-5)
+
+    def test_dropout_matches_manual(self):
+        """Forward with dropout matches manually chaining with per-layer split keys."""
+        key = jax.random.key(0)
+        drop = nn.Dropout(0.5)
+        model = nn.Sequential(drop, jax.nn.relu, drop)
+
+        x = jnp.ones((100,))
+        keys = jax.random.split(key, 3)
+        expected = drop(jax.nn.relu(drop(x, key=keys[0])), key=keys[2])
+        npt.assert_allclose(model(x, key=key), expected, rtol=1e-5, atol=1e-5)
+
+    def test_dropout_requires_key(self):
+        """Calling with active dropout and no key raises ValueError."""
+        model = nn.Sequential(nn.Dropout(0.5))
+        with pytest.raises(ValueError, match="key"):
+            model(jnp.ones((4,)))
+
+    def test_key_routed_by_signature(self):
+        """Any callable accepting a key kwarg receives a per-layer subkey."""
+        key = jax.random.key(0)
+
+        def noise(x, *, key):
+            return x + jax.random.normal(key, x.shape)
+
+        model = nn.Sequential(noise, jax.nn.relu)
+
+        x = jnp.zeros((100,))
+        keys = jax.random.split(key, 2)
+        expected = jax.nn.relu(noise(x, key=keys[0]))
+        npt.assert_allclose(model(x, key=key), expected, rtol=1e-5, atol=1e-5)
+
     def test_non_callable_raises(self):
         """Passing a non-callable raises TypeError."""
         with pytest.raises(TypeError, match="callable"):
