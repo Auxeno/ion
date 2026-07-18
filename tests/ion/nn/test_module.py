@@ -213,9 +213,9 @@ class TestPytreeRegistration:
         npt.assert_array_equal(leaves[1], jnp.array([2.0]))
 
 
-class TestReplace:
-    def test_single_field(self):
-        """Replacing one field returns correct values."""
+class TestAt:
+    def test_set_field(self):
+        """Setting one field returns correct values."""
 
         class Model(nn.Module):
             a: int
@@ -226,12 +226,12 @@ class TestReplace:
                 self.b = b
 
         m = Model(a=1, b=2)
-        m2 = m.replace(b=10)
+        m2 = m.at.b.set(10)
         assert m2.a == 1
         assert m2.b == 10
 
-    def test_multiple_fields(self):
-        """Replacing several fields at once."""
+    def test_chained_sets(self):
+        """Several fields update via chained set calls."""
 
         class Model(nn.Module):
             a: int
@@ -244,13 +244,85 @@ class TestReplace:
                 self.c = c
 
         m = Model(a=1, b=2, c=3)
-        m2 = m.replace(a=10, c=30)
+        m2 = m.at.a.set(10).at.c.set(30)
         assert m2.a == 10
         assert m2.b == 2
         assert m2.c == 30
 
+    def test_deep_set_shares_siblings(self):
+        """Setting a nested leaf rebuilds only the spine; untouched subtrees are shared."""
+
+        class Outer(nn.Module):
+            inner: nn.Linear
+            other: nn.Linear
+
+            def __init__(self, key):
+                keys = jax.random.split(key, 2)
+                self.inner = nn.Linear(4, 8, key=keys[0])
+                self.other = nn.Linear(8, 4, key=keys[1])
+
+        m = Outer(key=jax.random.key(0))
+        new_w = nn.Param(jnp.zeros((4, 8)))
+        m2 = m.at.inner.w.set(new_w)
+        npt.assert_array_equal(m2.inner.w._value, jnp.zeros((4, 8)))
+        assert m2.other is m.other
+        assert m2.inner.b is m.inner.b
+
+    def test_tuple_index(self):
+        """Setting an element inside a tuple field preserves the container type."""
+
+        class Model(nn.Module):
+            layers: tuple
+
+            def __init__(self, key):
+                keys = jax.random.split(key, 2)
+                self.layers = (nn.Linear(4, 4, key=keys[0]), nn.Linear(4, 4, key=keys[1]))
+
+        m = Model(key=jax.random.key(0))
+        new_w = nn.Param(jnp.zeros((4, 4)))
+        m2 = m.at.layers[1].w.set(new_w)
+        npt.assert_array_equal(m2.layers[1].w._value, jnp.zeros((4, 4)))
+        assert m2.layers[0] is m.layers[0]
+        assert isinstance(m2.layers, tuple)
+
+    def test_dict_key(self):
+        """Setting a value inside a dict field."""
+
+        class Model(nn.Module):
+            heads: dict
+
+            def __init__(self, key):
+                keys = jax.random.split(key, 2)
+                self.heads = {"a": nn.Linear(4, 4, key=keys[0]), "b": nn.Linear(4, 4, key=keys[1])}
+
+        m = Model(key=jax.random.key(0))
+        new_w = nn.Param(jnp.zeros((4, 4)))
+        m2 = m.at.heads["b"].w.set(new_w)
+        npt.assert_array_equal(m2.heads["b"].w._value, jnp.zeros((4, 4)))
+        assert m2.heads["a"] is m.heads["a"]
+
+    def test_namedtuple_field(self):
+        """Setting inside a NamedTuple field works by attribute name and by index."""
+
+        class State(NamedTuple):
+            h: jax.Array
+            c: jax.Array
+
+        class Model(nn.Module):
+            state: State
+
+            def __init__(self):
+                self.state = State(h=jnp.ones(2), c=jnp.zeros(2))
+
+        m = Model()
+        m2 = m.at.state.h.set(jnp.full(2, 5.0))
+        npt.assert_array_equal(m2.state.h, jnp.full(2, 5.0))
+        assert isinstance(m2.state, State)
+        m3 = m.at.state[1].set(jnp.full(2, 7.0))
+        npt.assert_array_equal(m3.state.c, jnp.full(2, 7.0))
+
     def test_returns_new_instance(self):
-        """Original module is unchanged after replace."""
+        """Original module is unchanged after set."""
 
         class Model(nn.Module):
             x: int
@@ -259,13 +331,13 @@ class TestReplace:
                 self.x = x
 
         m = Model(x=1)
-        m2 = m.replace(x=2)
+        m2 = m.at.x.set(2)
         assert m.x == 1
         assert m2.x == 2
         assert m is not m2
 
-    def test_replaced_is_frozen(self):
-        """The copy returned by replace is also immutable."""
+    def test_result_is_frozen(self):
+        """The copy returned by set is also immutable."""
 
         class Model(nn.Module):
             x: int
@@ -274,12 +346,12 @@ class TestReplace:
                 self.x = x
 
         m = Model(x=1)
-        m2 = m.replace(x=2)
+        m2 = m.at.x.set(2)
         with pytest.raises(AttributeError, match="frozen"):
             m2.x = 3
 
     def test_preserves_type(self):
-        """replace returns the same subclass type."""
+        """set returns the same subclass type."""
 
         class Child(nn.Module):
             x: int
@@ -288,7 +360,7 @@ class TestReplace:
                 self.x = x
 
         m = Child(x=1)
-        m2 = m.replace(x=2)
+        m2 = m.at.x.set(2)
         assert type(m2) is Child
 
 
@@ -521,7 +593,7 @@ class TestFreezeUnfreeze:
         assert m.inner.w.trainable is False
         assert m.b.trainable is False
 
-    def test_partial_freeze_via_replace(self):
+    def test_partial_freeze_via_at(self):
         """Freeze one sub-module, keep the other trainable."""
 
         class Model(nn.Module):
@@ -534,7 +606,7 @@ class TestFreezeUnfreeze:
                 self.decoder = nn.Linear(8, 4, key=keys[1])
 
         m = Model(key=jax.random.key(0))
-        m = m.replace(encoder=m.encoder.freeze())
+        m = m.at.encoder.set(m.encoder.freeze())
         assert m.encoder.w.trainable is False
         assert m.decoder.w.trainable is True
 
@@ -760,9 +832,9 @@ class TestNamedTupleFields:
         npt.assert_allclose(jitted, eager, rtol=1e-5, atol=1e-5)
 
 
-class TestReplaceEdgeCases:
-    def test_replace_unknown_field_raises(self):
-        """replace raises ValueError for unknown field names."""
+class TestAtEdgeCases:
+    def test_unknown_field_raises(self):
+        """set raises AttributeError for unknown field names."""
 
         class Model(nn.Module):
             x: int
@@ -771,20 +843,26 @@ class TestReplaceEdgeCases:
                 self.x = x
 
         m = Model(x=1)
-        with pytest.raises(ValueError, match="Unknown field"):
-            m.replace(nonexistent=42)
+        with pytest.raises(AttributeError, match="has no field"):
+            m.at.nonexistent.set(42)
 
-    def test_replace_with_param(self):
-        """replace can swap a Param value."""
+    def test_navigating_into_leaf_raises(self):
+        """Navigating into a non-container leaf raises TypeError."""
+        linear = nn.Linear(4, 8, key=jax.random.key(0))
+        with pytest.raises(TypeError, match="Cannot set"):
+            linear.at.w.foo.set(1)
+
+    def test_set_param(self):
+        """set can swap a Param value."""
         linear = nn.Linear(4, 8, key=jax.random.key(0))
         new_w = nn.Param(jnp.zeros_like(linear.w._value))
-        replaced = linear.replace(w=new_w)
+        replaced = linear.at.w.set(new_w)
         npt.assert_array_equal(replaced.w._value, jnp.zeros_like(linear.w._value))
         # Original unchanged
         assert not jnp.allclose(linear.w._value, replaced.w._value)
 
-    def test_replace_param_with_non_param_breaks_tree_ops(self):
-        """Replacing a Param field with a plain value creates a structurally different pytree."""
+    def test_set_param_to_non_param_breaks_tree_ops(self):
+        """Setting a Param field to a plain value creates a structurally different pytree."""
 
         class Model(nn.Module):
             w: nn.Param
@@ -796,16 +874,16 @@ class TestReplaceEdgeCases:
         original_def = jax.tree.flatten(m)[1]
 
         # Replace Param with plain array
-        m2 = m.replace(w=jnp.ones(3))
+        m2 = m.at.w.set(jnp.ones(3))
         new_def = jax.tree.flatten(m2)[1]
 
         # The tree structures are different!
         assert original_def != new_def
 
-    def test_replace_changing_structure_works_under_jit(self):
-        """internals.md: 'replace() can change pytree structure.' JIT will recompile this."""
+    def test_changing_structure_works_under_jit(self):
+        """internals.md: 'at can change pytree structure.' JIT will recompile this."""
         linear = nn.Linear(4, 8, key=jax.random.key(0))
-        no_bias = linear.replace(b=None)
+        no_bias = linear.at.b.set(None)
 
         @jax.jit
         def f(m, x):
@@ -817,8 +895,8 @@ class TestReplaceEdgeCases:
         assert r1.shape == (1, 8)
         assert r2.shape == (1, 8)
 
-    def test_replace_with_none_changes_structure(self):
-        """Replacing a Param with None changes pytree structure (loses a leaf)."""
+    def test_set_none_changes_structure(self):
+        """Setting a Param to None changes pytree structure (loses a leaf)."""
 
         class Model(nn.Module):
             w: nn.Param
@@ -829,7 +907,7 @@ class TestReplaceEdgeCases:
                 self.b = nn.Param(jnp.zeros(3))
 
         m = Model()
-        m2 = m.replace(b=None)
+        m2 = m.at.b.set(None)
         # Original has 2 leaves (w._value, b._value), replacement has 1
         assert len(jax.tree.leaves(m)) == 2
         assert len(jax.tree.leaves(m2)) == 1
@@ -1591,12 +1669,12 @@ class TestParamsPropertyEdgeCases:
 class TestFieldPartitioning:
     """Tests for the dynamic child vs static aux partitioning in _register_module."""
 
-    def test_replace_param_with_none_changes_treedef(self):
-        """Replacing a Param field with None moves it from dynamic child to static aux."""
+    def test_set_param_to_none_changes_treedef(self):
+        """Setting a Param field to None moves it from dynamic child to static aux."""
         model = nn.Linear(3, 4, key=jax.random.key(0))
         _, treedef_with_bias = jax.tree.flatten(model)
 
-        model_no_bias = model.replace(b=None)
+        model_no_bias = model.at.b.set(None)
         leaves, treedef_no_bias = jax.tree.flatten(model_no_bias)
 
         # Different treedef (b moved from child to static aux)
@@ -1608,15 +1686,15 @@ class TestFieldPartitioning:
         assert rebuilt.b is None
         npt.assert_array_equal(rebuilt.w._value, model_no_bias.w._value)
 
-    def test_replace_none_with_param_changes_treedef(self):
-        """Replacing None with a Param moves it from static aux to dynamic child."""
+    def test_set_none_to_param_changes_treedef(self):
+        """Setting a None field to a Param moves it from static aux to dynamic child."""
         model = nn.Linear(3, 4, bias=False, key=jax.random.key(0))
         assert model.b is None
         leaves_before = jax.tree.leaves(model)
         assert len(leaves_before) == 1
 
         new_bias = nn.Param(jnp.zeros(4))
-        model_with_bias = model.replace(b=new_bias)
+        model_with_bias = model.at.b.set(new_bias)
         leaves_after = jax.tree.leaves(model_with_bias)
         assert len(leaves_after) == 2
 
@@ -1628,7 +1706,7 @@ class TestFieldPartitioning:
         result_with_bias = jax.jit(model)(x)
         assert result_with_bias.shape == (2, 4)
 
-        model_no_bias = model.replace(b=None)
+        model_no_bias = model.at.b.set(None)
         result_no_bias = jax.jit(model_no_bias)(x)
         assert result_no_bias.shape == (2, 4)
 

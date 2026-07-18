@@ -44,7 +44,7 @@ Three things happen in `__init_subclass__` when a class inherits from `Module`:
 
    The result is that `jax.jit` and `jax.grad` work natively with models without special wrappers.
 
-3. **Freeze after init.** `__init__` is wrapped to set `_frozen` once construction completes. Subsequent attribute assignment raises `AttributeError`, because mutation would silently break JAX tracing. Use `model.replace(field=new_value)` to create a modified copy.
+3. **Freeze after init.** `__init__` is wrapped to set `_frozen` once construction completes. Subsequent attribute assignment raises `AttributeError`, because mutation would silently break JAX tracing. Use `model.at.field.set(new_value)` to create a modified copy: `at` returns a path-recording proxy, and `set` rebuilds the modules and containers along the recorded path (sharing all untouched subtrees) via the same `object.__new__` + `object.__setattr__` mechanism as unflatten.
 
 ## Optimizer (`ion/optimizer.py`)
 
@@ -124,13 +124,13 @@ logits = x @ self.embed.w.T
 
 Non-array fields (ints, strings, activation functions) come from the reference tree passed to `load`, not from the file. If you change an activation in code and load an old checkpoint, you get the new activation with the old weights, with no warning. Array data and `trainable` flags do round-trip exactly, including `bfloat16`/`float8` (stored as raw bytes with the dtype in metadata); shape mismatches raise `ValueError`.
 
-### `replace()` can change pytree structure
+### `at` can change pytree structure
 
-Replacing a `Param` field with a plain array or `None` changes the treedef. That is useful for model surgery, but a later `jax.tree.map` between the original and modified model crashes with a structure mismatch.
+Setting a `Param` field to a plain array or `None` changes the treedef. That is useful for model surgery, but a later `jax.tree.map` between the original and modified model crashes with a structure mismatch.
 
 ### Optimizer state is bound to the model at construction
 
-`ion.Optimizer` snapshots the model's pytree structure when created, including each `Param`'s `trainable` flag, and allocates no state for frozen params. If you then change the model, whether by `freeze()`/`unfreeze()` or by restructuring with `replace()`, the next `update()` raises `ValueError: Model structure or trainability changed, create a new Optimizer.` The fix is one line: rebuild the optimizer from the updated model.
+`ion.Optimizer` snapshots the model's pytree structure when created, including each `Param`'s `trainable` flag, and allocates no state for frozen params. If you then change the model, whether by `freeze()`/`unfreeze()` or by restructuring with `at`, the next `update()` raises `ValueError: Model structure or trainability changed, create a new Optimizer.` The fix is one line: rebuild the optimizer from the updated model.
 
 ```python
 optimizer = ion.Optimizer(optax.adam(3e-4), model)
@@ -158,7 +158,7 @@ y = model(x.astype(jnp.bfloat16))
 
 ### Module immutability is shallow
 
-`_frozen` prevents field reassignment, but mutable containers (lists, dicts, numpy arrays) stored in fields can still be mutated in place: `model.layers.append(...)` bypasses the freeze. Worse, mutating a static field in place does **not** trigger JIT recompilation, because JAX identifies pytree aux data by object identity, so the mutated list still hits the stale cached trace with the old value baked in. Use `replace()` to create a new module with the updated field.
+`_frozen` prevents field reassignment, but mutable containers (lists, dicts, numpy arrays) stored in fields can still be mutated in place: `model.layers.append(...)` bypasses the freeze. Worse, mutating a static field in place does **not** trigger JIT recompilation, because JAX identifies pytree aux data by object identity, so the mutated list still hits the stale cached trace with the old value baked in. Use `at` to create a new module with the updated field.
 
 ### `Param.__eq__` returns a JAX array, not a bool
 

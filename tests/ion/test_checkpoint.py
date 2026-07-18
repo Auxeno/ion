@@ -197,10 +197,8 @@ class TestSaveLoadTrainable:
         model = Model(key=jax.random.key(0))
         # Reference has opposite trainable flags
         reference = Model(key=jax.random.key(1))
-        reference = reference.replace(
-            w=nn.Param(reference.w._value, trainable=False),
-            b=nn.Param(reference.b._value, trainable=True),
-        )
+        reference = reference.at.w.set(nn.Param(reference.w._value, trainable=False))
+        reference = reference.at.b.set(nn.Param(reference.b._value, trainable=True))
 
         with tempfile.NamedTemporaryFile(suffix=".npz") as f:
             checkpoint.save(f.name, model)

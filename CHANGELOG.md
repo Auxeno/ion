@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.0
+
+- **Path-based model surgery with `Module.at`.** New `at` property, the model version of
+  JAX's `x.at[idx].set(v)`: navigate to any field, index, or key, then `set` a new value,
+  e.g. `model.at.blocks[2].attn.w_q.set(new_w)`. Works uniformly for arrays, Params,
+  sub-modules, static values, and structural changes like `b=None`; rebuilds only the nodes
+  along the path and shares untouched subtrees with the original. Chain for several edits.
+- **`Module.replace` removed.** `at` subsumes it: `model.replace(b=None)` becomes
+  `model.at.b.set(None)`, and multi-field updates chain as `model.at.a.set(x).at.b.set(y)`.
+
 ## 0.8.1
 
 - **Style consistency pass.** Source, tests and vault docs audited against the house style
