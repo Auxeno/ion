@@ -48,11 +48,11 @@ class LayerNorm(Module):
 class GroupNorm(Module):
     """Group normalization, splitting channels into groups.
 
-    >>> norm = GroupNorm(64, num_groups=8)
-    >>> norm(x)  # (*, 64) -> (*, 64)
-
     >>> norm = GroupNorm(64, num_groups=8, num_spatial_dims=2)
     >>> norm(x)  # (*, h, w, 64) -> (*, h, w, 64)
+
+    >>> norm = GroupNorm(64, num_groups=8, num_spatial_dims=0)
+    >>> norm(x)  # (*, 64) -> (*, 64), per-position normalization
     """
 
     scale: Param[Float[Array, " d"]]
@@ -65,7 +65,7 @@ class GroupNorm(Module):
         self,
         dim: int,
         num_groups: int,
-        num_spatial_dims: int = 0,
+        num_spatial_dims: int,
         eps: float = 1e-5,
     ) -> None:
 

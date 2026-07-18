@@ -37,7 +37,7 @@ class TestLayerNorm:
 class TestGroupNorm:
     def test_zero_mean_per_group(self):
         """Output has approximately zero mean within each group."""
-        layer = nn.GroupNorm(8, 2)
+        layer = nn.GroupNorm(8, 2, num_spatial_dims=0)
         x = jax.random.normal(jax.random.key(0), (4, 8))
         y = layer(x)
         y_groups = y.reshape(4, 2, 4)
@@ -46,7 +46,7 @@ class TestGroupNorm:
 
     def test_unit_variance_per_group(self):
         """Output has approximately unit variance within each group."""
-        layer = nn.GroupNorm(8, 2)
+        layer = nn.GroupNorm(8, 2, num_spatial_dims=0)
         x = jax.random.normal(jax.random.key(0), (4, 8))
         y = layer(x)
         y_groups = y.reshape(4, 2, 4)
@@ -55,23 +55,23 @@ class TestGroupNorm:
 
     def test_scale_init(self):
         """Scale is initialized to all ones."""
-        layer = nn.GroupNorm(8, 2)
+        layer = nn.GroupNorm(8, 2, num_spatial_dims=0)
         npt.assert_allclose(layer.scale._value, jnp.ones(8))
 
     def test_bias_init(self):
         """Bias is initialized to all zeros."""
-        layer = nn.GroupNorm(8, 2)
+        layer = nn.GroupNorm(8, 2, num_spatial_dims=0)
         npt.assert_allclose(layer.b._value, jnp.zeros(8))
 
     def test_indivisible_dim_errors(self):
         """dim not divisible by num_groups raises ValueError."""
         with pytest.raises(ValueError, match="divisible"):
-            nn.GroupNorm(8, 3)
+            nn.GroupNorm(8, 3, num_spatial_dims=0)
 
     def test_single_group_matches_layer_norm(self):
         """With num_groups=1, GroupNorm behaves like LayerNorm."""
         x = jax.random.normal(jax.random.key(0), (4, 8))
-        gn = nn.GroupNorm(8, 1)
+        gn = nn.GroupNorm(8, 1, num_spatial_dims=0)
         ln = nn.LayerNorm(8)
         npt.assert_allclose(gn(x), ln(x), atol=1e-6)
 
@@ -108,7 +108,7 @@ class TestGroupNorm:
         assert y.shape == x.shape
         npt.assert_allclose(y[1, 2], layer(x[1, 2]), atol=1e-6)
 
-        layer = nn.GroupNorm(8, 2)
+        layer = nn.GroupNorm(8, 2, num_spatial_dims=0)
         x = jax.random.normal(jax.random.key(1), (2, 5, 8))
         npt.assert_allclose(layer(x)[0], layer(x[0]), atol=1e-6)
 
