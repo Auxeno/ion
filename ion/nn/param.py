@@ -64,9 +64,7 @@ class Param(_ParamBase[T]):
     trainable: bool = True
 
     def __jax_array__(self) -> Array:
-        if self.trainable:
-            return self._value
-        return jax.lax.stop_gradient(self._value)
+        return self._value if self.trainable else jax.lax.stop_gradient(self._value)
 
     def __getattr__(self, name: str) -> Any:
         # Do not forward explicit dunder retrieval
@@ -191,8 +189,8 @@ class Param(_ParamBase[T]):
 
         attributes = {"value": self._value, "trainable": self.trainable}
 
-        # Grey for trainable, ice blue for non-trainable/frozen
-        color = "oklch(0.92 0.06 260.0)" if not self.trainable else "oklch(0.925 0.0 0.0)"
+        # Grey for trainable, ice blue for frozen
+        color = "oklch(0.925 0.0 0.0)" if self.trainable else "oklch(0.92 0.06 260.0)"
 
         return treescope.repr_lib.render_object_constructor(
             object_type=type(self),

@@ -9,6 +9,12 @@
   along the path and shares untouched subtrees with the original. Chain for several edits.
 - **`Module.replace` removed.** `at` subsumes it: `model.replace(b=None)` becomes
   `model.at.b.set(None)`, and multi-field updates chain as `model.at.a.set(x).at.b.set(y)`.
+- **Core internals simplified.** `module.py`, `param.py`, `checkpoint.py` and `optimizer.py`
+  slimmed with equivalent behaviour: `Module`'s init depth counter replaced by a
+  `type(self) is cls` check and its flatten cache merged into one `_flatten_info` attribute,
+  `checkpoint.load`'s duplicate Param/array branches unified (dtype warning now one line),
+  and `Optimizer._new` folded into `tree_unflatten`. Private classes get one-line
+  docstrings; TypeVars drop the underscore prefix (`M`, matching `param.py`'s `T`).
 
 ## 0.8.1
 
