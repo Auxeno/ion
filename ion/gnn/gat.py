@@ -83,6 +83,7 @@ class GATConv(Module):
         x: Float[Array, "n i"],
         senders: Int[Array, " e"],
         receivers: Int[Array, " e"],
+        *,
         x_edge: Float[Array, "e f"] | None = None,
         edge_mask: Bool[Array, " e"] | None = None,
     ) -> Float[Array, "n o"]:
@@ -194,6 +195,7 @@ class GATv2Conv(Module):
         x: Float[Array, "n i"],
         senders: Int[Array, " e"],
         receivers: Int[Array, " e"],
+        *,
         x_edge: Float[Array, "e f"] | None = None,
         edge_mask: Bool[Array, " e"] | None = None,
     ) -> Float[Array, "n o"]:
