@@ -70,14 +70,13 @@ The same letter can mean different things in different layers. Meaning is determ
 | `s` | query (source) sequence position | |
 | `t` | key/value (target) sequence position | distinct from `s` in cross-attention |
 
-Einsum patterns:
+Weights are stored flat 2D (`(d, h*k)`); the forward pass projects with plain matmuls and splits or merges heads by reshape:
 
 ```
-Q projection:       bsd, dhk -> bshk
-K/V projection:     bsd, djk -> bsjk
+Q/K/V projection:   (b, s, d) @ (d, h*k), reshape -> (b, s, h, k)
 Attention logits:   bshk, bthk -> bhst
 Attention output:   bhst, bthk -> bshk
-Output projection:  bshk, hkd -> bsd
+Output projection:  reshape -> (b, s, h*k), @ (h*k, d) -> (b, s, d)
 ```
 
 ### Recurrent
@@ -148,7 +147,7 @@ Each layer family uses init schemes suited to its typical activation:
 
 **Linear, Conv, and MLP** default to He normal, which assumes ReLU activation. If using a different activation (tanh, GELU, sigmoid, etc.), pass a different `w_init` like `jax.nn.initializers.glorot_uniform()` for tanh/sigmoid or `jax.nn.initializers.lecun_normal()` for SELU. Using He normal with non-ReLU activations can cause vanishing signals.
 
-**Attention and Embedding** use truncated normal with a small std (0.02), standard practice from GPT-2 and BERT. This is activation-agnostic since attention weights are followed by softmax, not a pointwise activation. Attention projections are initialized at their flat 2D shapes before the head split, so a custom variance-scaling `w_init` computes the true fans.
+**Attention and Embedding** use truncated normal with a small std (0.02), standard practice from GPT-2 and BERT. This is activation-agnostic since attention weights are followed by softmax, not a pointwise activation. Attention weights are stored at their flat 2D shapes (heads are split in the forward pass), so a custom variance-scaling `w_init` computes the true fans.
 
 **Recurrent** layers use Glorot uniform for input-to-hidden weights and orthogonal for hidden-to-hidden weights. Orthogonal init preserves gradient norms across time steps, reducing vanishing/exploding gradients in long sequences. LSTM forget gate bias is initialized to 1 to encourage remembering early in training.
 
