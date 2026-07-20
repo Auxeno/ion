@@ -20,9 +20,6 @@ from ..module import Module
 class MLP(Module):
     """Multi-layer perceptron with configurable layer dimensions and activation.
 
-    `dims` lists every layer width from input to output: `[3, 64, 64, 1]` is a
-    network with two hidden layers of 64, and `[3, 1]` is a single linear layer.
-
     >>> mlp = MLP([3, 64, 64, 1], key=key)
     >>> mlp(x)  # (*, 3) -> (*, 1)
     """
