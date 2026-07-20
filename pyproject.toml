@@ -55,9 +55,14 @@ examples = [
     "rdkit",
     "tqdm",
 ]
+docs = [
+    "mkdocs-material",
+    "mkdocstrings[python]",
+]
 all = [
     {include-group = "dev"},
     {include-group = "examples"},
+    {include-group = "docs"},
 ]
 
 [tool.ruff]

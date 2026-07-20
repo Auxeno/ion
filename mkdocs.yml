@@ -1,0 +1,75 @@
+site_name: Ion
+site_url: https://auxeno.github.io/ion/
+site_description: A simple neural network library for JAX
+repo_url: https://github.com/auxeno/ion
+repo_name: auxeno/ion
+
+theme:
+  name: material
+  logo: assets/logo.png
+  favicon: assets/favicon.png
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+  features:
+    - navigation.sections
+    - navigation.path
+    - navigation.top
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - API:
+      - Layers: api/layers.md
+      - GNN: api/gnn.md
+  - Guides:
+      - Layer Conventions: guides/layer-conventions.md
+  - Internals: internals.md
+
+exclude_docs: |
+  docstrings/
+  templates/
+  _extension.py
+  __pycache__/
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.details
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      custom_templates: docs/templates
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+            docstring_section_style: list
+            extensions:
+              - docs/_extension.py
+            show_root_heading: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            separate_signature: true
+            line_length: 400
+            show_signature_annotations: false
+            signature_crossrefs: true
+            merge_init_into_class: true
+            show_bases: false
+            show_source: false
+            members_order: source

@@ -1,0 +1,25 @@
+{#- Replaces _base/docstring.html.jinja: wraps each non-text section in a
+    div.doc-section so extra.css can indent section bodies under their titles. -#}
+
+{% if docstring_sections %}
+  {% with autoref_hook = AutorefsHook(obj, config) %}
+    {% for section in docstring_sections %}
+      {% set kind = section.kind.value %}
+      {% if kind == "text" %}
+        {% if config.show_docstring_description %}
+          {{ section.value|convert_markdown(heading_level, html_id, autoref_hook=autoref_hook) }}
+        {% endif %}
+      {% elif kind == "admonition" %}
+        {% if config.show_docstring_description %}
+          <div class="doc-section">
+            {% include "docstring/admonition.html.jinja" with context %}
+          </div>
+        {% endif %}
+      {% elif config|attr("show_docstring_" ~ kind|replace(" ", "_")) %}
+        <div class="doc-section">
+          {% include "docstring/" ~ kind|replace(" ", "_") ~ ".html.jinja" with context %}
+        </div>
+      {% endif %}
+    {% endfor %}
+  {% endwith %}
+{% endif %}

@@ -1,0 +1,50 @@
+/* Ion docs theme. Tune each colour scheme independently below. */
+
+/* Light scheme */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #181a20;
+  --md-accent-fg-color: #8e51ff;
+
+  /* Code highlighting */
+  --md-code-hl-keyword-color: #7c4dff;
+  --md-code-hl-string-color: #2e7d32;
+  --md-code-hl-number-color: #b16600;
+  --md-code-hl-function-color: #3949ab;
+  --md-code-hl-comment-color: #8a8f98;
+}
+
+/* Dark scheme */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #181a20;
+  --md-accent-fg-color: #8e51ff;
+
+  /* Code highlighting */
+  --md-code-hl-keyword-color: #b39dff;
+  --md-code-hl-string-color: #8fd694;
+  --md-code-hl-number-color: #e6a23c;
+  --md-code-hl-function-color: #8ab4ff;
+  --md-code-hl-comment-color: #7a7f88;
+}
+
+/* Right-aligned [source] link in API headings */
+.doc-heading .doc-source-link {
+  float: right;
+  font-size: 0.7em;
+  font-weight: 400;
+}
+
+/* Signature blocks: one logical line, soft-wrapped in the browser */
+.doc-signature code {
+  font-size: 0.85em;
+  white-space: pre-wrap;
+}
+
+/* Indent everything belonging to a class or member under its heading */
+.doc-contents {
+  padding-left: 1rem;
+}
+
+/* Indent section bodies under their titles (Parameters, Returns, Examples) */
+.doc-section > :not(:first-child) {
+  margin-left: 1rem;
+}

@@ -2,9 +2,9 @@
 
 Everything behind the scenes in Ion. Three files and <1000 lines of code make up the whole engine. This document explains the design. Readers are encouraged to check out the source code:
 
-- [`ion/nn/param.py`](../ion/nn/param.py): Param wrapper, trainable/frozen distinction
-- [`ion/nn/module.py`](../ion/nn/module.py): Module base class, pytree registration
-- [`ion/optimizer.py`](../ion/optimizer.py): Optimizer wrapper, auto-partitioning for frozen params
+- [`ion/nn/param.py`](https://github.com/auxeno/ion/blob/main/ion/nn/param.py): Param wrapper, trainable/frozen distinction
+- [`ion/nn/module.py`](https://github.com/auxeno/ion/blob/main/ion/nn/module.py): Module base class, pytree registration
+- [`ion/optimizer.py`](https://github.com/auxeno/ion/blob/main/ion/optimizer.py): Optimizer wrapper, auto-partitioning for frozen params
 
 ## Param (`ion/nn/param.py`)
 
@@ -92,7 +92,7 @@ Tensor names are tree paths (`blocks[2].attn.w_q`), the same paths used by `Modu
 Layer constructors take no `dtype` argument. Parameters are created in JAX's default float dtype (`float32`, or `float64` when `jax_enable_x64` is set), and precision is controlled entirely through `astype`. There are three patterns:
 
 - **Default (float32).** Build and train with no dtype handling.
-- **Mixed precision.** Keep float32 master params and cast the model to `bfloat16` *inside* the loss with `ion.astype(model, jnp.bfloat16)`. The cast is differentiable, so gradients return in float32 to match the master params and the optimizer state; only the forward/backward math runs in bfloat16. This mirrors Keras `mixed_bfloat16`, PyTorch AMP, and Flax's `param_dtype`/`dtype` split. See [`examples/gpt_tinystories.ipynb`](../examples/gpt_tinystories.ipynb) for a worked example.
+- **Mixed precision.** Keep float32 master params and cast the model to `bfloat16` *inside* the loss with `ion.astype(model, jnp.bfloat16)`. The cast is differentiable, so gradients return in float32 to match the master params and the optimizer state; only the forward/backward math runs in bfloat16. This mirrors Keras `mixed_bfloat16`, PyTorch AMP, and Flax's `param_dtype`/`dtype` split. See [`examples/gpt_tinystories.ipynb`](https://github.com/auxeno/ion/blob/main/examples/gpt_tinystories.ipynb) for a worked example.
 - **Full bfloat16 inference.** Cast once after construction with `model.astype(jnp.bfloat16)`.
 
 ## 🔪 Sharp Edges

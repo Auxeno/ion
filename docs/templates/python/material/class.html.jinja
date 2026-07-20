@@ -1,0 +1,8 @@
+{% extends "_base/class.html.jinja" %}
+
+{% block heading %}
+  {{ super() }}
+  {% if class.relative_package_filepath and class.lineno %}
+    <a class="doc-source-link" href="https://github.com/auxeno/ion/blob/main/{{ class.relative_package_filepath }}#L{{ class.lineno }}{% if class.endlineno %}-L{{ class.endlineno }}{% endif %}" title="View source on GitHub">[source]</a>
+  {% endif %}
+{% endblock heading %}

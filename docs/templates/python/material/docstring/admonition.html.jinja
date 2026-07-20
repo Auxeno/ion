@@ -1,0 +1,9 @@
+{#- Replaces the stock collapsible details element with a static admonition box.
+    Numpy "Notes" sections map to Material's note style, titled "Note". -#}
+
+{% set kind = "note" if section.value.kind == "notes" else section.value.kind %}
+{% set title = "Note" if section.title == "Notes" else section.title %}
+<div class="admonition {{ kind }}">
+  <p class="admonition-title">{{ title|convert_markdown(heading_level, html_id, strip_paragraph=True, autoref_hook=autoref_hook) }}</p>
+  {{ section.value.contents|convert_markdown(heading_level, html_id, autoref_hook=autoref_hook) }}
+</div>
