@@ -79,6 +79,13 @@ class TestSinusoidal:
         npt.assert_allclose(e[0, 0::2], 0.0, atol=1e-6)  # sin(0) = 0
         npt.assert_allclose(e[0, 1::2], 1.0, atol=1e-6)  # cos(0) = 1
 
+    def test_theta_changes_frequencies(self):
+        """Larger theta lowers frequencies, slowing the encoding across positions."""
+        base = nn.sinusoidal(128, 64)
+        large = nn.sinusoidal(128, 64, theta=100_000.0)
+        assert not jnp.allclose(base, large)
+        npt.assert_allclose(large[0], base[0], atol=1e-6)  # position 0 is theta independent
+
     def test_dtype(self):
         """Output respects requested dtype."""
         assert nn.sinusoidal(128, 64, dtype=jnp.float32).dtype == jnp.float32

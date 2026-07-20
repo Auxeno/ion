@@ -92,6 +92,7 @@ class RoPE(Module):
 def sinusoidal(
     seq_len: int,
     dim: int,
+    theta: float = 10_000.0,
     dtype: jnp.dtype = jnp.float32,
 ) -> Float[Array, "s d"]:
     """Sinusoidal positional encodings.
@@ -104,7 +105,7 @@ def sinusoidal(
 
     # Relative positions (s, 1) and frequency scales (d / 2,)
     positions = jnp.arange(seq_len, dtype=jnp.float32)[:, None]
-    divisor = jnp.exp(jnp.arange(0, dim, 2, dtype=jnp.float32) * (-jnp.log(10_000.0) / dim))
+    divisor = jnp.exp(jnp.arange(0, dim, 2, dtype=jnp.float32) * (-jnp.log(theta) / dim))
 
     # Phase angles (s, d / 2)
     angles = positions * divisor
