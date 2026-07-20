@@ -1,245 +1,98 @@
 # Changelog
 
+## 0.10.2
+
+- **`sinusoidal` takes `theta`.** The frequency base is now a parameter (`nn.sinusoidal(seq_len, dim, theta=10_000.0)`) instead of hardcoded, matching `RoPE`.
+
 ## 0.10.1
 
-- **Type steps in `model.at`.** Indexing the `at` proxy with a layer type selects every
-  matching node in the subtree and applies the rest of the path to each:
-  `model.at[nn.Dropout].p.set(0.5)` sets the rate on all dropout layers, and
-  `model.at.encoder[nn.Dropout].p.set(0.5)` scopes the sweep to a subtree. A type step
-  that matches nothing raises `ValueError`. Untouched subtrees are shared with the
-  original, as with ordinary path steps.
-- **`Sequential` takes an optional `key`.** `model(x, key=key)` splits the key per layer
-  and forwards a subkey to any layer whose signature accepts `key` (e.g. `Dropout`);
-  other layers are called with `x` alone.
+- **Type steps in `model.at`.** Indexing `at` with a layer type applies the rest of the path to every matching node in the subtree: `model.at[nn.Dropout].p.set(0.5)`, or `model.at.encoder[nn.Dropout].p.set(0.5)` to scope it. Raises `ValueError` if nothing matches.
+- **`Sequential` takes an optional `key`.** `model(x, key=key)` splits the key per layer and forwards a subkey to any layer whose signature accepts `key` (e.g. `Dropout`).
 
 ## 0.10.0
 
-- **New `.ion` checkpoint format.** `ion.save`/`ion.load` now write `.ion` files, a
-  [safetensors](https://huggingface.co/docs/safetensors)-style container replacing `.npz`.
-  The implementation stays fully in-house (stdlib + numpy + `ml_dtypes`, no new
-  dependencies), and safetensors tools can read Ion checkpoints directly. `bfloat16`,
-  `float8` and `complex64` are stored natively, removing the raw-bytes workaround npz
-  needed for extension dtypes. Tensor names are clean tree paths (`blocks[2].attn.w_q`, no `._value`
-  suffix); trainable flags and the format version live in the header's `__metadata__` entry,
-  and the version is now checked on load. Loading validates the container (header size,
-  offsets must exactly tile the data section) with the same strict structure and shape checks
-  as before. Old `.npz` checkpoints are incompatible.
-- **`GroupNorm` requires `num_spatial_dims`.** The previous default of `0` silently
-  diverged from the standard GroupNorm (Wu & He, 2018) on spatial data: statistics were
-  computed per position instead of over spatial dims and group channels jointly. The
-  argument is now required; pass `num_spatial_dims=0` for the old per-position behaviour.
-- **`GATConv`/`GATv2Conv` take `x_edge` and `edge_mask` as keyword-only.** Both are
-  per-edge arrays and easy to confuse positionally; call sites now name them, e.g.
-  `gat(x, senders, receivers, x_edge=x_edge, edge_mask=mask)`.
-- **Attention weights stored flat 2D with separate `w_k` and `w_v`.** `SelfAttention` and
-  `CrossAttention` replace the stacked `w_kv` weight with separate key and value
-  projections and store all weights at their flat 2D shapes (`w_q` is
-  `(dim, num_heads * head_dim)`); the forward pass projects with plain matmuls and splits
-  heads by reshape. Variance-scaling initialisers passed as `w_init` (He, Glorot) now
-  compute the true `(dim, features)` fans, where the old head-split shapes inflated
-  `fan_in` by the head count (He normal on `dim=64, num_heads=8` gave std 0.063 instead of
-  0.177; the default `truncated_normal(0.02)` is shape-independent and was unaffected).
-  Per-projection surgery becomes natural: freeze or swap `w_v` alone, LoRA-target q and v.
-  `num_heads` (and `num_kv_heads`) are now stored as static fields. Checkpoints keyed on
-  `w_kv` or the 3D/4D shapes do not load (already true this cycle via the `.ion` change).
-- **`CrossAttention` takes `context_dim`.** Keys and values may now come from a context
-  with a different feature dim than the query input (encoder-decoder with mismatched
-  widths, conditioning embeddings); `None` (default) matches `dim`. Breaking: positional
-  arguments after `num_heads` shift by one.
-- **`TransformerBlock` and `CrossTransformerBlock` removed.** Ion ships primitives, not
-  architecture opinions: a block hard-codes choices (pre-norm, FFN ratio, activation,
-  dropout placement) that are exactly the axes research varies, and keeping it complete
-  would mean mirroring every attention feature through a second API. Compose blocks from
-  `SelfAttention`/`CrossAttention`, `LayerNorm` and `Linear` instead; the TinyStories GPT
-  example shows the pattern in about twenty lines.
+- **New `.ion` checkpoint format.** `ion.save`/`ion.load` write `.ion` files, a safetensors-style container replacing `.npz`, fully in-house (stdlib + numpy + `ml_dtypes`, no new dependencies); safetensors tools can read Ion checkpoints directly. `bfloat16`, `float8`, and `complex64` are stored natively. Tensor names are clean tree paths (no `._value` suffix); format version is checked on load. Old `.npz` checkpoints are incompatible.
+- **`GroupNorm` requires `num_spatial_dims`.** The old default of `0` silently diverged from standard GroupNorm on spatial data. Pass `num_spatial_dims=0` for the old behaviour.
+- **`GATConv`/`GATv2Conv` take `x_edge` and `edge_mask` as keyword-only.** Easy to confuse positionally: `gat(x, senders, receivers, x_edge=x_edge, edge_mask=mask)`.
+- **Attention weights stored flat 2D with separate `w_k` and `w_v`.** `SelfAttention`/`CrossAttention` replace `w_kv` with separate key and value projections, all weights at flat 2D shapes. Fixes `w_init` fan calculations, which previously inflated with head count. Checkpoints from before don't load.
+- **`CrossAttention` takes `context_dim`.** Keys/values may come from a context with a different feature dim than the query; `None` (default) matches `dim`. Breaking: positional args after `num_heads` shift by one.
+- **`TransformerBlock`/`CrossTransformerBlock` removed.** Ion ships primitives, not architecture opinions. Compose from `SelfAttention`/`CrossAttention`, `LayerNorm`, and `Linear` instead.
 
 ## 0.9.0
 
-- **Path-based model surgery with `Module.at`.** New `at` property, the model version of
-  JAX's `x.at[idx].set(v)`: navigate to any field, index, or key, then `set` a new value,
-  e.g. `model.at.blocks[2].attn.w_q.set(new_w)`. Works uniformly for arrays, Params,
-  sub-modules, static values, and structural changes like `b=None`; rebuilds only the nodes
-  along the path and shares untouched subtrees with the original. Chain for several edits.
-- **`Module.replace` removed.** `at` subsumes it: `model.replace(b=None)` becomes
-  `model.at.b.set(None)`, and multi-field updates chain as `model.at.a.set(x).at.b.set(y)`.
-- **Core internals simplified.** `module.py`, `param.py`, `checkpoint.py` and `optimizer.py`
-  slimmed with equivalent behaviour: `Module`'s init depth counter replaced by a
-  `type(self) is cls` check and its flatten cache merged into one `_flatten_info` attribute,
-  `checkpoint.load`'s duplicate Param/array branches unified (dtype warning now one line),
-  and `Optimizer._new` folded into `tree_unflatten`. Private classes get one-line
-  docstrings; TypeVars drop the underscore prefix (`M`, matching `param.py`'s `T`).
+- **Path-based model surgery with `Module.at`.** New `at` property, the model version of JAX's `x.at[idx].set(v)`: navigate to any field, index, or key, then `set` a new value, e.g. `model.at.blocks[2].attn.w_q.set(new_w)`. Shares untouched subtrees with the original; chain for multiple edits.
+- **`Module.replace` removed.** `at` subsumes it: `model.replace(b=None)` becomes `model.at.b.set(None)`.
+- **Core internals simplified.** `module.py`, `param.py`, `checkpoint.py`, and `optimizer.py` slimmed with equivalent behaviour. No user-facing change.
 
 ## 0.8.1
 
-- **Style consistency pass.** Source, tests and vault docs audited against the house style
-  (docstring formats, RNG key naming, import ordering, doctest shape comments); newer code
-  brought in line with the established layers. No behavioural changes.
-- **Error messages compacted and unified.** Every `raise` is now at most three lines with a
-  single-line message, shaped `name (value) must be ...` with no trailing period. Some
-  messages were reworded to fit (e.g. checkpoint mismatch errors no longer list the file's
-  available keys).
+- **Style consistency pass.** Source, tests, and vault docs audited against house style. No behavioural changes.
+- **Error messages compacted and unified.** Every `raise` is now at most three lines, shaped `name (value) must be ...`.
 - **`MLP.__call__` annotation fixed.**
 - **Line length enforced.** Ruff now checks `E501` with a 100 character limit.
 
 ## 0.8.0
 
-- **`GINConv`.** Graph Isomorphism Network layer (Xu et al., 2019): sum-aggregates neighbor
-  features and applies a caller-supplied MLP to `(1 + eps) * x + aggregated`. `eps` defaults
-  to a fixed `0.0`; `train_eps=True` makes it a learnable scalar. Takes no `key` since the
-  update network is built by the caller. Do not add self-loops; own features enter through
-  the `(1 + eps)` term.
-- **Graph-level readout pooling.** `ion.gnn` gains `mean_pool`, `sum_pool` and `max_pool`,
-  which pool node features `(n, d)` into per-graph vectors `(g, d)` via a `graph_ids`
-  assignment array, enabling graph classification. `max_pool` returns zeros for empty graphs
-  rather than `segment_max`'s `-inf` fill; `mean_pool` likewise guards empty graphs to zeros.
-- **`segment_mean` and a coherent segment namespace.** New `segment_mean` (per-segment mean;
-  JAX ships sum/max/min/prod but no mean), and `segment_sum`, `segment_max`, `segment_min`
-  and `segment_prod` re-exported from `jax.ops`, so every segment reduction is reachable as
-  `gnn.segment_*` alongside the existing `segment_softmax`.
-- **`batch_graphs`.** Packs a list of graphs into one disconnected graph: node features are
-  concatenated, edge indices offset by cumulative node counts, and a `graph_ids` array is
-  returned for the pooling functions. Message passing on the union is exactly equivalent to
-  processing each graph separately. Call it outside `jit`; per-batch shapes vary and each new
-  shape recompiles.
+- **`GINConv`.** Graph Isomorphism Network layer (Xu et al., 2019): sum-aggregates neighbor features and applies a caller-supplied MLP to `(1 + eps) * x + aggregated`. `train_eps=True` makes `eps` learnable.
+- **Graph-level readout pooling.** `ion.gnn` gains `mean_pool`, `sum_pool`, and `max_pool`, pooling node features `(n, d)` into per-graph vectors `(g, d)` via `graph_ids`.
+- **`segment_mean` and a coherent segment namespace.** New `segment_mean`; `segment_sum`/`max`/`min`/`prod` re-exported from `jax.ops` alongside `segment_softmax`.
+- **`batch_graphs`.** Packs a list of graphs into one disconnected graph for batched message passing; returns `graph_ids` for the pooling functions.
 
 ## 0.7.0
 
-- **Nested containers in Module fields are now pytree children.** Field classification
-  previously looked only one level deep, so a `list[list[Module]]` or `dict[str, list[Module]]`
-  field was silently treated as static metadata: its params were invisible to `jax.grad`,
-  skipped by `ion.Optimizer`, and baked into `jit` traces as compile-time constants, meaning
-  such models silently did not train. Containers are now classified by their contents at any
-  depth. Containers holding only modules and arrays traverse natively; mixed containers wrap
-  non-array elements (callables, strings) as static metadata at any nesting depth. Flatten of
-  flat all-module containers is also slightly faster. Empty containers remain static.
-- **Tree calls migrated to the `jax.tree` namespace.** All `jax.tree_util.tree_*` operation
-  calls (`tree_leaves`, `tree_flatten_with_path`) now use their `jax.tree` equivalents, which
-  JAX documents as the current API (the `tree_util` spellings are listed as legacy).
-  Registration APIs (`register_dataclass`, `register_pytree_with_keys`) remain on
-  `jax.tree_util`, their supported home. No user-facing change.
-- **Attention rebuilt on `jax.nn.dot_product_attention`.** `SelfAttention` and `CrossAttention`
-  delegate the scaled-dot-product core to JAX's kernel. The softmax now runs in float32 even
-  under `bfloat16` (previously it ran in the input dtype, losing precision in mixed-precision
-  training), and cuDNN flash attention is used automatically on supported GPUs.
-- **Grouped-query and multi-query attention.** `SelfAttention` and `TransformerBlock` take
-  `num_kv_heads`: fewer key/value heads than query heads gives grouped-query attention, `1`
-  gives multi-query. `num_heads` must be divisible by it; the default (`None`) keeps standard
-  multi-head attention.
-- **Sliding-window attention.** `SelfAttention` takes `window` (a symmetric `int` or a
-  `(left, right)` tuple) for local attention; `None` (default) is full attention.
-- **Breaking: `SelfAttention.w_qkv` split into `w_q` and `w_kv`.** The fused QKV weight is now a
-  separate query projection `w_q` `(dim, num_heads, head_dim)` and a fused key/value projection
-  `w_kv` `(2, dim, num_kv_heads, head_dim)`, required to let key/value heads differ from query
-  heads. `CrossAttention.w_kv` likewise moves its split axis first. Total parameter count is
-  unchanged, but checkpoints saved before 0.7.0 no longer load into the new layers.
-- **Breaking: `SelfAttention` constructor argument order.** `num_kv_heads` is inserted after
-  `num_heads` and `window` after `causal`, so positional arguments past `num_heads` shift.
-- **Fully masked attention rows output the mean of the value vectors.** A query position with
-  no attendable positions now returns the mean of the values (dot_product_attention's
-  behaviour) rather than the zeros introduced in 0.6.1. Output and gradients stay finite; mask
-  these positions out of the loss as usual.
-- **Migration.** Access attention weights via `w_q` / `w_kv` instead of `w_qkv`, and pass
-  `bias`, `causal`, and initializers by keyword (or update positional calls for the new
-  `num_kv_heads` and `window` slots). Re-save any checkpoints written before 0.7.0.
+- **Nested containers in Module fields are now pytree children.** Field classification previously looked only one level deep, so e.g. a `list[list[Module]]` field was silently treated as static metadata and such models silently did not train. Containers are now classified by their contents at any depth.
+- **Tree calls migrated to the `jax.tree` namespace.** `tree_leaves`, `tree_flatten_with_path`, etc. now use their `jax.tree` equivalents. No user-facing change.
+- **Attention rebuilt on `jax.nn.dot_product_attention`.** Softmax now runs in float32 even under `bfloat16`; cuDNN flash attention is used automatically on supported GPUs.
+- **Grouped-query and multi-query attention.** `SelfAttention`/`TransformerBlock` take `num_kv_heads`: fewer KV heads than query heads gives GQA, `1` gives MQA.
+- **Sliding-window attention.** `SelfAttention` takes `window` (a symmetric `int` or `(left, right)` tuple) for local attention.
+- **Breaking: `SelfAttention.w_qkv` split into `w_q` and `w_kv`.** Required to let key/value heads differ from query heads. `CrossAttention.w_kv` also moves its split axis first. Checkpoints from before 0.7.0 no longer load.
+- **Breaking: `SelfAttention` constructor argument order.** `num_kv_heads` inserted after `num_heads`, `window` after `causal`.
+- **Fully masked attention rows output the mean of the value vectors** instead of zeros, matching `dot_product_attention`'s behaviour.
+- **Migration.** Access attention weights via `w_q`/`w_kv` instead of `w_qkv`; re-save checkpoints written before 0.7.0.
 
 ## 0.6.2
 
-- **Dropout validates `p` at construction.** `p` outside `[0, 1]` now raises `ValueError`;
-  previously out-of-range values silently corrupted outputs (negative `p` rescaled
-  activations with no mask applied).
-- **GAT layers require `x_edge` and `edge_dim` together.** `GATConv` and `GATv2Conv` now
-  raise `ValueError` when one is provided without the other; previously an edge-aware layer
-  called without `x_edge` silently ignored its edge parameters, and passing `x_edge` to a
-  non-edge layer failed with a cryptic shape error.
-- **Pooling padding must be smaller than the kernel.** `MaxPool` and `AvgPool` now raise
-  `ValueError` at construction when a `padding` value is greater than or equal to the
-  corresponding `kernel_shape` entry; previously such a config produced a window landing
-  entirely in padding, which gave `AvgPool` a `0 / 0 = NaN` output and `MaxPool` a `-inf`
-  output. String paddings (`'SAME'`, `'VALID'`) are unaffected.
+- **Dropout validates `p` at construction.** `p` outside `[0, 1]` now raises `ValueError` instead of silently corrupting outputs.
+- **GAT layers require `x_edge` and `edge_dim` together.** `GATConv`/`GATv2Conv` now raise `ValueError` when one is given without the other.
+- **Pooling padding must be smaller than the kernel.** `MaxPool`/`AvgPool` raise `ValueError` at construction instead of producing NaN/-inf outputs.
 
 ## 0.6.1
 
-- **Breaking: `rope` and `apply_rope` replaced by the `RoPE` module.** `nn.RoPE(theta)`
-  applies rotary embeddings directly to query or key tensors. Frequency tables are computed
-  on the fly from the input shape and constant-folded under `jit`, so there is no `max_len`,
-  no stored tables, and no `key`. Tables are computed in float32 and cast to the input dtype.
-- **Migration.** `cos, sin = nn.rope(s, d)` followed by `nn.apply_rope(q, cos, sin)` becomes
-  `rope = nn.RoPE()` then `rope(q)`.
-- **Fully masked attention rows output zeros.** `SelfAttention` and `CrossAttention` now mask
-  via `jax.nn.softmax(..., where=)`: a query position with no attendable positions outputs
-  zeros instead of NaN. Rows with at least one attendable position are unchanged.
-- **Exact `segment_softmax` normalization.** Removed the `1e-6` denominator epsilon, which
-  biased every attention weight slightly low; per-segment weights now sum to exactly 1.
-- **Class-level field defaults work with custom `__init__`.** A Module field with a class
-  default (`eps: float = 1e-5`) no longer needs to be assigned in a custom `__init__`;
-  construction previously crashed with a bare `KeyError`. A field with no default that is
-  never assigned now raises a clear `AttributeError` naming the field instead.
-- **NamedTuple Module fields work.** A Module field holding a NamedTuple of array-like
-  elements (Params, Modules, arrays) previously crashed on flatten/unflatten because
-  containers were rebuilt by passing an iterable to the constructor; NamedTuples are now
-  rebuilt with positional fields.
-- **`Optimizer.update` rejects trainability changes with a clear error.** The
-  frozen/trainable partition is baked into the optimizer state at construction, so calling
-  `freeze()`/`unfreeze()` on the model and reusing the old optimizer previously failed with a
-  cryptic pytree mismatch (or, for stateless transforms, silently left unfrozen params
-  untrained). `update()` now checks the model structure against the one recorded at
-  construction and raises `ValueError` telling you to create a new Optimizer.
+- **Breaking: `rope` and `apply_rope` replaced by the `RoPE` module.** `nn.RoPE(theta)` applies rotary embeddings directly; frequency tables are computed on the fly and constant-folded under `jit`.
+- **Migration.** `cos, sin = nn.rope(s, d); nn.apply_rope(q, cos, sin)` becomes `nn.RoPE()(q)`.
+- **Fully masked attention rows output zeros** instead of NaN, via `jax.nn.softmax(..., where=)`.
+- **Exact `segment_softmax` normalization.** Removed the `1e-6` denominator epsilon; weights now sum to exactly 1.
+- **Class-level field defaults work with custom `__init__`.** A Module field with a class default no longer needs to be assigned in a custom `__init__`.
+- **NamedTuple Module fields work.** Previously crashed on flatten/unflatten.
+- **`Optimizer.update` rejects trainability changes with a clear error** instead of a cryptic pytree mismatch.
 
 ## 0.6.0
 
-- **Breaking: `dtype` removed from all layer and block constructors.** Parameters are now
-  created in JAX's default float dtype (`float32`, or `float64` under `jax_enable_x64`).
-  Control precision with `model.astype(...)` / `ion.astype(...)` instead: keep float32 master
-  params and cast to `bfloat16` inside the loss for mixed-precision training, or cast once for
-  full low-precision inference. See the new precision section in
-  [internals.md](docs/internals.md).
-- **Migration.** Drop any `dtype=...` argument from layer construction. Because `dtype` was a
-  positional parameter (before the initializer arguments), code passing later arguments
-  positionally must drop the `dtype` slot too; keyword arguments are unaffected.
-- SSM layers (LRU, S4D, S5) keep their `complex64` recurrent state, and the `sinusoidal`,
-  `alibi`, and `rope` positional-encoding functions keep their `dtype` argument (they build
-  arrays rather than parameters).
-- **Breaking: `MLP` takes a single `dims` sequence.** `MLP(in_dim, out_dim, hidden_dim,
-  num_hidden_layers, ...)` is now `MLP(dims, ...)` where `dims` lists every layer width
-  from input to output: `MLP([3, 64, 64, 1], key=key)` builds two hidden layers of 64.
-  Hidden widths may now vary per layer (`MLP([784, 512, 128, 10], key=key)`), and a single
-  linear layer is `MLP([3, 1], key=key)`.
-- **Migration.** `MLP(i, o, h, n, ...)` becomes `MLP([i, *[h] * n, o], ...)`. All other
-  arguments (`activation`, `final_activation`, `bias`, initializers, `key`) are unchanged.
+- **Breaking: `dtype` removed from all layer and block constructors.** Params are now created in JAX's default float dtype. Use `model.astype(...)` for precision control.
+- **Migration.** Drop `dtype=...` from layer construction; positional args after it shift.
+- SSM layers (LRU, S4D, S5) keep their `complex64` recurrent state; `sinusoidal`, `alibi`, and `rope` keep their `dtype` argument.
+- **Breaking: `MLP` takes a single `dims` sequence.** `MLP(in_dim, out_dim, hidden_dim, num_hidden_layers, ...)` is now `MLP(dims, ...)`, e.g. `MLP([3, 64, 64, 1], key=key)`.
+- **Migration.** `MLP(i, o, h, n, ...)` becomes `MLP([i, *[h] * n, o], ...)`.
 
 ## 0.5.3
 
-- **Attention mask shapes.** `SelfAttention` and `CrossAttention` masks may be `(s, t)`,
-  `(b, s, t)`, or `(b, h, s, t)`. Rank-3 masks now apply per batch element; previously they
-  broadcast over heads, silently misapplying the mask when batch size equalled head count.
-- **Correct ALiBi slopes.** `alibi` uses the paper's geometric head slopes `2^(-8i/n)`.
-  The previous fixed ratio of 0.5 was only correct for 8 heads.
-- **GroupNorm rank handling.** `GroupNorm` normalizes over trailing dimensions like
-  `LayerNorm`, supporting unbatched inputs and arbitrary leading batch dims.
-- **GAT Glorot init.** `GATConv` and `GATv2Conv` multi-head projections initialize with
-  correct Glorot fans; previously variance shrank with head count and input width.
-  Custom `w_init` now receives the flat `(in_dim, out_dim)` shape.
-- **bfloat16 checkpoints.** `save` and `load` round-trip extension dtypes (`bfloat16`,
-  `float8`) exactly; previously they were silently unrecoverable. `load` also appends
-  `.npz` to the path when missing, matching `save`.
-- **Recurrent initial state dtype.** `initial_state` on RNN, LSTM, and GRU cells follows
-  the parameter dtype instead of always returning float32.
+- **Attention mask shapes.** `SelfAttention` and `CrossAttention` masks may be `(s, t)`, `(b, s, t)`, or `(b, h, s, t)`. Rank-3 masks now apply per batch element; previously they broadcast over heads, silently misapplying the mask when batch size equalled head count.
+- **Correct ALiBi slopes.** `alibi` uses the paper's geometric head slopes `2^(-8i/n)`. The previous fixed ratio of 0.5 was only correct for 8 heads.
+- **GroupNorm rank handling.** `GroupNorm` normalizes over trailing dimensions like `LayerNorm`, supporting unbatched inputs and arbitrary leading batch dims.
+- **GAT Glorot init.** `GATConv` and `GATv2Conv` multi-head projections initialize with correct Glorot fans; previously variance shrank with head count and input width. Custom `w_init` now receives the flat `(in_dim, out_dim)` shape.
+- **bfloat16 checkpoints.** `save` and `load` round-trip extension dtypes (`bfloat16`, `float8`) exactly; previously they were silently unrecoverable. `load` also appends `.npz` to the path when missing, matching `save`.
+- **Recurrent initial state dtype.** `initial_state` on RNN, LSTM, and GRU cells follows the parameter dtype instead of always returning float32.
 
 ## 0.5.2
 
-- **Per-field optimizer transforms.** `Optimizer` accepts a dict mapping field names
-  (or tuples of field names) to separate optax transforms, enabling different learning
-  rates or schedules for different parts of a model (e.g. generator vs discriminator).
+- **Per-field optimizer transforms.** `Optimizer` accepts a dict mapping field names (or tuples of field names) to separate optax transforms, enabling different learning rates or schedules for different parts of a model (e.g. generator vs discriminator).
 - Fixed SSM demo notebook links.
 - Improved generic test coverage (bfloat16 tests, refactored layer type grouping).
 
 ## 0.5.1
 
-- **Edge masking.** `GATConv` and `GATv2Conv` accept an optional `edge_mask` argument to
-  zero out attention on selected edges. Masked edges receive zero attention weight and
-  their edge features (if any) are zeroed.
-- **Numerically stable segment softmax.** `segment_softmax` now handles empty segments
-  (e.g. from full masking) cleanly instead of producing NaN.
+- **Edge masking.** `GATConv` and `GATv2Conv` accept an optional `edge_mask` argument to zero out attention on selected edges. Masked edges receive zero attention weight and their edge features (if any) are zeroed.
+- **Numerically stable segment softmax.** `segment_softmax` now handles empty segments (e.g. from full masking) cleanly instead of producing NaN.
 - **RL demos.** New DQN (Atari), PPO, and PQN example scripts and notebooks.
 
 ## 0.5.0
@@ -265,9 +118,7 @@
 
 ## 0.3.0
 
-- **Optimizer.** New `ion.Optimizer` wraps an optax transform with Param-aware updates,
-  replacing `apply_updates` as the third core abstraction alongside `Param` and `Module`.
-  Frozen params are automatically partitioned so no optimizer memory is wasted on them.
+- **Optimizer.** New `ion.Optimizer` wraps an optax transform with Param-aware updates, replacing `apply_updates` as the third core abstraction alongside `Param` and `Module`. Frozen params are automatically partitioned so no optimizer memory is wasted on them.
 - **Breaking:** Removed `ion.apply_updates`. Use new `ion.Optimizer` instead.
 - **Dependency:** `optax` is now a runtime dependency (previously dev-only).
 - Fix Treescope not rendering arrays.
