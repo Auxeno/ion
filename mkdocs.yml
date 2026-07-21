@@ -21,18 +21,45 @@ theme:
         name: Light mode
   features:
     - navigation.sections
+    - navigation.indexes
     - navigation.path
     - navigation.top
     - content.code.copy
 
 nav:
   - Home: index.md
-  - API:
-      - Layers: api/layers.md
-      - GNN: api/gnn.md
+  - Core:
+      - Module: core/module.md
+      - Param: core/param.md
+      - Optimizer: core/optimizer.md
+      - Tree Utilities: core/tree.md
+      - Checkpointing: core/checkpoint.md
+  - NN:
+      - nn/index.md
+      - Conventions: nn/conventions.md
+      - Layers:
+          - Linear: nn/layers/linear.md
+          - Convolution: nn/layers/conv.md
+          - Attention: nn/layers/attention.md
+          - Normalization: nn/layers/norm.md
+          - Recurrent: nn/layers/recurrent.md
+          - State Space: nn/layers/ssm.md
+          - Embedding: nn/layers/embedding.md
+          - Positional: nn/layers/positional.md
+          - Pooling: nn/layers/pool.md
+          - Dropout: nn/layers/dropout.md
+          - LoRA: nn/layers/lora.md
+      - Blocks: nn/blocks.md
+  - GNN:
+      - gnn/index.md
+      - Layers:
+          - GCN: gnn/layers/gcn.md
+          - GAT: gnn/layers/gat.md
+          - GIN: gnn/layers/gin.md
+      - Ops: gnn/ops.md
   - Guides:
-      - Layer Conventions: guides/layer-conventions.md
-  - Internals: internals.md
+      - Sharp Edges: guides/sharp-edges.md
+  - Examples: examples.md
 
 exclude_docs: |
   docstrings/
@@ -57,6 +84,9 @@ plugins:
       custom_templates: docs/templates
       handlers:
         python:
+          inventories:
+            - https://docs.jax.dev/en/latest/objects.inv
+            - https://optax.readthedocs.io/en/latest/objects.inv
           options:
             docstring_style: numpy
             docstring_section_style: list

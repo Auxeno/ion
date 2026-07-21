@@ -21,7 +21,7 @@ y = model(x)  # (32, 4) -> (32, 2)
 
 ## Where to go next
 
-- [Layers](api/layers.md): API reference for `ion.nn` layers.
-- [GNN](api/gnn.md): graph neural network layers and ops.
-- [Layer Conventions](guides/layer-conventions.md): shapes, batching, initialisation.
-- [Internals](internals.md): how `Module`, `Param`, and `Optimizer` work.
+- [Core](core/module.md): how `Module`, `Param`, and `Optimizer` work.
+- [NN](nn/index.md): the layer library and its [conventions](nn/conventions.md).
+- [GNN](gnn/index.md): graph neural network layers and ops.
+- [Examples](examples.md): end-to-end training scripts and notebooks.

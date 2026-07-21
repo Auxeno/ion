@@ -1,4 +1,4 @@
-# Layers
+# Conventions
 
 Conventions and design decisions across Ion's layer library.
 
@@ -134,6 +134,8 @@ AvgPool(kernel_shape=(3,), padding=1)               # AvgPool1d
 Scalar values for `stride`, `padding`, `dilation`, etc. are broadcast across all spatial dimensions. Tuples give per-dimension control.
 
 ## Weight Initialization
+
+Every `w_init` / `b_init` argument takes an `Initializer` (`jax.nn.initializers.Initializer`): a callable `(key, shape, dtype) -> Array`. Pass any factory from `jax.nn.initializers`, such as `he_normal()`, `glorot_uniform()`, `truncated_normal(0.02)`, or `zeros`. In the API reference these type and default names are links into the JAX docs, and each layer's default is shown in its signature.
 
 Each layer family uses init schemes suited to its typical activation:
 
