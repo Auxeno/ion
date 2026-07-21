@@ -15,7 +15,7 @@ w_init : Initializer
     is typically followed by ReLU.
 b_init : Initializer
     Bias initializer. Zeros by default.
-key : PRNGKeyArray
+key : jax.Array
     RNG key for parameter initialization. Keyword-only.
 
 Attributes

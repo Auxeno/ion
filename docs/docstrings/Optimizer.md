@@ -11,7 +11,7 @@ model : PyTree
 
 Attributes
 ----------
-step : Array
+step : jax.Array
     `int32` step counter, incremented once per `update` call.
 state : PyTree
     Internal optax optimizer state.

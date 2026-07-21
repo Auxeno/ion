@@ -17,7 +17,7 @@ w_h_init : Initializer
 b_init : Initializer
     Bias initializer. Zeros by default, except the forget-gate slice, which is
     set to ones to encourage remembering early in training.
-key : PRNGKeyArray
+key : jax.Array
     RNG key for parameter initialization. Keyword-only.
 
 Attributes

@@ -16,7 +16,7 @@ dtype : jnp.dtype, default=jnp.float32
 
 Returns
 -------
-Float[Array, "seq_len dim"]
+jax.Array["seq_len dim", float]
     Positional encoding table.
 
 Examples

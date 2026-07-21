@@ -11,7 +11,7 @@ dim : int
 w_init : Initializer
     Weight initializer. Truncated normal (std 0.02) by default, the GPT-2/BERT
     convention.
-key : PRNGKeyArray
+key : jax.Array
     RNG key for parameter initialization. Keyword-only.
 
 Attributes

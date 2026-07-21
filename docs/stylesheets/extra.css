@@ -26,6 +26,13 @@
   --md-code-hl-comment-color: #7a7f88;
 }
 
+/* Top-level API headings (class ion.nn.RNN, func ion.nn.sinusoidal): a touch
+   larger than base h2. These are name-only; the signature renders separately.
+   `__call__` and other members are h3, so they keep their smaller size. */
+.md-typeset h2.doc-heading {
+  font-size: 1.7em;
+}
+
 /* Right-aligned [source] link in API headings */
 .doc-heading .doc-source-link {
   float: right;
@@ -35,7 +42,7 @@
 
 /* Signature blocks: one logical line, soft-wrapped in the browser */
 .doc-signature code {
-  font-size: 0.85em;
+  font-size: 0.95em;
   white-space: pre-wrap;
 }
 

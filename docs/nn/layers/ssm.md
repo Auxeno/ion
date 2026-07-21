@@ -1,6 +1,6 @@
 # State Space
 
-Deep state space model layers. `S4D`, `S5`, and `LRU` process a sequence with a linear complex-valued recurrence, returning outputs plus the final state; the matching `*Cell` classes apply a single timestep. The output dimension is always `in_dim`. See [Conventions](../conventions.md#ssm) for the complex-state conventions.
+Deep state space model layers. `S4D`, `S5`, and `LRU` process a sequence with a linear complex-valued recurrence, returning outputs plus the final state; the matching `*Cell` classes apply a single timestep. The output dimension is always `in_dim`. See [Reference](../reference.md#ssm) for the complex-state conventions.
 
 ::: ion.nn.S4D
 

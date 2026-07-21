@@ -17,7 +17,7 @@ w_init : Initializer
     Initializer for the `B` and `C` projections. Glorot normal by default.
 d_init : Initializer
     Initializer for the `D` skip term. Zeros by default.
-key : PRNGKeyArray
+key : jax.Array
     RNG key for parameter initialization. Keyword-only.
 
 Attributes
@@ -33,7 +33,7 @@ log_dt : Param
 
 Notes
 -----
-The output dimension equals `in_dim`. State is complex with shape `(state_dim // 2,)`; `initial_state` returns it zeroed. See [Conventions](../conventions.md#ssm).
+The output dimension equals `in_dim`. State is complex with shape `(state_dim // 2,)`; `initial_state` returns it zeroed. See [Reference](../reference.md#ssm).
 
 Examples
 --------

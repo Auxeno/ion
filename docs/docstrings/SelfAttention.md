@@ -23,7 +23,7 @@ w_init : Initializer
     Projection initializer. Truncated normal (std 0.02) by default.
 b_init : Initializer
     Bias initializer. Zeros by default.
-key : PRNGKeyArray
+key : jax.Array
     RNG key for parameter initialization. Keyword-only.
 
 Attributes
@@ -39,7 +39,7 @@ b_out : Param | None
 
 Notes
 -----
-`head_dim` is `dim // num_heads`. Weights are stored flat 2D and reshaped into heads in the forward pass, so a custom variance-scaling `w_init` sees the true fan sizes. `causal` and `window` compose with an explicit call-time `mask`; see [Conventions](../conventions.md#attention-masking) for mask shapes.
+`head_dim` is `dim // num_heads`. Weights are stored flat 2D and reshaped into heads in the forward pass, so a custom variance-scaling `w_init` sees the true fan sizes. `causal` and `window` compose with an explicit call-time `mask`; see [Reference](../reference.md#attention-masking) for mask shapes.
 
 Examples
 --------

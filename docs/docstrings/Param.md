@@ -2,7 +2,7 @@ Marks a JAX array as a model parameter, making the trainable/frozen distinction 
 
 Parameters
 ----------
-_value : Array
+_value : jax.Array
     The underlying JAX array.
 trainable : bool, default=True
     Whether gradients flow to this parameter. Frozen params (`trainable=False`)
@@ -11,7 +11,7 @@ trainable : bool, default=True
 
 Notes
 -----
-Array attributes (`.shape`, `.dtype`, `.T`, ...) and `jnp` operations proxy to the underlying array through `__jax_array__`, so a `Param` is usable anywhere a raw array is. Arithmetic returns plain arrays, not `Param` instances. The `_value` field is private: reach the raw array with `jnp.asarray(param)`, never `param._value`, so `stop_gradient` is preserved for frozen params.
+jax.Array attributes (`.shape`, `.dtype`, `.T`, ...) and `jnp` operations proxy to the underlying array through `__jax_array__`, so a `Param` is usable anywhere a raw array is. Arithmetic returns plain arrays, not `Param` instances. The `_value` field is private: reach the raw array with `jnp.asarray(param)`, never `param._value`, so `stop_gradient` is preserved for frozen params.
 
 Examples
 --------

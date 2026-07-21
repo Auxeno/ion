@@ -2,12 +2,12 @@ Run the GRU over a sequence.
 
 Parameters
 ----------
-x : Float[Array, "b t i"]
+x : jax.Array["b t i", float]
     Input sequence of `t` timesteps.
-hx : Float[Array, "b h"] | None, default=None
+hx : jax.Array["b h", float] | None, default=None
     Initial hidden state. Defaults to zeros.
 
 Returns
 -------
-tuple[Float[Array, "b t h"], Float[Array, "b h"]]
+tuple[jax.Array["b t h", float], jax.Array["b h", float]]
     Per-timestep outputs and the final hidden state.

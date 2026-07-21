@@ -16,7 +16,7 @@ w_h_init : Initializer
     Hidden-to-hidden initializer. Orthogonal by default.
 b_init : Initializer
     Bias initializer. Zeros by default.
-key : PRNGKeyArray
+key : jax.Array
     RNG key for parameter initialization. Keyword-only.
 
 Attributes
@@ -26,7 +26,7 @@ cell : RNNCell
 
 Notes
 -----
-Pass `hx` to override the default zero initial state, for example when continuing a sequence across chunks. See [Conventions](../conventions.md#recurrent-state).
+Pass `hx` to override the default zero initial state, for example when continuing a sequence across chunks. See [Reference](../reference.md#recurrent-state).
 
 Examples
 --------

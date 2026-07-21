@@ -2,12 +2,12 @@ Advance the shared state by one step.
 
 Parameters
 ----------
-x : Float[Array, "... i"]
+x : jax.Array["... i", float]
     Input at the current timestep.
-h : Complex[Array, "... h"]
+h : jax.Array["... h", complex]
     Previous complex state, shared across features.
 
 Returns
 -------
-tuple[Float[Array, "... i"], Complex[Array, "... h"]]
+tuple[jax.Array["... i", float], jax.Array["... h", complex]]
     Output at this step and the new complex state.

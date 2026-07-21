@@ -2,11 +2,11 @@ Add positional embeddings to the input.
 
 Parameters
 ----------
-x : Float[Array, "... s d"]
+x : jax.Array["... s d", float]
     Input with sequence positions on the second-to-last axis (length `<= max_len`)
     and feature dimension `dim` last.
 
 Returns
 -------
-Float[Array, "... s d"]
+jax.Array["... s d", float]
     Input with the first `s` positional rows added, same shape as the input.

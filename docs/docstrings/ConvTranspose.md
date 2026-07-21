@@ -30,7 +30,7 @@ w_init : Initializer
     Weight initializer. He normal by default, suited to ReLU networks.
 b_init : Initializer
     Bias initializer. Zeros by default.
-key : PRNGKeyArray
+key : jax.Array
     RNG key for parameter initialization. Keyword-only.
 
 Attributes

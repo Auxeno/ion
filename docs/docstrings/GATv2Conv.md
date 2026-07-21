@@ -24,7 +24,7 @@ att_init : Initializer
     Attention vector initializer. Glorot uniform by default.
 b_init : Initializer
     Bias initializer. Zeros by default.
-key : PRNGKeyArray
+key : jax.Array
     RNG key for parameter initialization. Keyword-only.
 
 Attributes

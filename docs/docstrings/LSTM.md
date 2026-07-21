@@ -16,7 +16,7 @@ w_h_init : Initializer
     Hidden-to-hidden initializer. Orthogonal by default.
 b_init : Initializer
     Bias initializer. Zeros by default, except the forget-gate slice, set to ones.
-key : PRNGKeyArray
+key : jax.Array
     RNG key for parameter initialization. Keyword-only.
 
 Attributes
@@ -26,7 +26,7 @@ cell : LSTMCell
 
 Notes
 -----
-Pass `hx` as an `(h, c)` tuple to override the default zero initial state. See [Conventions](../conventions.md#recurrent-state).
+Pass `hx` as an `(h, c)` tuple to override the default zero initial state. See [Reference](../reference.md#recurrent-state).
 
 Examples
 --------

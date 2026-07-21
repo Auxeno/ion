@@ -2,11 +2,11 @@ Rotate features by position.
 
 Parameters
 ----------
-x : Float[Array, "... s d"]
+x : jax.Array["... s d", float]
     Query or key with sequence positions on the second-to-last axis and an
     even per-head dimension last.
 
 Returns
 -------
-Float[Array, "... s d"]
+jax.Array["... s d", float]
     Position-rotated array, same shape as the input.

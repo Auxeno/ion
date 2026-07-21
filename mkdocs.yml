@@ -36,7 +36,7 @@ nav:
       - Checkpointing: core/checkpoint.md
   - NN:
       - nn/index.md
-      - Conventions: nn/conventions.md
+      - Reference: nn/reference.md
       - Layers:
           - Linear: nn/layers/linear.md
           - Convolution: nn/layers/conv.md
@@ -49,9 +49,11 @@ nav:
           - Pooling: nn/layers/pool.md
           - Dropout: nn/layers/dropout.md
           - LoRA: nn/layers/lora.md
-      - Blocks: nn/blocks.md
+          - MLP: nn/layers/mlp.md
+          - Sequential: nn/layers/sequential.md
   - GNN:
       - gnn/index.md
+      - Reference: gnn/reference.md
       - Layers:
           - GCN: gnn/layers/gcn.md
           - GAT: gnn/layers/gat.md
@@ -85,6 +87,7 @@ plugins:
       handlers:
         python:
           inventories:
+            - https://docs.python.org/3/objects.inv
             - https://docs.jax.dev/en/latest/objects.inv
             - https://optax.readthedocs.io/en/latest/objects.inv
           options:

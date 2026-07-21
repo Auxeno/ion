@@ -18,7 +18,7 @@ w_init : Initializer
     Initializer for the `B` and `C` projections. Glorot normal by default.
 d_init : Initializer
     Initializer for the `D` skip term. Zeros by default.
-key : PRNGKeyArray
+key : jax.Array
     RNG key for parameter initialization. Keyword-only.
 
 Attributes
@@ -28,7 +28,7 @@ cell : LRUCell
 
 Notes
 -----
-The output dimension equals `in_dim`. Pass `hx` to override the default zero initial state. See [Conventions](../conventions.md#ssm).
+The output dimension equals `in_dim`. Pass `hx` to override the default zero initial state. See [Reference](../reference.md#ssm).
 
 Examples
 --------

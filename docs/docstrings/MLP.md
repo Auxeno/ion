@@ -17,7 +17,7 @@ w_init : Initializer
     Weight initializer for every linear layer. He normal by default.
 b_init : Initializer
     Bias initializer. Zeros by default.
-key : PRNGKeyArray
+key : jax.Array
     RNG key, split across the layers. Keyword-only.
 
 Attributes

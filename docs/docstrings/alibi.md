@@ -13,7 +13,7 @@ dtype : jnp.dtype, default=jnp.float32
 
 Returns
 -------
-Float[Array, "num_heads seq_len seq_len"]
+jax.Array["num_heads seq_len seq_len", float]
     Additive attention bias, one matrix per head.
 
 Notes

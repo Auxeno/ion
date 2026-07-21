@@ -16,7 +16,7 @@ w_init : Initializer
     Projection initializer. Truncated normal (std 0.02) by default.
 b_init : Initializer
     Bias initializer. Zeros by default.
-key : PRNGKeyArray
+key : jax.Array
     RNG key for parameter initialization. Keyword-only.
 
 Attributes
@@ -32,7 +32,7 @@ b_out : Param | None
 
 Notes
 -----
-The call-time `mask` matches the query-key dimensions; see [Conventions](../conventions.md#attention-masking) for shapes.
+The call-time `mask` matches the query-key dimensions; see [Reference](../reference.md#attention-masking) for shapes.
 
 Examples
 --------

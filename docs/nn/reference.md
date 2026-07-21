@@ -1,6 +1,6 @@
-# Conventions
+# Reference
 
-Conventions and design decisions across Ion's layer library.
+Cross-cutting rules and design decisions that apply across Ion's layers: input format, shape labels, batching, initialization, masking, and state.
 
 ## Input Format
 

@@ -22,6 +22,6 @@ y = model(x)  # (32, 4) -> (32, 2)
 ## Where to go next
 
 - [Core](core/module.md): how `Module`, `Param`, and `Optimizer` work.
-- [NN](nn/index.md): the layer library and its [conventions](nn/conventions.md).
+- [NN](nn/index.md): the layer library and its [reference](nn/reference.md).
 - [GNN](gnn/index.md): graph neural network layers and ops.
 - [Examples](examples.md): end-to-end training scripts and notebooks.

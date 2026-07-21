@@ -2,16 +2,16 @@ Attend from the query sequence into the context.
 
 Parameters
 ----------
-x : Float[Array, "b s d"]
+x : jax.Array["b s d", float]
     Query sequence of `s` tokens with feature dimension `dim`.
-context : Float[Array, "b t c"]
+context : jax.Array["b t c", float]
     Context (key/value) sequence of `t` tokens with feature dimension
     `context_dim`.
-mask : Bool[Array, ...] | None, default=None
+mask : jax.Array["...", bool] | None, default=None
     Optional boolean mask over query-key pairs. Accepts `(s, t)`, `(b, s, t)`,
     or `(b, h, s, t)`.
 
 Returns
 -------
-Float[Array, "b s d"]
+jax.Array["b s d", float]
     Attention output over the query sequence.

@@ -17,7 +17,7 @@ a_init : Initializer
 b_init : Initializer
     Initializer for `B`. Zeros by default, so the update starts at zero and the
     wrapped layer is unchanged at initialization.
-key : PRNGKeyArray
+key : jax.Array
     RNG key for parameter initialization. Keyword-only.
 
 Attributes

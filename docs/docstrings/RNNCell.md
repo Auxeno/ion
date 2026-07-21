@@ -17,7 +17,7 @@ w_h_init : Initializer
     gradient norms across time steps.
 b_init : Initializer
     Bias initializer. Zeros by default.
-key : PRNGKeyArray
+key : jax.Array
     RNG key for parameter initialization. Keyword-only.
 
 Attributes

@@ -2,12 +2,12 @@ Advance the hidden state by one step.
 
 Parameters
 ----------
-x : Float[Array, "... i"]
+x : jax.Array["... i", float]
     Input at the current timestep.
-h : Float[Array, "... h"]
+h : jax.Array["... h", float]
     Previous hidden state.
 
 Returns
 -------
-Float[Array, "... h"]
+jax.Array["... h", float]
     New hidden state.
