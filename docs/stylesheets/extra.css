@@ -41,12 +41,12 @@
   max-width: 45rem;
 }
 
-/* Drop the table of contents before the nav when width runs out. Material
-   shows the TOC from 60em but the nav only from 76.25em (1220px), so by
-   default the nav collapses first. Hiding the TOC below a threshold above
-   76.25em reverses the order: the TOC goes first, then the nav. 87.5em is
-   where content still fits a 100-char code line with both sidebars present.
-   Must match the theme's `:not([hidden])` specificity to win. */
+/* Drop the table of contents before the nav when width runs out. The nav is
+   lowered to 60em by docs/hooks.py, matching Material's own TOC breakpoint, so
+   both would otherwise appear together. Hiding the TOC below 87.5em reverses the
+   order: the TOC goes first, then the nav. 87.5em is where content still fits a
+   100-char code line with both sidebars present. Must match the theme's
+   `:not([hidden])` specificity to win. */
 @media screen and (max-width: 87.49em) {
   .md-sidebar--secondary:not([hidden]) {
     display: none;
@@ -54,11 +54,23 @@
 }
 
 /* Sidebars 10% narrower than the 12.1rem default, giving the width back to
-   content. Desktop only, so the mobile nav drawer keeps its full width. */
-@media screen and (min-width: 76.25em) {
+   content. Matches the lowered 60em nav breakpoint so the mobile nav drawer
+   keeps its full width. */
+@media screen and (min-width: 60em) {
   .md-sidebar {
     width: 10.9rem;
   }
+}
+
+/* Keep the repository link in the top header at every width. Material hides the
+   header source below 60em and relocates it into the nav drawer; there is room
+   for it in the header bar even when narrow, so pin it there and never show the
+   drawer copy. */
+.md-header__source {
+  display: block;
+}
+.md-nav__source {
+  display: none;
 }
 
 /* Top-level API headings (class ion.nn.RNN, func ion.nn.sinusoidal): a touch

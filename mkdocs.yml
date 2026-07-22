@@ -84,7 +84,11 @@ exclude_docs: |
   docstrings/
   templates/
   _extension.py
+  hooks.py
   __pycache__/
+
+hooks:
+  - docs/hooks.py
 
 extra_css:
   - stylesheets/extra.css
