@@ -12,11 +12,23 @@
   --ion-violet: #7c3aed;
   --ion-gradient: linear-gradient(120deg, #0891b2, #7c3aed);
 
-  /* Code highlighting */
-  --md-code-hl-keyword-color: #c22ed4;
-  --md-code-hl-string-color: #0e9d76;
-  --md-code-hl-number-color: #b16600;
-  --md-code-hl-function-color: #3b7de0;
+  /* Full Ion palette. Purple (--ion-violet) and cyan lead; the rest are accents.
+     Light-scheme values are deepened where the vivid hue would be too pale on
+     white for text use (badges, code tokens). */
+  --ion-red: #e03b38;
+  --ion-orange: #d1600f;
+  --ion-yellow: #b07d0a;
+  --ion-green: #12a37c;
+  --ion-blue: #2f6fe0;
+  --ion-magenta: #b02fc0;
+
+  /* Code highlighting, aligned to the palette: purple keywords, cyan constants,
+     blue calls, green strings, orange numbers. */
+  --md-code-hl-keyword-color: #7c3aed;
+  --md-code-hl-function-color: #478af5;
+  --md-code-hl-string-color: #12a37c;
+  --md-code-hl-number-color: #c25e0d;
+  --md-code-hl-constant-color: #0891b2;
   --md-code-hl-comment-color: #8a8f98;
 }
 
@@ -28,12 +40,76 @@
   --ion-violet: #8e51ff;
   --ion-gradient: linear-gradient(120deg, #22d3ee, #8e51ff);
 
-  /* Code highlighting */
-  --md-code-hl-keyword-color: #d950ea;
+  /* Full Ion palette (vivid on the dark background). */
+  --ion-red: #ef5350;
+  --ion-orange: #f57e2c;
+  --ion-yellow: #f4c038;
+  --ion-green: #1fce9c;
+  --ion-blue: #478af5;
+  --ion-magenta: #d950ea;
+
+  /* Code highlighting, aligned to the palette. */
+  --md-code-hl-keyword-color: #b083ff;
+  --md-code-hl-function-color: #8ab4ff;
   --md-code-hl-string-color: #45dcac;
-  --md-code-hl-number-color: #e6a23c;
-  --md-code-hl-function-color: #6ba5ff;
+  --md-code-hl-number-color: #f0913f;
+  --md-code-hl-constant-color: #22d3ee;
   --md-code-hl-comment-color: #7a7f88;
+}
+
+/* Colour-code the mkdocstrings symbol badges with the brand palette so every
+   layer page carries it: purple classes, cyan methods, accents for the rest.
+   `[data-md-color-scheme]` matches both schemes and, loading after mkdocstrings'
+   own CSS, wins over its defaults; the --ion-* refs resolve per scheme. */
+[data-md-color-scheme] {
+  --doc-symbol-class-fg-color: var(--ion-violet);
+  --doc-symbol-class-bg-color: color-mix(in srgb, var(--ion-violet) 12%, transparent);
+  --doc-symbol-method-fg-color: var(--ion-cyan);
+  --doc-symbol-method-bg-color: color-mix(in srgb, var(--ion-cyan) 12%, transparent);
+  --doc-symbol-function-fg-color: var(--ion-blue);
+  --doc-symbol-function-bg-color: color-mix(in srgb, var(--ion-blue) 12%, transparent);
+  --doc-symbol-attribute-fg-color: var(--ion-green);
+  --doc-symbol-attribute-bg-color: color-mix(in srgb, var(--ion-green) 12%, transparent);
+  --doc-symbol-parameter-fg-color: var(--ion-magenta);
+  --doc-symbol-parameter-bg-color: color-mix(in srgb, var(--ion-magenta) 12%, transparent);
+  --doc-symbol-module-fg-color: var(--ion-orange);
+  --doc-symbol-module-bg-color: color-mix(in srgb, var(--ion-orange) 12%, transparent);
+}
+
+/* Colour True / False / None as numeric literals rather than the default name
+   colour: they are values, so they read best grouped with ints and floats.
+   Pygments tags them Keyword.Constant (.kc). */
+.highlight .kc {
+  color: var(--md-code-hl-number-color);
+}
+
+/* Notebook code cells (mkdocs-jupyter) ship nbconvert's default Pygments theme
+   through JupyterLab --jp-mirror-editor-* variables, ignoring Material's palette.
+   Point those at the same --md-code-hl-* colours the rest of the site uses, and
+   match the code background, so notebooks read as part of Ion. The body[...]
+   prefix outranks the theme's own light and dark .jupyter-wrapper rules, which
+   are injected into each page after this stylesheet. */
+body[data-md-color-scheme] .jupyter-wrapper {
+  --jp-cell-editor-background: var(--md-code-bg-color);
+  --jp-cell-editor-active-background: var(--md-code-bg-color);
+  --jp-mirror-editor-variable-color: var(--md-code-fg-color);
+  --jp-mirror-editor-keyword-color: var(--md-code-hl-keyword-color);
+  --jp-mirror-editor-number-color: var(--md-code-hl-number-color);
+  --jp-mirror-editor-string-color: var(--md-code-hl-string-color);
+  --jp-mirror-editor-string-2-color: var(--md-code-hl-string-color);
+  --jp-mirror-editor-comment-color: var(--md-code-hl-comment-color);
+  --jp-mirror-editor-def-color: var(--md-code-hl-function-color);
+  --jp-mirror-editor-builtin-color: var(--md-code-hl-constant-color);
+  --jp-mirror-editor-meta-color: var(--md-code-hl-keyword-color);
+  --jp-mirror-editor-operator-color: var(--md-code-hl-operator-color);
+  --jp-mirror-editor-punctuation-color: var(--md-code-hl-punctuation-color);
+}
+
+/* True / False / None as numeric literals in notebooks too (nbconvert tags them
+   .kc and colours them as keywords). */
+.jupyter-wrapper .highlight-ipynb .kc {
+  color: var(--md-code-hl-number-color);
+  font-weight: normal;
 }
 
 /* Wider grid than the 61rem default so the 100-char example sources embedded
