@@ -6,34 +6,34 @@ End-to-end training scripts and notebooks live in the [`examples/`](https://gith
 
 | Example | What it covers |
 |---------|----------------|
-| [Ion Tour](https://github.com/auxeno/ion/blob/main/examples/ion_tour.ipynb) | A guided walkthrough of `Module`, `Param`, `Optimizer`, and the training loop. |
+| [Ion Tour](ion-tour.ipynb) | A guided walkthrough of `Module`, `Param`, `Optimizer`, and the training loop. |
 
 ## Vision
 
 | Example | What it covers |
 |---------|----------------|
-| [CNN on MNIST](https://github.com/auxeno/ion/blob/main/examples/cnn_mnist.py) | Convolutional classifier with `Conv` and pooling. |
-| [RNN on MNIST](https://github.com/auxeno/ion/blob/main/examples/rnn_mnist.py) | Sequence classification reading images row by row. |
-| [VAE on MNIST](https://github.com/auxeno/ion/blob/main/examples/vae_mnist.ipynb) | Variational autoencoder with a reparameterized latent. |
+| [CNN on MNIST](cnn-mnist.md) | Convolutional classifier with `Conv` and pooling. |
+| [RNN on MNIST](rnn-mnist.md) | Sequence classification reading a flattened pixel stream. |
+| [VAE on MNIST](vae-mnist.ipynb) | Variational autoencoder with a reparameterized latent. |
 
 ## Sequence modeling
 
 | Example | What it covers |
 |---------|----------------|
-| [GPT on TinyStories](https://github.com/auxeno/ion/blob/main/examples/gpt_tinystories.ipynb) | Transformer language model with attention, RoPE, and mixed-precision training. |
-| [SSM on Pathfinder](https://github.com/auxeno/ion/blob/main/examples/ssm_pathfinder.ipynb) | Deep state space model on a long-range dependency benchmark. |
+| [GPT on TinyStories](gpt-tinystories.ipynb) | Transformer language model with attention, RoPE, and mixed-precision training. |
+| [SSM on Pathfinder](ssm-pathfinder.ipynb) | Deep state space model on a long-range dependency benchmark. |
 
 ## Graphs
 
 | Example | What it covers |
 |---------|----------------|
-| [GNN on Cora](https://github.com/auxeno/ion/blob/main/examples/gnn_cora.py) | Node classification with `GCNConv` and self-loops. |
-| [GNN on BBBP](https://github.com/auxeno/ion/blob/main/examples/gnn_bbbp.ipynb) | Molecular property prediction with graph pooling and batching. |
+| [GNN on Cora](gnn-cora.md) | Node classification with `GCNConv`, `GATConv`, and self-loops. |
+| [GNN on BBBP](gnn-bbbp.ipynb) | Molecular property prediction with graph pooling and batching. |
 
 ## Reinforcement learning
 
 | Example | What it covers |
 |---------|----------------|
-| [DQN on Atari](https://github.com/auxeno/ion/blob/main/examples/dqn_atari.ipynb) | Deep Q-network with a convolutional encoder. |
-| [PPO on Gymnax](https://github.com/auxeno/ion/blob/main/examples/ppo_gymnax.py) | Actor-critic with per-field optimizers. |
-| [PQN on Gymnax](https://github.com/auxeno/ion/blob/main/examples/pqn_gymnax.py) | Parallelized Q-network training. |
+| [DQN on Atari](dqn-atari.ipynb) | Deep Q-network with a convolutional encoder. |
+| [PPO on Gymnax](ppo-gymnax.md) | Clipped actor-critic across vectorized environments. |
+| [PQN on Gymnax](pqn-gymnax.md) | Parallelized Q-network with layer norm, no replay buffer. |

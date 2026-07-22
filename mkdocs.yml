@@ -61,7 +61,24 @@ nav:
       - Ops: gnn/ops.md
   - Guides:
       - Sharp Edges: guides/sharp-edges.md
-  - Examples: examples.md
+  - Examples:
+      - examples/index.md
+      - Getting started:
+          - Ion Tour: examples/ion-tour.ipynb
+      - Vision:
+          - CNN on MNIST: examples/cnn-mnist.md
+          - RNN on MNIST: examples/rnn-mnist.md
+          - VAE on MNIST: examples/vae-mnist.ipynb
+      - Sequence modeling:
+          - GPT on TinyStories: examples/gpt-tinystories.ipynb
+          - SSM on Pathfinder: examples/ssm-pathfinder.ipynb
+      - Graphs:
+          - GNN on Cora: examples/gnn-cora.md
+          - GNN on BBBP: examples/gnn-bbbp.ipynb
+      - Reinforcement learning:
+          - DQN on Atari: examples/dqn-atari.ipynb
+          - PPO on Gymnax: examples/ppo-gymnax.md
+          - PQN on Gymnax: examples/pqn-gymnax.md
 
 exclude_docs: |
   docstrings/
@@ -77,11 +94,19 @@ markdown_extensions:
   - pymdownx.highlight
   - pymdownx.superfences
   - pymdownx.details
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
   - toc:
       permalink: true
 
 plugins:
   - search
+  - mkdocs-jupyter:
+      execute: false
+      include_source: true
+      include_requirejs: true
+      ignore_h1_titles: true
   - mkdocstrings:
       custom_templates: docs/templates
       handlers:

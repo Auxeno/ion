@@ -1,4 +1,4 @@
-# GNN (Graph Neural Network)
+# GNN
 
 Graph neural network layers and operations, imported from `ion.gnn`. Graphs are plain arrays in COO format (node features plus `senders`/`receivers` edge indices), so the native JAX transforms work directly and there is no custom graph object to learn.
 

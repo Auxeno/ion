@@ -1,5 +1,6 @@
 *.ipynb
 !examples/*.ipynb
+!docs/examples/*.ipynb
 *pycache*
 *.pytest_cache*
 .DS_Store
@@ -10,3 +11,4 @@ uv.lock
 dist/
 site/
 .coverage
+.cache/

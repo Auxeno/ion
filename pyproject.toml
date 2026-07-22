@@ -56,6 +56,7 @@ examples = [
     "tqdm",
 ]
 docs = [
+    "mkdocs-jupyter>=0.26.3",
     "mkdocs-material",
     "mkdocstrings[python]",
 ]

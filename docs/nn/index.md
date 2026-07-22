@@ -1,6 +1,6 @@
-# NN (Neural Network)
+# NN
 
-`ion.nn` is the layer library built on the [core](../core/module.md). Every layer is a `Module`: an immutable pytree that works directly with `jax.jit`, `jax.grad`, and `jax.vmap`. Layers are constructed with their dimensions and a keyword-only `key`, then called on a batched input.
+`ion.nn` is the neural network layer library built on the [core](../core/module.md). Every layer is a `Module`: an immutable pytree that works directly with `jax.jit`, `jax.grad`, and `jax.vmap`. Layers are constructed with their dimensions and a keyword-only `key`, then called on a batched input.
 
 ```python
 import jax
