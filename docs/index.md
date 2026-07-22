@@ -11,8 +11,6 @@ hide:
 
 Neural networks for JAX in under 1000 lines of code.
 
-Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html), so `jax.grad`, `jax.jit`, and `jax.vmap` work directly.
-
 [Get started](core/module.md){ .md-button .md-button--primary }
 [GitHub](https://github.com/auxeno/ion){ .md-button }
 
