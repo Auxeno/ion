@@ -119,11 +119,11 @@
   color: var(--md-code-hl-keyword-color);
 }
 
-/* Decorators get their own hue rather than sharing keyword purple. Pygments
-   tags only the leading @name segment (.nd); any dotted tail stays plain. */
+/* Decorators share the call cyan. Pygments tags only the leading @name
+   segment (.nd); any dotted tail stays plain. */
 .highlight .nd,
 .jupyter-wrapper .highlight-ipynb .nd {
-  color: var(--ion-text-magenta);
+  color: var(--ion-text-cyan);
 }
 
 /* Dunder methods (__call__, __init__) are functions wherever they appear;
@@ -142,11 +142,11 @@
   color: var(--md-code-hl-function-color);
 }
 
-/* self and cls stay plain: Pygments tags them Name.Builtin.Pseudo (.bp),
-   which Material otherwise groups with builtins under the constant cyan. */
+/* self and cls carry the call cyan. Pygments tags them Name.Builtin.Pseudo
+   (.bp), which Material otherwise groups with builtins under the constant hue. */
 .highlight .bp,
 .jupyter-wrapper .highlight-ipynb .bp {
-  color: var(--md-code-fg-color);
+  color: var(--ion-text-cyan);
 }
 
 /* Notebook code cells (mkdocs-jupyter) ship nbconvert's default Pygments theme
@@ -169,6 +169,22 @@ body[data-md-color-scheme] .jupyter-wrapper {
   --jp-mirror-editor-meta-color: var(--md-code-hl-keyword-color);
   --jp-mirror-editor-operator-color: var(--md-code-hl-operator-color);
   --jp-mirror-editor-punctuation-color: var(--md-code-hl-punctuation-color);
+}
+
+/* The notebook Pygments theme colours the keyword, string, number and comment
+   families through the --jp-mirror-editor-* vars above but leaves the Name
+   family unstyled, so namespaces, defs, class names and builtins fall back to
+   the default text colour. Material colours those in fenced blocks; mirror its
+   mapping here so notebook code reads identically: cyan namespaces, defs and
+   classes, blue builtins and constants. */
+.jupyter-wrapper .highlight-ipynb .nn,
+.jupyter-wrapper .highlight-ipynb .nf,
+.jupyter-wrapper .highlight-ipynb .nc {
+  color: var(--md-code-hl-function-color);
+}
+.jupyter-wrapper .highlight-ipynb .nb,
+.jupyter-wrapper .highlight-ipynb .no {
+  color: var(--md-code-hl-constant-color);
 }
 
 /* True / False / None as numeric literals in notebooks too (nbconvert tags them
@@ -277,12 +293,13 @@ body[data-md-color-scheme] .jupyter-wrapper {
 /* Landing hero (home page only, where nav and TOC are hidden) */
 .md-typeset .hero {
   text-align: center;
-  padding: 1.2rem 0 1.1rem;
+  margin-top: -0.4rem;
+  padding: 0.77rem 0 1rem;
 }
 .md-typeset .hero-logo {
   width: 5rem;
   height: auto;
-  margin: 0 auto 0.6rem;
+  margin: 0 auto 0.48rem;
 }
 .md-typeset .hero h1 {
   font-size: 2.7rem;
@@ -321,25 +338,38 @@ body[data-md-color-scheme] .jupyter-wrapper {
   text-align: left;
 }
 
-/* Primary button carries the brand, flipping cyan on hover to trace the gradient */
+/* Primary button carries the brand, flipping magenta on hover */
 .md-typeset .md-button--primary {
   background-color: var(--ion-brand-purple);
   border-color: var(--ion-brand-purple);
   color: #fff;
 }
 .md-typeset .md-button--primary:is(:hover, :focus) {
-  background-color: var(--ion-brand-cyan);
-  border-color: var(--ion-brand-cyan);
-  color: #04141a;
+  background-color: var(--ion-magenta);
+  border-color: var(--ion-magenta);
+  color: #fff;
+}
+/* Secondary button picks up magenta on hover to match */
+.md-typeset .md-button:not(.md-button--primary):is(:hover, :focus) {
+  background-color: transparent;
+  color: var(--ion-magenta);
+  border-color: var(--ion-magenta);
 }
 
 /* Feature cards: subtle brand lift on hover */
 .md-typeset .grid.cards > ul > li {
+  position: relative;
   transition: border-color 125ms, box-shadow 125ms;
 }
 .md-typeset .grid.cards > ul > li:hover {
   border-color: var(--ion-brand-purple);
   box-shadow: 0 0 0 1px var(--ion-brand-purple);
+}
+/* Stretch each card's single link over the whole card so any click lands right */
+.md-typeset .grid.cards > ul > li a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
 }
 .md-typeset .grid.cards .md-typeset__scrollwrap svg,
 .md-typeset .grid.cards .twemoji svg {

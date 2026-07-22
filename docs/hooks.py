@@ -7,13 +7,15 @@ from pygments.token import Name, Operator, Punctuation
 
 # Pygments only tags Name.Function at def sites, so call-heavy example code
 # renders almost entirely in the default text colour. Wrap the Python lexer
-# with a one-token lookahead that retags a plain Name directly followed by an
-# opening paren as Name.Function (nn.MLP(...), jax.grad(...)) and any other
-# dotted name as Name.Attribute (optax.chain, model.at); extra.css colours
-# both with the function blue. Arguments, kwargs, and bare variables stay
-# plain. nbconvert's IPython lexer subclasses PythonLexer, so notebook pages
-# inherit the retag. Build-time only; if a Pygments upgrade ever breaks the
-# wrap, everything reverts to plain names.
+# with a one-token lookahead that retags every Name in a dotted path: a Name
+# directly followed by an opening paren becomes Name.Function (nn.MLP(...),
+# jax.grad(...)), and a Name that sits after a dot or directly before one
+# becomes Name.Attribute, so the whole path colours (jax.Array, nn.Linear,
+# optax.chain, model.at); extra.css colours both with the call cyan. Bare
+# variables, arguments, and kwargs stay plain. nbconvert's IPython lexer
+# subclasses PythonLexer, so notebook pages inherit the retag. Build-time
+# only; if a Pygments upgrade ever breaks the wrap, everything reverts to
+# plain names.
 
 
 def on_config(config, **kwargs):
@@ -29,8 +31,10 @@ def on_config(config, **kwargs):
             if pending is not None:
                 if token is Punctuation and value == "(":
                     yield pending[0], Name.Function, pending[1]
+                elif pending[2] or (token is Operator and value == "."):
+                    yield pending[0], Name.Attribute, pending[1]
                 else:
-                    yield pending[0], Name.Attribute if pending[2] else Name, pending[1]
+                    yield pending[0], Name, pending[1]
                 pending = None
             if token is Name:
                 pending = (index, value, after_dot)

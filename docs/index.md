@@ -11,7 +11,7 @@ hide:
 
 Neural networks for JAX in under 1000 lines of code.
 
-[Get started](core/module.md){ .md-button .md-button--primary }
+[Overview](core/module.md){ .md-button .md-button--primary }
 [GitHub](https://github.com/auxeno/ion){ .md-button }
 
 ```bash
@@ -19,21 +19,6 @@ pip install ion-nn
 ```
 
 </div>
-
-## Quick example
-
-```python
-import jax
-import ion.nn as nn
-
-key = jax.random.key(0)
-model = nn.MLP([4, 64, 64, 2], key=key)
-
-x = jax.numpy.ones((32, 4))
-y = model(x)  # (32, 4) -> (32, 2)
-```
-
-## Explore
 
 <div class="grid cards" markdown>
 
