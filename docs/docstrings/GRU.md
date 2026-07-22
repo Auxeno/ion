@@ -1,4 +1,4 @@
-GRU over a full sequence (Cho et al., 2014).
+GRU over a full sequence ([Cho et al., 2014](https://arxiv.org/abs/1406.1078)).
 
 Scans a `GRUCell` across the time axis, returning the output at every step and the final hidden state.
 

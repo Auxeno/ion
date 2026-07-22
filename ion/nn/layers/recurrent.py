@@ -18,7 +18,7 @@ Initial state defaults to zeros if not provided.
 import jax
 import jax.numpy as jnp
 from jax import lax
-from jax.nn.initializers import Initializer
+from jax.nn.initializers import Initializer, glorot_uniform, orthogonal, zeros
 from jaxtyping import Array, Float, PRNGKeyArray
 
 from ..module import Module
@@ -41,9 +41,9 @@ class RNNCell(Module):
         in_dim: int,
         hidden_dim: int,
         bias: bool = True,
-        w_i_init: Initializer = jax.nn.initializers.glorot_uniform(),
-        w_h_init: Initializer = jax.nn.initializers.orthogonal(),
-        b_init: Initializer = jax.nn.initializers.zeros,
+        w_i_init: Initializer = glorot_uniform(),
+        w_h_init: Initializer = orthogonal(),
+        b_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
@@ -84,9 +84,9 @@ class RNN(Module):
         in_dim: int,
         hidden_dim: int,
         bias: bool = True,
-        w_i_init: Initializer = jax.nn.initializers.glorot_uniform(),
-        w_h_init: Initializer = jax.nn.initializers.orthogonal(),
-        b_init: Initializer = jax.nn.initializers.zeros,
+        w_i_init: Initializer = glorot_uniform(),
+        w_h_init: Initializer = orthogonal(),
+        b_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
@@ -134,9 +134,9 @@ class LSTMCell(Module):
         in_dim: int,
         hidden_dim: int,
         bias: bool = True,
-        w_i_init: Initializer = jax.nn.initializers.glorot_uniform(),
-        w_h_init: Initializer = jax.nn.initializers.orthogonal(),
-        b_init: Initializer = jax.nn.initializers.zeros,
+        w_i_init: Initializer = glorot_uniform(),
+        w_h_init: Initializer = orthogonal(),
+        b_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
@@ -197,9 +197,9 @@ class LSTM(Module):
         in_dim: int,
         hidden_dim: int,
         bias: bool = True,
-        w_i_init: Initializer = jax.nn.initializers.glorot_uniform(),
-        w_h_init: Initializer = jax.nn.initializers.orthogonal(),
-        b_init: Initializer = jax.nn.initializers.zeros,
+        w_i_init: Initializer = glorot_uniform(),
+        w_h_init: Initializer = orthogonal(),
+        b_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
@@ -249,9 +249,9 @@ class GRUCell(Module):
         in_dim: int,
         hidden_dim: int,
         bias: bool = True,
-        w_i_init: Initializer = jax.nn.initializers.glorot_uniform(),
-        w_h_init: Initializer = jax.nn.initializers.orthogonal(),
-        b_init: Initializer = jax.nn.initializers.zeros,
+        w_i_init: Initializer = glorot_uniform(),
+        w_h_init: Initializer = orthogonal(),
+        b_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
@@ -307,9 +307,9 @@ class GRU(Module):
         in_dim: int,
         hidden_dim: int,
         bias: bool = True,
-        w_i_init: Initializer = jax.nn.initializers.glorot_uniform(),
-        w_h_init: Initializer = jax.nn.initializers.orthogonal(),
-        b_init: Initializer = jax.nn.initializers.zeros,
+        w_i_init: Initializer = glorot_uniform(),
+        w_h_init: Initializer = orthogonal(),
+        b_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:

@@ -52,13 +52,13 @@ class TestConv:
         y = layer(x)
         assert y.shape == (1, 5, 8)
 
-    def test_1d_he_normal_init(self):
-        """He normal initialization gives var(w) close to 2/fan_in."""
+    def test_1d_glorot_uniform_init(self):
+        """Glorot uniform initialization gives var(w) close to 2/(fan_in + fan_out)."""
         layer = nn.Conv(64, 64, kernel_shape=(3,), key=jax.random.key(42))
         var = jnp.var(layer.w._value)
-        fan_in = 3 * 64
-        expected_var = 2.0 / fan_in
-        npt.assert_allclose(var, expected_var, atol=0.05)
+        fan_in = fan_out = 3 * 64
+        expected_var = 2.0 / (fan_in + fan_out)
+        npt.assert_allclose(var, expected_var, rtol=0.1)
 
     def test_1d_zero_bias_init(self):
         """Bias is initialized to all zeros."""
@@ -138,13 +138,13 @@ class TestConv:
         y = layer(x)
         assert y.shape == (1, 3, 3, 8)
 
-    def test_2d_he_normal_init(self):
-        """He normal initialization gives var(w) close to 2/fan_in."""
+    def test_2d_glorot_uniform_init(self):
+        """Glorot uniform initialization gives var(w) close to 2/(fan_in + fan_out)."""
         layer = nn.Conv(64, 64, kernel_shape=(3, 3), key=jax.random.key(42))
         var = jnp.var(layer.w._value)
-        fan_in = 3 * 3 * 64
-        expected_var = 2.0 / fan_in
-        npt.assert_allclose(var, expected_var, atol=0.05)
+        fan_in = fan_out = 3 * 3 * 64
+        expected_var = 2.0 / (fan_in + fan_out)
+        npt.assert_allclose(var, expected_var, rtol=0.1)
 
     def test_2d_zero_bias_init(self):
         """Bias is initialized to all zeros."""
@@ -254,13 +254,13 @@ class TestConvTranspose:
         y = layer(x)
         assert y.shape == (1, 14, 8)
 
-    def test_1d_he_normal_init(self):
-        """He normal initialization gives var(w) close to 2/fan_in."""
+    def test_1d_glorot_uniform_init(self):
+        """Glorot uniform initialization gives var(w) close to 2/(fan_in + fan_out)."""
         layer = nn.ConvTranspose(64, 64, kernel_shape=(3,), key=jax.random.key(42))
         var = jnp.var(layer.w._value)
-        fan_in = 3 * 64
-        expected_var = 2.0 / fan_in
-        npt.assert_allclose(var, expected_var, atol=0.05)
+        fan_in = fan_out = 3 * 64
+        expected_var = 2.0 / (fan_in + fan_out)
+        npt.assert_allclose(var, expected_var, rtol=0.1)
 
     def test_1d_zero_bias_init(self):
         """Bias is initialized to all zeros."""
@@ -360,13 +360,13 @@ class TestConvTranspose:
         y = layer(x)
         assert y.shape == (1, 10, 10, 8)
 
-    def test_2d_he_normal_init(self):
-        """He normal initialization gives var(w) close to 2/fan_in."""
+    def test_2d_glorot_uniform_init(self):
+        """Glorot uniform initialization gives var(w) close to 2/(fan_in + fan_out)."""
         layer = nn.ConvTranspose(64, 64, kernel_shape=(3, 3), key=jax.random.key(42))
         var = jnp.var(layer.w._value)
-        fan_in = 3 * 3 * 64
-        expected_var = 2.0 / fan_in
-        npt.assert_allclose(var, expected_var, atol=0.05)
+        fan_in = fan_out = 3 * 3 * 64
+        expected_var = 2.0 / (fan_in + fan_out)
+        npt.assert_allclose(var, expected_var, rtol=0.1)
 
     def test_2d_zero_bias_init(self):
         """Bias is initialized to all zeros."""

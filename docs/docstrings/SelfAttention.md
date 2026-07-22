@@ -1,4 +1,4 @@
-Multi-head self-attention (Vaswani et al., 2017).
+Multi-head self-attention ([Vaswani et al., 2017](https://arxiv.org/abs/1706.03762)).
 
 Projects the input to queries, keys, and values, attends within a single sequence, and projects the concatenated heads back to `dim`. Supports grouped-query and multi-query attention, causal masking, and sliding-window attention.
 
@@ -20,7 +20,7 @@ window : int | tuple[int, int] | None, default=None
     Sliding-window attention. An int gives a symmetric window; a `(left, right)`
     tuple sets each side. `None` attends over the full sequence.
 w_init : Initializer
-    Projection initializer. Truncated normal (std 0.02) by default.
+    Projection initializer. Glorot uniform by default.
 b_init : Initializer
     Bias initializer. Zeros by default.
 key : jax.Array

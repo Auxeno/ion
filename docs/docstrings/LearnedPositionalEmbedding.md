@@ -9,7 +9,7 @@ max_len : int
 dim : int
     Feature dimension, matching the input's last dimension.
 w_init : Initializer
-    Weight initializer. Truncated normal (std 0.02) by default.
+    Weight initializer. Fan-in variance scaling (std 1/sqrt(dim)) by default.
 key : jax.Array
     RNG key for parameter initialization. Keyword-only.
 

@@ -3,11 +3,10 @@
 Modules:
     Embedding  Token embedding lookup table.
 
-Truncated normal weight init (std=0.02).
+Fan-in variance scaling weight init (std 1/sqrt(dim)), independent of vocab size.
 """
 
-import jax
-from jax.nn.initializers import Initializer
+from jax.nn.initializers import Initializer, variance_scaling
 from jaxtyping import Array, Float, Int, PRNGKeyArray
 
 from ..module import Module
@@ -27,7 +26,7 @@ class Embedding(Module):
         self,
         num_embeddings: int,
         dim: int,
-        w_init: Initializer = jax.nn.initializers.truncated_normal(0.02),
+        w_init: Initializer = variance_scaling(1.0, "fan_in", "uniform", out_axis=0),
         *,
         key: PRNGKeyArray,
     ) -> None:

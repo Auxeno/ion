@@ -5,13 +5,13 @@ Modules:
     ConvTranspose  N-dimensional transposed convolution.
 
 Channels-last format to match image data conventions: (..., spatial, channels).
-He normal weight init for ReLU activation, zeros for bias.
+Glorot uniform weight init, zeros for bias.
 """
 
 import jax
 import jax.numpy as jnp
 from jax import lax
-from jax.nn.initializers import Initializer
+from jax.nn.initializers import Initializer, glorot_uniform, zeros
 from jaxtyping import Array, Float, PRNGKeyArray
 
 from ..module import Module
@@ -44,8 +44,8 @@ class Conv(Module):
         dilation: int | tuple[int, ...] = 1,
         groups: int = 1,
         bias: bool = True,
-        w_init: Initializer = jax.nn.initializers.he_normal(),
-        b_init: Initializer = jax.nn.initializers.zeros,
+        w_init: Initializer = glorot_uniform(),
+        b_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
@@ -131,8 +131,8 @@ class ConvTranspose(Module):
         dilation: int | tuple[int, ...] = 1,
         groups: int = 1,
         bias: bool = True,
-        w_init: Initializer = jax.nn.initializers.he_normal(),
-        b_init: Initializer = jax.nn.initializers.zeros,
+        w_init: Initializer = glorot_uniform(),
+        b_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:

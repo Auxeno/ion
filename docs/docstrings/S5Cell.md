@@ -1,4 +1,4 @@
-Single-step S5 cell (Smith et al., 2023).
+Single-step S5 cell ([Smith et al., 2023](https://arxiv.org/abs/2208.04933)).
 
 A diagonal state space model with a single state shared across all features (multi-input multi-output), in contrast to `S4D`'s per-feature states. One complex diagonal recurrence mixes every input channel through `B` and reads out through `C`. Use `S5` to scan a whole sequence.
 
@@ -14,7 +14,7 @@ dt_min : float, default=0.001
 dt_max : float, default=0.1
     Upper bound of the initial timestep range.
 w_init : Initializer
-    Initializer for the `B` and `C` projections. Glorot normal by default.
+    Initializer for the `B` and `C` projections. Glorot uniform by default.
 d_init : Initializer
     Initializer for the `D` skip term. Zeros by default.
 key : jax.Array

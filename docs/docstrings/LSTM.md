@@ -1,4 +1,4 @@
-LSTM over a full sequence (Hochreiter & Schmidhuber, 1997).
+LSTM over a full sequence ([Hochreiter & Schmidhuber, 1997](https://doi.org/10.1162/neco.1997.9.8.1735)).
 
 Scans an `LSTMCell` across the time axis, returning the output at every step and the final `(h, c)` state.
 

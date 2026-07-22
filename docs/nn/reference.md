@@ -137,19 +137,23 @@ Scalar values for `stride`, `padding`, `dilation`, etc. are broadcast across all
 
 Every `w_init` / `b_init` argument takes an `Initializer` (`jax.nn.initializers.Initializer`): a callable `(key, shape, dtype) -> Array`. Pass any factory from `jax.nn.initializers`, such as `he_normal()`, `glorot_uniform()`, `truncated_normal(0.02)`, or `zeros`. In the API reference these type and default names are links into the JAX docs, and each layer's default is shown in its signature.
 
-Each layer family uses init schemes suited to its typical activation:
+Each layer defaults to a variance-scaling scheme matched to what follows the weights, using the uniform variant throughout:
 
 | Layer | Weights | Bias |
 |-------|---------|------|
-| Linear, Conv, MLP | He normal | zeros |
-| Attention, Embedding, Positional | Truncated normal (std=0.02) | zeros |
+| Linear, Conv | Glorot uniform | zeros |
+| MLP | He uniform | zeros |
+| Attention, SSM | Glorot uniform | zeros |
+| Embedding, Positional | Fan-in variance scaling (std 1/√dim) | - |
 | Recurrent (input) | Glorot uniform | zeros (LSTM forget gate: ones) |
 | Recurrent (hidden) | Orthogonal | - |
 | Norm | scale=1, bias=0 | - |
 
-**Linear, Conv, and MLP** default to He normal, which assumes ReLU activation. If using a different activation (tanh, GELU, sigmoid, etc.), pass a different `w_init` like `jax.nn.initializers.glorot_uniform()` for tanh/sigmoid or `jax.nn.initializers.lecun_normal()` for SELU. Using He normal with non-ReLU activations can cause vanishing signals.
+**Linear and Conv** default to Glorot uniform (gain 1), which is activation-agnostic and safe when the layer is used as a plain projection. **MLP** uses He uniform (gain sqrt(2)) instead, since it applies ReLU between its layers. For a bespoke activation you can always pass a different `w_init`, such as `jax.nn.initializers.lecun_normal()` for SELU.
 
-**Attention and Embedding** use truncated normal with a small std (0.02), standard practice from GPT-2 and BERT. This is activation-agnostic since attention weights are followed by softmax, not a pointwise activation. Attention weights are stored at their flat 2D shapes (heads are split in the forward pass), so a custom variance-scaling `w_init` computes the true fans.
+**Attention** projections are linear (Q, K, V, and output), so they use Glorot uniform rather than a ReLU-tuned scheme. Weights are stored at their flat 2D shapes (heads are split in the forward pass), so a variance-scaling `w_init` computes the true fans.
+
+**Embedding and Positional** tables use fan-in variance scaling with the vocabulary axis held out (`out_axis=0`), giving std `1/sqrt(dim)`. Each row therefore starts near unit norm regardless of `dim`, and the scale is independent of vocabulary or sequence length, rather than a hardcoded constant.
 
 **Recurrent** layers use Glorot uniform for input-to-hidden weights and orthogonal for hidden-to-hidden weights. Orthogonal init preserves gradient norms across time steps, reducing vanishing/exploding gradients in long sequences. LSTM forget gate bias is initialized to 1 to encourage remembering early in training.
 

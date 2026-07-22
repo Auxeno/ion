@@ -1,4 +1,4 @@
-S4D over a full sequence (Gu et al., 2022).
+S4D over a full sequence ([Gu et al., 2022](https://arxiv.org/abs/2206.11893)).
 
 Runs an `S4DCell` over the time axis with an associative parallel scan. Each input feature is processed by its own diagonal state space model (single-input single-output). Returns the output at every step and the final complex state.
 
@@ -13,7 +13,7 @@ dt_min : float, default=0.001
 dt_max : float, default=0.1
     Upper bound of the initial timestep range.
 w_init : Initializer
-    Initializer for the `C` output projection. Glorot normal by default.
+    Initializer for the `C` output projection. Glorot uniform by default.
 d_init : Initializer
     Initializer for the `D` skip term. Zeros by default.
 key : jax.Array

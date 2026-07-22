@@ -1,4 +1,4 @@
-Graph Isomorphism Network layer (Xu et al., 2019).
+Graph Isomorphism Network layer ([Xu et al., 2019](https://arxiv.org/abs/1810.00826)).
 
 Sum-aggregates neighbor features and applies a caller-supplied MLP to `(1 + eps) * x + aggregated`. Sum aggregation preserves neighbor multiplicity, making GIN as discriminative as the Weisfeiler-Lehman graph isomorphism test.
 

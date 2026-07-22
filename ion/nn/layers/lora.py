@@ -8,7 +8,7 @@ Output scaled by alpha/rank (default alpha=rank for neutral scaling).
 """
 
 import jax
-from jax.nn.initializers import Initializer
+from jax.nn.initializers import Initializer, he_normal, zeros
 from jaxtyping import Array, Float, PRNGKeyArray
 
 from ...tree import freeze
@@ -35,8 +35,8 @@ class LoRALinear(Module):
         linear: Linear,
         rank: int = 8,
         alpha: float | None = None,
-        a_init: Initializer = jax.nn.initializers.he_normal(),
-        b_init: Initializer = jax.nn.initializers.zeros,
+        a_init: Initializer = he_normal(),
+        b_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:

@@ -1,4 +1,4 @@
-Single-step LSTM cell (Hochreiter & Schmidhuber, 1997).
+Single-step LSTM cell ([Hochreiter & Schmidhuber, 1997](https://doi.org/10.1162/neco.1997.9.8.1735)).
 
 Computes one timestep of the input, forget, cell, and output gates, returning the new hidden and cell states `(h, c)`. Use `LSTM` to scan a whole sequence.
 

@@ -1,4 +1,4 @@
-Group normalization (Wu & He, 2018).
+Group normalization ([Wu & He, 2018](https://arxiv.org/abs/1803.08494)).
 
 Splits the channel dimension into `num_groups` groups and normalizes each group over its channels and a configurable number of trailing spatial dimensions, then applies a learnable per-channel scale and bias.
 

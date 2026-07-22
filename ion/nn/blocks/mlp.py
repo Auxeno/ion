@@ -3,14 +3,14 @@
 Modules:
     MLP  Fully connected network with configurable layer dimensions and activation.
 
-He normal weight init, zeros for bias. Assumes ReLU activation.
+He uniform weight init, zeros for bias. Assumes ReLU activation.
 No activation on the final layer by default.
 """
 
 from collections.abc import Callable, Sequence
 
 import jax
-from jax.nn.initializers import Initializer
+from jax.nn.initializers import Initializer, he_uniform, zeros
 from jaxtyping import Array, Float, PRNGKeyArray
 
 from ..layers.linear import Linear
@@ -34,8 +34,8 @@ class MLP(Module):
         activation: Callable[[Array], Array] = jax.nn.relu,
         final_activation: Callable[[Array], Array] | None = None,
         bias: bool = True,
-        w_init: Initializer = jax.nn.initializers.he_normal(),
-        b_init: Initializer = jax.nn.initializers.zeros,
+        w_init: Initializer = he_uniform(),
+        b_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:

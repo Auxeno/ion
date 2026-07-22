@@ -12,7 +12,7 @@ Optional boolean edge mask: True = keep edge, False = ignore.
 
 import jax
 import jax.numpy as jnp
-from jax.nn.initializers import Initializer
+from jax.nn.initializers import Initializer, glorot_uniform, zeros
 from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 
 from ..nn.module import Module
@@ -46,9 +46,9 @@ class GATConv(Module):
         edge_dim: int | None = None,
         negative_slope: float = 0.2,
         bias: bool = True,
-        w_init: Initializer = jax.nn.initializers.glorot_uniform(),
-        att_init: Initializer = jax.nn.initializers.glorot_uniform(),
-        b_init: Initializer = jax.nn.initializers.zeros,
+        w_init: Initializer = glorot_uniform(),
+        att_init: Initializer = glorot_uniform(),
+        b_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
@@ -159,9 +159,9 @@ class GATv2Conv(Module):
         edge_dim: int | None = None,
         negative_slope: float = 0.2,
         bias: bool = True,
-        w_init: Initializer = jax.nn.initializers.glorot_uniform(),
-        att_init: Initializer = jax.nn.initializers.glorot_uniform(),
-        b_init: Initializer = jax.nn.initializers.zeros,
+        w_init: Initializer = glorot_uniform(),
+        att_init: Initializer = glorot_uniform(),
+        b_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:

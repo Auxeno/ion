@@ -1,4 +1,4 @@
-Graph Convolutional Network layer (Kipf & Welling, 2017).
+Graph Convolutional Network layer ([Kipf & Welling, 2017](https://arxiv.org/abs/1609.02907)).
 
 Applies a shared linear transform then aggregates over each node's neighborhood with symmetric degree normalization, `D^{-1/2} A D^{-1/2} X W`.
 
@@ -11,8 +11,7 @@ out_dim : int
 bias : bool, default=True
     Whether to include a learnable bias term.
 w_init : Initializer
-    Weight initializer. He normal by default, matching `Linear`, since GCNConv
-    is typically followed by ReLU.
+    Weight initializer. Glorot uniform by default, matching `Linear`.
 b_init : Initializer
     Bias initializer. Zeros by default.
 key : jax.Array

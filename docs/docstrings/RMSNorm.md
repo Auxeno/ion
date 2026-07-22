@@ -1,4 +1,4 @@
-Root mean square normalization over the last dimension (Zhang & Sennrich, 2019).
+Root mean square normalization over the last dimension ([Zhang & Sennrich, 2019](https://arxiv.org/abs/1910.07467)).
 
 Rescales each input vector by its root mean square without subtracting the mean, then applies a learnable elementwise scale. Cheaper than `LayerNorm` and common in modern transformers.
 

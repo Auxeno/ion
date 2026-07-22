@@ -9,8 +9,8 @@ num_embeddings : int
 dim : int
     Embedding vector dimension.
 w_init : Initializer
-    Weight initializer. Truncated normal (std 0.02) by default, the GPT-2/BERT
-    convention.
+    Weight initializer. Fan-in variance scaling (std 1/sqrt(dim)) by default,
+    independent of vocabulary size.
 key : jax.Array
     RNG key for parameter initialization. Keyword-only.
 

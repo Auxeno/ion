@@ -4,14 +4,14 @@ Modules:
     SelfAttention   Multi-head self-attention.
     CrossAttention  Multi-head cross-attention.
 
-Truncated normal weight init (std=0.02), zeros for bias.
+Glorot uniform weight init, zeros for bias.
 Grouped-query and multi-query attention use fewer key/value heads than query heads.
 Optional boolean mask: True = attend, False = ignore.
 Masks may be (s, t) shared, (b, s, t) per batch, or (b, h, s, t) per head.
 """
 
 import jax
-from jax.nn.initializers import Initializer
+from jax.nn.initializers import Initializer, glorot_uniform, zeros
 from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
 from ..module import Module
@@ -44,8 +44,8 @@ class SelfAttention(Module):
         bias: bool = False,
         causal: bool = False,
         window: int | tuple[int, int] | None = None,
-        w_init: Initializer = jax.nn.initializers.truncated_normal(0.02),
-        b_init: Initializer = jax.nn.initializers.zeros,
+        w_init: Initializer = glorot_uniform(),
+        b_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
@@ -121,8 +121,8 @@ class CrossAttention(Module):
         num_heads: int = 1,
         context_dim: int | None = None,
         bias: bool = False,
-        w_init: Initializer = jax.nn.initializers.truncated_normal(0.02),
-        b_init: Initializer = jax.nn.initializers.zeros,
+        w_init: Initializer = glorot_uniform(),
+        b_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:

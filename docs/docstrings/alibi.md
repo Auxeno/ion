@@ -1,4 +1,4 @@
-ALiBi linear position bias (Press et al., 2022).
+ALiBi linear position bias ([Press et al., 2022](https://arxiv.org/abs/2108.12409)).
 
 Builds a per-head bias that penalizes attention between distant positions by a distance proportional to a fixed, head-specific slope. Add the result to attention logits before the softmax; it holds no parameters and needs no `key`.
 

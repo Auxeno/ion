@@ -1,4 +1,4 @@
-Multi-head cross-attention (Vaswani et al., 2017).
+Multi-head cross-attention ([Vaswani et al., 2017](https://arxiv.org/abs/1706.03762)).
 
 Queries come from one sequence and keys/values from a separate context, so a decoder can attend into an encoder's output. Projects the concatenated heads back to `dim`.
 
@@ -13,7 +13,7 @@ context_dim : int | None, default=None
 bias : bool, default=False
     Whether the output projection includes a bias term.
 w_init : Initializer
-    Projection initializer. Truncated normal (std 0.02) by default.
+    Projection initializer. Glorot uniform by default.
 b_init : Initializer
     Bias initializer. Zeros by default.
 key : jax.Array

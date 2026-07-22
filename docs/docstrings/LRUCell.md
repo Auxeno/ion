@@ -1,4 +1,4 @@
-Single-step Linear Recurrent Unit cell (Orvieto et al., 2023).
+Single-step Linear Recurrent Unit cell ([Orvieto et al., 2023](https://arxiv.org/abs/2303.06349)).
 
 Applies one step of a complex diagonal linear recurrence, `h' = diag(lambda) h + B x`, with output `y = Re(C h) + D x`. Eigenvalues `lambda` are parameterized in the log domain so their magnitudes stay in the stable range during training. Use `LRU` to scan a whole sequence.
 
@@ -16,7 +16,7 @@ r_max : float, default=1.0
 max_phase : float, default=2 * pi
     Upper bound on the initial eigenvalue phases.
 w_init : Initializer
-    Initializer for the `B` and `C` projections. Glorot normal by default.
+    Initializer for the `B` and `C` projections. Glorot uniform by default.
 d_init : Initializer
     Initializer for the `D` skip term. Zeros by default.
 key : jax.Array

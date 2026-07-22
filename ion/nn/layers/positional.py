@@ -8,12 +8,11 @@ Functions:
     sinusoidal  Fixed sin/cos encodings.  (Vaswani et al., 2017)
     alibi       Linear attention bias.    (Press et al., 2022)
 
-Truncated normal weight init (std=0.02) for the learned embedding table.
+Fan-in variance scaling weight init (std 1/sqrt(dim)) for the learned embedding table.
 """
 
-import jax
 import jax.numpy as jnp
-from jax.nn.initializers import Initializer
+from jax.nn.initializers import Initializer, variance_scaling
 from jaxtyping import Array, Float, PRNGKeyArray
 
 from ..module import Module
@@ -33,7 +32,7 @@ class LearnedPositionalEmbedding(Module):
         self,
         max_len: int,
         dim: int,
-        w_init: Initializer = jax.nn.initializers.truncated_normal(0.02),
+        w_init: Initializer = variance_scaling(1.0, "fan_in", "uniform", out_axis=0),
         *,
         key: PRNGKeyArray,
     ) -> None:

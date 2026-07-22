@@ -1,4 +1,4 @@
-Fixed sinusoidal positional encodings (Vaswani et al., 2017).
+Fixed sinusoidal positional encodings ([Vaswani et al., 2017](https://arxiv.org/abs/1706.03762)).
 
 Builds the classic table of interleaved sines and cosines at geometrically spaced frequencies. Add the result to input features; it holds no parameters and needs no `key`.
 

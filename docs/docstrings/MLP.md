@@ -14,7 +14,7 @@ final_activation : Callable | None, default=None
 bias : bool, default=True
     Whether the linear layers include bias terms.
 w_init : Initializer
-    Weight initializer for every linear layer. He normal by default.
+    Weight initializer for every linear layer. He uniform by default.
 b_init : Initializer
     Bias initializer. Zeros by default.
 key : jax.Array

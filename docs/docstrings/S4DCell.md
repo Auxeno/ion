@@ -1,4 +1,4 @@
-Single-step S4D cell (Gu et al., 2022).
+Single-step S4D cell ([Gu et al., 2022](https://arxiv.org/abs/2206.11893)).
 
 A diagonal state space model applied independently per input feature (single-input single-output). Each feature runs its own complex diagonal recurrence with a learnable timestep, discretized from continuous-time parameters. Use `S4D` to scan a whole sequence.
 
@@ -14,7 +14,7 @@ dt_min : float, default=0.001
 dt_max : float, default=0.1
     Upper bound of the initial timestep range.
 w_init : Initializer
-    Initializer for the `C` output projection. Glorot normal by default.
+    Initializer for the `C` output projection. Glorot uniform by default.
 d_init : Initializer
     Initializer for the `D` skip term. Zeros by default.
 key : jax.Array

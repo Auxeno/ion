@@ -12,7 +12,7 @@ Sequence layers use associative scan for O(log T) parallel time complexity.
 All hidden states are complex-valued. S4D and S5 use conjugate pairs
 (state_dim N stores N//2 eigenvalues, readout via 2*Re). LRU stores N
 independent complex eigenvalues directly.
-Glorot normal for projections, zeros for D and skip connections.
+Glorot uniform for projections, zeros for D and skip connections.
 Input layout is (batch, time, features).
 Initial state defaults to zeros if not provided.
 """
@@ -22,7 +22,7 @@ from math import pi
 import jax
 import jax.numpy as jnp
 from jax import lax
-from jax.nn.initializers import Initializer
+from jax.nn.initializers import Initializer, glorot_uniform, zeros
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ..module import Module
@@ -57,8 +57,8 @@ class LRUCell(Module):
         r_min: float = 0.0,
         r_max: float = 1.0,
         max_phase: float = 2 * pi,
-        w_init: Initializer = jax.nn.initializers.glorot_normal(),
-        d_init: Initializer = jax.nn.initializers.zeros,
+        w_init: Initializer = glorot_uniform(),
+        d_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
@@ -118,8 +118,8 @@ class LRU(Module):
         r_min: float = 0.0,
         r_max: float = 1.0,
         max_phase: float = 2 * pi,
-        w_init: Initializer = jax.nn.initializers.glorot_normal(),
-        d_init: Initializer = jax.nn.initializers.zeros,
+        w_init: Initializer = glorot_uniform(),
+        d_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
@@ -169,8 +169,8 @@ class S4DCell(Module):
         state_dim: int,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
-        w_init: Initializer = jax.nn.initializers.glorot_normal(),
-        d_init: Initializer = jax.nn.initializers.zeros,
+        w_init: Initializer = glorot_uniform(),
+        d_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
@@ -239,8 +239,8 @@ class S4D(Module):
         state_dim: int,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
-        w_init: Initializer = jax.nn.initializers.glorot_normal(),
-        d_init: Initializer = jax.nn.initializers.zeros,
+        w_init: Initializer = glorot_uniform(),
+        d_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
@@ -293,8 +293,8 @@ class S5Cell(Module):
         state_dim: int,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
-        w_init: Initializer = jax.nn.initializers.glorot_normal(),
-        d_init: Initializer = jax.nn.initializers.zeros,
+        w_init: Initializer = glorot_uniform(),
+        d_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
@@ -364,8 +364,8 @@ class S5(Module):
         state_dim: int,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
-        w_init: Initializer = jax.nn.initializers.glorot_normal(),
-        d_init: Initializer = jax.nn.initializers.zeros,
+        w_init: Initializer = glorot_uniform(),
+        d_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:

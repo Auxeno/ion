@@ -1,4 +1,4 @@
-Layer normalization over the last dimension (Ba et al., 2016).
+Layer normalization over the last dimension ([Ba et al., 2016](https://arxiv.org/abs/1607.06450)).
 
 Normalizes each input vector to zero mean and unit variance across its features, then applies a learnable elementwise scale and bias.
 

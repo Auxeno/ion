@@ -1,4 +1,4 @@
-Rotary positional embeddings (Su et al., 2021).
+Rotary positional embeddings ([Su et al., 2021](https://arxiv.org/abs/2104.09864)).
 
 Encodes position by rotating pairs of features by an angle proportional to their position, applied to query and key vectors before attention. Relative position falls out of the dot product, and there are no learnable parameters.
 

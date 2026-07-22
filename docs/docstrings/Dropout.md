@@ -1,4 +1,4 @@
-Stochastic dropout (Srivastava et al., 2014).
+Stochastic dropout ([Srivastava et al., 2014](https://jmlr.org/papers/v15/srivastava14a.html)).
 
 Randomly zeros elements with probability `p` and scales the survivors by `1 / (1 - p)` (inverted dropout), so activation magnitudes match between training and inference.
 

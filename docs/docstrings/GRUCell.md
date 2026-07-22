@@ -1,4 +1,4 @@
-Single-step GRU cell (Cho et al., 2014).
+Single-step GRU cell ([Cho et al., 2014](https://arxiv.org/abs/1406.1078)).
 
 Computes one timestep of the reset, update, and candidate gates, returning the new hidden state. Use `GRU` to scan a whole sequence.
 

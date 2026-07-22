@@ -9,7 +9,7 @@ out_dim : int
 bias : bool, default=True
     Whether to include a learnable bias term.
 w_init : Initializer
-    Weight initializer. He normal by default, suited to ReLU networks.
+    Weight initializer. Glorot uniform by default.
 b_init : Initializer
     Bias initializer. Zeros by default.
 key : jax.Array

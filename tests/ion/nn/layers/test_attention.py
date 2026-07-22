@@ -48,13 +48,12 @@ class TestSelfAttention:
         layer = nn.SelfAttention(8, num_heads=2, bias=False, key=jax.random.key(0))
         assert layer.b_out is None
 
-    def test_truncated_normal_init(self):
-        """Truncated normal init gives std close to 0.02 with no values beyond 2 sigma."""
+    def test_glorot_uniform_init(self):
+        """Glorot uniform init gives std close to sqrt(2/(fan_in + fan_out))."""
         layer = nn.SelfAttention(256, num_heads=4, key=jax.random.key(42))
         std = jnp.std(layer.w_q._value)
-        npt.assert_allclose(std, 0.02, atol=0.005)
-        # Truncated normal: no values beyond 2 sigma
-        assert jnp.all(jnp.abs(layer.w_q._value) <= 0.04 + 1e-6)
+        expected_std = (2 / (256 + 256)) ** 0.5
+        npt.assert_allclose(std, expected_std, rtol=0.1)
 
     def test_variance_scaling_init_fans(self):
         """Variance-scaling init sees the true (dim, features) fans despite the head split."""

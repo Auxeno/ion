@@ -3,14 +3,14 @@
 Modules:
     GCNConv  Graph convolutional layer with symmetric degree normalization.
 
-He normal weight init for ReLU activation, zeros for bias.
+Glorot uniform weight init, zeros for bias.
 Self-loops are the caller's responsibility, see `gnn.add_self_loops`.
 """
 
 import jax
 import jax.numpy as jnp
 from jax import lax
-from jax.nn.initializers import Initializer
+from jax.nn.initializers import Initializer, glorot_uniform, zeros
 from jaxtyping import Array, Float, Int, PRNGKeyArray
 
 from ..nn.module import Module
@@ -32,8 +32,8 @@ class GCNConv(Module):
         in_dim: int,
         out_dim: int,
         bias: bool = True,
-        w_init: Initializer = jax.nn.initializers.he_normal(),
-        b_init: Initializer = jax.nn.initializers.zeros,
+        w_init: Initializer = glorot_uniform(),
+        b_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:

@@ -4,13 +4,13 @@ Modules:
     Linear    Fully connected layer.
     Identity  Pass-through, returns input unchanged.
 
-He normal weight init for ReLU activation, zeros for bias.
+Glorot uniform weight init, zeros for bias.
 """
 
 from typing import Any
 
 import jax
-from jax.nn.initializers import Initializer
+from jax.nn.initializers import Initializer, glorot_uniform, zeros
 from jaxtyping import Array, Float, PRNGKeyArray
 
 from ..module import Module
@@ -32,8 +32,8 @@ class Linear(Module):
         in_dim: int,
         out_dim: int,
         bias: bool = True,
-        w_init: Initializer = jax.nn.initializers.he_normal(),
-        b_init: Initializer = jax.nn.initializers.zeros,
+        w_init: Initializer = glorot_uniform(),
+        b_init: Initializer = zeros,
         *,
         key: PRNGKeyArray,
     ) -> None:
