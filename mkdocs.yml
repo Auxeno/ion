@@ -8,6 +8,9 @@ theme:
   name: material
   logo: assets/logo.png
   favicon: assets/favicon.png
+  font:
+    text: Space Grotesk
+    code: JetBrains Mono
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -95,6 +98,11 @@ extra_css:
 
 markdown_extensions:
   - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight
   - pymdownx.superfences
   - pymdownx.details

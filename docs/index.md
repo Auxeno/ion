@@ -1,10 +1,26 @@
+---
+hide:
+  - toc
+---
+
+<div class="hero" markdown>
+
+![Ion logo](assets/logo.png){ .hero-logo }
+
 # Ion
 
-A simple neural network library for JAX. The core is three concepts (`Module`, `Param`, `Optimizer`) in under 1000 lines of code. Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html) that always work directly with `jax.grad`, `jax.jit`, and `jax.vmap`. Ion also ships with standard neural network layers (linear, convolution, attention, normalization, recurrent, and more) built on the core.
+Neural networks for JAX in under 1000 lines of code.
+
+Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html), so `jax.grad`, `jax.jit`, and `jax.vmap` work directly.
+
+[Get started](core/module.md){ .md-button .md-button--primary }
+[GitHub](https://github.com/auxeno/ion){ .md-button }
 
 ```bash
 pip install ion-nn
 ```
+
+</div>
 
 ## Quick example
 
@@ -19,9 +35,40 @@ x = jax.numpy.ones((32, 4))
 y = model(x)  # (32, 4) -> (32, 2)
 ```
 
-## Where to go next
+## Explore
 
-- [Core](core/module.md): how `Module`, `Param`, and `Optimizer` work.
-- [NN](nn/index.md): the layer library and its [reference](nn/reference.md).
-- [GNN](gnn/index.md): graph neural network layers and ops.
-- [Examples](examples/index.md): end-to-end training scripts and notebooks.
+<div class="grid cards" markdown>
+
+-   :material-atom:{ .lg .middle } **Core**
+
+    ---
+
+    How `Module`, `Param`, and `Optimizer` fit together in three concepts.
+
+    [:octicons-arrow-right-24: Core concepts](core/module.md)
+
+-   :material-layers-outline:{ .lg .middle } **NN**
+
+    ---
+
+    The neural network layer library and its full API reference.
+
+    [:octicons-arrow-right-24: Layers](nn/index.md)
+
+-   :material-graph-outline:{ .lg .middle } **GNN**
+
+    ---
+
+    Graph neural network layers and message-passing ops.
+
+    [:octicons-arrow-right-24: Graphs](gnn/index.md)
+
+-   :material-notebook-outline:{ .lg .middle } **Examples**
+
+    ---
+
+    End-to-end training scripts and runnable notebooks.
+
+    [:octicons-arrow-right-24: Examples](examples/index.md)
+
+</div>

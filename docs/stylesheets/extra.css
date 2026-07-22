@@ -5,6 +5,13 @@
   --md-primary-fg-color: #181a20;
   --md-accent-fg-color: #7c3aed;
 
+  /* Ion brand, sampled from the logo's cyan-to-violet gradient. Defined per
+     scheme as a literal (not via nested vars) so the gradient value is always
+     valid, and the cyan stays legible on light backgrounds. */
+  --ion-cyan: #0891b2;
+  --ion-violet: #7c3aed;
+  --ion-gradient: linear-gradient(120deg, #0891b2, #7c3aed);
+
   /* Code highlighting */
   --md-code-hl-keyword-color: #c22ed4;
   --md-code-hl-string-color: #0e9d76;
@@ -17,6 +24,9 @@
 [data-md-color-scheme="slate"] {
   --md-primary-fg-color: #181a20;
   --md-accent-fg-color: #8e51ff;
+  --ion-cyan: #22d3ee;
+  --ion-violet: #8e51ff;
+  --ion-gradient: linear-gradient(120deg, #22d3ee, #8e51ff);
 
   /* Code highlighting */
   --md-code-hl-keyword-color: #d950ea;
@@ -108,4 +118,88 @@
 .jp-OutputArea-output {
   max-height: 30rem;
   overflow: auto;
+}
+
+/* Thin gradient rule under the top header, echoing the logo. The header is
+   already positioned by the theme, so the pseudo-element anchors to it. */
+.md-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--ion-gradient);
+}
+
+/* Landing hero (home page only, where nav and TOC are hidden) */
+.md-typeset .hero {
+  text-align: center;
+  padding: 2.4rem 0 1.6rem;
+}
+.md-typeset .hero-logo {
+  width: 6rem;
+  height: auto;
+  margin: 0 auto 1rem;
+}
+.md-typeset .hero h1 {
+  font-size: 3.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.6rem;
+  background: var(--ion-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+/* Drop the heading permalink (pilcrow) so the wordmark centres cleanly */
+.md-typeset .hero .headerlink {
+  display: none;
+}
+.md-typeset .hero > p {
+  max-width: 34rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+.md-typeset .hero .md-button {
+  margin: 0.4rem 0.2rem;
+}
+/* Secondary button: the theme colours its text with --md-primary-fg-color, which
+   we pin near-black for the header, so it vanishes on the dark theme. Use the
+   default foreground instead so it reads in both schemes. */
+.md-typeset .md-button:not(.md-button--primary) {
+  color: var(--md-default-fg-color);
+  border-color: currentcolor;
+}
+/* Center the install snippet under the buttons at a compact width */
+.md-typeset .hero > .highlight {
+  max-width: 22rem;
+  margin: 1.2rem auto 0;
+  text-align: left;
+}
+
+/* Primary button carries the brand, flipping cyan on hover to trace the gradient */
+.md-typeset .md-button--primary {
+  background-color: var(--ion-violet);
+  border-color: var(--ion-violet);
+  color: #fff;
+}
+.md-typeset .md-button--primary:is(:hover, :focus) {
+  background-color: var(--ion-cyan);
+  border-color: var(--ion-cyan);
+  color: #04141a;
+}
+
+/* Feature cards: subtle brand lift on hover */
+.md-typeset .grid.cards > ul > li {
+  transition: border-color 125ms, box-shadow 125ms;
+}
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: var(--ion-violet);
+  box-shadow: 0 0 0 1px var(--ion-violet);
+}
+.md-typeset .grid.cards .md-typeset__scrollwrap svg,
+.md-typeset .grid.cards .twemoji svg {
+  fill: var(--ion-violet);
 }
