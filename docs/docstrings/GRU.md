@@ -27,7 +27,11 @@ cell : GRUCell
 Example
 -------
 ```python
-gru = nn.GRU(3, 16, key=key)
-outputs, h = gru(x)          # (b, t, 3) -> (b, t, 16), (b, 16)
-outputs, h = gru(x, hx=h0)   # custom initial state
+batch, time, in_dim, hidden_dim = 4, 10, 3, 16
+gru = nn.GRU(in_dim, hidden_dim, key=key)
+x = jnp.ones((batch, time, in_dim))
+outputs, h = gru(x)  # (4, 10, 3) -> (4, 10, 16), (4, 16)
+
+x_batched = jnp.ones((5, batch, time, in_dim))  # extra batch dim
+outputs, h = jax.vmap(gru)(x_batched)  # (5, 4, 10, 3) -> (5, 4, 10, 16), (5, 4, 16)
 ```

@@ -32,6 +32,9 @@ final_activation : Callable | None
 Example
 -------
 ```python
-mlp = nn.MLP([3, 64, 64, 1], key=key)
-y = mlp(x)  # (*, 3) -> (*, 1)
+batch, in_dim, hidden_dim, out_dim = 32, 3, 64, 1
+
+mlp = nn.MLP([in_dim, hidden_dim, hidden_dim, out_dim], key=key)
+x = jnp.ones((batch, in_dim))
+y = mlp(x)  # (32, 3) -> (32, 1)
 ```

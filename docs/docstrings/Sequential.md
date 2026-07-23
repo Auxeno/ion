@@ -16,10 +16,14 @@ layers : tuple[Callable, ...]
 Example
 -------
 ```python
+batch, in_dim, hidden_dim, out_dim = 32, 3, 16, 1
+key_1, key_2, key_dropout = jax.random.split(key, 3)
+
 model = nn.Sequential(
-    nn.Linear(3, 16, key=keys[0]),
+    nn.Linear(in_dim, hidden_dim, key=key_1),
     nn.Dropout(0.1),
-    nn.Linear(16, 1, key=keys[1]),
+    nn.Linear(hidden_dim, out_dim, key=key_2),
 )
-y = model(x, key=key)  # (*, 3) -> (*, 1)
+x = jnp.ones((batch, in_dim))
+y = model(x, key=key_dropout)  # (32, 3) -> (32, 1)
 ```

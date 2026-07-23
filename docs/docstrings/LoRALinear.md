@@ -36,6 +36,11 @@ Pairs with the optimizer's [auto-partitioning](../../core/optimizer.md), which a
 Example
 -------
 ```python
-lora = nn.LoRALinear(nn.Linear(64, 128, key=keys[0]), rank=8, key=keys[1])
-y = lora(x)  # (*, 64) -> (*, 128)
+batch, seq, in_dim, out_dim, rank = 4, 16, 64, 128, 8
+key_linear, key_lora = jax.random.split(key)
+
+linear = nn.Linear(in_dim, out_dim, key=key_linear)
+lora = nn.LoRALinear(linear, rank, key=key_lora)
+x = jnp.ones((batch, seq, in_dim))
+y = lora(x)  # (4, 16, 64) -> (4, 16, 128)
 ```

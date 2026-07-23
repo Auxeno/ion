@@ -9,14 +9,11 @@ p : float
 deterministic : bool, default=False
     If `True`, the layer is a no-op (used for eval). Can be overridden per call.
 
-Info
-----
-Pass a `key` at call time to sample the mask; omit it (or set `deterministic=True`) to pass the input through unchanged. A `key` is required unless the call is deterministic.
-
 Example
 -------
 ```python
 drop = nn.Dropout(0.5)
-y = drop(x, key=key)                  # training: mask sampled from key
-y = drop(x, deterministic=True)       # eval: pass-through, no key needed
+x = jnp.ones((8, 64))
+y = drop(x, key=key)             # (8, 64), mask sampled from key
+y = drop(x, deterministic=True)  # (8, 64), pass-through
 ```

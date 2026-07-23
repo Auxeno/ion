@@ -33,11 +33,14 @@ log_dt : Param
 
 Info
 ----
-The output dimension equals `in_dim`. State is complex with shape `(state_dim // 2,)`; `initial_state` returns it zeroed.
+The output dimension equals `in_dim`.
 
 Example
 -------
 ```python
-cell = nn.S5Cell(3, 8, key=key)
-y, h = cell(x, cell.initial_state)  # (*, 3), (*, 4) -> (*, 3), (*, 4)
+batch, in_dim, state_dim = 4, 3, 8
+cell = nn.S5Cell(in_dim, state_dim, key=key)
+x = jnp.ones((batch, in_dim))
+h0 = jnp.zeros((batch, state_dim // 2), dtype=jnp.complex64)
+y, h = cell(x, h0)  # (4, 3), (4, 4) -> (4, 3), (4, 4)
 ```

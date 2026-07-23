@@ -45,9 +45,16 @@ Structural difference from `GATConv`: two weight matrices (`w_sender`, `w_receiv
 Example
 -------
 ```python
-gat = gnn.GATv2Conv(16, 32, num_heads=4, key=key)
-y = gat(x, senders, receivers)                         # (n, 16) -> (n, 32)
+num_nodes, num_edges = 3, 3
+in_dim, out_dim, edge_dim = 16, 32, 8
+x = jnp.ones((num_nodes, in_dim))
+senders = jnp.array([0, 1, 2])
+receivers = jnp.array([1, 2, 0])
 
-gat = gnn.GATv2Conv(16, 32, num_heads=4, edge_dim=8, key=key)
-y = gat(x, senders, receivers, x_edge=x_edge)          # x_edge: (e, 8)
+gat = gnn.GATv2Conv(in_dim, out_dim, num_heads=4, key=key)
+y = gat(x, senders, receivers)  # (3, 16) -> (3, 32)
+
+x_edge = jnp.ones((num_edges, edge_dim))
+gat_edges = gnn.GATv2Conv(in_dim, out_dim, num_heads=4, edge_dim=edge_dim, key=key)
+y = gat_edges(x, senders, receivers, x_edge=x_edge)  # (3, 16) -> (3, 32)
 ```

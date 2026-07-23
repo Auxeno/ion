@@ -11,6 +11,8 @@ Example
 -------
 ```python
 rope = nn.RoPE()
-q = rope(q)  # (*, s, d) -> (*, s, d)
-k = rope(k)  # (*, s, d) -> (*, s, d)
+q = jnp.ones((4, 8, 16, 32))
+k = jnp.ones((4, 8, 16, 32))
+q = rope(q)  # (4, 8, 16, 32) -> (4, 8, 16, 32)
+k = rope(k)  # (4, 8, 16, 32) -> (4, 8, 16, 32)
 ```

@@ -22,5 +22,6 @@ Example
 -------
 ```python
 pos = nn.LearnedPositionalEmbedding(128, 64, key=key)
-y = pos(x)  # (*, s, 64) -> (*, s, 64), s <= 128
+x = jnp.ones((4, 16, 64))
+y = pos(x)  # (4, 16, 64) -> (4, 16, 64)
 ```

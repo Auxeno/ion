@@ -10,3 +10,8 @@ Returns
 -------
 jax.Array["... d", float]
     Normalized and affine-transformed output, same shape as the input.
+
+Info
+----
+Operates on the last dimension only, so any number of leading batch dimensions
+is supported.

@@ -23,5 +23,6 @@ Example
 -------
 ```python
 pe = nn.sinusoidal(128, 64)  # (128, 64)
-y = x + pe                    # add to (*, 128, 64) features
+x = jnp.ones((4, 128, 64))
+y = x + pe  # (4, 128, 64), broadcast across the batch
 ```

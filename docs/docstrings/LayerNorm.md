@@ -16,13 +16,10 @@ scale : Param
 b : Param
     Elementwise bias of shape `(dim,)`, initialized to zeros.
 
-Info
-----
-Operates on the last dimension only, so any number of leading batch dimensions is supported.
-
 Example
 -------
 ```python
 norm = nn.LayerNorm(64)
-y = norm(x)  # (*, 64) -> (*, 64)
+x = jnp.ones((4, 16, 64))
+y = norm(x)  # (4, 16, 64) -> (4, 16, 64)
 ```

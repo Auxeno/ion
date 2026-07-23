@@ -16,6 +16,11 @@ padding : str | int | tuple[int, ...], default=0
 Example
 -------
 ```python
+batch, height, width, channels = 8, 32, 32, 3
 pool = nn.AvgPool(kernel_shape=(2, 2))
-y = pool(x)  # (b, h, w, c) -> (b, h // 2, w // 2, c)
+x = jnp.ones((batch, height, width, channels))
+y = pool(x)  # (8, 32, 32, 3) -> (8, 16, 16, 3)
+
+x_batched = jnp.ones((5, batch, height, width, channels))  # extra batch dim
+y_batched = jax.vmap(pool)(x_batched)  # (5, 8, 32, 32, 3) -> (5, 8, 16, 16, 3)
 ```

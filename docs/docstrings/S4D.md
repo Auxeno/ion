@@ -27,7 +27,11 @@ cell : S4DCell
 Example
 -------
 ```python
-s4d = nn.S4D(3, 8, key=key)
-outputs, h = s4d(x)          # (b, t, 3) -> (b, t, 3), (b, 3, 4)
-outputs, h = s4d(x, hx=h0)   # custom initial state
+batch, time, in_dim, state_dim = 4, 10, 3, 8
+s4d = nn.S4D(in_dim, state_dim, key=key)
+x = jnp.ones((batch, time, in_dim))
+outputs, h = s4d(x)  # (4, 10, 3) -> (4, 10, 3), (4, 3, 4)
+
+x_batched = jnp.ones((5, batch, time, in_dim))  # extra batch dim
+outputs, h = jax.vmap(s4d)(x_batched)  # (5, 4, 10, 3) -> (5, 4, 10, 3), (5, 4, 3, 4)
 ```

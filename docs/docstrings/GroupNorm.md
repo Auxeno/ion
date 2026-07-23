@@ -23,10 +23,6 @@ scale : Param
 b : Param
     Per-channel bias of shape `(dim,)`, initialized to zeros.
 
-Info
-----
-Channels are last. Takes no `key`: scale and bias are initialized deterministically.
-
 Warning
 -------
 `num_spatial_dims` must match the number of trailing spatial dimensions in the input. A mismatch reduces over the wrong axes and silently produces wrong statistics rather than raising.
@@ -34,9 +30,15 @@ Warning
 Example
 -------
 ```python
-norm = nn.GroupNorm(64, num_groups=8, num_spatial_dims=2)
-y = norm(x)  # (b, h, w, 64) -> (b, h, w, 64)
+batch, height, width, channels = 8, 32, 32, 64
+norm = nn.GroupNorm(channels, num_groups=8, num_spatial_dims=2)
+x = jnp.ones((batch, height, width, channels))
+y = norm(x)  # (8, 32, 32, 64) -> (8, 32, 32, 64)
 
-norm = nn.GroupNorm(64, num_groups=8, num_spatial_dims=0)
-y = norm(x)  # (b, 64) -> (b, 64), per-position over channel groups
+norm = nn.GroupNorm(channels, num_groups=8, num_spatial_dims=0)
+x = jnp.ones((batch, channels))
+y = norm(x)  # (8, 64) -> (8, 64), per-position over channel groups
+
+x_batched = jnp.ones((5, batch, height, width, channels))  # extra batch dim
+y_batched = jax.vmap(nn.GroupNorm(channels, 8, 2))(x_batched)  # (5, 8, 32, 32, 64) -> (5, 8, 32, 32, 64)
 ```

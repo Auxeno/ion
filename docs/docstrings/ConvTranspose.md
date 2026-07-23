@@ -40,23 +40,20 @@ w : Param
 b : Param | None
     Bias vector of shape `(out_channels,)`. `None` when `bias=False`.
 
-Info
-----
-Channels-last format: input shape is `(batch, *spatial, channels)` with exactly one leading batch dimension. Use `jax.vmap` for extra batch dimensions.
-
 Example
 -------
 ```python
-# 1D: 2x spatial upsampling (stride=2, kernel=4, padding=1)
-conv_t1d = nn.ConvTranspose(3, 16, kernel_shape=(4,), stride=2, padding=1, key=key)  
-x = jnp.ones((4, 10, 3))
+batch, length, in_channels, out_channels = 4, 10, 3, 16
+conv_t1d = nn.ConvTranspose(in_channels, out_channels, kernel_shape=(4,), stride=2, padding=1, key=key)
+x = jnp.ones((batch, length, in_channels))
 y = conv_t1d(x)  # (4, 10, 3) -> (4, 20, 16)
 
-# 2D: 2x spatial upsampling with output_padding to resolve shape ambiguity
-conv_t2d = nn.ConvTranspose(3, 16, kernel_shape=(3, 3), stride=2, padding=1, output_padding=1, key=key)  
-x = jnp.ones((8, 16, 16, 3))
+# 2D, with output_padding to resolve the stride shape ambiguity
+batch, height, width = 8, 16, 16
+conv_t2d = nn.ConvTranspose(in_channels, out_channels, kernel_shape=(3, 3), stride=2, padding=1, output_padding=1, key=key)
+x = jnp.ones((batch, height, width, in_channels))
 y = conv_t2d(x)  # (8, 16, 16, 3) -> (8, 32, 32, 16)
 
-x = jnp.ones((5, 8, 16, 16, 3))  # extra batch dim
+x = jnp.ones((5, batch, height, width, in_channels))  # extra batch dim
 y = jax.vmap(conv_t2d)(x)  # (5, 8, 16, 16, 3) -> (5, 8, 32, 32, 16)
 ```

@@ -10,3 +10,8 @@ Returns
 -------
 jax.Array["... d", float]
     Normalized and affine-transformed output, same shape as the input.
+
+Info
+----
+Channels are last. Takes no `key`: scale and bias are initialized
+deterministically.

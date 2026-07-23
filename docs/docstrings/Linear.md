@@ -25,11 +25,12 @@ b : Param | None
 Example
 -------
 ```python
-linear = nn.Linear(3, 16, key=key)
+batch, in_dim, out_dim = 10, 3, 16
+linear = nn.Linear(in_dim, out_dim, key=key)
 
-x = jnp.ones((10, 3))
+x = jnp.ones((batch, in_dim))
 y = linear(x)  # (10, 3) -> (10, 16)
 
-x = jnp.ones((5, 10, 3))
+x = jnp.ones((5, batch, in_dim))  # extra batch dim
 y = linear(x)  # (5, 10, 3) -> (5, 10, 16)
 ```

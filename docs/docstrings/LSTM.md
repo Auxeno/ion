@@ -27,7 +27,11 @@ cell : LSTMCell
 Example
 -------
 ```python
-lstm = nn.LSTM(3, 16, key=key)
-outputs, (h, c) = lstm(x)                # (b, t, 3) -> (b, t, 16), ((b, 16), (b, 16))
-outputs, (h, c) = lstm(x, hx=(h0, c0))   # custom initial state
+batch, time, in_dim, hidden_dim = 4, 10, 3, 16
+lstm = nn.LSTM(in_dim, hidden_dim, key=key)
+x = jnp.ones((batch, time, in_dim))
+outputs, (h, c) = lstm(x)  # (4, 10, 3) -> (4, 10, 16), ((4, 16), (4, 16))
+
+x_batched = jnp.ones((5, batch, time, in_dim))  # extra batch dim
+outputs, (h, c) = jax.vmap(lstm)(x_batched)  # (5, 4, 10, 3) -> (5, 4, 10, 16), ((5, 4, 16), (5, 4, 16))
 ```

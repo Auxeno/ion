@@ -40,14 +40,15 @@ b_out : Param | None
 Example
 -------
 ```python
-attn = nn.SelfAttention(64, num_heads=8, key=key)
-x = jnp.ones((4, 16, 64))
+batch, seq, dim = 4, 16, 64
+attn = nn.SelfAttention(dim, num_heads=8, key=key)
+x = jnp.ones((batch, seq, dim))
 y = attn(x)  # (4, 16, 64) -> (4, 16, 64)
 
-# GCA, causal, with a sliding window of length 5
-attn_gqa = nn.SelfAttention(64, num_heads=8, num_kv_heads=2, causal=True, window=5, key=key)
+# GQA, causal, with a sliding window of length 5
+attn_gqa = nn.SelfAttention(dim, num_heads=8, num_kv_heads=2, causal=True, window=5, key=key)
 y = attn_gqa(x)  # (4, 16, 64) -> (4, 16, 64)
 
-x_batched = jnp.ones((5, 4, 16, 64))  # extra batch dim
+x_batched = jnp.ones((5, batch, seq, dim))  # extra batch dim
 y_batched = jax.vmap(attn)(x_batched)  # (5, 4, 16, 64) -> (5, 4, 16, 64)
 ```

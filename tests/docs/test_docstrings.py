@@ -23,6 +23,10 @@ class TestSupplementaryDocstrings:
         obj = next((getattr(m, root) for m in (ion.nn, ion, ion.gnn) if hasattr(m, root)), None)
         assert obj is not None, f"{name}: not found in ion, ion.nn, or ion.gnn"
         obj = getattr(obj, attr) if attr else obj
+
+        if isinstance(obj, property):
+            return
+
         params = inspect.signature(obj).parameters.values()
         expected = [p for p in params if p.name != "self"]
 

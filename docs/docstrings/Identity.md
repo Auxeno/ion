@@ -5,6 +5,9 @@ Useful as a placeholder for optional layers (e.g. a normalization slot that can 
 Example
 -------
 ```python
-layer = nn.Identity()
-y = layer(x)  # x unchanged
+batch, seq, dim = 4, 16, 64
+
+identity = nn.Identity()
+x = jnp.ones((batch, seq, dim))
+y = identity(x)  # (4, 16, 64) -> (4, 16, 64)
 ```

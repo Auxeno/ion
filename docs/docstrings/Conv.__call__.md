@@ -11,3 +11,8 @@ Returns
 jax.Array["b *spatial c", float]
     Convolved output. Output spatial dimensions depend on stride, padding,
     and dilation.
+
+Info
+----
+Channels-last format: input shape is `(batch, *spatial, channels)` with exactly
+one leading batch dimension. Use `jax.vmap` for extra batch dimensions.

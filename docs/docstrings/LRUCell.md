@@ -35,11 +35,14 @@ D : Param
 
 Info
 ----
-The output dimension equals `in_dim`. State is complex; `initial_state` returns a zero complex vector of shape `(hidden_dim,)`.
+The output dimension equals `in_dim`.
 
 Example
 -------
 ```python
-cell = nn.LRUCell(3, 16, key=key)
-y, h = cell(x, cell.initial_state)  # (*, 3), (*, 16) -> (*, 3), (*, 16)
+batch, in_dim, hidden_dim = 4, 3, 16
+cell = nn.LRUCell(in_dim, hidden_dim, key=key)
+x = jnp.ones((batch, in_dim))
+h0 = jnp.zeros((batch, hidden_dim), dtype=jnp.complex64)
+y, h = cell(x, h0)  # (4, 3), (4, 16) -> (4, 3), (4, 16)
 ```

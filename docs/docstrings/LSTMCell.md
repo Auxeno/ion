@@ -29,13 +29,12 @@ w_h : Param
 b : Param | None
     Gate bias of shape `(4 * hidden_dim,)`. `None` when `bias=False`.
 
-Info
-----
-State is a `(h, c)` tuple. The `initial_state` property returns a zero `(h, c)` pair of the right shapes.
-
 Example
 -------
 ```python
-cell = nn.LSTMCell(3, 16, key=key)
-h, c = cell(x, cell.initial_state)  # (*, 3), ((*, 16), (*, 16)) -> ((*, 16), (*, 16))
+batch, in_dim, hidden_dim = 4, 3, 16
+cell = nn.LSTMCell(in_dim, hidden_dim, key=key)
+x = jnp.ones((batch, in_dim))
+hx = (jnp.zeros((batch, hidden_dim)), jnp.zeros((batch, hidden_dim)))
+h, c = cell(x, hx)  # (4, 3), ((4, 16), (4, 16)) -> ((4, 16), (4, 16))
 ```

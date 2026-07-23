@@ -31,13 +31,12 @@ b_h : Param | None
     Hidden-side gate bias, kept separate so the candidate gate matches the
     reference GRU formulation exactly. `None` when `bias=False`.
 
-Info
-----
-The `initial_state` property returns a zero hidden state of the right shape.
-
 Example
 -------
 ```python
-cell = nn.GRUCell(3, 16, key=key)
-h = cell(x, cell.initial_state)  # (*, 3), (*, 16) -> (*, 16)
+batch, in_dim, hidden_dim = 4, 3, 16
+cell = nn.GRUCell(in_dim, hidden_dim, key=key)
+x = jnp.ones((batch, in_dim))
+h0 = jnp.zeros((batch, hidden_dim))
+h = cell(x, h0)  # (4, 3), (4, 16) -> (4, 16)
 ```

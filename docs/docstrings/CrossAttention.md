@@ -33,8 +33,13 @@ b_out : Param | None
 Example
 -------
 ```python
-attn = nn.CrossAttention(64, num_heads=8, key=key)
-x = jnp.ones((4, 16, 64))
-context = jnp.ones((4, 32, 64))
+batch, query_seq, context_seq, dim = 4, 16, 32, 64
+attn = nn.CrossAttention(dim, num_heads=8, key=key)
+x = jnp.ones((batch, query_seq, dim))
+context = jnp.ones((batch, context_seq, dim))
 y = attn(x, context)  # (4, 16, 64), (4, 32, 64) -> (4, 16, 64)
+
+x_batched = jnp.ones((5, batch, query_seq, dim))  # extra batch dim
+context_batched = jnp.ones((5, batch, context_seq, dim))
+y_batched = jax.vmap(attn)(x_batched, context_batched)  # (5, 4, 16, 64), (5, 4, 32, 64) -> (5, 4, 16, 64)
 ```

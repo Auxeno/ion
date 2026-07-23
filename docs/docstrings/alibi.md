@@ -20,5 +20,6 @@ Example
 -------
 ```python
 bias = nn.alibi(128, 8)  # (8, 128, 128)
-logits = logits + bias   # add to (b, 8, 128, 128) attention logits
+logits = jnp.ones((4, 8, 128, 128))
+logits = logits + bias  # (4, 8, 128, 128), broadcast across the batch
 ```

@@ -23,5 +23,6 @@ Example
 -------
 ```python
 embed = nn.Embedding(1000, 64, key=key)
-y = embed(ids)  # (*,) int -> (*, 64)
+ids = jnp.array([[12, 48, 9], [7, 23, 81]])
+y = embed(ids)  # (2, 3) -> (2, 3, 64)
 ```

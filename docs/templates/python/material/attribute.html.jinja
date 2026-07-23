@@ -1,0 +1,6 @@
+{% extends "_base/attribute.html.jinja" %}
+
+{# Property headings already show the member name and property badge. #}
+{% block signature scoped %}
+  {% if "property" not in attribute.labels %}{{ super() }}{% endif %}
+{% endblock signature %}

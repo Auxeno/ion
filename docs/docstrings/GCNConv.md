@@ -24,17 +24,16 @@ w : Param
 b : Param | None
     Bias vector of shape `(out_dim,)`. `None` when `bias=False`.
 
-Info
-----
-No activation is included; compose with `jax.nn.relu` between layers.
-
-Warning
--------
-Self-loops are not added automatically. Call `gnn.add_self_loops` first, otherwise each node excludes its own features from the aggregation.
-
 Example
 -------
 ```python
-gcn = gnn.GCNConv(16, 32, key=key)
-y = gcn(x, senders, receivers)  # (n, 16) -> (n, 32)
+# Three-node directed cycle, with self-loops
+num_nodes, in_dim, out_dim = 3, 16, 32
+x = jnp.ones((num_nodes, in_dim))
+senders = jnp.array([0, 1, 2])
+receivers = jnp.array([1, 2, 0])
+senders, receivers = gnn.add_self_loops(senders, receivers, num_nodes)
+
+gcn = gnn.GCNConv(in_dim, out_dim, key=key)
+y = gcn(x, senders, receivers)  # (3, 16) -> (3, 32)
 ```
