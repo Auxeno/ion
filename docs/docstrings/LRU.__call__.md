@@ -11,3 +11,7 @@ Returns
 -------
 tuple[jax.Array["b t i", float], jax.Array["b h", complex]]
     Per-timestep outputs (dimension `in_dim`) and the final complex state.
+
+Info
+----
+Input is `(batch, time, features)`. Pass `hx` to override the default zero initial state.

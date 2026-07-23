@@ -33,11 +33,13 @@ B, C : Param
 D : Param
     Real per-feature skip connection.
 
-Notes
------
-The output dimension equals `in_dim`. State is complex; `initial_state` returns a zero complex vector of shape `(hidden_dim,)`. See [Reference](../reference.md#ssm).
+Info
+----
+The output dimension equals `in_dim`. State is complex; `initial_state` returns a zero complex vector of shape `(hidden_dim,)`.
 
-Examples
---------
->>> cell = nn.LRUCell(3, 16, key=key)
->>> y, h = cell(x, cell.initial_state)  # (*, 3), (*, 16) -> (*, 3), (*, 16)
+Example
+-------
+```python
+cell = nn.LRUCell(3, 16, key=key)
+y, h = cell(x, cell.initial_state)  # (*, 3), (*, 16) -> (*, 3), (*, 16)
+```

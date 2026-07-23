@@ -3,10 +3,13 @@ Apply the layers in sequence.
 Parameters
 ----------
 x : jax.Array["... i", float]
-    Input with feature dimension `dims[0]` last. Any number of leading batch
-    dimensions is supported.
+    Input with feature dimension `dims[0]` last.
 
 Returns
 -------
 jax.Array["... o", float]
     Output with feature dimension `dims[-1]`.
+
+Info
+----
+Applies to the last dimension, so any number of leading batch dimensions is supported.

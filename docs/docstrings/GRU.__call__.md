@@ -11,3 +11,7 @@ Returns
 -------
 tuple[jax.Array["b t h", float], jax.Array["b h", float]]
     Per-timestep outputs and the final hidden state.
+
+Info
+----
+Input is `(batch, time, features)` with one leading batch dimension. Pass `hx` to override the default zero initial state.

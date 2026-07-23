@@ -29,7 +29,9 @@ activation : Callable
 final_activation : Callable | None
     Output activation, if any.
 
-Examples
---------
->>> mlp = nn.MLP([3, 64, 64, 1], key=key)
->>> y = mlp(x)  # (*, 3) -> (*, 1)
+Example
+-------
+```python
+mlp = nn.MLP([3, 64, 64, 1], key=key)
+y = mlp(x)  # (*, 3) -> (*, 1)
+```

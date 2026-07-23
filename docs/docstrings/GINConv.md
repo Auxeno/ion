@@ -20,12 +20,15 @@ mlp : Module
 eps : Param | float
     Learnable scalar when `train_eps=True`, otherwise the fixed float.
 
-Notes
------
-Do not add self-loops: a node's own features already enter through the `(1 + eps)` term.
+Warning
+-------
+Do not add self-loops: a node's own features already enter through the `(1 + eps)` term, so adding them double-counts.
 
-Examples
---------
->>> gin = gnn.GINConv(nn.MLP([16, 32, 32], key=key))
->>> y = gin(x, senders, receivers)                     # (n, 16) -> (n, 32)
->>> gin = gnn.GINConv(nn.MLP([16, 32, 32], key=key), train_eps=True)
+Example
+-------
+```python
+gin = gnn.GINConv(nn.MLP([16, 32, 32], key=key))
+y = gin(x, senders, receivers)                     # (n, 16) -> (n, 32)
+
+gin = gnn.GINConv(nn.MLP([16, 32, 32], key=key), train_eps=True)
+```

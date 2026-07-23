@@ -24,12 +24,10 @@ Attributes
 cell : LSTMCell
     The wrapped single-step cell holding the weights.
 
-Notes
------
-Pass `hx` as an `(h, c)` tuple to override the default zero initial state. See [Reference](../reference.md#recurrent-state).
-
-Examples
---------
->>> lstm = nn.LSTM(3, 16, key=key)
->>> outputs, (h, c) = lstm(x)                # (b, t, 3) -> (b, t, 16), ((b, 16), (b, 16))
->>> outputs, (h, c) = lstm(x, hx=(h0, c0))   # custom initial state
+Example
+-------
+```python
+lstm = nn.LSTM(3, 16, key=key)
+outputs, (h, c) = lstm(x)                # (b, t, 3) -> (b, t, 16), ((b, 16), (b, 16))
+outputs, (h, c) = lstm(x, hx=(h0, c0))   # custom initial state
+```

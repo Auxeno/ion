@@ -24,12 +24,10 @@ Attributes
 cell : S4DCell
     The wrapped single-step cell holding the parameters.
 
-Notes
------
-The output dimension equals `in_dim`. Pass `hx` to override the default zero initial state. See [Reference](../reference.md#ssm).
-
-Examples
---------
->>> s4d = nn.S4D(3, 8, key=key)
->>> outputs, h = s4d(x)          # (b, t, 3) -> (b, t, 3), (b, 3, 4)
->>> outputs, h = s4d(x, hx=h0)   # custom initial state
+Example
+-------
+```python
+s4d = nn.S4D(3, 8, key=key)
+outputs, h = s4d(x)          # (b, t, 3) -> (b, t, 3), (b, 3, 4)
+outputs, h = s4d(x, hx=h0)   # custom initial state
+```

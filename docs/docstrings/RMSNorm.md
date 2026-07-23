@@ -14,11 +14,13 @@ Attributes
 scale : Param
     Elementwise scale of shape `(dim,)`, initialized to ones.
 
-Notes
------
-No mean centering and no bias term, the two differences from `LayerNorm`. Operates on the last dimension only, so any number of leading batch dimensions is supported.
+Info
+----
+Operates on the last dimension only, so any number of leading batch dimensions is supported.
 
-Examples
---------
->>> norm = nn.RMSNorm(64)
->>> y = norm(x)  # (*, 64) -> (*, 64)
+Example
+-------
+```python
+norm = nn.RMSNorm(64)
+y = norm(x)  # (*, 64) -> (*, 64)
+```

@@ -19,7 +19,9 @@ Returns
 jax.Array["seq_len dim", float]
     Positional encoding table.
 
-Examples
---------
->>> pe = nn.sinusoidal(128, 64)  # (128, 64)
->>> y = x + pe                    # add to (*, 128, 64) features
+Example
+-------
+```python
+pe = nn.sinusoidal(128, 64)  # (128, 64)
+y = x + pe                    # add to (*, 128, 64) features
+```

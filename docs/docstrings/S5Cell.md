@@ -31,11 +31,13 @@ D : Param
 log_dt : Param
     Log-domain discretization timestep.
 
-Notes
------
-The output dimension equals `in_dim`. State is complex with shape `(state_dim // 2,)`; `initial_state` returns it zeroed. See [Reference](../reference.md#ssm).
+Info
+----
+The output dimension equals `in_dim`. State is complex with shape `(state_dim // 2,)`; `initial_state` returns it zeroed.
 
-Examples
---------
->>> cell = nn.S5Cell(3, 8, key=key)
->>> y, h = cell(x, cell.initial_state)  # (*, 3), (*, 4) -> (*, 3), (*, 4)
+Example
+-------
+```python
+cell = nn.S5Cell(3, 8, key=key)
+y, h = cell(x, cell.initial_state)  # (*, 3), (*, 4) -> (*, 3), (*, 4)
+```

@@ -1,6 +1,6 @@
 # GNN Ops
 
-Segment reductions, graph-level pooling, and graph-building helpers. These back the GNN layers but are also the toolkit for writing custom message-passing layers. See [Reference](reference.md) for the array conventions and `graph_ids`.
+Segment reductions, graph-level pooling, and graph-building helpers. These back the GNN layers but are also the toolkit for writing custom message-passing layers. See [Reference](index.md) for the array conventions and `graph_ids`.
 
 ## segment_softmax
 
@@ -27,7 +27,7 @@ The four `jax.ops` segment reductions are also re-exported from `ion.gnn`, so ev
 
 ## Pooling: mean_pool, sum_pool, max_pool
 
-Graph-level readout for graph classification. Each pools node features `(n, d)` into per-graph vectors `(g, d)` using a `graph_ids` array that maps each node to its graph (see [Batching Multiple Graphs](reference.md#batching-multiple-graphs)).
+Graph-level readout for graph classification. Each pools node features `(n, d)` into per-graph vectors `(g, d)` using a `graph_ids` array that maps each node to its graph (see [Batching Multiple Graphs](index.md#batching-multiple-graphs)).
 
 ```python
 from ion.gnn import mean_pool
@@ -50,4 +50,4 @@ senders, receivers = add_self_loops(senders, receivers, num_nodes)
 
 ## batch_graphs
 
-Packs a list of graphs into a single disconnected graph for batched message passing, returning a `graph_ids` array for per-graph pooling. See [Batching Multiple Graphs](reference.md#batching-multiple-graphs) for the full walkthrough.
+Packs a list of graphs into a single disconnected graph for batched message passing, returning a `graph_ids` array for per-graph pooling. See [Batching Multiple Graphs](index.md#batching-multiple-graphs) for the full walkthrough.

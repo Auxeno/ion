@@ -24,8 +24,10 @@ theme:
         name: Light mode
   features:
     - navigation.indexes
+    - navigation.sections
     - navigation.path
     - navigation.top
+    - toc.integrate
     - content.code.copy
 
 nav:
@@ -37,7 +39,6 @@ nav:
       - Optimizer: core/optimizer.md
   - NN:
       - nn/index.md
-      - Reference: nn/reference.md
       - Layers:
           - Linear: nn/layers/linear.md
           - Convolution: nn/layers/conv.md
@@ -54,32 +55,31 @@ nav:
           - Sequential: nn/layers/sequential.md
   - GNN:
       - gnn/index.md
-      - Reference: gnn/reference.md
       - Layers:
           - GCN: gnn/layers/gcn.md
           - GAT: gnn/layers/gat.md
           - GIN: gnn/layers/gin.md
       - Ops: gnn/ops.md
   - Guides:
-      - Neural Networks: guides/neural-networks.md
-      - Graph Neural Networks: guides/graph-neural-networks.md
       - Freezing: guides/freezing.md
       - Mixed Precision: guides/mixed-precision.md
       - Checkpointing: guides/checkpointing.md
       - Sharp Edges: guides/sharp-edges.md
   - Examples:
       - examples/index.md
-      - Ion Tour: examples/ion-tour.ipynb
-      - CNN on MNIST: examples/cnn-mnist.md
-      - RNN on MNIST: examples/rnn-mnist.md
-      - VAE on MNIST: examples/vae-mnist.ipynb
-      - GPT on TinyStories: examples/gpt-tinystories.ipynb
-      - SSM on Pathfinder: examples/ssm-pathfinder.ipynb
-      - GNN on Cora: examples/gnn-cora.md
-      - GNN on BBBP: examples/gnn-bbbp.ipynb
-      - DQN on Atari: examples/dqn-atari.ipynb
-      - PPO on Gymnax: examples/ppo-gymnax.md
-      - PQN on Gymnax: examples/pqn-gymnax.md
+      - Scripts:
+          - CNN on MNIST: examples/cnn-mnist.md
+          - RNN on MNIST: examples/rnn-mnist.md
+          - GNN on Cora: examples/gnn-cora.md
+          - PPO on Gymnax: examples/ppo-gymnax.md
+          - PQN on Gymnax: examples/pqn-gymnax.md
+      - Notebooks:
+          - Ion Tour: examples/ion-tour.ipynb
+          - VAE on MNIST: examples/vae-mnist.ipynb
+          - GPT on TinyStories: examples/gpt-tinystories.ipynb
+          - SSM on Pathfinder: examples/ssm-pathfinder.ipynb
+          - GNN on BBBP: examples/gnn-bbbp.ipynb
+          - DQN on Atari: examples/dqn-atari.ipynb
 
 exclude_docs: |
   docstrings/

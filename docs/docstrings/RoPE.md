@@ -7,12 +7,10 @@ Parameters
 theta : float, default=10000.0
     Base wavelength controlling the rotation frequencies across feature pairs.
 
-Notes
------
-Apply to queries and keys (not values), after splitting into heads, so the last dimension is the per-head dimension, which must be even. `theta` is stored as static config, not a trainable parameter.
-
-Examples
---------
->>> rope = nn.RoPE()
->>> q = rope(q)  # (*, s, d) -> (*, s, d)
->>> k = rope(k)  # (*, s, d) -> (*, s, d)
+Example
+-------
+```python
+rope = nn.RoPE()
+q = rope(q)  # (*, s, d) -> (*, s, d)
+k = rope(k)  # (*, s, d) -> (*, s, d)
+```

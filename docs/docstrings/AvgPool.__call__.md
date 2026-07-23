@@ -10,3 +10,7 @@ Returns
 -------
 jax.Array["b *spatial c", float]
     Pooled output. Output spatial dimensions depend on stride and padding.
+
+Info
+----
+Channels-last format; use `jax.vmap` for extra leading batch dimensions.

@@ -36,13 +36,22 @@ w : Param
 b : Param | None
     Bias vector of shape `(out_channels,)`. `None` when `bias=False`.
 
-Notes
------
+Info
+----
 Channels-last format: input shape is `(batch, *spatial, channels)` with exactly
 one leading batch dimension. Use `jax.vmap` for extra batch dimensions.
 
-Examples
---------
->>> conv1d = nn.Conv(3, 16, kernel_shape=(5,), key=key)                # 1D
->>> conv2d = nn.Conv(3, 16, kernel_shape=(3, 3), padding=1, key=key)   # 2D
->>> y = conv2d(x)  # (b, h, w, 3) -> (b, h', w', 16)
+Example
+-------
+```python
+conv1d = nn.Conv(3, 16, kernel_shape=(5,), key=key)  # 1D
+x = jnp.ones((4, 10, 3))
+y = conv1d(x)  # (4, 10, 3) -> (4, 6, 16)
+
+conv2d = nn.Conv(3, 16, kernel_shape=(3, 3), padding=1, key=key)  # 2D
+x = jnp.ones((8, 32, 32, 3))
+y = conv2d(x)  # (8, 32, 32, 3) -> (8, 32, 32, 16)
+
+x = jnp.ones((5, 8, 32, 32, 3))  # extra batch dim
+y = jax.vmap(conv2d)(x)  # (5, 8, 32, 32, 3) -> (5, 8, 32, 32, 16)
+```

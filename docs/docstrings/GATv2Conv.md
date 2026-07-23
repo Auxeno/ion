@@ -42,9 +42,12 @@ Notes
 -----
 Structural difference from `GATConv`: two weight matrices (`w_sender`, `w_receiver`) instead of one, and a single attention vector (`att`) instead of two, so attention is computed per-edge rather than decomposed to node-level scores. The `edge_dim` / `x_edge` / `edge_mask` interface is identical to `GATConv`.
 
-Examples
---------
->>> gat = gnn.GATv2Conv(16, 32, num_heads=4, key=key)
->>> y = gat(x, senders, receivers)                         # (n, 16) -> (n, 32)
->>> gat = gnn.GATv2Conv(16, 32, num_heads=4, edge_dim=8, key=key)
->>> y = gat(x, senders, receivers, x_edge=x_edge)          # x_edge: (e, 8)
+Example
+-------
+```python
+gat = gnn.GATv2Conv(16, 32, num_heads=4, key=key)
+y = gat(x, senders, receivers)                         # (n, 16) -> (n, 32)
+
+gat = gnn.GATv2Conv(16, 32, num_heads=4, edge_dim=8, key=key)
+y = gat(x, senders, receivers, x_edge=x_edge)          # x_edge: (e, 8)
+```

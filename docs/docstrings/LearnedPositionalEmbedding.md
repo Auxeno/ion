@@ -18,11 +18,9 @@ Attributes
 w : Param
     Positional table of shape `(max_len, dim)`.
 
-Notes
------
-Only the first `s` rows are used for a length-`s` input, so the same layer serves any length up to `max_len`. Unlike `RoPE` and `sinusoidal`, positions are learned rather than fixed.
-
-Examples
---------
->>> pos = nn.LearnedPositionalEmbedding(128, 64, key=key)
->>> y = pos(x)  # (*, s, 64) -> (*, s, 64), s <= 128
+Example
+-------
+```python
+pos = nn.LearnedPositionalEmbedding(128, 64, key=key)
+y = pos(x)  # (*, s, 64) -> (*, s, 64), s <= 128
+```

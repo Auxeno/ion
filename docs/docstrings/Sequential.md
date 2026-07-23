@@ -13,15 +13,13 @@ Attributes
 layers : tuple[Callable, ...]
     The chained layers, in order.
 
-Notes
------
-Pass a `key` at call time to drive any stochastic layers in the chain; it is split and forwarded only to layers whose signature accepts one.
-
-Examples
---------
->>> model = nn.Sequential(
-...     nn.Linear(3, 16, key=keys[0]),
-...     nn.Dropout(0.1),
-...     nn.Linear(16, 1, key=keys[1]),
-... )
->>> y = model(x, key=key)  # (*, 3) -> (*, 1)
+Example
+-------
+```python
+model = nn.Sequential(
+    nn.Linear(3, 16, key=keys[0]),
+    nn.Dropout(0.1),
+    nn.Linear(16, 1, key=keys[1]),
+)
+y = model(x, key=key)  # (*, 3) -> (*, 1)
+```

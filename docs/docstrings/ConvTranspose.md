@@ -40,12 +40,23 @@ w : Param
 b : Param | None
     Bias vector of shape `(out_channels,)`. `None` when `bias=False`.
 
-Notes
------
+Info
+----
 Channels-last format: input shape is `(batch, *spatial, channels)` with exactly one leading batch dimension. Use `jax.vmap` for extra batch dimensions.
 
-Examples
---------
->>> conv_t = nn.ConvTranspose(3, 16, kernel_shape=(5,), padding=2, key=key)          # 1D
->>> conv_t = nn.ConvTranspose(3, 16, kernel_shape=(3, 3), padding="VALID", key=key)   # 2D
->>> y = conv_t(x)  # (b, h, w, 3) -> (b, h', w', 16)
+Example
+-------
+```python
+# 1D: 2x spatial upsampling (stride=2, kernel=4, padding=1)
+conv_t1d = nn.ConvTranspose(3, 16, kernel_shape=(4,), stride=2, padding=1, key=key)  
+x = jnp.ones((4, 10, 3))
+y = conv_t1d(x)  # (4, 10, 3) -> (4, 20, 16)
+
+# 2D: 2x spatial upsampling with output_padding to resolve shape ambiguity
+conv_t2d = nn.ConvTranspose(3, 16, kernel_shape=(3, 3), stride=2, padding=1, output_padding=1, key=key)  
+x = jnp.ones((8, 16, 16, 3))
+y = conv_t2d(x)  # (8, 16, 16, 3) -> (8, 32, 32, 16)
+
+x = jnp.ones((5, 8, 16, 16, 3))  # extra batch dim
+y = jax.vmap(conv_t2d)(x)  # (5, 8, 16, 16, 3) -> (5, 8, 32, 32, 16)
+```

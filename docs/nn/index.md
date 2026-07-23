@@ -11,7 +11,7 @@ linear = nn.Linear(4, 8, key=key)
 y = linear(jax.numpy.ones((32, 4)))  # (32, 4) -> (32, 8)
 ```
 
-Start with [Reference](reference.md) for the cross-cutting rules (input format, shape labels, batching, initialization, masking) that apply across all layers, then see each family below.
+The layer families are below, followed by the cross-cutting rules (input format, shape labels, batching, initialization, masking) that apply across all of them.
 
 ## Layers
 
@@ -32,3 +32,255 @@ Start with [Reference](reference.md) for the cross-cutting rules (input format, 
 | [Sequential](layers/sequential.md) | `Sequential` |
 
 `MLP` and `Sequential` are composite modules that assemble other layers, but they are constructed and called like any other layer.
+
+## Input Format
+
+All layers use **channels-last** ordering.
+
+| Domain | Format | Example |
+|--------|--------|---------|
+| Vector data | `(batch, features)` | `(32, 256)` |
+| 1D (sequences) | `(batch, length, channels)` | `(32, 128, 64)` |
+| 2D (images) | `(batch, height, width, channels)` | `(32, 32, 32, 3)` |
+| Attention | `(batch, seq, dim)` | `(32, 128, 512)` |
+| Recurrent | `(batch, time, features)` | `(32, 50, 64)` |
+
+Channels-last is the most typical format for image data and is followed by Flax and TensorFlow. PyTorch and Equinox use the channels-first convention.
+
+### Batch Dimensions
+
+All layers expect at least one leading batch dimension. Structural layers (Conv, Pool, RNN, LSTM, GRU) require exactly the right number of dimensions and will error on incorrect rank. Pointwise layers (Linear, LayerNorm, Embedding, etc.) operate on the last dimension and naturally handle any number of leading dims; GroupNorm likewise operates on the trailing spatial and channel dimensions.
+
+```python
+linear = nn.Linear(4, 8, key=key)
+x = jnp.ones((32, 4))
+linear(x)  # (32, 4) -> (32, 8)
+
+conv = nn.Conv(3, 16, kernel_shape=(3, 3), padding=1, key=key)
+x = jnp.ones((32, 28, 28, 3))
+conv(x)  # (32, 28, 28, 3) -> (32, 28, 28, 16)
+```
+
+Use `jax.vmap` for inputs with an multiple batch dimensions:
+
+```python
+x = jnp.ones((4, 32, 28, 28, 3))
+jax.vmap(conv)(x)  # (4, 32, 28, 28, 3) -> (4, 32, 28, 28, 16)
+
+x = jnp.ones((2, 4, 32, 28, 28, 3))
+jax.vmap(jax.vmap(conv))(x)  # (2, 4, 32, 28, 28, 3) -> (2, 4, 32, 28, 28, 16)
+```
+
+This design catches shape errors. Passing the wrong number of dimensions to a Conv or LSTM will raise an error rather than silently reshaping. 
+
+## Shape Annotations
+
+Single-letter dimension labels are used in `jaxtyping` annotations and einsum strings. These follow conventions from the JAX ecosystem.
+
+The same letter can mean different things in different layers. Meaning is determined by context, not globally.
+
+### General
+
+| Label | Meaning | Used in |
+|-------|---------|---------|
+| `d` | model / feature dimension | linear, attention, norm, embedding, positional |
+| `i` | input features | linear, recurrent, lora |
+| `o` | output features | linear, lora |
+| `r` | rank | lora |
+| `v` | vocabulary size | embedding |
+| `b` | batch dimension | everywhere |
+| `...` | arbitrary batch dimensions	 | everywhere |
+
+### Attention
+
+| Label | Meaning | Notes |
+|-------|---------|-------|
+| `d` | model dimension | total embedding size |
+| `h` | number of heads | matches original paper convention |
+| `k` | per-head dimension (`d_k`) | from "Attention Is All You Need" |
+| `s` | query (source) sequence position | |
+| `t` | key/value (target) sequence position | distinct from `s` in cross-attention |
+
+Weights are stored flat 2D (`(d, h*k)`); the forward pass projects with plain matmuls and splits or merges heads by reshape:
+
+```
+Q/K/V projection:   (b, s, d) @ (d, h*k), reshape -> (b, s, h, k)
+Attention logits:   bshk, bthk -> bhst
+Attention output:   bhst, bthk -> bshk
+Output projection:  reshape -> (b, s, h*k), @ (h*k, d) -> (b, s, d)
+```
+
+### Recurrent
+
+| Label | Meaning | Notes |
+|-------|---------|-------|
+| `i` | input features | |
+| `h` | hidden dimension | same letter as attention heads; context resolves it |
+| `g` | gate dimension | `4h` for LSTM, `3h` for GRU, `h` for RNN |
+| `t` | time steps | sequence dimension |
+
+### SSM
+
+SSM layers reuse the recurrent dimension labels (`i`, `h`, `t`). SSM matrix parameters use uppercase names (A, B, C, D) to match the literature and avoid collision with dimension labels. The output dimension is always `in_dim` (not `state_dim`).
+
+| Label | Meaning | Notes |
+|-------|---------|-------|
+| `i` | input features | also the output dimension |
+| `h` | state dimension | complex-valued; see note below |
+| `t` | time steps | sequence dimension |
+
+SSM hidden states are complex-valued. S4D and S5 use conjugate-pair structure: `state_dim=N` internally stores `N//2` complex eigenvalues, and the readout uses `2*Re(...)` to recover the full contribution from each pair. LRU uses `hidden_dim` (not `state_dim`) and stores independent complex eigenvalues without conjugate symmetry.
+
+### Convolution & Spatial
+
+| Label | Meaning | Used in |
+|-------|---------|---------|
+| `c` | channels | conv, pool |
+| `h` | height | pool, conv (2D) |
+| `w` | width | pool, conv (2D) |
+| `l` | length | pool (1D) |
+
+### Positional Encodings
+
+| Label | Meaning | Used in |
+|-------|---------|---------|
+| `s` | sequence position | sinusoidal, learned, RoPE |
+| `d` | feature dimension | sinusoidal, learned, RoPE |
+| `h` | number of heads | alibi |
+
+## Spatial Layers
+
+Convolution and pooling layers are N-dimensional. This keeps the API surface small while supporting 1D, 2D, 3D, and beyond with the same class.
+
+All spatial layers infer the spatial rank from `kernel_shape`, which must be a tuple.
+
+```python
+Conv(3, 16, kernel_shape=(5,), key=key)             # Conv1d
+Conv(3, 16, kernel_shape=(3, 3), key=key)           # Conv2d
+ConvTranspose(16, 3, kernel_shape=(3, 3), key=key)  # ConvTranspose2d
+MaxPool(kernel_shape=(2, 2))                        # MaxPool2d
+AvgPool(kernel_shape=(3,), padding=1)               # AvgPool1d
+```
+
+Scalar values for `stride`, `padding`, `dilation`, etc. are broadcast across all spatial dimensions. Tuples give per-dimension control.
+
+## Weight Initialization
+
+Every `w_init` / `b_init` argument takes an `Initializer` (`jax.nn.initializers.Initializer`): a callable `(key, shape, dtype) -> Array`. Pass any factory from `jax.nn.initializers`, such as `he_normal()`, `glorot_uniform()`, `truncated_normal(0.02)`, or `zeros`. In the API reference these type and default names are links into the JAX docs, and each layer's default is shown in its signature.
+
+Each layer defaults to a variance-scaling scheme matched to what follows the weights, using the uniform variant throughout:
+
+| Layer | Weights | Bias |
+|-------|---------|------|
+| Linear, Conv | Glorot uniform | zeros |
+| MLP | He uniform | zeros |
+| Attention, SSM | Glorot uniform | zeros |
+| Embedding, Positional | Fan-in variance scaling (std 1/√dim) | - |
+| Recurrent (input) | Glorot uniform | zeros (LSTM forget gate: ones) |
+| Recurrent (hidden) | Orthogonal | - |
+| Norm | scale=1, bias=0 | - |
+
+**Linear and Conv** default to Glorot uniform (gain 1), which is activation-agnostic and safe when the layer is used as a plain projection. **MLP** uses He uniform (gain sqrt(2)) instead, since it applies ReLU between its layers. For a bespoke activation you can always pass a different `w_init`, such as `jax.nn.initializers.lecun_normal()` for SELU.
+
+**Attention** projections are linear (Q, K, V, and output), so they use Glorot uniform rather than a ReLU-tuned scheme. Weights are stored at their flat 2D shapes (heads are split in the forward pass), so a variance-scaling `w_init` computes the true fans.
+
+**Embedding and Positional** tables use fan-in variance scaling with the vocabulary axis held out (`out_axis=0`), giving std `1/sqrt(dim)`. Each row therefore starts near unit norm regardless of `dim`, and the scale is independent of vocabulary or sequence length, rather than a hardcoded constant.
+
+**Recurrent** layers use Glorot uniform for input-to-hidden weights and orthogonal for hidden-to-hidden weights. Orthogonal init preserves gradient norms across time steps, reducing vanishing/exploding gradients in long sequences. LSTM forget gate bias is initialized to 1 to encourage remembering early in training.
+
+## Attention Masking
+
+`SelfAttention` and `CrossAttention` accept an optional boolean `mask` where `True` means attend and `False` means ignore. Masked positions are filled with `-inf` before softmax. The mask may be `(s, s)` (shared across batch and heads), `(b, s, s)` (per batch, shared across heads), or `(b, h, s, s)` (per head).
+
+```python
+attn = nn.SelfAttention(64, num_heads=8, key=key)
+
+# Causal (autoregressive) masking via constructor flag
+attn = nn.SelfAttention(64, num_heads=8, causal=True, key=key)
+attn(x)  # lower-triangular mask applied automatically
+
+# Padding mask: each batch element attends only to its valid tokens
+mask = jnp.arange(seq_len)[None, :] < lengths[:, None]  # (b, s)
+attn(x, mask=mask[:, None, :] & mask[:, :, None])  # (b, s, s)
+
+# Sliding window attention: each token attends to its local neighborhood
+window = 32
+ids = jnp.arange(seq_len)
+mask = jnp.abs(ids[:, None] - ids[None, :]) <= window
+attn(x, mask=mask)  # (s, s) broadcasted across batch and heads
+
+# Per-head masks: e.g. different window sizes per head
+windows = jnp.array([2, 4, 8, 16, 32, 64, 128, 256])  # one per head
+mask = jnp.abs(ids[:, None] - ids[None, :]) <= windows[:, None, None]
+mask = jnp.broadcast_to(mask, (batch, 8, seq_len, seq_len))
+attn(x, mask=mask)  # (b, h, s, s)
+```
+
+For `CrossAttention`, the mask shape matches the query-key dimensions:
+
+```python
+cross_attn = nn.CrossAttention(64, num_heads=8, key=key)
+mask = jnp.ones((src_len, tgt_len), dtype=bool)     # (s, t)
+cross_attn(x, context, mask=mask)
+```
+
+## Recurrent State
+
+Sequence layers (`RNN`, `LSTM`, `GRU`, `LRU`, `S4D`, `S5`) default to zero-initialized hidden state. Pass `hx` to provide a custom initial state, for example when processing sequences across multiple chunks.
+
+```python
+rnn = nn.RNN(3, 16, key=key)
+outputs, h = rnn(x)                     # zero-initialized state
+outputs, h = rnn(x, hx=h0)              # custom initial state
+
+lstm = nn.LSTM(3, 16, key=key)
+outputs, (h, c) = lstm(x)               # zero-initialized state
+outputs, (h, c) = lstm(x, hx=(h0, c0))  # custom initial state
+
+gru = nn.GRU(3, 16, key=key)
+outputs, h = gru(x)                     # zero-initialized state
+outputs, h = gru(x, hx=h0)              # custom initial state
+
+s4d = nn.S4D(3, 8, key=key)
+outputs, h = s4d(x)                     # zero-initialized state
+outputs, h = s4d(x, hx=h0)              # custom initial state
+
+s5 = nn.S5(3, 8, key=key)
+outputs, h = s5(x)                      # zero-initialized state
+outputs, h = s5(x, hx=h0)               # custom initial state
+```
+
+Cell layers (`RNNCell`, `LSTMCell`, `GRUCell`, `LRUCell`, `S4DCell`, `S5Cell`) expose an `initial_state` property for convenience:
+
+```python
+cell = nn.LSTMCell(3, 16, key=key)
+hx = cell.initial_state  # (zeros(16), zeros(16))
+```
+
+## GroupNorm Spatial Dimensions
+
+`GroupNorm` requires `num_spatial_dims`, the number of trailing spatial dimensions included in the group statistics. For spatial data like images this should match the data's spatial rank (the standard GroupNorm of Wu & He, 2018); `num_spatial_dims=0` normalizes each position over its channel groups only.
+
+```python
+# Channels only (e.g. after a linear layer)
+norm = nn.GroupNorm(64, num_groups=8, num_spatial_dims=0)
+norm(x)  # (b, 64) -> (b, 64)
+
+# With 2D spatial dims (e.g. after a conv layer)
+norm = nn.GroupNorm(64, num_groups=8, num_spatial_dims=2)
+norm(x)  # (b, h, w, 64) -> (b, h, w, 64)
+```
+
+## Stateless Design
+
+All layers are stateless and frozen after `__init__`. Dropout takes a `key` argument at call time for stochastic masking.
+
+### Why no BatchNorm?
+
+BatchNorm's mutable running statistics are fundamentally at odds with Ion's functional, immutable design. Every API pattern we explored was a footgun: forgetting to call `.update()` silently leaves running stats at their initial values, producing a model that trains fine but degrades at eval time. Rather than ship a layer that's inherently error-prone, we made a deliberate choice to omit it.
+
+If you need batch normalization, you have good options:
+
+- **Use LayerNorm or GroupNorm.** Most modern architectures have moved away from BatchNorm. GroupNorm with `num_groups=1` is equivalent to LayerNorm; with `num_groups=dim` it gives instance normalization.
+- **Build your own.** The stateless forward pass is simple; the challenge is managing running statistics in your training loop.
+- **Use Flax NNX.** Its mutable model design makes inplace updates to batch statistics easy.

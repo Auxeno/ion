@@ -31,11 +31,13 @@ b_h : Param | None
     Hidden-side gate bias, kept separate so the candidate gate matches the
     reference GRU formulation exactly. `None` when `bias=False`.
 
-Notes
------
+Info
+----
 The `initial_state` property returns a zero hidden state of the right shape.
 
-Examples
---------
->>> cell = nn.GRUCell(3, 16, key=key)
->>> h = cell(x, cell.initial_state)  # (*, 3), (*, 16) -> (*, 16)
+Example
+-------
+```python
+cell = nn.GRUCell(3, 16, key=key)
+h = cell(x, cell.initial_state)  # (*, 3), (*, 16) -> (*, 16)
+```

@@ -19,7 +19,9 @@ Attributes
 w : Param
     Embedding table of shape `(num_embeddings, dim)`.
 
-Examples
---------
->>> embed = nn.Embedding(1000, 64, key=key)
->>> y = embed(ids)  # (*,) int -> (*, 64)
+Example
+-------
+```python
+embed = nn.Embedding(1000, 64, key=key)
+y = embed(ids)  # (*,) int -> (*, 64)
+```

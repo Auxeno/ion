@@ -44,7 +44,7 @@ pip install ion-nn
 
     Training, freezing, mixed precision, and checkpointing walkthroughs.
 
-    [:octicons-arrow-right-24: Guides](guides/neural-networks.md)
+    [:octicons-arrow-right-24: Guides](guides/freezing.md)
 
 -   :material-notebook-outline:{ .lg .middle } **Examples**
 

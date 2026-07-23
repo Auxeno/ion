@@ -16,11 +16,9 @@ Returns
 jax.Array["num_heads seq_len seq_len", float]
     Additive attention bias, one matrix per head.
 
-Notes
------
-A parameter-free alternative to positional embeddings that extrapolates to longer sequences than seen in training.
-
-Examples
---------
->>> bias = nn.alibi(128, 8)  # (8, 128, 128)
->>> logits = logits + bias   # add to (b, 8, 128, 128) attention logits
+Example
+-------
+```python
+bias = nn.alibi(128, 8)  # (8, 128, 128)
+logits = logits + bias   # add to (b, 8, 128, 128) attention logits
+```

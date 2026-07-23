@@ -40,13 +40,16 @@ b : Param | None
 w_edge, att_edge : Param | None
     Edge projection and attention parameters. `None` unless `edge_dim` is set.
 
-Notes
------
+Info
+----
 `edge_dim` and `x_edge` must be used together; setting one without the other raises an error. `x_edge` and `edge_mask` are keyword-only. Pass a boolean `edge_mask` of shape `(e,)` to disable individual edges: masked edges get `-inf` attention logits (zero weight) and their edge features are zeroed. This is useful for padded batches or dropping edges at inference without rebuilding the edge index.
 
-Examples
---------
->>> gat = gnn.GATConv(16, 32, num_heads=4, key=key)
->>> y = gat(x, senders, receivers)                         # (n, 16) -> (n, 32)
->>> gat = gnn.GATConv(16, 32, num_heads=4, edge_dim=8, key=key)
->>> y = gat(x, senders, receivers, x_edge=x_edge)          # x_edge: (e, 8)
+Example
+-------
+```python
+gat = gnn.GATConv(16, 32, num_heads=4, key=key)
+y = gat(x, senders, receivers)                         # (n, 16) -> (n, 32)
+
+gat = gnn.GATConv(16, 32, num_heads=4, edge_dim=8, key=key)
+y = gat(x, senders, receivers, x_edge=x_edge)          # x_edge: (e, 8)
+```

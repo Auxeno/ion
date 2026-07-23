@@ -30,11 +30,11 @@ w_out : Param
 b_out : Param | None
     Output bias of shape `(dim,)`. `None` when `bias=False`.
 
-Notes
------
-The call-time `mask` matches the query-key dimensions; see [Reference](../reference.md#attention-masking) for shapes.
-
-Examples
---------
->>> attn = nn.CrossAttention(64, num_heads=8, key=key)
->>> y = attn(x, context)  # (b, s, 64), (b, t, 64) -> (b, s, 64)
+Example
+-------
+```python
+attn = nn.CrossAttention(64, num_heads=8, key=key)
+x = jnp.ones((4, 16, 64))
+context = jnp.ones((4, 32, 64))
+y = attn(x, context)  # (4, 16, 64), (4, 32, 64) -> (4, 16, 64)
+```

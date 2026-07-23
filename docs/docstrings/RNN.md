@@ -24,12 +24,10 @@ Attributes
 cell : RNNCell
     The wrapped single-step cell holding the weights.
 
-Notes
------
-Pass `hx` to override the default zero initial state, for example when continuing a sequence across chunks. See [Reference](../reference.md#recurrent-state).
-
-Examples
---------
->>> rnn = nn.RNN(3, 16, key=key)
->>> outputs, h = rnn(x)          # (b, t, 3) -> (b, t, 16), (b, 16)
->>> outputs, h = rnn(x, hx=h0)   # custom initial state
+Example
+-------
+```python
+rnn = nn.RNN(3, 16, key=key)
+outputs, h = rnn(x)  # (b, t, 3) -> (b, t, 16), (b, 16)
+outputs, h = rnn(x, hx=h0)  # custom initial state
+```

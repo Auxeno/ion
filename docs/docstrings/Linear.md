@@ -22,7 +22,14 @@ w : Param
 b : Param | None
     Bias vector of shape `(out_dim,)`. `None` when `bias=False`.
 
-Examples
---------
->>> linear = nn.Linear(3, 16, key=key)
->>> y = linear(x)  # (*, 3) -> (*, 16)
+Example
+-------
+```python
+linear = nn.Linear(3, 16, key=key)
+
+x = jnp.ones((10, 3))
+y = linear(x)  # (10, 3) -> (10, 16)
+
+x = jnp.ones((5, 10, 3))
+y = linear(x)  # (5, 10, 3) -> (5, 10, 16)
+```

@@ -33,7 +33,9 @@ Notes
 -----
 Pairs with the optimizer's [auto-partitioning](../../core/optimizer.md), which allocates no state for the frozen base and updates only `A` and `B`.
 
-Examples
---------
->>> lora = nn.LoRALinear(nn.Linear(64, 128, key=keys[0]), rank=8, key=keys[1])
->>> y = lora(x)  # (*, 64) -> (*, 128)
+Example
+-------
+```python
+lora = nn.LoRALinear(nn.Linear(64, 128, key=keys[0]), rank=8, key=keys[1])
+y = lora(x)  # (*, 64) -> (*, 128)
+```

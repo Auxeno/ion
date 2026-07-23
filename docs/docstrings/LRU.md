@@ -26,12 +26,10 @@ Attributes
 cell : LRUCell
     The wrapped single-step cell holding the parameters.
 
-Notes
------
-The output dimension equals `in_dim`. Pass `hx` to override the default zero initial state. See [Reference](../reference.md#ssm).
-
-Examples
---------
->>> lru = nn.LRU(3, 16, key=key)
->>> outputs, h = lru(x)          # (b, t, 3) -> (b, t, 3), (b, 16)
->>> outputs, h = lru(x, hx=h0)   # custom initial state
+Example
+-------
+```python
+lru = nn.LRU(3, 16, key=key)
+outputs, h = lru(x)          # (b, t, 3) -> (b, t, 3), (b, 16)
+outputs, h = lru(x, hx=h0)   # custom initial state
+```

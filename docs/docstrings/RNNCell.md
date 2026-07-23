@@ -29,11 +29,13 @@ w_h : Param
 b : Param | None
     Bias of shape `(hidden_dim,)`. `None` when `bias=False`.
 
-Notes
------
+Info
+----
 The `initial_state` property returns a zero hidden state of the right shape.
 
-Examples
---------
->>> cell = nn.RNNCell(3, 16, key=key)
->>> h = cell(x, cell.initial_state)  # (*, 3), (*, 16) -> (*, 16)
+Example
+-------
+```python
+cell = nn.RNNCell(3, 16, key=key)
+h = cell(x, cell.initial_state)  # (*, 3), (*, 16) -> (*, 16)
+```

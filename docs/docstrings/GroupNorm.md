@@ -23,13 +23,20 @@ scale : Param
 b : Param
     Per-channel bias of shape `(dim,)`, initialized to zeros.
 
-Notes
------
+Info
+----
 Channels are last. Takes no `key`: scale and bias are initialized deterministically.
 
-Examples
---------
->>> norm = nn.GroupNorm(64, num_groups=8, num_spatial_dims=2)
->>> y = norm(x)  # (b, h, w, 64) -> (b, h, w, 64)
->>> norm = nn.GroupNorm(64, num_groups=8, num_spatial_dims=0)
->>> y = norm(x)  # (b, 64) -> (b, 64), per-position over channel groups
+Warning
+-------
+`num_spatial_dims` must match the number of trailing spatial dimensions in the input. A mismatch reduces over the wrong axes and silently produces wrong statistics rather than raising.
+
+Example
+-------
+```python
+norm = nn.GroupNorm(64, num_groups=8, num_spatial_dims=2)
+y = norm(x)  # (b, h, w, 64) -> (b, h, w, 64)
+
+norm = nn.GroupNorm(64, num_groups=8, num_spatial_dims=0)
+y = norm(x)  # (b, 64) -> (b, 64), per-position over channel groups
+```

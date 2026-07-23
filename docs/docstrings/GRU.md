@@ -24,12 +24,10 @@ Attributes
 cell : GRUCell
     The wrapped single-step cell holding the weights.
 
-Notes
------
-Pass `hx` to override the default zero initial state. See [Reference](../reference.md#recurrent-state).
-
-Examples
---------
->>> gru = nn.GRU(3, 16, key=key)
->>> outputs, h = gru(x)          # (b, t, 3) -> (b, t, 16), (b, 16)
->>> outputs, h = gru(x, hx=h0)   # custom initial state
+Example
+-------
+```python
+gru = nn.GRU(3, 16, key=key)
+outputs, h = gru(x)          # (b, t, 3) -> (b, t, 16), (b, 16)
+outputs, h = gru(x, hx=h0)   # custom initial state
+```

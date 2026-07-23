@@ -37,13 +37,17 @@ w_out : Param
 b_out : Param | None
     Output bias of shape `(dim,)`. `None` when `bias=False`.
 
-Notes
------
-`head_dim` is `dim // num_heads`. Weights are stored flat 2D and reshaped into heads in the forward pass, so a custom variance-scaling `w_init` sees the true fan sizes. `causal` and `window` compose with an explicit call-time `mask`; see [Reference](../reference.md#attention-masking) for mask shapes.
+Example
+-------
+```python
+attn = nn.SelfAttention(64, num_heads=8, key=key)
+x = jnp.ones((4, 16, 64))
+y = attn(x)  # (4, 16, 64) -> (4, 16, 64)
 
-Examples
---------
->>> attn = nn.SelfAttention(64, num_heads=8, key=key)
->>> y = attn(x)                                  # (b, s, 64) -> (b, s, 64)
->>> attn = nn.SelfAttention(64, num_heads=8, num_kv_heads=2, causal=True, key=key)
->>> y = attn(x)                                  # grouped-query, causal
+# GCA, causal, with a sliding window of length 5
+attn_gqa = nn.SelfAttention(64, num_heads=8, num_kv_heads=2, causal=True, window=5, key=key)
+y = attn_gqa(x)  # (4, 16, 64) -> (4, 16, 64)
+
+x_batched = jnp.ones((5, 4, 16, 64))  # extra batch dim
+y_batched = jax.vmap(attn)(x_batched)  # (5, 4, 16, 64) -> (5, 4, 16, 64)
+```

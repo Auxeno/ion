@@ -80,7 +80,7 @@ attn = nn.SelfAttention(64, num_heads=8, key=jax.random.key(0))
 y = attn(jax.numpy.ones((32, 16, 64)))
 ```
 
-The [NN reference](nn/reference.md) covers input formats and conventions shared across layers.
+The [NN reference](nn/index.md) covers input formats and conventions shared across layers.
 
 ## Graph neural network layers
 
@@ -102,7 +102,7 @@ gcn = gnn.GCNConv(16, 32, key=jax.random.key(0))
 h = gcn(x, senders, receivers)
 ```
 
-The [GNN reference](gnn/reference.md) covers the graph array format and conventions shared across graph layers.
+The [GNN reference](gnn/index.md) covers the graph array format and conventions shared across graph layers.
 
 ## Native transforms
 
@@ -201,5 +201,5 @@ Casting is how Ion does [mixed precision](guides/mixed-precision.md); see [Freez
 
 - [Core](core/module.md) for how Module, Param, and Optimizer fit together.
 - [NN](nn/index.md) and [GNN](gnn/index.md) for the layers and their cross-cutting rules.
-- [Guides](guides/neural-networks.md) for training, freezing, mixed precision, and checkpointing.
+- [Guides](guides/freezing.md) for training, freezing, mixed precision, and checkpointing.
 - [Examples](examples/index.md) for end-to-end projects on real datasets.

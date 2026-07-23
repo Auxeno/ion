@@ -16,11 +16,13 @@ scale : Param
 b : Param
     Elementwise bias of shape `(dim,)`, initialized to zeros.
 
-Notes
------
-Operates on the last dimension only, so any number of leading batch dimensions is supported. Takes no `key`: the scale and bias are initialized deterministically.
+Info
+----
+Operates on the last dimension only, so any number of leading batch dimensions is supported.
 
-Examples
---------
->>> norm = nn.LayerNorm(64)
->>> y = norm(x)  # (*, 64) -> (*, 64)
+Example
+-------
+```python
+norm = nn.LayerNorm(64)
+y = norm(x)  # (*, 64) -> (*, 64)
+```
