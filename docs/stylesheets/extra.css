@@ -230,6 +230,35 @@ body[data-md-color-scheme] .jupyter-wrapper {
   }
 }
 
+/* Hairline between each sidebar and the content column so the left nav and
+   right table of contents read as separate panes. The sticky sidebar collapses
+   to its wrapper, so it gets a viewport-height floor to anchor to; a
+   pseudo-element then insets from that box's top and bottom by an equal gap,
+   giving both sides a matching rule with small, symmetric top and bottom gaps.
+   Only present when the sidebars are (>=60em); reuses the iframe border's
+   lightest rule colour. */
+@media screen and (min-width: 60em) {
+  .md-sidebar--primary,
+  .md-sidebar--secondary {
+    min-height: calc(100vh - 8rem);
+  }
+  .md-sidebar--primary::after,
+  .md-sidebar--secondary::after {
+    content: "";
+    position: absolute;
+    top: 0.8rem;
+    bottom: 0.8rem;
+    width: 0.05rem;
+    background: var(--md-default-fg-color--lightest);
+  }
+  .md-sidebar--primary::after {
+    right: 0;
+  }
+  .md-sidebar--secondary::after {
+    left: 0;
+  }
+}
+
 /* Keep the repository link in the top header at every width. Material hides the
    header source below 60em and relocates it into the nav drawer; there is room
    for it in the header bar even when narrow, so pin it there and never show the

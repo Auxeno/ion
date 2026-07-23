@@ -9,9 +9,9 @@ hide:
 
 # Ion
 
-Neural networks for JAX in under 1000 lines of code.
+A simple library for neural and graph networks in JAX.
 
-[Overview](core/module.md){ .md-button .md-button--primary }
+[Overview](overview.md){ .md-button .md-button--primary }
 [GitHub](https://github.com/auxeno/ion){ .md-button }
 
 ```bash
@@ -21,14 +21,6 @@ pip install ion-nn
 </div>
 
 <div class="grid cards" markdown>
-
--   :material-atom:{ .lg .middle } **Core**
-
-    ---
-
-    How `Module`, `Param`, and `Optimizer` fit together in three concepts.
-
-    [:octicons-arrow-right-24: Core concepts](core/module.md)
 
 -   :material-layers-outline:{ .lg .middle } **NN**
 
@@ -45,6 +37,14 @@ pip install ion-nn
     Graph neural network layers and message-passing ops.
 
     [:octicons-arrow-right-24: Graphs](gnn/index.md)
+
+-   :material-book-open-variant:{ .lg .middle } **Guides**
+
+    ---
+
+    Training, freezing, mixed precision, and checkpointing walkthroughs.
+
+    [:octicons-arrow-right-24: Guides](guides/neural-networks.md)
 
 -   :material-notebook-outline:{ .lg .middle } **Examples**
 

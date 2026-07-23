@@ -2,6 +2,10 @@
 
 Known gotchas when using Ion. Some are JAX limitations, others follow from Ion's design.
 
+## What Ion leaves out
+
+Some things are left out deliberately. There is no BatchNorm (mutable running statistics conflict with immutable models), no custom transforms, and no training loop abstractions. Ion defines and trains models; JAX does everything else.
+
 ## Python scalars are compile-time constants
 
 Plain Python scalars (ints, floats, strings) stored as module fields go into the treedef as static auxiliary data. JAX cannot trace them: they are invisible to `jax.grad` and fixed at `jax.jit` compile time. If a value needs to change at runtime (a temperature, a step counter), store it as a `jnp.array` or `Param`.

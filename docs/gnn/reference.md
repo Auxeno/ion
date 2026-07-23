@@ -1,4 +1,4 @@
-# Reference
+# GNN Reference
 
 Cross-cutting rules for `ion.gnn`: how graphs are represented, self-loops, shape labels, and batching. Read this before the [layer pages](layers/gcn.md), since every layer expects the array format described here.
 

@@ -1,4 +1,4 @@
-# Reference
+# NN Reference
 
 Cross-cutting rules and design decisions that apply across Ion's layers: input format, shape labels, batching, initialization, masking, and state.
 
