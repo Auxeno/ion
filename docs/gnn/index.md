@@ -1,121 +1,278 @@
 # GNN
 
-Graph neural network layers and operations, imported from `ion.gnn`. Graphs are plain arrays in COO format (node features plus `senders`/`receivers` edge indices), so the native JAX transforms work directly and there is no custom graph object to learn.
+An ordinary neural network layer transforms each item from its features. A
+graph neural network layer also uses connections between items. Ion represents
+both parts as plain JAX arrays:
 
-```python
-from ion import gnn
+- `x` stores one feature vector per node.
+- `senders` and `receivers` store the directed edges.
 
-gcn = gnn.GCNConv(in_dim=16, out_dim=32, key=key)
-y = gcn(x, senders, receivers)  # (n, 16) -> (n, 32)
-```
+There is no graph container or custom data type. This page builds one graph
+from those three arrays, follows information through it, and then collects the
+input conventions shared by every layer in `ion.gnn`.
 
-The convolutions are [GCN](layers/gcn.md), [GAT](layers/gat.md) (including GATv2), and [GIN](layers/gin.md); [Ops](ops.md) covers segment reductions, graph-level pooling, and graph-building helpers (`add_self_loops`, `batch_graphs`). The array format, self-loops, shape labels, and batching that every layer assumes are documented below.
+## Build a Graph
 
-Full worked examples: [Node classification on Cora](https://github.com/auxeno/ion/blob/main/examples/gnn_cora.py) and [Molecular property prediction on BBBP](https://github.com/auxeno/ion/blob/main/examples/gnn_bbbp.ipynb).
-
-## Graph Representation
-
-Graphs are represented as plain arrays, no custom graph object:
-
-| Array | Type | Shape | Meaning |
-|-------|------|-------|---------|
-| `x` | float | `(n, d)` | Node feature matrix (n nodes, d features) |
-| `senders` | int | `(e,)` | Source node index for each edge |
-| `receivers` | int | `(e,)` | Destination node index for each edge |
-| `x_edge` | float | `(e, f)` | Edge feature matrix (optional, GATConv/GATv2Conv only) |
-
-Edges are directed. For undirected graphs, include both directions:
-
-```python
-# Triangle: 0-1, 1-2, 0-2 (undirected = 6 directed edges)
-senders   = jnp.array([0, 1, 1, 2, 0, 2])
-receivers = jnp.array([1, 0, 2, 1, 2, 0])
-```
-
-This is a COO (coordinate) sparse format. Storage is O(edges), not O(nodes^2). All operations use `jax.ops.segment_sum` for aggregation, which is JIT-friendly and efficient.
-
-All GNN layers expect unbatched inputs. Passing a batched `(b, n, d)` tensor or a 2D edge index `(e, 2)` will raise immediately via tuple unpacking at the top of each `__call__`. For batching multiple graphs, see [Batching Multiple Graphs](#batching-multiple-graphs) below.
-
-## Self-Loops
-
-The standard GCN formulation (Kipf & Welling, 2017) operates on A_hat = A + I, meaning every node includes its own features in the aggregation. Self-loops are **not** added automatically. Use `add_self_loops` to append them:
-
-```python
-from ion.gnn import add_self_loops
-
-senders, receivers = add_self_loops(senders, receivers, num_nodes)
-```
-
-Without self-loops, a node's output depends only on its neighbors, not itself. This is almost never what you want for GCNConv. For GATConv, self-loops allow the node to attend to its own features. GINConv is the exception: do not add self-loops, since a node's own features enter through its `(1 + eps)` term.
-
-## Shape Annotations
-
-| Label | Meaning | Used in |
-|-------|---------|---------|
-| `n` | number of nodes | everywhere |
-| `e` | number of edges | everywhere |
-| `g` | number of graphs | mean_pool, sum_pool, max_pool, batch_graphs |
-| `d` | node feature dimension | pooling, batch_graphs |
-| `i` | input features | GCNConv, GATConv, GATv2Conv, GINConv |
-| `o` | output features | GCNConv, GATConv, GATv2Conv, GINConv |
-| `h` | number of attention heads | GATConv, GATv2Conv |
-| `k` | per-head dimension | GATConv, GATv2Conv |
-| `f` | edge feature dimension | GATConv, GATv2Conv (edge_dim) |
-
-## Batching Multiple Graphs
-
-For a batch of graphs with different sizes, the standard approach is to pack them into a single disconnected graph. `batch_graphs` concatenates node features, offsets the edge indices of each graph by the cumulative node count, and returns a `graph_ids` array mapping each node to its source graph:
-
-```python
-xs = [x1, x2]                    # (3, d) and (2, d)
-senders_list = [s1, s2]
-receivers_list = [r1, r2]
-
-x, senders, receivers, graph_ids = gnn.batch_graphs(xs, senders_list, receivers_list)
-# x: (5, d), edges of graph 2 offset by 3, graph_ids: [0, 0, 0, 1, 1]
-```
-
-Since the subgraphs are disconnected, message passing on the union is exactly equivalent to processing each graph separately. For graph-level predictions, pool node features per graph with `graph_ids`:
-
-```python
-h = conv(x, senders, receivers)
-y = gnn.mean_pool(h, graph_ids, num_graphs=len(xs))  # (g, d)
-```
-
-Call `batch_graphs` outside `jit`: per-batch shapes vary, and each new shape triggers recompilation. For static shapes across batches, pad the batched arrays to a fixed maximum number of nodes and edges. Dummy padding nodes are disconnected (no edges), so they do not affect the output. Mask them out when computing losses or metrics.
-
-## Example
-
-Full examples: [Node classification on Cora](https://github.com/auxeno/ion/blob/main/examples/gnn_cora.py) | [Molecular property prediction on BBBP](https://github.com/auxeno/ion/blob/main/examples/gnn_bbbp.ipynb)
-
-Node classification on a small graph:
+The example has six nodes. Each node starts with an exclusive one-hot feature,
+so it is always possible to tell where a contribution originated:
 
 ```python
 import jax
 import jax.numpy as jnp
-import optax
 
-import ion
-from ion import nn, gnn
+from ion import gnn
 
-class NodeClassifier(nn.Module):
-    gcn_1: gnn.GCNConv
-    gcn_2: gnn.GCNConv
+x = jnp.array([
+    [1, 0, 0, 0, 0, 0],  # node 0 has feature e_0
+    [0, 1, 0, 0, 0, 0],  # node 1 has feature e_1
+    [0, 0, 1, 0, 0, 0],
+    [0, 0, 0, 1, 0, 0],
+    [0, 0, 0, 0, 1, 0],
+    [0, 0, 0, 0, 0, 1],
+], dtype=jnp.float32)
+```
 
-    def __init__(self, in_dim: int, hidden_dim: int, num_classes: int, *, key):
-        key_1, key_2 = jax.random.split(key)
-        self.gcn_1 = gnn.GCNConv(in_dim, hidden_dim, key=key_1)
-        self.gcn_2 = gnn.GCNConv(hidden_dim, num_classes, key=key_2)
+The rows are nodes and the columns are features:
 
-    def __call__(self, x, senders, receivers):
-        x = jax.nn.relu(self.gcn_1(x, senders, receivers))
-        x = self.gcn_2(x, senders, receivers)
-        return x
+| Axis | Size | Meaning |
+|---|---:|---|
+| `x.shape[0]` | 6 | Number of nodes |
+| `x.shape[1]` | 6 | Features per node |
 
-# Initialize
-model = NodeClassifier(16, 32, 7, key=jax.random.key(0))
-optimizer = ion.Optimizer(optax.adam(1e-3), model)
+The features do not describe the connections. Two nodes can have feature
+vectors without being connected, and an edge can connect nodes with completely
+different features.
 
-# Add self-loops to graph edges
+### Add Edges in COO Format
+
+Edges are stored as two parallel one-dimensional arrays:
+
+```python
+senders   = jnp.array([0, 1, 0, 2, 1, 3, 1, 4, 2, 4, 2, 5, 3, 4, 4, 5])
+receivers = jnp.array([1, 0, 2, 0, 3, 1, 4, 1, 4, 2, 5, 2, 4, 3, 5, 4])
+```
+
+Read the arrays vertically at the same index:
+
+| `senders[i]` | `receivers[i]` | Meaning |
+|---:|---:|---|
+| **0** | **1** | **Node 0 sends to node 1** |
+| 1 | 0 | Node 1 sends to node 0 |
+| 0 | 2 | Node 0 sends to node 2 |
+| 2 | 0 | Node 2 sends to node 0 |
+| 1 | 3 | Node 1 sends to node 3 |
+| 3 | 1 | Node 3 sends to node 1 |
+
+This is coordinate, or COO, sparse format. Each pair
+`(senders[i], receivers[i])` is one directed edge. The first two entries encode
+the undirected connection `0 <-> 1` as two directed edges:
+
+```python
+senders[0], receivers[0]  # 0, 1: node 0 sends to node 1
+senders[1], receivers[1]  # 1, 0: node 1 sends to node 0
+```
+
+The complete arrays above produce this graph. The highlighted arrow is edge 0.
+
+<iframe
+  class="gnn-plot gnn-plot--graph"
+  src="../assets/gnn-coo-graph.html"
+  title="Six-node graph built from the COO edge arrays"
+  loading="lazy"
+></iframe>
+
+Edges in Ion are always directed. If the relationship should be undirected,
+include both directions as above. COO storage grows with the number of edges,
+not with the square of the number of nodes.
+
+## Pass Messages Along Edges
+
+A graph layer uses each directed edge to route information:
+
+1. The sender produces a message.
+2. The edge optionally scales or transforms that message.
+3. Messages with the same receiver are aggregated.
+
+`senders` has one entry per edge. Indexing `x` with it copies the feature row
+of each edge's source node:
+
+```python
+messages = x[senders]
+messages.shape  # (16 edges, 6 features)
+
+messages[0]  # x[senders[0]] = x[0]
+messages[1]  # x[senders[1]] = x[1]
+```
+
+Nothing has been combined yet. `messages[i]` is the feature vector travelling
+along edge `i`, from `senders[i]` to `receivers[i]`.
+
+`segment_sum` then groups those rows by their receiver. Message `i` is added to
+output row `receivers[i]`:
+
+```python
+aggregated = gnn.segment_sum(messages, receivers, num_segments=x.shape[0])
+```
+
+Node 4 receives edges 6, 8, 12, and 15:
+
+```python
+edge_ids = jnp.array([6, 8, 12, 15])
+
+senders[edge_ids]    # [1, 2, 3, 5]
+receivers[edge_ids]  # [4, 4, 4, 4]
+
+aggregated[4]  # [0, 1, 1, 1, 0, 1] = x[1] + x[2] + x[3] + x[5]
+```
+
+The four messages are grouped into row 4 because their receiver is 4. Node 4's
+own feature is absent because the graph does not yet contain a `4 -> 4`
+self-loop. This send-then-group operation is the basis of the GCN, GAT, and GIN
+layers.
+
+### Include Each Node's Own Features
+
+A node is not automatically its own neighbour. `GCNConv` and the attention
+layers normally need self-loop edges so each node can retain its current
+features:
+
+```python
+num_nodes = x.shape[0]
 senders, receivers = gnn.add_self_loops(senders, receivers, num_nodes)
 ```
+
+This appends `(0, 0)`, `(1, 1)`, through `(5, 5)`. GIN is the exception: its
+`(1 + eps)` term already handles the central node, so do not add self-loops
+before `GINConv`.
+
+## Watch Features Mix
+
+A GCN applies a shared linear transformation and then combines features using
+degree-normalized edges. To make the graph operation visible by itself, the
+plot below fixes the linear transformation to the identity and omits the bias
+and activation. It repeatedly applies only the normalized aggregation:
+
+```text
+D^-1/2 A D^-1/2 x
+```
+
+The input is the one-hot matrix constructed above, with self-loops added.
+Choose a step from 0 to 5. Click any node to follow its original feature, and
+hover any node to inspect its complete mixed feature vector.
+
+<iframe
+  class="gnn-plot gnn-plot--propagation"
+  src="../assets/gnn-feature-propagation.html"
+  title="One-hot node features mixing over five message-passing steps"
+  loading="lazy"
+></iframe>
+
+One step lets a feature reach immediate neighbours. By two steps, feature
+`e_0` has reached the entire example graph. Later steps continue mixing the
+values even though the set of reachable nodes no longer changes.
+
+These are five message-passing steps, which correspond to five GCN layers when
+their learned transformations are replaced by the identity. Calling the same
+layer five separate times on the original `x` would instead repeat the same
+one-step calculation.
+
+## Use a GCN Layer
+
+`GCNConv` learns the feature transformation that the previous plot held fixed:
+
+```python
+key = jax.random.key(0)
+gcn = gnn.GCNConv(in_dim=6, out_dim=16, key=key)
+
+# (6 nodes, 6 input features) -> (6 nodes, 16 output features)
+h = gcn(x, senders, receivers)
+```
+
+The same model can stack layers to increase its receptive field:
+
+```python
+key_1, key_2 = jax.random.split(key)
+gcn_1 = gnn.GCNConv(6, 16, key=key_1)
+gcn_2 = gnn.GCNConv(16, 4, key=key_2)
+
+h = jax.nn.relu(gcn_1(x, senders, receivers))
+logits = gcn_2(h, senders, receivers)
+```
+
+Ion modules are JAX pytrees, so `jax.jit`, `jax.grad`, and the usual Ion
+optimizer workflow apply without graph-specific transforms.
+
+## Layer Reference
+
+| Family | Layers | Neighbour aggregation |
+|---|---|---|
+| [GCN](layers/gcn.md) | `GCNConv` | Fixed symmetric degree normalization |
+| [GAT](layers/gat.md) | `GATConv`, `GATv2Conv` | Learned attention weights |
+| [GIN](layers/gin.md) | `GINConv` | Sum plus a separate central-node term |
+| [Ops](ops.md) | Segment reductions, pooling, graph construction | Functions for custom graph layers |
+
+### Graph Array Contract
+
+| Array | Type | Shape | Meaning |
+|---|---|---|---|
+| `x` | float | `(n, d)` | Node feature matrix |
+| `senders` | int | `(e,)` | Source node for every directed edge |
+| `receivers` | int | `(e,)` | Destination node for every directed edge |
+| `x_edge` | float | `(e, f)` | Optional edge features for GAT and GATv2 |
+
+All GNN layers accept one graph at a time. A batched `(b, n, d)` node tensor or
+an edge matrix shaped `(e, 2)` is not accepted. Pass the two COO edge arrays
+separately.
+
+### Self-Loop Reference
+
+| Layer | Add self-loops? | Reason |
+|---|---|---|
+| `GCNConv` | Normally yes | Include the node's current features in aggregation |
+| `GATConv`, `GATv2Conv` | Normally yes | Let a node attend to itself |
+| `GINConv` | No | The `(1 + eps)` term already includes the node |
+
+Self-loops are explicit and are never added inside a layer.
+
+### Batch Graphs
+
+Graphs with different numbers of nodes are packed into one disconnected graph:
+
+```python
+x, senders, receivers, graph_ids = gnn.batch_graphs(
+    [x_1, x_2],
+    [senders_1, senders_2],
+    [receivers_1, receivers_2],
+)
+```
+
+`batch_graphs` concatenates the features, offsets the second graph's edge
+indices, and records the source graph for every node. Since there are no edges
+between the components, message passing is equivalent to processing each graph
+separately.
+
+For graph-level outputs, pool the node features by `graph_ids`:
+
+```python
+h = gcn(x, senders, receivers)
+graph_h = gnn.mean_pool(h, graph_ids, num_graphs=2)
+```
+
+Call `batch_graphs` outside `jax.jit`. If batch shapes vary, each new shape
+causes a compilation. Pad nodes and edges to fixed maximum sizes when static
+shapes are required.
+
+### Shape Labels
+
+| Label | Meaning |
+|---|---|
+| `n` | Number of nodes |
+| `e` | Number of directed edges |
+| `g` | Number of graphs |
+| `d` | General node feature dimension |
+| `i`, `o` | Input and output feature dimensions |
+| `h`, `k` | Attention heads and per-head dimension |
+| `f` | Edge feature dimension |
+
+Full examples: [node classification on Cora](https://github.com/auxeno/ion/blob/main/examples/gnn_cora.py)
+and [molecular property prediction on BBBP](https://github.com/auxeno/ion/blob/main/examples/gnn_bbbp.ipynb).

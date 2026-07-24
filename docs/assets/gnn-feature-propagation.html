@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>One-hot feature propagation</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --foreground: #252a34;
+      --muted: #6b7688;
+      --edge: rgba(37, 42, 52, 0.25);
+      --control: rgba(124, 58, 237, 0.15);
+      --purple: #7c3aed;
+      --cyan: #0891b2;
+      --green: #159a76;
+      --blue: #478af5;
+    }
+    :root[data-theme="dark"] {
+      --foreground: #f0f0f0;
+      --muted: #a6adbb;
+      --edge: rgba(240, 240, 240, 0.28);
+      --control: rgba(142, 81, 255, 0.22);
+      --cyan: #22d3ee;
+      --green: #1fce9c;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      color: var(--foreground);
+      background: transparent;
+      font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+    }
+    .control {
+      display: grid;
+      grid-template-columns: auto minmax(10rem, 1fr) auto;
+      align-items: center;
+      gap: 0.7rem;
+      color: var(--muted);
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--purple);
+    }
+    output {
+      min-width: 4.5rem;
+      color: var(--foreground);
+      text-align: right;
+    }
+    #propagation-graph {
+      width: 100%;
+      height: 465px;
+    }
+    #propagation-status {
+      min-height: 1.5em;
+      margin: 0;
+      color: var(--muted);
+      text-align: center;
+    }
+    @media (max-width: 480px) {
+      .control {
+        grid-template-columns: 1fr auto;
+      }
+      .control label {
+        grid-column: 1 / -1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="control">
+    <label for="step">Message-passing steps</label>
+    <input id="step" type="range" min="0" max="5" value="0" step="1">
+    <output id="step-value" for="step">0 · input</output>
+  </div>
+  <div
+    id="propagation-graph"
+    role="img"
+    aria-label="One-hot node features mixing over five graph message-passing steps"
+  ></div>
+  <p id="propagation-status" aria-live="polite"></p>
+
+  <script src="https://cdn.plot.ly/plotly-3.4.0.min.js"></script>
+  <script>
+    (() => {
+      const plot = document.getElementById("propagation-graph");
+      const stepInput = document.getElementById("step");
+      const stepValue = document.getElementById("step-value");
+      const status = document.getElementById("propagation-status");
+      const positions = [
+        [-1.35, 0.00],
+        [-0.45, 0.85],
+        [-0.45, -0.85],
+        [0.70, 0.85],
+        [0.45, 0.00],
+        [0.70, -0.85]
+      ];
+      const edges = [
+        [0, 1], [0, 2], [1, 3], [1, 4],
+        [2, 4], [2, 5], [3, 4], [4, 5]
+      ];
+      const n = positions.length;
+      let selectedFeature = 0;
+      let selectedStep = 0;
+
+      const adjacency = Array.from({ length: n }, () => Array(n).fill(0));
+      for (let node = 0; node < n; node += 1) adjacency[node][node] = 1;
+      for (const [a, b] of edges) {
+        adjacency[a][b] = 1;
+        adjacency[b][a] = 1;
+      }
+      const degree = adjacency.map(row =>
+        row.reduce((sum, value) => sum + value, 0)
+      );
+      const propagation = adjacency.map((row, receiver) =>
+        row.map((value, sender) =>
+          value / Math.sqrt(degree[receiver] * degree[sender])
+        )
+      );
+      const identity = Array.from({ length: n }, (_, row) =>
+        Array.from({ length: n }, (_, col) => Number(row === col))
+      );
+
+      function multiply(a, b) {
+        return a.map(row =>
+          b[0].map((_, col) =>
+            row.reduce((sum, value, k) => sum + value * b[k][col], 0)
+          )
+        );
+      }
+
+      const states = [identity];
+      for (let step = 1; step <= 5; step += 1) {
+        states.push(multiply(propagation, states[step - 1]));
+      }
+
+      function setTheme() {
+        let scheme;
+        try {
+          scheme = window.parent.document.body.dataset.mdColorScheme;
+        } catch {
+          scheme = null;
+        }
+        const dark = scheme
+          ? scheme === "slate"
+          : window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+      }
+
+      function featureVector(row) {
+        return `[${row.map(value => value.toFixed(3)).join(", ")}]`;
+      }
+
+      function render() {
+        const style = getComputedStyle(document.documentElement);
+        const foreground = style.getPropertyValue("--foreground").trim();
+        const muted = style.getPropertyValue("--muted").trim();
+        const edgeColor = style.getPropertyValue("--edge").trim();
+        const purple = style.getPropertyValue("--purple").trim();
+        const cyan = style.getPropertyValue("--cyan").trim();
+        const green = style.getPropertyValue("--green").trim();
+        const blue = style.getPropertyValue("--blue").trim();
+        const matrix = states[selectedStep];
+        const trackedValues = matrix.map(row => row[selectedFeature]);
+        const edgeX = [];
+        const edgeY = [];
+        const activeX = [];
+        const activeY = [];
+        for (const [a, b] of edges) {
+          edgeX.push(positions[a][0], positions[b][0], null);
+          edgeY.push(positions[a][1], positions[b][1], null);
+          if (trackedValues[a] > 1e-8 && trackedValues[b] > 1e-8) {
+            activeX.push(positions[a][0], positions[b][0], null);
+            activeY.push(positions[a][1], positions[b][1], null);
+          }
+        }
+        const traces = [
+          {
+            type: "scatter",
+            mode: "lines",
+            x: edgeX,
+            y: edgeY,
+            hoverinfo: "skip",
+            line: { color: edgeColor, width: 2.5 },
+            showlegend: false
+          },
+          {
+            type: "scatter",
+            mode: "lines",
+            x: activeX,
+            y: activeY,
+            hoverinfo: "skip",
+            line: { color: blue, width: 4 },
+            opacity: 0.55,
+            showlegend: false
+          },
+          {
+            type: "scatter",
+            mode: "markers+text",
+            x: positions.map(point => point[0]),
+            y: positions.map(point => point[1]),
+            text: positions.map((_, node) => String(node)),
+            textposition: "middle center",
+            textfont: { color: foreground, size: 14 },
+            customdata: matrix.map((row, node) => [
+              node,
+              trackedValues[node],
+              featureVector(row)
+            ]),
+            hovertemplate:
+              "<b>node %{customdata[0]}</b><br>" +
+              "tracked contribution: %{customdata[1]:.3f}<br>" +
+              "features: %{customdata[2]}<extra></extra>",
+            marker: {
+              size: 50,
+              color: trackedValues,
+              cmin: 0,
+              cmax: 1,
+              colorscale: [
+                [0, purple],
+                [0.05, blue],
+                [0.15, green],
+                [0.35, cyan],
+                [1, cyan]
+              ],
+              line: {
+                color: positions.map((_, node) =>
+                  node === selectedFeature ? cyan : foreground
+                ),
+                width: positions.map((_, node) =>
+                  node === selectedFeature ? 4 : 1.5
+                )
+              },
+              showscale: false
+            },
+            showlegend: false
+          }
+        ];
+        const layout = {
+          margin: { l: 16, r: 16, t: 54, b: 24 },
+          paper_bgcolor: "rgba(0,0,0,0)",
+          plot_bgcolor: "rgba(0,0,0,0)",
+          font: {
+            color: foreground,
+            family: "Space Grotesk, sans-serif"
+          },
+          hoverlabel: {
+            bgcolor: purple,
+            bordercolor: cyan,
+            font: { color: "#ffffff" },
+            align: "left"
+          },
+          xaxis: {
+            visible: false,
+            range: [-1.75, 1.15],
+            fixedrange: true
+          },
+          yaxis: {
+            visible: false,
+            range: [-1.25, 1.25],
+            scaleanchor: "x",
+            scaleratio: 1,
+            fixedrange: true
+          },
+          annotations: [
+            {
+              x: 0.5,
+              y: 1.04,
+              xref: "paper",
+              yref: "paper",
+              text:
+                `<b>Tracking e${selectedFeature} from node ${selectedFeature}</b>` +
+                " · click another node to change feature",
+              showarrow: false,
+              font: { color: muted, size: 13 }
+            }
+          ],
+          showlegend: false,
+          dragmode: false
+        };
+        stepValue.textContent = selectedStep === 0
+          ? "0 · input"
+          : `${selectedStep} · step${selectedStep === 1 ? "" : "s"}`;
+        const reached = trackedValues
+          .map((value, node) => ({ value, node }))
+          .filter(item => item.value > 1e-8)
+          .map(item => item.node);
+        status.textContent =
+          `e${selectedFeature} contributes to node` +
+          `${reached.length === 1 ? "" : "s"} ${reached.join(", ")}.`;
+        return Plotly.react(plot, traces, layout, {
+          displayModeBar: false,
+          responsive: true
+        });
+      }
+
+      stepInput.addEventListener("input", event => {
+        selectedStep = Number(event.target.value);
+        render();
+      });
+      setTheme();
+      render().then(() => {
+        plot.on("plotly_click", event => {
+          const point = event.points[0];
+          const node = point && point.customdata
+            ? Number(point.customdata[0])
+            : NaN;
+          if (Number.isInteger(node)) {
+            selectedFeature = node;
+            render();
+          }
+        });
+      });
+      let activeTheme = document.documentElement.dataset.theme;
+      window.setInterval(() => {
+        setTheme();
+        const nextTheme = document.documentElement.dataset.theme;
+        if (nextTheme !== activeTheme) {
+          activeTheme = nextTheme;
+          render();
+        }
+      }, 250);
+      window.matchMedia("(prefers-color-scheme: dark)")
+        .addEventListener("change", () => {
+          setTheme();
+          render();
+        });
+      new ResizeObserver(() => render()).observe(document.body);
+    })();
+  </script>
+</body>
+</html>

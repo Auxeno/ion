@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A graph represented in COO format</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --foreground: #252a34;
+      --muted: #6b7688;
+      --edge: rgba(37, 42, 52, 0.28);
+      --purple: #7c3aed;
+      --cyan: #0891b2;
+      --blue: #478af5;
+    }
+    :root[data-theme="dark"] {
+      --foreground: #f0f0f0;
+      --muted: #a6adbb;
+      --edge: rgba(240, 240, 240, 0.3);
+      --cyan: #22d3ee;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: transparent;
+      font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+    }
+    #coo-graph {
+      width: 100%;
+      height: 440px;
+    }
+  </style>
+</head>
+<body>
+  <div
+    id="coo-graph"
+    role="img"
+    aria-label="Six labelled nodes connected by the edges in the senders and receivers arrays"
+  ></div>
+
+  <script src="https://cdn.plot.ly/plotly-3.4.0.min.js"></script>
+  <script>
+    (() => {
+      const plot = document.getElementById("coo-graph");
+      const positions = [
+        [-1.35, 0.00],
+        [-0.45, 0.85],
+        [-0.45, -0.85],
+        [0.70, 0.85],
+        [0.45, 0.00],
+        [0.70, -0.85]
+      ];
+      const edges = [
+        [0, 1], [0, 2], [1, 3], [1, 4],
+        [2, 4], [2, 5], [3, 4], [4, 5]
+      ];
+
+      function setTheme() {
+        let scheme;
+        try {
+          scheme = window.parent.document.body.dataset.mdColorScheme;
+        } catch {
+          scheme = null;
+        }
+        const dark = scheme
+          ? scheme === "slate"
+          : window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+      }
+
+      function render() {
+        const style = getComputedStyle(document.documentElement);
+        const foreground = style.getPropertyValue("--foreground").trim();
+        const muted = style.getPropertyValue("--muted").trim();
+        const edgeColor = style.getPropertyValue("--edge").trim();
+        const purple = style.getPropertyValue("--purple").trim();
+        const cyan = style.getPropertyValue("--cyan").trim();
+        const blue = style.getPropertyValue("--blue").trim();
+        const edgeTraces = edges.map(([sender, receiver], pairIndex) => ({
+          type: "scatter",
+          mode: "lines",
+          x: [positions[sender][0], positions[receiver][0]],
+          y: [positions[sender][1], positions[receiver][1]],
+          line: {
+            color: pairIndex === 0 ? cyan : edgeColor,
+            width: pairIndex === 0 ? 5 : 2.5
+          },
+          hovertemplate:
+            `<b>Nodes ${sender} and ${receiver}</b><br>` +
+            `edge ${pairIndex * 2}: ${sender} → ${receiver}<br>` +
+            `edge ${pairIndex * 2 + 1}: ${receiver} → ${sender}` +
+            "<extra></extra>",
+          showlegend: false
+        }));
+        const nodeTrace = {
+          type: "scatter",
+          mode: "markers+text",
+          x: positions.map(point => point[0]),
+          y: positions.map(point => point[1]),
+          text: positions.map((_, node) => String(node)),
+          textposition: "middle center",
+          textfont: { color: "#ffffff", size: 14 },
+          customdata: positions.map((_, node) => node),
+          hovertemplate:
+            "<b>node %{customdata}</b><br>" +
+            "x[%{customdata}] = e%{customdata}<br>" +
+            "one-hot feature length: 6<extra></extra>",
+          marker: {
+            size: 48,
+            color: positions.map((_, node) =>
+              node === 0 ? purple : node === 1 ? blue : purple
+            ),
+            opacity: positions.map((_, node) => node < 2 ? 1 : 0.78),
+            line: {
+              color: positions.map((_, node) =>
+                node === 0 ? cyan : foreground
+              ),
+              width: positions.map((_, node) => node === 0 ? 4 : 1.5)
+            }
+          },
+          showlegend: false
+        };
+        const layout = {
+          margin: { l: 16, r: 16, t: 42, b: 24 },
+          paper_bgcolor: "rgba(0,0,0,0)",
+          plot_bgcolor: "rgba(0,0,0,0)",
+          font: {
+            color: foreground,
+            family: "Space Grotesk, sans-serif"
+          },
+          hoverlabel: {
+            bgcolor: purple,
+            bordercolor: cyan,
+            font: { color: "#ffffff" },
+            align: "left"
+          },
+          xaxis: {
+            visible: false,
+            range: [-1.75, 1.15],
+            fixedrange: true
+          },
+          yaxis: {
+            visible: false,
+            range: [-1.25, 1.25],
+            scaleanchor: "x",
+            scaleratio: 1,
+            fixedrange: true
+          },
+          annotations: [
+            {
+              x: positions[1][0],
+              y: positions[1][1],
+              ax: positions[0][0],
+              ay: positions[0][1],
+              xref: "x",
+              yref: "y",
+              axref: "x",
+              ayref: "y",
+              text: "",
+              showarrow: true,
+              arrowhead: 3,
+              arrowsize: 1.2,
+              arrowwidth: 3,
+              arrowcolor: cyan,
+              standoff: 24,
+              startstandoff: 25
+            }
+          ],
+          showlegend: false,
+          dragmode: false
+        };
+        return Plotly.react(plot, [...edgeTraces, nodeTrace], layout, {
+          displayModeBar: false,
+          responsive: true
+        });
+      }
+
+      setTheme();
+      render();
+      let activeTheme = document.documentElement.dataset.theme;
+      window.setInterval(() => {
+        setTheme();
+        const nextTheme = document.documentElement.dataset.theme;
+        if (nextTheme !== activeTheme) {
+          activeTheme = nextTheme;
+          render();
+        }
+      }, 250);
+      window.matchMedia("(prefers-color-scheme: dark)")
+        .addEventListener("change", () => {
+          setTheme();
+          render();
+        });
+      new ResizeObserver(() => render()).observe(document.body);
+    })();
+  </script>
+</body>
+</html>

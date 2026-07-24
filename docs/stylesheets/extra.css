@@ -307,6 +307,23 @@ body[data-md-color-scheme] .jupyter-wrapper {
   overflow: auto;
 }
 
+/* Interactive COO and feature-propagation plots on the GNN landing page. Each
+   iframe mirrors Material's active colour scheme and keeps its Plotly paper,
+   plot and document backgrounds transparent. */
+.gnn-plot {
+  width: 100%;
+  border: 0;
+  background: transparent;
+}
+
+.gnn-plot--graph {
+  height: 28rem;
+}
+
+.gnn-plot--propagation {
+  height: 32rem;
+}
+
 /* Thin gradient rule under the top header, echoing the logo. The header is
    already positioned by the theme, so the pseudo-element anchors to it. */
 .md-header::after {
