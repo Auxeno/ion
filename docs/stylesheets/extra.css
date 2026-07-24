@@ -267,6 +267,11 @@ body[data-md-color-scheme] .jupyter-wrapper {
   color: inherit;
 }
 
+/* Nudge the logo toward the site title without changing the header layout. */
+.md-header .md-logo {
+  transform: translateX(0.25rem);
+}
+
 .md-header__source {
   display: block;
 }
