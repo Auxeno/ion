@@ -24,14 +24,19 @@ class TestSupplementaryDocstrings:
         assert obj is not None, f"{name}: not found in ion, ion.nn, or ion.gnn"
         obj = getattr(obj, attr) if attr else obj
 
-        if isinstance(obj, property):
-            return
-
-        params = inspect.signature(obj).parameters.values()
-        expected = [p for p in params if p.name != "self"]
-
         sections = griffe.Docstring(path.read_text(), parser="numpy").parse()
         params = next((s for s in sections if s.kind.value == "parameters"), None)
+
+        if isinstance(obj, property):
+            assert params is None, f"{name}: properties take no parameters"
+            return
+
+        expected = [p for p in inspect.signature(obj).parameters.values() if p.name != "self"]
+
+        if not expected:
+            assert params is None, f"{name}: parameterless callable documents parameters"
+            return
+
         assert params is not None, f"{name}: no Parameters section"
 
         documented = [p.name for p in params.value]

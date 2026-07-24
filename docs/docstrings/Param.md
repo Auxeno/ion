@@ -1,21 +1,27 @@
-Marks a JAX array as a model parameter, making the trainable/frozen distinction explicit inside a pytree.
+Marks a JAX array as a trainable or frozen model parameter.
 
 Parameters
 ----------
 _value : jax.Array
-    The underlying JAX array.
+    Array to wrap. Access it through `jnp.asarray(param)`, not the private
+    `_value` field.
 trainable : bool, default=True
-    Whether gradients flow to this parameter. Frozen params (`trainable=False`)
-    have `jax.lax.stop_gradient` applied via `__jax_array__`, so they are
-    invisible to autodiff and allocated no optimizer state.
+    Whether gradients flow through the parameter. Frozen parameters apply
+    `jax.lax.stop_gradient` and receive no optimizer state.
 
-Notes
------
-jax.Array attributes (`.shape`, `.dtype`, `.T`, ...) and `jnp` operations proxy to the underlying array through `__jax_array__`, so a `Param` is usable anywhere a raw array is. Arithmetic returns plain arrays, not `Param` instances. The `_value` field is private: reach the raw array with `jnp.asarray(param)`, never `param._value`, so `stop_gradient` is preserved for frozen params.
+Attributes
+----------
+trainable : bool
+    Whether the parameter is trainable.
 
-Examples
---------
->>> w = Param(jnp.zeros((3, 16)))              # trainable by default
->>> b = Param(jnp.zeros(16), trainable=False)  # frozen
->>> w.shape                                    # attributes proxy through
-(3, 16)
+Example
+-------
+```python
+in_dim, out_dim = 3, 16
+
+w = nn.Param(jnp.zeros((in_dim, out_dim)))
+b = nn.Param(jnp.zeros(out_dim), trainable=False)
+
+w.shape  # (3, 16)
+b.trainable  # False
+```

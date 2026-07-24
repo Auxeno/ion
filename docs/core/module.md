@@ -1,6 +1,8 @@
 # Module
 
-The base class for everything in Ion. Subclassing `Module` turns a plain class into an immutable JAX [pytree](https://docs.jax.dev/en/latest/pytrees.html), so `jax.jit`, `jax.grad`, and `jax.vmap` work on your models directly.
+The base class for everything in Ion. Subclassing `Module` turns a plain class
+into an immutable JAX [pytree](https://docs.jax.dev/en/latest/pytrees.html), so
+models work directly with `jax.jit`, `jax.grad`, and `jax.vmap`.
 
 ::: ion.nn.Module
     options:
@@ -12,20 +14,42 @@ The base class for everything in Ion. Subclassing `Module` turns a plain class i
         - params
         - num_params
 
-## How it works
+---
 
-Three things happen in `__init_subclass__` when a class inherits from `Module`:
+## Immutability
 
-1. **Dataclass conversion.** `@dataclasses.dataclass` is applied. If the subclass defines its own `__init__`, it is kept; otherwise one is generated from the annotations.
+Modules are frozen after `__init__`. Direct assignment raises
+`AttributeError`; methods that change a module return a new value instead.
 
-2. **Pytree registration.** The class is registered with `register_pytree_with_keys`. Each field is classified once at construction time (via `isinstance` checks) and the result is cached on the instance:
+```python
+model = model.at.encoder.layers[0].set(new_layer)
+model = model.freeze()
+model = model.astype(jnp.bfloat16)
+```
 
-   - **Array-like** (`Param`, `Module`, `jax.Array`, `np.ndarray`) become dynamic children, passed to JAX as-is.
-   - **Containers with array-like content at any depth** (a tuple of `Module`s in `Sequential`, a `list[list[Module]]`) become dynamic children. Pure containers traverse natively; mixed containers have their non-array elements wrapped in `_Static` at any nesting depth so JAX treats them as compile-time constants.
-   - **Everything else** (int, float, str, callable, None, containers with no arrays anywhere) becomes static auxiliary data, stored in the treedef directly.
+Untouched subtrees are shared with the original model. Changing pytree
+structure or trainability after constructing an optimizer requires a new
+`Optimizer`. See [Sharp Edges](../guides/sharp-edges.md).
 
-   Since modules are frozen after `__init__`, the classification never changes and subsequent flatten calls skip the `isinstance` checks entirely. Unflatten bypasses the constructor with `object.__new__` + `object.__setattr__`, because constructors take different arguments than stored fields (`Linear(in_dim, out_dim, key)` creates `w` and `b` internally). This is why registration uses `register_pytree_with_keys` rather than `register_dataclass`.
+## How does it work?
 
-3. **Freeze after init.** `__init__` is wrapped to set `_frozen` once construction completes. Subsequent attribute assignment raises `AttributeError`, because mutation would silently break JAX tracing. Use `at` to create a modified copy: it returns a path-recording proxy, and `set` rebuilds the modules along the recorded path (sharing all untouched subtrees). A type as a step fans out to every matching node: `model.at[nn.Dropout].p.set(0.5)`. Zero matches raise `ValueError`.
+Fields containing a `Param`, `Module`, array, or a container of those values
+become dynamic pytree children. JAX traces, differentiates, and transforms
+them. Configuration values such as integers, strings, callables, and `None`
+become static metadata stored in the pytree structure.
 
-For the design rationale and the immutability gotchas, see [Sharp Edges](../guides/sharp-edges.md).
+```python
+class Block(nn.Module):
+    linear: nn.Linear     # dynamic
+    activation: Callable  # static
+    width: int            # static
+```
+
+Static values are compile-time constants, so changing one creates a new JIT
+specialization. Field classification happens once after construction and is
+then fixed by module immutability.
+
+Ion registers each subclass as a keyed JAX pytree and reconstructs transformed
+modules without rerunning their constructors. This allows constructors to
+create stored parameters from dimensions and an RNG key while JAX transforms
+operate directly on the resulting fields.

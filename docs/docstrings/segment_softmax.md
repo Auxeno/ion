@@ -24,6 +24,5 @@ Example
 ```python
 scores = jnp.array([1.0, 2.0, 3.0, 1.0])
 receivers = jnp.array([0, 0, 1, 1])
-weights = gnn.segment_softmax(scores, receivers, num_segments=2)
-# [0.26894143, 0.7310586, 0.880797, 0.11920292]
+weights = gnn.segment_softmax(scores, receivers, num_segments=2)  # [0.26894143, 0.7310586, 0.880797, 0.11920292]
 ```

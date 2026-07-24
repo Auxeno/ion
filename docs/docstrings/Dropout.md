@@ -14,6 +14,6 @@ Example
 ```python
 drop = nn.Dropout(0.5)
 x = jnp.ones((8, 64))
-y = drop(x, key=key)             # (8, 64), mask sampled from key
+y = drop(x, key=key)  # (8, 64), mask sampled from key
 y = drop(x, deterministic=True)  # (8, 64), pass-through
 ```

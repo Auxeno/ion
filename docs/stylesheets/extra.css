@@ -384,6 +384,15 @@ body[data-md-color-scheme] .jupyter-wrapper {
   color: var(--ion-magenta);
   border-color: var(--ion-magenta);
 }
+/* Homepage calls to action use Ion blue on hover */
+.md-typeset .hero .md-button--primary:is(:hover, :focus) {
+  background-color: var(--ion-blue);
+  border-color: var(--ion-blue);
+}
+.md-typeset .hero .md-button:not(.md-button--primary):is(:hover, :focus) {
+  color: var(--ion-blue);
+  border-color: var(--ion-blue);
+}
 
 /* Feature cards: subtle brand lift on hover */
 .md-typeset .grid.cards > ul > li {

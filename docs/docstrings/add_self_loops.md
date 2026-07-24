@@ -23,6 +23,6 @@ Example
 senders = jnp.array([0, 1])
 receivers = jnp.array([1, 2])
 senders, receivers = gnn.add_self_loops(senders, receivers, num_nodes=3)
-# senders:   [0, 1, 0, 1, 2]
+# senders: [0, 1, 0, 1, 2]
 # receivers: [1, 2, 0, 1, 2]
 ```

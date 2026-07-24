@@ -1,23 +1,27 @@
-Base class for all neural network modules.
+Base class for immutable, pytree-native models.
 
-Subclass `Module` and annotate fields with their types. Ion converts the subclass to a frozen dataclass, registers it as a JAX pytree, and freezes each instance after `__init__`. The result works directly with `jax.jit`, `jax.grad`, and `jax.vmap`, with no wrappers.
+Subclass `Module`, annotate its stored fields, and assign them during
+`__init__`. Ion converts the subclass to a dataclass, registers it as a JAX
+pytree, and freezes each instance after construction.
 
-Notes
------
-Fields are classified once at construction. `Param`, `Module`, and array leaves (and containers of them) become dynamic pytree children; everything else (ints, strings, callables) becomes static metadata baked into the treedef. Instances are immutable after `__init__`, so build modified copies with `at` rather than assigning to fields.
+Example
+-------
+```python
+batch, in_dim, hidden_dim, out_dim = 32, 3, 16, 1
 
-Examples
---------
->>> class MLP(nn.Module):
-...     up: nn.Linear
-...     down: nn.Linear
-...
-...     def __init__(self, dim, hidden, *, key):
-...         key_up, key_down = jax.random.split(key)
-...         self.up = nn.Linear(dim, hidden, key=key_up)
-...         self.down = nn.Linear(hidden, dim, key=key_down)
-...
-...     def __call__(self, x):
-...         return self.down(jax.nn.relu(self.up(x)))
->>> model = MLP(16, 64, key=key)
->>> model = model.at.up.b.set(None)  # modified copy: drop the bias on `up`
+class MLP(nn.Module):
+    up: nn.Linear
+    down: nn.Linear
+
+    def __init__(self, in_dim, hidden_dim, out_dim, *, key):
+        key_up, key_down = jax.random.split(key)
+        self.up = nn.Linear(in_dim, hidden_dim, key=key_up)
+        self.down = nn.Linear(hidden_dim, out_dim, key=key_down)
+
+    def __call__(self, x):
+        return self.down(jax.nn.relu(self.up(x)))
+
+model = MLP(in_dim, hidden_dim, out_dim, key=key)
+x = jnp.ones((batch, in_dim))
+y = model(x)  # (32, 3) -> (32, 1)
+```

@@ -22,6 +22,5 @@ Example
 ```python
 messages = jnp.array([[1.0, 2.0], [3.0, 4.0], [8.0, 10.0]])
 receivers = jnp.array([0, 0, 2])
-means = gnn.segment_mean(messages, receivers, num_segments=3)
-# [[2., 3.], [0., 0.], [8., 10.]]
+means = gnn.segment_mean(messages, receivers, num_segments=3)  # [[2., 3.], [0., 0.], [8., 10.]]
 ```
