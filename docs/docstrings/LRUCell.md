@@ -1,6 +1,6 @@
 Single-step Linear Recurrent Unit cell ([Orvieto et al., 2023](https://arxiv.org/abs/2303.06349)).
 
-Applies one step of a complex diagonal linear recurrence, `h' = diag(lambda) h + B x`, with output `y = Re(C h) + D x`. Eigenvalues `lambda` are parameterized in the log domain so their magnitudes stay in the stable range during training. Use `LRU` to scan a whole sequence.
+Applies one step of a complex diagonal linear recurrence, \(h' = \operatorname{diag}(\lambda)h + Bx\), with output \(y = \operatorname{Re}(Ch) + Dx\). Eigenvalues \(\lambda\) are parameterized in the log domain so their magnitudes stay in the stable range during training. Use `LRU` to scan a whole sequence.
 
 Parameters
 ----------

@@ -1,6 +1,6 @@
 Dynamic Graph Attention Network layer ([Brody et al., 2022](https://arxiv.org/abs/2105.14491)).
 
-Fixes a limitation of `GATConv` where attention rankings are "static" (identical for all query nodes). GATv2 applies the LeakyReLU *after* combining sender and receiver features, `e_ij = a^T LeakyReLU(W_l h_i + W_r h_j)`, so attention scores depend on both nodes. The constructor interface matches `GATConv`.
+Fixes a limitation of `GATConv` where attention rankings are "static" (identical for all query nodes). GATv2 applies the LeakyReLU *after* combining sender and receiver features, \(e_{ij} = a^\top \operatorname{LeakyReLU}(W_l h_i + W_r h_j)\), so attention scores depend on both nodes. The constructor interface matches `GATConv`.
 
 Parameters
 ----------

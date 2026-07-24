@@ -9,8 +9,9 @@ num_embeddings : int
 dim : int
     Embedding vector dimension.
 w_init : Initializer
-    Weight initializer. Fan-in variance scaling (std 1/sqrt(dim)) by default,
-    independent of vocabulary size.
+    Weight initializer. Fan-in variance scaling
+    (\(\sigma = 1/\sqrt{\mathtt{dim}}\)) by default, independent of vocabulary
+    size.
 key : jax.Array
     RNG key for parameter initialization. Keyword-only.
 

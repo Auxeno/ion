@@ -1,6 +1,6 @@
 Graph Convolutional Network layer ([Kipf & Welling, 2017](https://arxiv.org/abs/1609.02907)).
 
-Applies a shared linear transform then aggregates over each node's neighborhood with symmetric degree normalization, `D^{-1/2} A D^{-1/2} X W`.
+Applies a shared linear transform then aggregates over each node's neighborhood with symmetric degree normalization, \(D^{-1/2} A D^{-1/2} X W\).
 
 Parameters
 ----------

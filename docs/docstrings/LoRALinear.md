@@ -1,6 +1,8 @@
 Low-rank adaptation of a linear layer ([Hu et al., 2021](https://arxiv.org/abs/2106.09685)).
 
-Wraps a frozen `Linear` with a trainable low-rank update `x @ A @ B`, scaled by `alpha / rank`. Only the small `A` and `B` factors receive gradients, so a large base layer can be adapted cheaply.
+Wraps a frozen `Linear` with a trainable low-rank update \(xAB\), scaled by
+\(\alpha/r\). Only the small `A` and `B` factors receive gradients, so a large
+base layer can be adapted cheaply.
 
 Parameters
 ----------

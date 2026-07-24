@@ -94,7 +94,7 @@ jax.grad(jax.grad(f))(p)  # ValueError
 jax.hessian(f)(p)         # works, use this for second derivatives
 ```
 
-The inner `grad` returns its gradient wrapped as a `Param`, and abstractifying that intermediate `Param` in the outer trace triggers `__jax_array__`, which JAX no longer supports during abstractification. In practice this rarely matters: nested `grad` is only valid for scalar-to-scalar functions anyway, even with plain arrays (the inner `grad` of `f: R^n -> R` returns a vector, which the outer `grad` rejects).
+The inner `grad` returns its gradient wrapped as a `Param`, and abstractifying that intermediate `Param` in the outer trace triggers `__jax_array__`, which JAX no longer supports during abstractification. In practice this rarely matters: nested `grad` is only valid for scalar-to-scalar functions anyway, even with plain arrays (the inner `grad` of \(f\colon \mathbb{R}^n \to \mathbb{R}\) returns a vector, which the outer `grad` rejects).
 
 ## `Module.params` preserves static fields
 

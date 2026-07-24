@@ -9,4 +9,4 @@ x : jax.Array["... i", float]
 Returns
 -------
 jax.Array["... o", float]
-    `linear(x) + (x @ A @ B) * (alpha / rank)`, projected to `out_dim`.
+    \(\operatorname{linear}(x) + xAB(\alpha/r)\), projected to `out_dim`.

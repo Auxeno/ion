@@ -94,6 +94,10 @@ hooks:
 extra_css:
   - stylesheets/extra.css
 
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
 markdown_extensions:
   - admonition
   - attr_list
@@ -105,6 +109,8 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.superfences
   - pymdownx.details
+  - pymdownx.arithmatex:
+      generic: true
   - pymdownx.snippets:
       base_path: ["."]
       check_paths: true
