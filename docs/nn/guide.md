@@ -1,7 +1,10 @@
 # Neural networks
 
-This guide builds and trains a neural network with JAX and Ion. Follow it from
-the beginning for a walkthrough, or jump directly to a topic:
+This guide builds and trains a neural network with JAX and Ion. For individual
+layers and their APIs, see the [NN layer reference](layers/index.md).
+
+Follow the guide from the beginning for a walkthrough, or jump directly to a
+topic:
 
 - [Feature arrays](#feature-arrays)
 - [Layers and nonlinearities](#layers-and-nonlinearities)
@@ -267,7 +270,7 @@ model = model.astype(jnp.bfloat16)
 ```
 
 Use `model.astype(dtype)` to change parameter precision after construction. See
-[Mixed Precision](../guides/mixed-precision.md) for activation casting and
+[Mixed precision](../workflows.md#mixed-precision) for activation casting and
 optimizer considerations.
 
 ## Further examples

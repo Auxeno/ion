@@ -167,7 +167,7 @@ ion.save("checkpoint.ion", (model, optimizer))
 model, optimizer = ion.load("checkpoint.ion", (model, optimizer))
 ```
 
-See [Checkpointing](guides/checkpointing.md) for the format and edge cases.
+See [Checkpointing](workflows.md#checkpointing) for the format and edge cases.
 
 ## Module sugar
 
@@ -189,7 +189,8 @@ model.num_params                              # total parameter count
 model.params                                  # Param leaves, everything else None
 ```
 
-Casting is how Ion does [mixed precision](guides/mixed-precision.md); see [Freezing](guides/freezing.md) for working with trainability.
+Casting is how Ion does [mixed precision](workflows.md#mixed-precision); see
+[Freezing](workflows.md#freezing) for working with trainability.
 
 ## How Ion compares
 
@@ -206,5 +207,6 @@ Casting is how Ion does [mixed precision](guides/mixed-precision.md); see [Freez
 - [Core](core/module.md) for how Module, Param, and Optimizer fit together.
 - The [NN guide](nn/guide.md) and [GNN guide](gnn/guide.md) for walkthroughs
   and shared conventions.
-- [Guides](guides/freezing.md) for training, freezing, mixed precision, and checkpointing.
+- [Workflows](workflows.md) for freezing, mixed precision, and checkpointing.
+- [Sharp edges](sharp-edges.md) for known constraints and gotchas.
 - [Examples](examples/index.md) for end-to-end projects on real datasets.

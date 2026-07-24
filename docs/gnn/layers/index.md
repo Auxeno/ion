@@ -11,7 +11,3 @@ representation, message passing, self-loops, batching, and pooling.
 | [GCN](gcn.md) | `GCNConv` | Fixed symmetric degree normalization |
 | [GAT](gat.md) | `GATConv`, `GATv2Conv` | Learned attention weights |
 | [GIN](gin.md) | `GINConv` | Sum plus a separate central-node term |
-
-All three return one output feature row per input node. Graph-level models add a
-pooling operation after message passing; the individual pages document each
-layer's parameters and call contract.

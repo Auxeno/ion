@@ -62,11 +62,8 @@ nav:
           - GAT: gnn/layers/gat.md
           - GIN: gnn/layers/gin.md
       - Operations: gnn/operations.md
-  - Guides:
-      - Freezing: guides/freezing.md
-      - Mixed Precision: guides/mixed-precision.md
-      - Checkpointing: guides/checkpointing.md
-      - Sharp Edges: guides/sharp-edges.md
+  - Workflows: workflows.md
+  - Sharp Edges: sharp-edges.md
   - Examples:
       - examples/index.md
       - Scripts:

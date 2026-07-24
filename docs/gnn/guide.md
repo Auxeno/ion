@@ -1,8 +1,11 @@
 # Graph neural networks
 
 This guide represents a graph with JAX arrays, follows messages through it, and
-builds node-level and graph-level predictors. Follow it from the beginning for
-a walkthrough, or jump directly to a topic:
+builds node-level and graph-level predictors. For individual graph layers and
+their APIs, see the [GNN layer reference](layers/index.md).
+
+Follow the guide from the beginning for a walkthrough, or jump directly to a
+topic:
 
 - [COO format](#coo-format)
 - [Message passing](#message-passing)
@@ -238,8 +241,6 @@ The linear classifier acts on each node independently after the graph layers
 have mixed information between connected nodes. Ion modules are JAX pytrees, so
 `jax.jit`, `jax.grad`, and the usual Ion optimizer workflow apply without
 graph-specific transforms.
-
-The [graph layer reference](layers/index.md) compares GCN, GAT, and GIN.
 
 ## Batching graphs
 

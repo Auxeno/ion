@@ -1,4 +1,4 @@
-# 🔪 Sharp Edges
+# 🔪 Sharp edges
 
 Known gotchas when using Ion. Some are JAX limitations, others follow from Ion's design.
 

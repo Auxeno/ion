@@ -29,7 +29,7 @@ model = model.astype(jnp.bfloat16)
 
 Untouched subtrees are shared with the original model. Changing pytree
 structure or trainability after constructing an optimizer requires a new
-`Optimizer`. See [Sharp Edges](../guides/sharp-edges.md).
+`Optimizer`. See [Sharp edges](../sharp-edges.md).
 
 ## How does it work?
 

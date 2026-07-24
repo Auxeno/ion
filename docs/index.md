@@ -38,13 +38,13 @@ pip install ion-nn
 
     [:octicons-arrow-right-24: Graphs](gnn/guide.md)
 
--   :material-book-open-variant:{ .lg .middle } **Guides**
+-   :material-book-open-variant:{ .lg .middle } **Workflows**
 
     ---
 
-    Training, freezing, mixed precision, and checkpointing walkthroughs.
+    Freezing, mixed precision, checkpointing, and other cross-cutting patterns.
 
-    [:octicons-arrow-right-24: Guides](guides/freezing.md)
+    [:octicons-arrow-right-24: Workflows](workflows.md)
 
 -   :material-notebook-outline:{ .lg .middle } **Examples**
 
