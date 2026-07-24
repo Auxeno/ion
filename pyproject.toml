@@ -23,6 +23,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/auxeno/ion"
+Documentation = "https://auxeno.github.io/ion/"
 Repository = "https://github.com/auxeno/ion"
 
 [build-system]

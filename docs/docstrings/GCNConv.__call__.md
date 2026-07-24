@@ -14,10 +14,6 @@ Returns
 jax.Array["n o", float]
     Aggregated node features with `out_dim` features per node.
 
-Info
-----
-The graph is unbatched and uses COO edge arrays.
-
 Warning
 -------
 Self-loops are not added automatically. Call `gnn.add_self_loops` first,

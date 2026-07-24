@@ -2,6 +2,47 @@
 
 Ion is a minimal harness for building and training neural networks in JAX. It has a small core of three pieces, with NN and GNN layers built on top.
 
+## Quickstart
+
+Install Ion with `pip`. For GPU or TPU support, follow the
+[JAX installation guide](https://docs.jax.dev/en/latest/installation.html).
+
+```bash
+pip install ion-nn
+```
+
+Construct a model from the built-in layers, then update it with native JAX
+transformations:
+
+```python
+import jax
+import jax.numpy as jnp
+import optax
+
+import ion
+from ion import nn
+
+# Two input features, one output
+model = nn.Linear(2, 1, key=jax.random.key(0))
+
+x = jnp.ones((32, 2))
+y = jnp.ones((32, 1))
+
+def loss_fn(model, x, y):
+    return jnp.mean((model(x) - y) ** 2)
+
+optimizer = ion.Optimizer(optax.adam(1e-2), model)
+
+@jax.jit
+def train_step(model, optimizer, x, y):
+    grads = jax.grad(loss_fn)(model, x, y)
+    return optimizer.update(model, grads)
+
+model, optimizer = train_step(model, optimizer, x, y)
+```
+
+The sections below unpack the model tree, transforms, optimizer, and layers.
+
 ## The core
 
 - [**Param**](core/param.md) wraps a JAX array and marks it trainable or frozen.
@@ -15,7 +56,9 @@ The whole core is under a thousand lines of code, small enough to read in an aft
 Subclass `Module`, declare fields as class annotations, and assign them in `__init__`:
 
 ```python
-import jax, typing
+import typing
+
+import jax
 import ion.nn as nn
 
 class MLP(nn.Module):
@@ -37,8 +80,7 @@ model = MLP(key=jax.random.key(0))
 
 Fields can hold params, submodules, callables, and static configuration.
 
-```python
->>> model
+```text
 MLP(
   layer_1=Linear(
     w=Param(f32[4, 16], trainable=True),
@@ -74,10 +116,13 @@ Each [`ion.nn`](nn/layers/index.md) layer is a `Module`, constructed with a `key
 | [Composite](nn/layers/mlp.md) | `MLP`, `Sequential` |
 
 ```python
-import ion.nn as nn
+import jax
+import jax.numpy as jnp
+
+from ion import nn
 
 attn = nn.SelfAttention(64, num_heads=8, key=jax.random.key(0))
-y = attn(jax.numpy.ones((32, 16, 64)))
+y = attn(jnp.ones((32, 16, 64)))
 ```
 
 The [NN guide](nn/guide.md) builds and trains a model and collects the shared
@@ -98,8 +143,14 @@ available families.
 Graphs are plain arrays in COO format: node features plus `senders`/`receivers` edge indices.
 
 ```python
-import ion.gnn as gnn
+import jax
+import jax.numpy as jnp
 
+from ion import gnn
+
+x = jnp.ones((3, 16))
+senders = jnp.array([0, 1, 2])
+receivers = jnp.array([1, 2, 0])
 gcn = gnn.GCNConv(16, 32, key=jax.random.key(0))
 h = gcn(x, senders, receivers)
 ```
@@ -113,7 +164,12 @@ reference](gnn/layers/index.md) compares the available graph convolutions.
 There is no `ion.jit` or `ion.grad`. A model's only pytree leaves are array params; activations and other config are kept as static metadata, meaning `jax.jit`, `jax.grad`, and `jax.vmap` etc. *always* work on Ion modules:
 
 ```python
+import jax
 import jax.numpy as jnp
+
+from ion import nn
+
+model = nn.MLP([4, 16, 3], key=jax.random.key(0))
 
 def mse_loss(model, x, y):
     return jnp.mean((model(x) - y) ** 2)
@@ -126,7 +182,7 @@ grads = jax.grad(mse_loss)(model, x, y)
 
 # Model ensemble
 keys = jax.random.split(jax.random.key(0), 8)
-ensemble = jax.vmap(MLP)(key=keys)
+ensemble = jax.vmap(lambda key: nn.MLP([4, 16, 3], key=key))(keys)
 preds = jax.vmap(lambda m: m(x))(ensemble)
 ```
 
@@ -135,10 +191,17 @@ preds = jax.vmap(lambda m: m(x))(ensemble)
 A training step is standard JAX. The loss takes the model first so `jax.grad` differentiates with respect to it, and the whole step compiles with `jax.jit`:
 
 ```python
+import jax
+import jax.numpy as jnp
 import optax
-import ion
 
+import ion
+from ion import nn
+
+model = nn.Linear(4, 3, key=jax.random.key(0))
 optimizer = ion.Optimizer(optax.adam(3e-4), model)
+x = jnp.ones((32, 4))
+y = jnp.zeros((32,), dtype=jnp.int32)
 
 def loss_fn(model, x, y):
     logits = model(x)
@@ -150,8 +213,7 @@ def train_step(model, optimizer, x, y):
     model, optimizer = optimizer.update(model, grads)
     return model, optimizer, loss
 
-for x, y in load_iris():
-    model, optimizer, loss = train_step(model, optimizer, x, y)
+model, optimizer, loss = train_step(model, optimizer, x, y)
 ```
 
 ## Checkpointing
@@ -159,6 +221,15 @@ for x, y in load_iris():
 `ion.save` persists any pytree to a `.ion` file. `load` takes a reference tree that supplies the structure.
 
 ```python
+import jax
+import optax
+
+import ion
+from ion import nn
+
+model = nn.Linear(4, 3, key=jax.random.key(0))
+optimizer = ion.Optimizer(optax.adam(3e-4), model)
+
 ion.save("model.ion", model)
 model = ion.load("model.ion", model)
 
@@ -174,17 +245,33 @@ See [Checkpointing](workflows.md#checkpointing) for the format and edge cases.
 A `Module` is a plain pytree, but it carries a few conveniences for commonly used operations. Since modules are immutable, anything that transforms the model returns a new one:
 
 ```python
-model.astype(jnp.bfloat16)                    # cast params to another dtype
-model.freeze()                                # freeze every param
-model.unfreeze()                              # unfreeze every param
-model.at.layer_1.set(model.layer_1.freeze())  # freeze a single submodule
-model.at.layer_2.w.set(new_w)                 # replace a leaf deep in the tree
-model.at[nn.Dropout].p.set(0.0)               # set a field on every matching layer
+import jax
+import jax.numpy as jnp
+
+from ion import nn
+
+model = nn.MLP([4, 16, 3], key=jax.random.key(0))
+new_w = jnp.zeros_like(model.layers[1].w)
+
+model.astype(jnp.bfloat16)                         # cast params to another dtype
+model.freeze()                                     # freeze every param
+model.unfreeze()                                   # unfreeze every param
+model.at.layers[0].set(model.layers[0].freeze())   # freeze a single submodule
+model.at.layers[1].w.set(new_w)                    # replace a leaf deep in the tree
+
+dropout_model = nn.Sequential(nn.Dropout(0.1))
+dropout_model.at[nn.Dropout].p.set(0.0)             # set every matching layer
 ```
 
 Read-only introspection returns plain values:
 
 ```python
+import jax
+
+from ion import nn
+
+model = nn.MLP([4, 16, 3], key=jax.random.key(0))
+
 model.num_params                              # total parameter count
 model.params                                  # Param leaves, everything else None
 ```

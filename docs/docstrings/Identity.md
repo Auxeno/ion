@@ -1,13 +1,11 @@
-Pass-through layer that returns its first argument unchanged and ignores the rest.
+Pass-through module that returns its first argument unchanged and ignores the
+rest.
 
-Useful as a placeholder for optional layers (e.g. a normalization slot that can be switched off) or as a residual stub, so surrounding code needs no conditional.
+Keeps a disabled module slot visible and replaceable through `Module.at`.
 
 Example
 -------
 ```python
-batch, seq, dim = 4, 16, 64
-
-identity = nn.Identity()
-x = jnp.ones((batch, seq, dim))
-y = identity(x)  # (4, 16, 64) -> (4, 16, 64)
+model = nn.Sequential(nn.LayerNorm(64))
+model = model.at.layers[0].set(nn.Identity())
 ```

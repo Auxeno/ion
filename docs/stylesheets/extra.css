@@ -263,6 +263,10 @@ body[data-md-color-scheme] .jupyter-wrapper {
    header source below 60em and relocates it into the nav drawer; there is room
    for it in the header bar even when narrow, so pin it there and never show the
    drawer copy. */
+.ion-header-home {
+  color: inherit;
+}
+
 .md-header__source {
   display: block;
 }

@@ -63,7 +63,7 @@ optimizer = ion.Optimizer(optax.adam(3e-4), model)
 model, optimizer = optimizer.update(model, grads)
 ```
 
-That's the entire core. See [Internals](https://github.com/auxeno/ion/blob/main/docs/internals.md) for design details and sharp edges.
+That's the entire core. See the [Overview](https://auxeno.github.io/ion/overview/) for design details and [Sharp edges](https://auxeno.github.io/ion/sharp-edges/) for known constraints.
 
 ## Example
 
@@ -146,7 +146,7 @@ Ion ships with standard neural network layers. Each is a `Module` with trainable
 | Blocks          | `Sequential`, `MLP`                                                       |
 | GNN             | `GCNConv`, `GATConv`, `GATv2Conv`, `GINConv`                              |
 
-See [Layer Conventions](https://github.com/auxeno/ion/blob/main/docs/layers.md) for data format, weight init, spatial layer usage, and SSM conventions. See [GNN Conventions](https://github.com/auxeno/ion/blob/main/docs/gnn.md) for graph layer usage.
+See the [NN guide](https://auxeno.github.io/ion/nn/guide/) for array formats, spatial layers, and shared conventions. See the [GNN guide](https://auxeno.github.io/ion/gnn/guide/) for graph representation and layer usage.
 
 ## Pretty Printing
 

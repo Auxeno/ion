@@ -1,6 +1,9 @@
 # State Space
 
-Deep state space model layers. `S4D`, `S5`, and `LRU` process a sequence with a linear complex-valued recurrence, returning outputs plus the final state; the matching `*Cell` classes apply a single timestep. The output dimension is always `in_dim`.
+State space models process sequences with a linear complex-valued recurrence.
+`S4D`, `S5`, and `LRU` use an associative scan with `O(log T)` parallel depth,
+compared with `O(T)` for RNNs, while total work remains `O(T)` rather than the
+`O(T²)` of standard attention.
 
 ::: ion.nn.S4D
 
@@ -25,6 +28,12 @@ The recurrent state is complex-valued. S4D and S5 use conjugate-pair structure:
 `state_dim=N` stores `N//2` complex eigenvalues and the readout uses
 `2*Re(...)` to recover each pair's full contribution. LRU instead stores
 `hidden_dim` independent complex eigenvalues without conjugate symmetry.
+
+Ion stores the state and complex parameters as `complex64`, with float32 real
+and imaginary components. As of 2026, JAX does not expose a `complex32` dtype,
+so casting the surrounding model to float16 or bfloat16 leaves this complex path
+at `complex64`. These layers therefore see less benefit from reduced-precision
+computation than ordinary real-valued layers.
 
 ## Recurrent State
 

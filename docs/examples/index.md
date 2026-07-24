@@ -6,7 +6,6 @@ End-to-end training scripts and notebooks live in the [`examples/`](https://gith
 
 | Example | What it covers |
 |---------|----------------|
-| [Quickstart](../quickstart.md) | A small MLP trained with native JAX gradients and an Ion optimizer. |
 | [Ion Tour](ion-tour.ipynb) | A guided walkthrough of `Module`, `Param`, `Optimizer`, and the training loop. |
 
 ## Vision

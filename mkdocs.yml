@@ -6,6 +6,7 @@ repo_name: auxeno/ion
 
 theme:
   name: material
+  custom_dir: docs/overrides
   logo: assets/logo.png
   favicon: assets/favicon.png
   font:
@@ -32,7 +33,6 @@ theme:
 
 nav:
   - Home: index.md
-  - Quickstart: quickstart.md
   - Overview: overview.md
   - Core:
       - Module: core/module.md
