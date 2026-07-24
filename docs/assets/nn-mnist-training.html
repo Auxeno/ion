@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MNIST training progress</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --foreground: #252a34;
+      --muted: #6b7688;
+      --grid: rgba(37, 42, 52, 0.14);
+      --purple: #7c3aed;
+      --cyan: #0891b2;
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --foreground: #f0f0f0;
+      --muted: #a6adbb;
+      --grid: rgba(240, 240, 240, 0.14);
+      --cyan: #22d3ee;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    html,
+    body,
+    #training-plot,
+    .js-plotly-plot,
+    .plot-container,
+    .svg-container,
+    .main-svg {
+      background: transparent !important;
+      background-color: transparent !important;
+    }
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+    }
+    #training-plot {
+      width: 100%;
+      height: 390px;
+    }
+  </style>
+</head>
+<body>
+  <div
+    id="training-plot"
+    role="img"
+    aria-label="Training loss falls while MNIST test accuracy rises over five epochs"
+  ></div>
+
+  <script src="https://cdn.plot.ly/plotly-3.4.0.min.js"></script>
+  <script>
+    (() => {
+      const plot = document.getElementById("training-plot");
+      const epochs = [1, 2, 3, 4, 5];
+      const losses = [0.3003, 0.0801, 0.0580, 0.0450, 0.0372];
+      const accuracies = [97.44, 98.32, 98.43, 98.46, 98.82];
+
+      function setTheme() {
+        let scheme;
+        try {
+          scheme = window.parent.document.body.dataset.mdColorScheme;
+        } catch {
+          scheme = null;
+        }
+        const dark = scheme
+          ? scheme === "slate"
+          : window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+      }
+
+      function render() {
+        const style = getComputedStyle(document.documentElement);
+        const foreground = style.getPropertyValue("--foreground").trim();
+        const muted = style.getPropertyValue("--muted").trim();
+        const grid = style.getPropertyValue("--grid").trim();
+        const purple = style.getPropertyValue("--purple").trim();
+        const cyan = style.getPropertyValue("--cyan").trim();
+
+        const traces = [
+          {
+            type: "scatter",
+            mode: "lines+markers+text",
+            name: "Training loss",
+            x: epochs,
+            y: losses,
+            xaxis: "x",
+            yaxis: "y",
+            line: { color: purple, width: 3 },
+            marker: { color: purple, size: 8 },
+            text: ["", "", "", "", "0.0372"],
+            textposition: "middle left",
+            textfont: { color: foreground, size: 12 },
+            cliponaxis: false,
+            hovertemplate:
+              "<b>Epoch %{x}</b><br>mean loss: %{y:.4f}<extra></extra>"
+          },
+          {
+            type: "scatter",
+            mode: "lines+markers+text",
+            name: "Test accuracy",
+            x: epochs,
+            y: accuracies,
+            xaxis: "x2",
+            yaxis: "y2",
+            line: { color: cyan, width: 3 },
+            marker: { color: cyan, size: 8 },
+            text: ["", "", "", "", "98.82%"],
+            textposition: "middle left",
+            textfont: { color: foreground, size: 12 },
+            cliponaxis: false,
+            hovertemplate:
+              "<b>Epoch %{x}</b><br>test accuracy: %{y:.2f}%<extra></extra>"
+          }
+        ];
+
+        const axis = {
+          color: muted,
+          gridcolor: grid,
+          linecolor: grid,
+          tickfont: { color: muted },
+          titlefont: { color: foreground },
+          fixedrange: true,
+          zeroline: false
+        };
+        const layout = {
+          margin: { l: 72, r: 76, t: 38, b: 48 },
+          paper_bgcolor: "rgba(0,0,0,0)",
+          plot_bgcolor: "rgba(0,0,0,0)",
+          font: {
+            color: foreground,
+            family: "Space Grotesk, sans-serif"
+          },
+          hoverlabel: {
+            bgcolor: purple,
+            bordercolor: cyan,
+            font: { color: "#ffffff" },
+            align: "left"
+          },
+          legend: {
+            orientation: "h",
+            x: 0,
+            y: 1.12,
+            font: { color: foreground }
+          },
+          xaxis: {
+            ...axis,
+            domain: [0, 1],
+            anchor: "y",
+            tickmode: "array",
+            tickvals: epochs,
+            showticklabels: false
+          },
+          yaxis: {
+            ...axis,
+            domain: [0.58, 1],
+            range: [0, 0.34],
+            title: { text: "Mean loss", standoff: 10 }
+          },
+          xaxis2: {
+            ...axis,
+            domain: [0, 1],
+            anchor: "y2",
+            tickmode: "array",
+            tickvals: epochs,
+            title: { text: "Epoch", standoff: 8 }
+          },
+          yaxis2: {
+            ...axis,
+            domain: [0, 0.39],
+            range: [97.2, 99.05],
+            ticksuffix: "%",
+            title: { text: "Test accuracy", standoff: 10 }
+          },
+          showlegend: true,
+          dragmode: false
+        };
+
+        return Plotly.react(plot, traces, layout, {
+          displayModeBar: false,
+          responsive: true
+        });
+      }
+
+      setTheme();
+      render();
+      let activeTheme = document.documentElement.dataset.theme;
+      window.setInterval(() => {
+        setTheme();
+        const nextTheme = document.documentElement.dataset.theme;
+        if (nextTheme !== activeTheme) {
+          activeTheme = nextTheme;
+          render();
+        }
+      }, 250);
+      window.matchMedia("(prefers-color-scheme: dark)")
+        .addEventListener("change", () => {
+          setTheme();
+          render();
+        });
+      new ResizeObserver(() => Plotly.Plots.resize(plot)).observe(document.body);
+    })();
+  </script>
+</body>
+</html>

@@ -327,6 +327,22 @@ body[data-md-color-scheme] .jupyter-wrapper {
   margin-top: 0.75rem;
 }
 
+/* MNIST training curves in the NN guide. The iframe and Plotly document use
+   the same explicit pixel height so Material's root font size cannot leave a
+   blank strip below the figure. */
+.nn-plot {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.nn-plot--training {
+  height: 390px;
+  margin-top: 0.75rem;
+}
+
 /* Thin gradient rule under the top header, echoing the logo. The header is
    already positioned by the theme, so the pseudo-element anchors to it. */
 .md-header::after {

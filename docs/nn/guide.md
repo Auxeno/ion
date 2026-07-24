@@ -1,24 +1,43 @@
 # Neural networks
 
-This guide builds and trains a neural network with JAX and Ion. For individual
+This guide follows a batch of MNIST images through an Ion model, from arrays to trained predictions. For individual
 layers and their APIs, see the [NN layer reference](layers/index.md).
 
-Follow the guide from the beginning for a walkthrough, or jump directly to a
-topic:
+Follow the guide from the beginning for a complete training walkthrough, or jump directly to a topic:
 
-- [Feature arrays](#feature-arrays)
-- [Layers and nonlinearities](#layers-and-nonlinearities)
-- [Building a model](#building-a-model)
-- [Losses and predictions](#losses-and-predictions)
-- [Gradients and updates](#gradients-and-updates)
+- [Image batches](#image-batches)
+- [Building the model](#building-the-model)
+- [The model pytree](#the-model-pytree)
+- [Forward pass](#forward-pass)
+- [Loss and gradients](#loss-and-gradients)
+- [Optimizer updates](#optimizer-updates)
 - [Compiling the training step](#compiling-the-training-step)
+- [Training on MNIST](#training-on-mnist)
+- [Evaluation and randomness](#evaluation-and-randomness)
 - [Array conventions](#array-conventions)
 - [Further examples](#further-examples)
 
-## Feature arrays
+## Image batches
 
-The final axis of an input array stores features. Here there are four items and
-three features per item:
+MNIST contains 28 by 28 grayscale images and an integer class label for each image. The loader in the complete
+[CNN on MNIST example](../examples/cnn-mnist.md) returns NumPy arrays:
+
+```python
+train_images, train_labels, test_images, test_labels = load_mnist()
+
+train_images.shape  # (60000, 28, 28, 1)
+train_labels.shape  # (60000,)
+train_images.dtype  # uint8
+```
+
+Ion uses channels-last image arrays. The axes here mean:
+
+```text
+(batch, height, width, channels)
+```
+
+Before a batch enters the model, move it into JAX and scale the pixel values from integers in `[0, 255]` to
+floating-point values in `[0, 1]`:
 
 ```python
 import jax
@@ -28,256 +47,312 @@ import optax
 import ion
 from ion import nn
 
-x = jnp.array([
-    [1.0, 0.2, -0.4],
-    [0.3, 0.8, 0.1],
-    [-0.2, 0.5, 0.9],
-    [0.7, -0.1, 0.4],
-])
+batch_indices = jnp.arange(128)
+images = jnp.asarray(train_images[batch_indices], dtype=jnp.float32) / 255.0
+labels = jnp.asarray(train_labels[batch_indices])
 
-x.shape  # (4 items, 3 features)
+images.shape  # (128, 28, 28, 1)
+labels.shape  # (128,)
 ```
 
-The leading axis can represent a batch, a sequence, or another collection of
-items. The meaning depends on the layer and task. The final axis is the feature
-dimension transformed by a fully connected layer.
+Every operation below receives arrays explicitly. Ion does not provide a data loader or training-loop abstraction.
 
-## Layers and nonlinearities
+## Building the model
 
-A `Linear` layer applies the same learned transformation to every row:
+The classifier uses two convolution and pooling stages, followed by two fully connected layers:
 
 ```python
-linear = nn.Linear(
-    in_dim=3,
-    out_dim=8,
-    key=jax.random.key(0),
-)
+class CNN(nn.Module):
+    conv_1: nn.Conv
+    conv_2: nn.Conv
+    pool: nn.MaxPool
+    fc_1: nn.Linear
+    fc_2: nn.Linear
 
-h = linear(x)
-h.shape  # (4, 8)
-```
-
-The layer computes `x @ w + b`. Its weight has shape `(3, 8)`, so the final
-dimension changes from three input features to eight output features. The
-leading dimension is preserved.
-
-An activation function is applied between learned transformations:
-
-```python
-h = jax.nn.relu(linear(x))
-```
-
-Without the activation, several linear layers in sequence still reduce to one
-linear transformation. The activation lets successive layers represent
-nonlinear functions.
-
-## Building a model
-
-`MLP` constructs a sequence of linear layers with an activation between them.
-The final layer has no activation by default, so its outputs can be used as
-class logits:
-
-```python
-model = nn.MLP(
-    dims=[3, 16, 16, 2],
-    key=jax.random.key(1),
-)
-
-logits = model(x)
-logits.shape  # (4, 2)
-```
-
-The dimensions describe the complete path through the network:
-
-```text
-3 input features -> 16 hidden features -> 16 hidden features -> 2 logits
-```
-
-Composite models are constructed and called like individual layers. A custom
-model declares its submodules as fields:
-
-```python
-class Classifier(nn.Module):
-    hidden: nn.Linear
-    output: nn.Linear
-
-    def __init__(self, in_dim: int, hidden_dim: int, num_classes: int, *, key):
-        key_hidden, key_output = jax.random.split(key)
-        self.hidden = nn.Linear(in_dim, hidden_dim, key=key_hidden)
-        self.output = nn.Linear(hidden_dim, num_classes, key=key_output)
+    def __init__(self, *, key):
+        keys = jax.random.split(key, 4)
+        self.conv_1 = nn.Conv(1, 16, kernel_shape=(3, 3), padding=1, key=keys[0])
+        self.conv_2 = nn.Conv(16, 32, kernel_shape=(3, 3), padding=1, key=keys[1])
+        self.pool = nn.MaxPool(kernel_shape=(2, 2))
+        self.fc_1 = nn.Linear(32 * 7 * 7, 128, key=keys[2])
+        self.fc_2 = nn.Linear(128, 10, key=keys[3])
 
     def __call__(self, x):
-        x = jax.nn.relu(self.hidden(x))
-        return self.output(x)
+        x = jax.nn.relu(self.conv_1(x))
+        x = self.pool(x)
 
+        x = jax.nn.relu(self.conv_2(x))
+        x = self.pool(x)
 
-model = Classifier(3, 16, 2, key=jax.random.key(2))
-logits = model(x)
+        x = x.reshape(x.shape[0], -1)
+        x = jax.nn.relu(self.fc_1(x))
+        return self.fc_2(x)
 ```
 
-The fields form a pytree containing the model's parameters and static
-configuration. There is no separate parameter dictionary.
+Submodules are ordinary fields. Parameterized layers receive an initialization key; `MaxPool` has no parameters and
+needs no key. The same pool instance can be called twice because modules are immutable.
 
-## Losses and predictions
+The feature shapes follow the operations in `__call__`:
 
-For a classification task, each output row contains one logit per class:
+| Operation | Output shape |
+|---|---|
+| Input batch | `(batch, 28, 28, 1)` |
+| `conv_1`, ReLU, pool | `(batch, 14, 14, 16)` |
+| `conv_2`, ReLU, pool | `(batch, 7, 7, 32)` |
+| Flatten | `(batch, 1568)` |
+| `fc_1`, ReLU | `(batch, 128)` |
+| `fc_2` | `(batch, 10)` |
+
+The final layer has no activation. Its ten outputs are logits, one for each digit class.
+
+## The model pytree
+
+Constructing the model creates its parameters:
 
 ```python
-targets = jnp.array([0, 1, 1, 0])
+model = CNN(key=jax.random.key(0))
+print(model)
+```
+
+Ion's terminal pretty printer displays the complete tree without printing every array value:
+
+```text
+CNN(
+  conv_1=Conv(
+    w=Param(f32[3, 3, 1, 16], trainable=True),
+    b=Param(f32[16], trainable=True),
+    kernel_shape=(3, 3),
+    stride=(1, 1),
+    padding=((1, 1), (1, 1)),
+    dilation=(1, 1),
+    groups=1,
+  ),
+  conv_2=Conv(
+    w=Param(f32[3, 3, 16, 32], trainable=True),
+    b=Param(f32[32], trainable=True),
+    kernel_shape=(3, 3),
+    stride=(1, 1),
+    padding=((1, 1), (1, 1)),
+    dilation=(1, 1),
+    groups=1,
+  ),
+  pool=MaxPool(
+    kernel_shape=(2, 2),
+    stride=(2, 2),
+    padding=((0, 0), (0, 0)),
+  ),
+  fc_1=Linear(
+    w=Param(f32[1568, 128], trainable=True),
+    b=Param(f32[128], trainable=True),
+  ),
+  fc_2=Linear(
+    w=Param(f32[128, 10], trainable=True),
+    b=Param(f32[10], trainable=True),
+  ),
+)
+```
+
+The fields form one JAX pytree. There is no separate parameter dictionary: `model` is both the callable network and the
+value differentiated and updated during training. In IPython and Jupyter, the same model renders as an interactive
+[Treescope](https://github.com/google-deepmind/treescope) tree.
+
+The main training operations correspond as follows:
+
+| Stateful training pattern | Ion and JAX |
+|---|---|
+| Parameters are collected from a model | Parameters are leaves of the model pytree |
+| Gradients accumulate on parameters | A gradient pytree is returned |
+| An optimizer mutates parameters | `update` returns a new model and optimizer |
+| Random state is implicit | RNG keys are passed explicitly |
+| A framework transform compiles the model | `jax.jit` compiles an ordinary function |
+
+## Forward pass
+
+Calling the model produces one row of logits per image:
+
+```python
+logits = model(images)
+
+logits.shape  # (128, 10)
+```
+
+The largest logit determines the predicted class:
+
+```python
 predictions = jnp.argmax(logits, axis=-1)
 
-predictions.shape  # (4,)
+predictions.shape  # (128,)
 ```
 
-Optax provides the loss function. The loss takes the model as an explicit
-argument so JAX can differentiate with respect to it:
+Use `jax.nn.softmax` only when probabilities are needed for inspection. The cross-entropy function below accepts
+logits directly:
 
 ```python
-def loss_fn(model, x, targets):
-    logits = model(x)
-    losses = optax.softmax_cross_entropy_with_integer_labels(logits, targets)
+probabilities = jax.nn.softmax(logits, axis=-1)
+probabilities[0].sum()  # 1.0
+```
+
+## Loss and gradients
+
+The loss function takes the model and batch as explicit arguments and returns a scalar:
+
+```python
+def loss_fn(model, images, labels):
+    logits = model(images)
+    losses = optax.softmax_cross_entropy_with_integer_labels(logits, labels)
     return losses.mean()
-
-
-loss = loss_fn(model, x, targets)
 ```
 
-Keeping the computation in a function also makes the data flow visible: the
-model and batch go in, and a scalar loss comes out.
-
-## Gradients and updates
-
-Because the model is a JAX pytree, `jax.grad` returns a matching pytree of
-gradients:
+JAX differentiates this function with respect to its first argument:
 
 ```python
-grads = jax.grad(loss_fn)(model, x, targets)
+loss, grads = jax.value_and_grad(loss_fn)(model, images, labels)
 ```
 
-`jax.value_and_grad` computes the loss and gradients together, which is the
-usual form inside a training step:
+`grads` has the same pytree structure as `model`, with one gradient array for each trainable `Param`. Gradients are
+returned from the transformation; they are not stored on the model. There is no `ion.grad`.
 
-```python
-loss, grads = jax.value_and_grad(loss_fn)(model, x, targets)
-```
+## Optimizer updates
 
-There is no `ion.grad`. Native JAX transformations operate directly on the
-model.
-
-`ion.Optimizer` wraps an Optax transformation and initializes its state from the
-model:
+`ion.Optimizer` wraps an Optax transformation and creates its state from the model:
 
 ```python
 optimizer = ion.Optimizer(optax.adam(3e-4), model)
 model, optimizer = optimizer.update(model, grads)
 ```
 
-Models and optimizers are immutable values. `update` returns the next model and
-optimizer rather than modifying either input.
+Models and optimizers are immutable values. `update` returns their next versions rather than modifying either input.
+Frozen parameters are excluded from the optimizer state automatically; see [Freezing](../workflows.md#freezing).
 
 ## Compiling the training step
 
-The complete training step can be compiled with `jax.jit`:
+The forward pass, differentiation, and update form one ordinary function:
 
 ```python
 @jax.jit
-def train_step(model, optimizer, x, targets):
-    loss, grads = jax.value_and_grad(loss_fn)(model, x, targets)
+def train_step(model, optimizer, images, labels):
+    loss, grads = jax.value_and_grad(loss_fn)(model, images, labels)
     model, optimizer = optimizer.update(model, grads)
     return model, optimizer, loss
-
-
-model, optimizer, loss = train_step(model, optimizer, x, targets)
 ```
 
-The same function is called for each batch:
+The first call traces and compiles the function for the model structure, input shapes, and dtypes it receives. Later
+batches with the same shapes and dtypes reuse the compiled program:
 
 ```python
-for x, targets in load_data():
-    model, optimizer, loss = train_step(model, optimizer, x, targets)
+model, optimizer, loss = train_step(model, optimizer, images, labels)
 ```
 
-The loader and loss depend on the task. The model, gradient, update, and
-compilation pattern remains ordinary JAX.
+Keeping a fixed batch size avoids compiling a separate program for a shorter final batch.
+
+## Training on MNIST
+
+The outer data loop stays in Python. Each batch is converted and passed to the compiled step:
+
+```python
+batch_size = 128
+num_batches = len(train_images) // batch_size
+
+for epoch in range(5):
+    key = jax.random.key(epoch)
+    indices = jax.random.permutation(key, len(train_images))
+
+    for i in range(num_batches):
+        batch_indices = indices[i * batch_size : (i + 1) * batch_size]
+        images = jnp.asarray(train_images[batch_indices], dtype=jnp.float32) / 255.0
+        labels = jnp.asarray(train_labels[batch_indices])
+
+        model, optimizer, loss = train_step(model, optimizer, images, labels)
+```
+
+The complete example trains for five epochs and reaches about 99% test accuracy. These are the values from one
+recorded run:
+
+<iframe
+  class="nn-plot nn-plot--training"
+  src="../../assets/nn-mnist-training.html"
+  title="MNIST training loss and test accuracy over five epochs"
+  loading="lazy"
+></iframe>
+
+The exact values vary with hardware and library versions. The model, loss, gradient, update, and compilation pattern
+remains the same for other supervised tasks.
+
+## Evaluation and randomness
+
+Evaluation is another function over the model and arrays:
+
+```python
+@jax.jit
+def accuracy(model, images, labels):
+    logits = model(images)
+    predictions = jnp.argmax(logits, axis=-1)
+    return (predictions == labels).mean()
+
+
+test_accuracy = accuracy(
+    model,
+    jnp.asarray(test_images, dtype=jnp.float32) / 255.0,
+    jnp.asarray(test_labels),
+)
+```
+
+This CNN is deterministic. Stochastic layers such as `Dropout` take a key at call time instead of reading global random
+state or a global training mode:
+
+```python
+dropout = nn.Dropout(0.1)
+
+training_x = dropout(x, key=jax.random.key(1))
+evaluation_x = dropout(x, deterministic=True)
+```
+
+Models containing stochastic layers pass their key through `__call__` and the loss function. See the
+[Dropout reference](layers/dropout.md) for the complete call contract.
 
 ## Array conventions
 
-Pointwise layers such as `Linear`, `LayerNorm`, and `MLP` transform the final
-feature axis and preserve arbitrary leading dimensions:
+Pointwise layers such as `Linear`, `LayerNorm`, and `MLP` transform the final feature axis and preserve arbitrary
+leading dimensions:
 
 ```python
-linear = nn.Linear(64, 128, key=jax.random.key(3))
+linear = nn.Linear(64, 128, key=jax.random.key(2))
 
-linear(jnp.ones((64,))).shape         # (128,)
-linear(jnp.ones((32, 64))).shape      # (32, 128)
+linear(jnp.ones((64,))).shape  # (128,)
+linear(jnp.ones((32, 64))).shape  # (32, 128)
 linear(jnp.ones((32, 16, 64))).shape  # (32, 16, 128)
 ```
 
-### Input layouts
+Structural layers assign specific meanings to the leading axes:
 
-Structural layers assign specific meanings to their leading axes. Ion uses
-channels-last ordering:
+| Domain | Input layout |
+|---|---|
+| Vector data | `(batch, features)` |
+| Images | `(batch, height, width, channels)` |
+| Sequences | `(batch, length, channels)` |
+| Attention | `(batch, sequence, dimension)` |
+| Recurrent | `(batch, time, features)` |
 
-| Domain | Format | Example |
-|---|---|---|
-| Vector data | `(batch, features)` | `(32, 256)` |
-| Sequences | `(batch, length, channels)` | `(32, 128, 64)` |
-| Images | `(batch, height, width, channels)` | `(32, 32, 32, 3)` |
-| Attention | `(batch, sequence, dimension)` | `(32, 128, 512)` |
-| Recurrent | `(batch, time, features)` | `(32, 50, 64)` |
-
-Convolution and pooling interpret spatial axes, while attention, recurrent, and
-state space layers interpret sequence axes. Each [layer reference](layers/index.md)
-documents any stricter rank or batching requirements.
-
-### Adding batch dimensions
-
-Some structural layers accept exactly one batch dimension. `jax.vmap` can add
-an additional leading batch dimension without changing the layer:
+Each [layer reference](layers/index.md) documents any stricter rank or batching requirements. `jax.vmap` can add another
+leading batch dimension where a structural layer accepts exactly one:
 
 ```python
-# x.shape == (5, batch, time, features)
-y = jax.vmap(rnn)(x)
+y = jax.vmap(rnn)(x)  # x.shape == (groups, batch, time, features)
 ```
 
-Pointwise layers do not normally need this because they already preserve
-arbitrary leading dimensions.
-
-### Shape labels
-
-Single-letter dimension labels appear in type annotations and einsum strings.
-Their meaning is local to each layer:
-
-| Label | Common meaning |
-|---|---|
-| `...` | Arbitrary leading dimensions |
-| `b` | Batch |
-| `d` | Model or feature dimension |
-| `i`, `o` | Input and output features |
-| `r` | LoRA rank |
-| `v` | Vocabulary size |
-
-The signature and example on each layer page define its local shapes.
-
-### Dtypes
-
-Layer constructors do not take a `dtype` argument. Parameters use JAX's default
-floating dtype when a model is constructed:
+Layer constructors use JAX's default floating dtype and do not take a `dtype` argument. Cast parameters after
+construction when another precision is needed:
 
 ```python
-model = nn.MLP([64, 128, 10], key=jax.random.key(4))
 model = model.astype(jnp.bfloat16)
 ```
 
-Use `model.astype(dtype)` to change parameter precision after construction. See
-[Mixed precision](../workflows.md#mixed-precision) for activation casting and
-optimizer considerations.
+See [Mixed precision](../workflows.md#mixed-precision) for activation and optimizer considerations.
 
 ## Further examples
 
-- [CNN on MNIST](../examples/cnn-mnist.md) trains a convolutional image
-  classifier.
-- [RNN on MNIST](../examples/rnn-mnist.md) treats each image as a pixel
-  sequence.
-- [Ion Tour](../examples/ion-tour.ipynb) covers modules, parameters,
-  optimization, and checkpointing in a notebook.
+- [CNN on MNIST](../examples/cnn-mnist.md) contains the complete loader, training loop, evaluation, and recorded output
+  used by this guide.
+- [RNN on MNIST](../examples/rnn-mnist.md) treats each image as a length-784 pixel sequence.
+- [VAE on MNIST](../examples/vae-mnist.ipynb) adds a stochastic latent space and reparameterized sampling.
+- [Ion Tour](../examples/ion-tour.ipynb) covers module surgery, freezing, optimization, and checkpointing in a notebook.
