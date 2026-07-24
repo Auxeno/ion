@@ -32,6 +32,7 @@ theme:
 
 nav:
   - Home: index.md
+  - Quickstart: quickstart.md
   - Overview: overview.md
   - Core:
       - Module: core/module.md
