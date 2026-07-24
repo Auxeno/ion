@@ -2,14 +2,14 @@ Apply each layer in order.
 
 Parameters
 ----------
-x : jax.Array
+x : Any
     Input to the first layer.
 key : jax.Array | None
     Optional RNG key. Keyword-only.
 
 Returns
 -------
-jax.Array
+Any
     Output of the final layer.
 
 Info

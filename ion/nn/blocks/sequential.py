@@ -10,9 +10,10 @@ Layers accepting a `key` kwarg receive a per-layer key.
 
 import inspect
 from collections.abc import Callable, Iterator
+from typing import Any
 
 import jax
-from jaxtyping import Array, PRNGKeyArray
+from jaxtyping import PRNGKeyArray
 
 from ..module import Module
 
@@ -33,7 +34,7 @@ class Sequential(Module):
                 raise TypeError(f"Sequential expects callable layers, got {type(layer).__name__}")
         self.layers = layers
 
-    def __call__(self, x: Array, *, key: PRNGKeyArray | None = None) -> Array:
+    def __call__(self, x: Any, *, key: PRNGKeyArray | None = None) -> Any:
 
         keys = [None] * len(self.layers) if key is None else jax.random.split(key, len(self.layers))
 

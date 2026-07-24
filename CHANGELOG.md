@@ -4,6 +4,8 @@
 
 - **Layer weight inits now default to uniform variance scaling, matched to the following activation.** `Linear`, `Conv`, `ConvTranspose`, `GCNConv`, `SelfAttention`/`CrossAttention`, and the SSM layers (`S4D`, `S5`, `LRU`) default to `glorot_uniform` (gain 1) instead of `he_normal`/`truncated_normal(0.02)`; `MLP` uses `he_uniform`, since it applies ReLU between its layers. He assumes a ReLU that a bare projection or attention does not have, so gain-1 Glorot is the safer default and matches PyTorch and Flax. Pass an explicit `w_init` to restore the old behaviour.
 - **`Embedding` and `LearnedPositionalEmbedding` init scales with dimension.** The default is now `variance_scaling(1.0, "fan_in", "uniform", out_axis=0)`, giving std `1/sqrt(dim)` so each row starts near unit norm regardless of `dim` and independent of vocabulary or sequence length. Replaces the dimension-blind `truncated_normal(0.02)` constant, matching Flax's `Embed`.
+- **`Sequential.__call__` accepts and returns `Any`.** The annotation now reflects that chained callables may pass non-array values.
+- **New MkDocs documentation site.** Adds guides, API reference, examples, workflows, and sharp-edge documentation under `docs/`.
 
 ## 0.10.2
 

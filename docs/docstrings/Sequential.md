@@ -5,8 +5,8 @@ Each layer's output feeds the next. Layers that accept a `key` (like `Dropout`) 
 Parameters
 ----------
 *layers : Callable
-    The layers or callables to apply in order. Any callable taking one array
-    and returning one array works, not only `Module`s.
+    The layers or callables to apply in order. Any callable taking one value
+    and returning one value works, not only `Module`s.
 
 Attributes
 ----------
