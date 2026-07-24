@@ -56,7 +56,7 @@ In a terminal, a pretty printer gives the tree as text. In IPython/Jupyter envir
 
 ## Neural network layers
 
-Each [`ion.nn`](nn/index.md) layer is a `Module`, constructed with a `key` for weight initialization:
+Each [`ion.nn`](nn/layers/index.md) layer is a `Module`, constructed with a `key` for weight initialization:
 
 | Family | Layers |
 |--------|--------|
@@ -80,18 +80,20 @@ attn = nn.SelfAttention(64, num_heads=8, key=jax.random.key(0))
 y = attn(jax.numpy.ones((32, 16, 64)))
 ```
 
-The [NN reference](nn/index.md) covers input formats and conventions shared across layers.
+The [NN guide](nn/guide.md) builds and trains a model and collects the shared
+array conventions. The [layer reference](nn/layers/index.md) lists the
+available families.
 
 ## Graph neural network layers
 
-[`ion.gnn`](gnn/index.md) provides graph layers and message-passing ops.
+[`ion.gnn`](gnn/guide.md) provides graph layers and message-passing operations.
 
 | Family | Layers |
 |--------|--------|
 | [GCN](gnn/layers/gcn.md) | `GCNConv` |
 | [GAT](gnn/layers/gat.md) | `GATConv`, `GATv2Conv` |
 | [GIN](gnn/layers/gin.md) | `GINConv` |
-| [Ops](gnn/ops.md) | segment reductions, graph pooling, `add_self_loops`, `batch_graphs` |
+| [Operations](gnn/operations.md) | segment reductions, graph pooling, `add_self_loops`, `batch_graphs` |
 
 Graphs are plain arrays in COO format: node features plus `senders`/`receivers` edge indices.
 
@@ -102,7 +104,9 @@ gcn = gnn.GCNConv(16, 32, key=jax.random.key(0))
 h = gcn(x, senders, receivers)
 ```
 
-The [GNN reference](gnn/index.md) covers the graph array format and conventions shared across graph layers.
+The [GNN guide](gnn/guide.md) follows messages through a graph and covers the
+shared COO, batching, pooling, and self-loop conventions. The [layer
+reference](gnn/layers/index.md) compares the available graph convolutions.
 
 ## Native transforms
 
@@ -200,6 +204,7 @@ Casting is how Ion does [mixed precision](guides/mixed-precision.md); see [Freez
 ## Where to go next
 
 - [Core](core/module.md) for how Module, Param, and Optimizer fit together.
-- [NN](nn/index.md) and [GNN](gnn/index.md) for the layers and their cross-cutting rules.
+- The [NN guide](nn/guide.md) and [GNN guide](gnn/guide.md) for walkthroughs
+  and shared conventions.
 - [Guides](guides/freezing.md) for training, freezing, mixed precision, and checkpointing.
 - [Examples](examples/index.md) for end-to-end projects on real datasets.

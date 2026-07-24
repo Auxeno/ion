@@ -38,8 +38,9 @@ nav:
       - Param: core/param.md
       - Optimizer: core/optimizer.md
   - NN:
-      - nn/index.md
+      - Guide: nn/guide.md
       - Layers:
+          - nn/layers/index.md
           - Linear: nn/layers/linear.md
           - Convolution: nn/layers/conv.md
           - Attention: nn/layers/attention.md
@@ -54,12 +55,13 @@ nav:
           - MLP: nn/layers/mlp.md
           - Sequential: nn/layers/sequential.md
   - GNN:
-      - gnn/index.md
+      - Guide: gnn/guide.md
       - Layers:
+          - gnn/layers/index.md
           - GCN: gnn/layers/gcn.md
           - GAT: gnn/layers/gat.md
           - GIN: gnn/layers/gin.md
-      - Ops: gnn/ops.md
+      - Operations: gnn/operations.md
   - Guides:
       - Freezing: guides/freezing.md
       - Mixed Precision: guides/mixed-precision.md

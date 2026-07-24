@@ -28,7 +28,7 @@ pip install ion-nn
 
     The neural network layer library and its full API reference.
 
-    [:octicons-arrow-right-24: Layers](nn/index.md)
+    [:octicons-arrow-right-24: Layers](nn/layers/index.md)
 
 -   :material-graph-outline:{ .lg .middle } **GNN**
 
@@ -36,7 +36,7 @@ pip install ion-nn
 
     Graph neural network layers and message-passing ops.
 
-    [:octicons-arrow-right-24: Graphs](gnn/index.md)
+    [:octicons-arrow-right-24: Graphs](gnn/guide.md)
 
 -   :material-book-open-variant:{ .lg .middle } **Guides**
 
