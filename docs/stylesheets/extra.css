@@ -311,17 +311,20 @@ body[data-md-color-scheme] .jupyter-wrapper {
    iframe mirrors Material's active colour scheme and keeps its Plotly paper,
    plot and document backgrounds transparent. */
 .gnn-plot {
+  display: block;
   width: 100%;
   border: 0;
-  background: transparent;
+  background: transparent !important;
+  background-color: transparent !important;
 }
 
 .gnn-plot--graph {
-  height: 28rem;
+  height: 360px;
 }
 
 .gnn-plot--propagation {
-  height: 32rem;
+  height: 440px;
+  margin-top: 0.75rem;
 }
 
 /* Thin gradient rule under the top header, echoing the logo. The header is

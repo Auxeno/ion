@@ -6,7 +6,7 @@
   <title>A graph represented in COO format</title>
   <style>
     :root {
-      color-scheme: light dark;
+      color-scheme: light;
       --foreground: #252a34;
       --muted: #6b7688;
       --edge: rgba(37, 42, 52, 0.28);
@@ -15,6 +15,7 @@
       --blue: #478af5;
     }
     :root[data-theme="dark"] {
+      color-scheme: dark;
       --foreground: #f0f0f0;
       --muted: #a6adbb;
       --edge: rgba(240, 240, 240, 0.3);
@@ -23,15 +24,24 @@
     * {
       box-sizing: border-box;
     }
+    html,
+    body,
+    #coo-graph,
+    .js-plotly-plot,
+    .plot-container,
+    .svg-container,
+    .main-svg {
+      background: transparent !important;
+      background-color: transparent !important;
+    }
     body {
       margin: 0;
-      background: transparent;
       font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       font-size: 14px;
     }
     #coo-graph {
       width: 100%;
-      height: 440px;
+      height: 360px;
     }
   </style>
 </head>
