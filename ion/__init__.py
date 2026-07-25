@@ -34,7 +34,9 @@ def enable_treescope(everything: bool = False) -> None:
             from jaxlib._jax import ArrayImpl
 
             html_fmt = ip.display_formatter.formatters["text/html"]  # type: ignore[reportAttributeAccessIssue,reportOptionalMemberAccess]
-            render = treescope.render_to_html
+
+            # Wrap in a slightly smaller font so trees render more compactly in notebooks
+            render = lambda obj: f'<div style="font-size:90%">{treescope.render_to_html(obj)}</div>'
 
             html_fmt.for_type(nn.Module, lambda obj: render(obj))
             html_fmt.for_type(nn.Param, lambda obj: render(obj))
