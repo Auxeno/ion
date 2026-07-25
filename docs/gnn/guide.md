@@ -150,8 +150,8 @@ aggregated[4]  # [0.0, 1.0, 1.0, 1.0, 0.0, 1.0] = x[1] + x[2] + x[3] + x[5]
 
 The four messages are grouped into row 4 because their receiver is 4. Node 4's
 own feature is absent because the graph does not yet contain a `4 -> 4`
-self-loop. This send-then-group operation is the basis of the GCN, GAT, and GIN
-layers.
+self-loop. This send-then-group operation is the basis of the GCN, GAT, GIN, and
+GraphSAGE layers.
 
 ## Self-loops
 
@@ -172,6 +172,7 @@ are never added inside a layer.
 | `GCNConv` | Normally yes | Include the node's current features in aggregation |
 | `GATConv`, `GATv2Conv` | Normally yes | Let a node attend to itself |
 | `GINConv` | No | The `(1 + eps)` term already includes the node |
+| `SAGEConv` | No | The root weight already includes the node |
 
 `add_self_loops` appends one loop for every node. It does not check whether the
 input already contains self-loops, so avoid calling it twice on the same edge

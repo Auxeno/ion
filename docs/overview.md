@@ -139,6 +139,7 @@ available families.
 | [GCN](gnn/layers/gcn.md) | `GCNConv` |
 | [GAT](gnn/layers/gat.md) | `GATConv`, `GATv2Conv` |
 | [GIN](gnn/layers/gin.md) | `GINConv` |
+| [GraphSAGE](gnn/layers/sage.md) | `SAGEConv` |
 | [Operations](gnn/operations.md) | segment reductions, graph pooling, `add_self_loops`, `batch_graphs` |
 
 Graphs are plain arrays in COO format: node features plus `senders`/`receivers` edge indices.

@@ -22,7 +22,7 @@ def triangle_graph_no_self_loops():
 
 
 def _build_gnn_layers(key):
-    keys = iter(jax.random.split(key, 15))
+    keys = iter(jax.random.split(key, 20))
     senders = jnp.array([0, 1, 1, 2, 0, 2, 0, 1, 2])
     receivers = jnp.array([1, 0, 2, 1, 2, 0, 0, 1, 2])
     x = jax.random.normal(next(keys), (3, 8))
@@ -56,6 +56,11 @@ def _build_gnn_layers(key):
             receivers,
             None,
         ),
+        (gnn.SAGEConv(8, 16, key=next(keys)), x, senders, receivers, None),
+        (gnn.SAGEConv(8, 16, aggregator="max", key=next(keys)), x, senders, receivers, None),
+        (gnn.SAGEConv(8, 16, aggregator="sum", key=next(keys)), x, senders, receivers, None),
+        (gnn.SAGEConv(8, 16, normalize=True, key=next(keys)), x, senders, receivers, None),
+        (gnn.SAGEConv(8, 16, root_weight=False, key=next(keys)), x, senders, receivers, None),
     ]
 
 
@@ -70,6 +75,11 @@ _GNN_PARAM_NAMES = [
     "gat_v2_conv_edge_dim",
     "gin_conv",
     "gin_conv_train_eps",
+    "sage_conv",
+    "sage_conv_max",
+    "sage_conv_sum",
+    "sage_conv_normalize",
+    "sage_conv_no_root",
 ]
 
 

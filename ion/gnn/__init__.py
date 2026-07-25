@@ -12,12 +12,14 @@ from .ops import (
     segment_softmax,
     sum_pool,
 )
+from .sage import SAGEConv
 
 __all__ = [
     "GATConv",
     "GATv2Conv",
     "GCNConv",
     "GINConv",
+    "SAGEConv",
     "add_self_loops",
     "batch_graphs",
     "max_pool",

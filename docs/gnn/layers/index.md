@@ -11,3 +11,4 @@ representation, message passing, self-loops, batching, and pooling.
 | [GCN](gcn.md) | `GCNConv` | Fixed symmetric degree normalization |
 | [GAT](gat.md) | `GATConv`, `GATv2Conv` | Learned attention weights |
 | [GIN](gin.md) | `GINConv` | Sum plus a separate central-node term |
+| [GraphSAGE](sage.md) | `SAGEConv` | Mean, max, or sum pooling plus a root term |
