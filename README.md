@@ -2,7 +2,7 @@
 
   <h1><img src="https://raw.githubusercontent.com/auxeno/ion/main/assets/logo-transparent.png" alt="Ion" width="72"><br>Ion</h1>
 
-  <h3>A simple neural network library for JAX</h3>
+  <h3>A simple library for neural and graph networks in JAX.</h3>
 
 [![Python](https://img.shields.io/badge/Python-3.11+-7C3AED.svg)](https://www.python.org/)
 [![PyPI](https://img.shields.io/pypi/v/ion-nn?color=478AF5)](https://pypi.org/project/ion-nn/)
