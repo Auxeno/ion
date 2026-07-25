@@ -1,6 +1,6 @@
 <div align="center">
 
-  <h1><img src="https://raw.githubusercontent.com/auxeno/ion/main/assets/logo.png" alt="Ion" width="72"><br>Ion</h1>
+  <h1><img src="https://raw.githubusercontent.com/auxeno/ion/main/assets/logo-transparent.png" alt="Ion" width="72"><br>Ion</h1>
 
   <h3>A simple neural network library for JAX</h3>
 
