@@ -7,7 +7,7 @@ model : PyTree
     construct the optimizer.
 grads : PyTree
     Gradients returned by `jax.grad`.
-kwargs : Any
+**kwargs : Any
     Additional keyword arguments forwarded to the optax transform.
 
 Returns

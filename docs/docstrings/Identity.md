@@ -3,6 +3,13 @@ rest.
 
 Keeps a disabled module slot visible and replaceable through `Module.at`.
 
+Parameters
+----------
+*args : Any
+    Positional arguments accepted and ignored.
+**kwargs : Any
+    Keyword arguments accepted and ignored.
+
 Example
 -------
 ```python
