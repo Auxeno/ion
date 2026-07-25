@@ -1,8 +1,6 @@
 {% extends "_base/function.html.jinja" %}
 
-{#- Top-level functions render like classes: a name-only heading with the
-    signature in a separate block below. Methods (parent is a class) stay on a
-    single line, with the signature merged into the heading. -#}
+{#- Separate top-level signatures; keep method signatures in their headings. -#}
 {% block heading %}
   {% if function.parent and function.parent.is_class %}
     {% if config.show_symbol_type_heading %}<code class="doc-symbol doc-symbol-heading doc-symbol-{{ symbol_type }}"></code>{% endif %}

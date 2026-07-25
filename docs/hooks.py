@@ -5,29 +5,20 @@ import pathlib
 from pygments.lexers.python import PythonLexer
 from pygments.token import Name, Operator, Punctuation
 
-# Pygments only tags Name.Function at def sites, so call-heavy example code
-# renders almost entirely in the default text colour. Wrap the Python lexer
-# with a one-token lookahead that retags every Name in a dotted path: a Name
-# directly followed by an opening paren becomes Name.Function (nn.MLP(...),
-# jax.grad(...)), and a Name that sits after a dot or directly before one
-# becomes Name.Attribute, so the whole path colours (jax.Array, nn.Linear,
-# optax.chain, model.at); extra.css colours both with the call cyan. Bare
-# variables, arguments, and kwargs stay plain. nbconvert's IPython lexer
-# subclasses PythonLexer, so notebook pages inherit the retag. Build-time
-# only; if a Pygments upgrade ever breaks the wrap, everything reverts to
-# plain names.
+# Highlight calls and dotted names consistently in fenced and notebook code.
+# The IPython lexer used by nbconvert inherits this Python lexer.
 
 
 def on_config(config, **kwargs):
     if getattr(PythonLexer, "_ion_call_sites", False):
         return
     setattr(PythonLexer, "_ion_call_sites", True)
-    inner = PythonLexer.get_tokens_unprocessed
+    tokenize = PythonLexer.get_tokens_unprocessed
 
-    def with_call_sites(self, text, *args):
+    def highlight_call_sites(self, text, *args):
         pending = None
         after_dot = False
-        for index, token, value in inner(self, text, *args):
+        for index, token, value in tokenize(self, text, *args):
             if pending is not None:
                 if token is Punctuation and value == "(":
                     yield pending[0], Name.Function, pending[1]
@@ -44,17 +35,13 @@ def on_config(config, **kwargs):
         if pending is not None:
             yield pending[0], Name.Attribute if pending[2] else Name, pending[1]
 
-    setattr(PythonLexer, "get_tokens_unprocessed", with_call_sites)
+    setattr(PythonLexer, "get_tokens_unprocessed", highlight_call_sites)
 
-# Material reveals the left navigation only from 76.25em, which on a laptop is
-# roughly a full-width window. Shift that breakpoint, and its max-width drawer
-# companion, down to 60em (960px) so the sidebar appears around 65% width. The
-# value lives in both the compiled CSS and the JS media watcher, so we rewrite
-# both to keep them in sync. Breakpoints below 60em (mobile, tablet) are left
-# untouched, so small-screen layout is unchanged.
+# Show Material's desktop navigation from 60em. Both values occur in the
+# compiled CSS and JavaScript media queries.
 BREAKPOINTS = {
-    "76.234375em": "59.984375em",  # max-width drawer companion (60em - 0.015625em)
-    "76.25em": "60em",             # min-width desktop breakpoint
+    "76.234375em": "59.984375em",
+    "76.25em": "60em",
 }
 
 

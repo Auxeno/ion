@@ -1,9 +1,6 @@
-/* Ion docs theme. Tune each colour scheme independently below. */
+/* Ion docs theme */
 
-/* Canonical Ion palette: twelve vivid hues designed for plotting, all at one
-   lightness level. Text never uses these raw values; the shared block below
-   derives text-safe variants per scheme, so token colours track this palette
-   automatically. */
+/* Brand palette */
 :root {
   --ion-red: #ef5350;
   --ion-rose: #e6668a;
@@ -24,15 +21,11 @@
   --md-primary-fg-color: #181a20;
   --md-accent-fg-color: #7c3aed;
 
-  /* Ion brand, sampled from the logo's cyan-to-purple gradient. Defined per
-     scheme as a literal (not via nested vars) so the gradient value is always
-     valid, and the cyan stays legible on light backgrounds. */
   --ion-brand-cyan: #0891b2;
   --ion-brand-purple: #7c3aed;
   --ion-gradient: linear-gradient(120deg, #0891b2, #7c3aed);
 
-  /* Token lightness on the near-white code background: every derived hue
-     lands between 4.8:1 and 5.8:1. */
+  /* Text-safe token lightness */
   --ion-text-l: 0.52;
 
   --md-code-hl-comment-color: #8a8f98;
@@ -46,16 +39,12 @@
   --ion-brand-purple: #8e51ff;
   --ion-gradient: linear-gradient(120deg, #22d3ee, #8e51ff);
 
-  /* Token lightness on the dark code background: every derived hue lands
-     between 6:1 and 7:1. */
   --ion-text-l: 0.76;
 
   --md-code-hl-comment-color: #7a7f88;
 }
 
-/* Text-safe palette: canonical hue and chroma with lightness re-pinned to the
-   scheme's --ion-text-l, so every colour clears contrast on that scheme's code
-   background. `[data-md-color-scheme]` matches both schemes. */
+/* Syntax palette */
 [data-md-color-scheme] {
   --ion-text-red: oklch(from var(--ion-red) var(--ion-text-l) c h);
   --ion-text-rose: oklch(from var(--ion-rose) var(--ion-text-l) c h);
@@ -70,9 +59,6 @@
   --ion-text-purple: oklch(from var(--ion-purple) var(--ion-text-l) c h);
   --ion-text-magenta: oklch(from var(--ion-magenta) var(--ion-text-l) c h);
 
-  /* Code highlighting, aligned to the palette: purple keywords, blue
-     constants, cyan calls, green strings, yellow numbers, slate operators
-     and punctuation (muted so the coloured tokens carry the block). */
   --md-code-hl-keyword-color: var(--ion-text-purple);
   --md-code-hl-function-color: var(--ion-text-cyan);
   --md-code-hl-string-color: var(--ion-text-green);
@@ -81,16 +67,10 @@
   --md-code-hl-operator-color: var(--ion-text-slate);
   --md-code-hl-punctuation-color: var(--ion-text-slate);
 
-  /* Line highlights (hl_lines) carry brand cyan instead of Material's blue. */
   --md-code-hl-color: var(--ion-cyan);
   --md-code-hl-color--light: color-mix(in srgb, var(--ion-cyan) 10%, transparent);
-}
 
-/* Colour-code the mkdocstrings symbol badges with the brand palette so every
-   layer page carries it: purple classes, cyan methods, accents for the rest.
-   `[data-md-color-scheme]` matches both schemes and, loading after mkdocstrings'
-   own CSS, wins over its defaults; the --ion-text-* refs resolve per scheme. */
-[data-md-color-scheme] {
+  /* mkdocstrings symbol badges */
   --doc-symbol-class-fg-color: var(--ion-text-purple);
   --doc-symbol-class-bg-color: color-mix(in srgb, var(--ion-text-purple) 12%, transparent);
   --doc-symbol-method-fg-color: var(--ion-text-cyan);
@@ -105,56 +85,37 @@
   --doc-symbol-module-bg-color: color-mix(in srgb, var(--ion-text-orange) 12%, transparent);
 }
 
-/* Colour True / False / None as numeric literals rather than the default name
-   colour: they are values, so they read best grouped with ints and floats.
-   Pygments tags them Keyword.Constant (.kc). */
+/* Pygments token refinements */
 .highlight .kc {
   color: var(--md-code-hl-number-color);
 }
 
-/* Word operators (in, and, or, not) read as keywords, matching editor
-   convention; Pygments tags them Operator.Word (.ow). */
 .highlight .ow,
 .jupyter-wrapper .highlight-ipynb .ow {
   color: var(--md-code-hl-keyword-color);
 }
 
-/* Decorators share the call cyan. Pygments tags only the leading @name
-   segment (.nd); any dotted tail stays plain. */
 .highlight .nd,
 .jupyter-wrapper .highlight-ipynb .nd {
   color: var(--ion-text-cyan);
 }
 
-/* Dunder methods (__call__, __init__) are functions wherever they appear;
-   Pygments tags them Name.Function.Magic (.fm), which Material leaves
-   unstyled. */
 .highlight .fm,
 .jupyter-wrapper .highlight-ipynb .fm {
   color: var(--md-code-hl-function-color);
 }
 
-/* Bare attribute access (optax.chain, model.at) shares the function blue.
-   The build hook in docs/hooks.py retags dotted non-call names as
-   Name.Attribute (.na). */
 .highlight .na,
 .jupyter-wrapper .highlight-ipynb .na {
   color: var(--md-code-hl-function-color);
 }
 
-/* self and cls carry the call cyan. Pygments tags them Name.Builtin.Pseudo
-   (.bp), which Material otherwise groups with builtins under the constant hue. */
 .highlight .bp,
 .jupyter-wrapper .highlight-ipynb .bp {
   color: var(--ion-text-cyan);
 }
 
-/* Notebook code cells (mkdocs-jupyter) ship nbconvert's default Pygments theme
-   through JupyterLab --jp-mirror-editor-* variables, ignoring Material's palette.
-   Point those at the same --md-code-hl-* colours the rest of the site uses, and
-   match the code background, so notebooks read as part of Ion. The body[...]
-   prefix outranks the theme's own light and dark .jupyter-wrapper rules, which
-   are injected into each page after this stylesheet. */
+/* Keep notebook cells aligned with Material's syntax theme. */
 body[data-md-color-scheme] .jupyter-wrapper {
   --jp-cell-editor-background: var(--md-code-bg-color);
   --jp-cell-editor-active-background: var(--md-code-bg-color);
@@ -171,37 +132,27 @@ body[data-md-color-scheme] .jupyter-wrapper {
   --jp-mirror-editor-punctuation-color: var(--md-code-hl-punctuation-color);
 }
 
-/* The notebook Pygments theme colours the keyword, string, number and comment
-   families through the --jp-mirror-editor-* vars above but leaves the Name
-   family unstyled, so namespaces, defs, class names and builtins fall back to
-   the default text colour. Material colours those in fenced blocks; mirror its
-   mapping here so notebook code reads identically: cyan namespaces, defs and
-   classes, blue builtins and constants. */
 .jupyter-wrapper .highlight-ipynb .nn,
 .jupyter-wrapper .highlight-ipynb .nf,
 .jupyter-wrapper .highlight-ipynb .nc {
   color: var(--md-code-hl-function-color);
 }
+
 .jupyter-wrapper .highlight-ipynb .nb,
 .jupyter-wrapper .highlight-ipynb .no {
   color: var(--md-code-hl-constant-color);
 }
 
-/* True / False / None as numeric literals in notebooks too (nbconvert tags them
-   .kc and colours them as keywords). */
 .jupyter-wrapper .highlight-ipynb .kc {
   color: var(--md-code-hl-number-color);
   font-weight: normal;
 }
 
-/* Wider grid than the 61rem default so the 100-char example sources embedded
-   from examples/ fit without scrolling. Prose is capped separately below. */
+/* Wide code and output area with a readable prose measure */
 .md-grid {
   max-width: 80rem;
 }
 
-/* Keep running text at a readable measure even though the grid is wide.
-   Code blocks, tables and notebook outputs stay full width. */
 .md-typeset > p,
 .md-typeset > ul,
 .md-typeset > ol,
@@ -209,34 +160,20 @@ body[data-md-color-scheme] .jupyter-wrapper {
   max-width: 45rem;
 }
 
-/* Drop the table of contents before the nav when width runs out. The nav is
-   lowered to 60em by docs/hooks.py, matching Material's own TOC breakpoint, so
-   both would otherwise appear together. Hiding the TOC below 87.5em reverses the
-   order: the TOC goes first, then the nav. 87.5em is where content still fits a
-   100-char code line with both sidebars present. Must match the theme's
-   `:not([hidden])` specificity to win. */
+/* Drop the table of contents before the primary navigation. */
 @media screen and (max-width: 87.49em) {
   .md-sidebar--secondary:not([hidden]) {
     display: none;
   }
 }
 
-/* Sidebars 10% narrower than the 12.1rem default, giving the width back to
-   content. Matches the lowered 60em nav breakpoint so the mobile nav drawer
-   keeps its full width. */
 @media screen and (min-width: 60em) {
   .md-sidebar {
     width: 10.9rem;
   }
 }
 
-/* Hairline between each sidebar and the content column so the left nav and
-   right table of contents read as separate panes. The sticky sidebar collapses
-   to its wrapper, so it gets a viewport-height floor to anchor to; a
-   pseudo-element then insets from that box's top and bottom by an equal gap,
-   giving both sides a matching rule with small, symmetric top and bottom gaps.
-   Only present when the sidebars are (>=60em); reuses the iframe border's
-   lightest rule colour. */
+/* Sidebar separators */
 @media screen and (min-width: 60em) {
   .md-sidebar--primary,
   .md-sidebar--secondary {
@@ -259,8 +196,7 @@ body[data-md-color-scheme] .jupyter-wrapper {
   }
 }
 
-/* Keep the repository link in the top header down to 350px. Below that, use
-   Material's drawer placement so the site title still fits without overflow. */
+/* Keep the repository link in the header when space permits. */
 .ion-header-home {
   color: inherit;
 }
@@ -286,9 +222,7 @@ body[data-md-color-scheme] .jupyter-wrapper {
   }
 }
 
-/* Top-level API headings (class ion.nn.RNN, func ion.nn.sinusoidal): a touch
-   larger than base h2. These are name-only; the signature renders separately.
-   `__call__` and other members are h3, so they keep their smaller size. */
+/* API reference */
 .md-typeset h2.doc-heading {
   font-size: 1.7em;
 }
@@ -300,38 +234,32 @@ body[data-md-color-scheme] .jupyter-wrapper {
   font-weight: 400;
 }
 
-/* Signature blocks: one logical line, soft-wrapped in the browser */
 .doc-signature code {
   font-size: 0.95em;
   white-space: pre-wrap;
 }
 
-/* Indent everything belonging to a class or member under its heading */
 .doc-contents {
   padding-left: 1rem;
 }
 
-/* Indent section bodies under their titles (Parameters, Returns, Examples) */
 .doc-section > :not(:first-child) {
   margin-left: 1rem;
 }
 
-/* Notebook pages: cap tall cell outputs (treescope pytree reprs especially)
-   so they scroll inside a fixed box instead of dominating the page. */
+/* Cap tall notebook outputs, including treescope representations. */
 .jp-OutputArea-output {
   max-height: 30rem;
   overflow: auto;
 }
 
-/* Interactive COO and feature-propagation plots on the GNN landing page. Each
-   iframe mirrors Material's active colour scheme and keeps its Plotly paper,
-   plot and document backgrounds transparent. */
-.gnn-plot {
+/* Embedded Plotly figures */
+.gnn-plot,
+.nn-plot {
   display: block;
   width: 100%;
   border: 0;
   background: transparent !important;
-  background-color: transparent !important;
 }
 
 .gnn-plot--graph {
@@ -343,24 +271,12 @@ body[data-md-color-scheme] .jupyter-wrapper {
   margin-top: 0.75rem;
 }
 
-/* MNIST training curves in the NN guide. The iframe and Plotly document use
-   the same explicit pixel height so Material's root font size cannot leave a
-   blank strip below the figure. */
-.nn-plot {
-  display: block;
-  width: 100%;
-  border: 0;
-  background: transparent !important;
-  background-color: transparent !important;
-}
-
 .nn-plot--training {
   height: 390px;
   margin-top: 0.75rem;
 }
 
-/* Thin gradient rule under the top header, echoing the logo. The header is
-   already positioned by the theme, so the pseudo-element anchors to it. */
+/* Gradient header rule */
 .md-header::after {
   content: "";
   position: absolute;
@@ -371,7 +287,7 @@ body[data-md-color-scheme] .jupyter-wrapper {
   background: var(--ion-gradient);
 }
 
-/* Landing hero (home page only, where nav and TOC are hidden) */
+/* Landing page */
 .md-typeset .hero {
   text-align: center;
   margin-top: -0.4rem;
@@ -393,7 +309,7 @@ body[data-md-color-scheme] .jupyter-wrapper {
   -webkit-text-fill-color: transparent;
   color: transparent;
 }
-/* Drop the heading permalink (pilcrow) so the wordmark centres cleanly */
+
 .md-typeset .hero .headerlink {
   display: none;
 }
@@ -405,21 +321,16 @@ body[data-md-color-scheme] .jupyter-wrapper {
 .md-typeset .hero .md-button {
   margin: 0.4rem 0.2rem;
 }
-/* Secondary button: the theme colours its text with --md-primary-fg-color, which
-   we pin near-black for the header, so it vanishes on the dark theme. Use the
-   default foreground instead so it reads in both schemes. */
 .md-typeset .md-button:not(.md-button--primary) {
   color: var(--md-default-fg-color);
   border-color: currentcolor;
 }
-/* Center the install snippet under the buttons at a compact width */
 .md-typeset .hero > .highlight {
   max-width: 22rem;
   margin: 1.2rem auto 0;
   text-align: left;
 }
 
-/* Primary button carries the brand, flipping magenta on hover */
 .md-typeset .md-button--primary {
   background-color: var(--ion-brand-purple);
   border-color: var(--ion-brand-purple);
@@ -430,13 +341,11 @@ body[data-md-color-scheme] .jupyter-wrapper {
   border-color: var(--ion-magenta);
   color: #fff;
 }
-/* Secondary button picks up magenta on hover to match */
 .md-typeset .md-button:not(.md-button--primary):is(:hover, :focus) {
   background-color: transparent;
   color: var(--ion-magenta);
   border-color: var(--ion-magenta);
 }
-/* Homepage calls to action use Ion blue on hover */
 .md-typeset .hero .md-button--primary:is(:hover, :focus) {
   background-color: var(--ion-blue);
   border-color: var(--ion-blue);
@@ -446,7 +355,7 @@ body[data-md-color-scheme] .jupyter-wrapper {
   border-color: var(--ion-blue);
 }
 
-/* Feature cards: subtle brand lift on hover */
+/* Feature cards */
 .md-typeset .grid.cards > ul > li {
   position: relative;
   transition: border-color 125ms, box-shadow 125ms;
@@ -455,7 +364,6 @@ body[data-md-color-scheme] .jupyter-wrapper {
   border-color: var(--ion-brand-purple);
   box-shadow: 0 0 0 1px var(--ion-brand-purple);
 }
-/* Stretch each card's single link over the whole card so any click lands right */
 .md-typeset .grid.cards > ul > li a::after {
   content: "";
   position: absolute;

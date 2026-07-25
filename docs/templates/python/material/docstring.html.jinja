@@ -1,5 +1,4 @@
-{#- Replaces _base/docstring.html.jinja: wraps each non-text section in a
-    div.doc-section so extra.css can indent section bodies under their titles. -#}
+{#- Wrap structured sections so their bodies can be indented. -#}
 
 {% if docstring_sections %}
   {% with autoref_hook = AutorefsHook(obj, config) %}

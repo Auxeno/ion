@@ -1,5 +1,4 @@
-{#- Replaces the stock collapsible details element with a static admonition box.
-    Numpy "Notes" sections map to Material's note style, titled "Note". -#}
+{#- Render docstring admonitions as static Material boxes. -#}
 
 {% set kind = "note" if section.value.kind == "notes" else section.value.kind %}
 {% set title = "Note" if section.title == "Notes" else section.title %}
