@@ -1,6 +1,6 @@
 # Overview
 
-Ion is a minimal harness for building and training neural networks in JAX. It has a small core of three pieces, with NN and GNN layers built on top.
+Ion introduces three core abstractions for building and training neutral networks in JAX. Its neural and graph network layers are built on top of them.
 
 ## Quickstart
 
@@ -41,7 +41,7 @@ def train_step(model, optimizer, x, y):
 model, optimizer = train_step(model, optimizer, x, y)
 ```
 
-The sections below unpack the model tree, transforms, optimizer, and layers.
+The sections below introduce the three core abstractions, network layers and common workflows.
 
 ## The core
 
