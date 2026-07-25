@@ -2,9 +2,40 @@
 
 Common workflows that apply across models and layer families:
 
+- [Inspecting models](#inspecting-models)
 - [Freezing](#freezing)
 - [Mixed precision](#mixed-precision)
 - [Checkpointing](#checkpointing)
+
+## Inspecting models
+
+A model prints as a tree, with each `Param` showing its dtype, shape, and
+trainability:
+
+```text
+MLP(
+  layer_1=Linear(
+    w=Param(f32[4, 16], trainable=True),
+    b=Param(f32[16], trainable=True),
+  ),
+  layer_2=Linear(
+    w=Param(f32[16, 3], trainable=True),
+    b=Param(f32[3], trainable=True),
+  ),
+  activation=relu,
+)
+```
+
+In IPython and Jupyter, [Treescope](https://github.com/google-deepmind/treescope)
+renders the same tree interactively, with collapsible nodes and array
+visualizations. It is enabled on import and covers Ion modules, params, and JAX
+arrays:
+
+```python
+ion.enable_treescope()                 # Ion modules, params, and arrays (default)
+ion.enable_treescope(everything=True)  # every type treescope supports
+ion.disable_treescope()                # fall back to plain text
+```
 
 ## Freezing
 
