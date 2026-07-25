@@ -8,6 +8,8 @@ Channels-last format to match image data conventions: (..., spatial, channels).
 Glorot uniform weight init, zeros for bias.
 """
 
+from typing import Literal
+
 import jax
 import jax.numpy as jnp
 from jax import lax
@@ -30,7 +32,7 @@ class Conv(Module):
     b: Param[Float[Array, " c"]] | None
     kernel_shape: tuple[int, ...]
     stride: tuple[int, ...]
-    padding: str | tuple[tuple[int, int], ...]
+    padding: Literal["SAME", "VALID"] | tuple[tuple[int, int], ...]
     dilation: tuple[int, ...]
     groups: int
 
@@ -40,7 +42,7 @@ class Conv(Module):
         out_channels: int,
         kernel_shape: tuple[int, ...],
         stride: int | tuple[int, ...] = 1,
-        padding: str | int | tuple[int, ...] = 0,
+        padding: Literal["SAME", "VALID"] | int | tuple[int, ...] = 0,
         dilation: int | tuple[int, ...] = 1,
         groups: int = 1,
         bias: bool = True,
@@ -126,7 +128,7 @@ class ConvTranspose(Module):
         out_channels: int,
         kernel_shape: tuple[int, ...],
         stride: int | tuple[int, ...] = 1,
-        padding: str | int | tuple[int, ...] = 0,
+        padding: Literal["SAME", "VALID"] | int | tuple[int, ...] = 0,
         output_padding: int | tuple[int, ...] = 0,
         dilation: int | tuple[int, ...] = 1,
         groups: int = 1,

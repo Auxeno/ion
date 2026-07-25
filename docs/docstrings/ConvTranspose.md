@@ -13,7 +13,7 @@ kernel_shape : tuple[int, ...]
 stride : int | tuple[int, ...], default=1
     Stride of the equivalent forward convolution; the upsampling factor. A
     scalar broadcasts across all spatial dimensions.
-padding : str | int | tuple[int, ...], default=0
+padding : Literal["SAME", "VALID"] | int | tuple[int, ...], default=0
     `"SAME"`, `"VALID"`, or numeric padding. A scalar broadcasts; a tuple gives
     per-dimension control.
 output_padding : int | tuple[int, ...], default=0

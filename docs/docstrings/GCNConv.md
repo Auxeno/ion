@@ -11,7 +11,7 @@ out_dim : int
 bias : bool, default=True
     Whether to include a learnable bias term.
 w_init : Initializer
-    Weight initializer. Glorot uniform by default, matching `Linear`.
+    Weight initializer. Glorot uniform by default.
 b_init : Initializer
     Bias initializer. Zeros by default.
 key : jax.Array

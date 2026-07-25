@@ -12,7 +12,7 @@ kernel_shape : tuple[int, ...]
     Spatial kernel dimensions. The tuple length sets the spatial rank.
 stride : int | tuple[int, ...], default=1
     Convolution stride. A scalar broadcasts across all spatial dimensions.
-padding : str | int | tuple[int, ...], default=0
+padding : Literal["SAME", "VALID"] | int | tuple[int, ...], default=0
     `"SAME"`, `"VALID"`, or numeric padding applied to both sides of each
     spatial dimension. A scalar broadcasts; a tuple gives per-dimension control.
 dilation : int | tuple[int, ...], default=1

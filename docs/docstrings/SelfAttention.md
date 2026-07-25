@@ -1,6 +1,6 @@
 Multi-head self-attention ([Vaswani et al., 2017](https://arxiv.org/abs/1706.03762)).
 
-Projects the input to queries, keys, and values, attends within a single sequence, and projects the concatenated heads back to `dim`. Supports grouped-query attention ([Ainslie et al., 2023](https://arxiv.org/abs/2305.13245)), multi-query attention ([Shazeer, 2019](https://arxiv.org/abs/1911.02150)), causal masking, and sliding-window attention ([Beltagy et al., 2020](https://arxiv.org/abs/2004.05150)).
+Projects the input to queries, keys, and values, attends within a single sequence, and projects the concatenated heads back to `dim`. Supports grouped-query attention ([Ainslie et al., 2023](https://arxiv.org/abs/2305.13245)), multi-query attention ([Shazeer, 2019](https://arxiv.org/abs/1911.02150)), sliding-window attention ([Beltagy et al., 2020](https://arxiv.org/abs/2004.05150)), and causal masking.
 
 Parameters
 ----------

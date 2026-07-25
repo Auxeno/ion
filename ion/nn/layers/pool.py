@@ -8,6 +8,8 @@ Channels-last format: (..., spatial, channels).
 Stride defaults to kernel shape when not specified.
 """
 
+from typing import Literal
+
 import jax.numpy as jnp
 from jax import lax
 from jaxtyping import Array, Float
@@ -24,13 +26,13 @@ class MaxPool(Module):
 
     kernel_shape: tuple[int, ...]
     stride: tuple[int, ...]
-    padding: str | tuple[tuple[int, int], ...]
+    padding: Literal["SAME", "VALID"] | tuple[tuple[int, int], ...]
 
     def __init__(
         self,
         kernel_shape: tuple[int, ...],
         stride: int | tuple[int, ...] | None = None,
-        padding: str | int | tuple[int, ...] = 0,
+        padding: Literal["SAME", "VALID"] | int | tuple[int, ...] = 0,
     ) -> None:
 
         if isinstance(kernel_shape, int):
@@ -89,13 +91,13 @@ class AvgPool(Module):
 
     kernel_shape: tuple[int, ...]
     stride: tuple[int, ...]
-    padding: str | tuple[tuple[int, int], ...]
+    padding: Literal["SAME", "VALID"] | tuple[tuple[int, int], ...]
 
     def __init__(
         self,
         kernel_shape: tuple[int, ...],
         stride: int | tuple[int, ...] | None = None,
-        padding: str | int | tuple[int, ...] = 0,
+        padding: Literal["SAME", "VALID"] | int | tuple[int, ...] = 0,
     ) -> None:
 
         if isinstance(kernel_shape, int):

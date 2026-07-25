@@ -9,7 +9,7 @@ kernel_shape : tuple[int, ...]
 stride : int | tuple[int, ...] | None, default=None
     Step between windows. Defaults to `kernel_shape` (non-overlapping windows).
     A scalar broadcasts across all spatial dimensions.
-padding : str | int | tuple[int, ...], default=0
+padding : Literal["SAME", "VALID"] | int | tuple[int, ...], default=0
     `"SAME"`, `"VALID"`, or numeric padding applied to both sides of each
     spatial dimension. A scalar broadcasts; a tuple gives per-dimension control.
 
