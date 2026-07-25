@@ -102,7 +102,7 @@ Each [`ion.nn`](nn/layers/index.md) layer is a `Module`, constructed with a `key
 
 | Family | Layers |
 |--------|--------|
-| [Linear](nn/layers/linear.md) | `Linear`, `Identity` |
+| [Linear](nn/layers/linear.md) | `Linear` |
 | [Convolution](nn/layers/conv.md) | `Conv`, `ConvTranspose` |
 | [Attention](nn/layers/attention.md) | `SelfAttention`, `CrossAttention` |
 | [Normalization](nn/layers/norm.md) | `LayerNorm`, `RMSNorm`, `GroupNorm` |
@@ -113,6 +113,7 @@ Each [`ion.nn`](nn/layers/index.md) layer is a `Module`, constructed with a `key
 | [Pooling](nn/layers/pool.md) | `MaxPool`, `AvgPool` |
 | [Dropout](nn/layers/dropout.md) | `Dropout` |
 | [LoRA](nn/layers/lora.md) | `LoRALinear` |
+| [Identity](nn/layers/identity.md) | `Identity` |
 | [Composite](nn/layers/mlp.md) | `MLP`, `Sequential` |
 
 ```python

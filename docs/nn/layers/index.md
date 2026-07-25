@@ -8,7 +8,7 @@ transformations.
 
 | Family | Layers |
 |---|---|
-| [Linear](linear.md) | `Linear`, `Identity` |
+| [Linear](linear.md) | `Linear` |
 | [Convolution](conv.md) | `Conv`, `ConvTranspose` |
 | [Attention](attention.md) | `SelfAttention`, `CrossAttention` |
 | [Normalization](norm.md) | `LayerNorm`, `RMSNorm`, `GroupNorm` |
@@ -19,6 +19,7 @@ transformations.
 | [Pooling](pool.md) | `MaxPool`, `AvgPool` |
 | [Dropout](dropout.md) | `Dropout` |
 | [LoRA](lora.md) | `LoRALinear` |
+| [Identity](identity.md) | `Identity` |
 | [MLP](mlp.md) | `MLP` |
 | [Sequential](sequential.md) | `Sequential` |
 

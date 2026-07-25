@@ -53,6 +53,7 @@ nav:
           - Pooling: nn/layers/pool.md
           - Dropout: nn/layers/dropout.md
           - LoRA: nn/layers/lora.md
+          - Identity: nn/layers/identity.md
           - MLP: nn/layers/mlp.md
           - Sequential: nn/layers/sequential.md
   - GNN:

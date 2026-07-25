@@ -6,7 +6,8 @@ from .layers.attention import CrossAttention, SelfAttention
 from .layers.conv import Conv, ConvTranspose
 from .layers.dropout import Dropout
 from .layers.embedding import Embedding
-from .layers.linear import Identity, Linear
+from .layers.identity import Identity
+from .layers.linear import Linear
 from .layers.lora import LoRALinear
 from .layers.norm import GroupNorm, LayerNorm, RMSNorm
 from .layers.pool import AvgPool, MaxPool

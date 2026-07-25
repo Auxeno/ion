@@ -6,6 +6,7 @@
 - **`Embedding` and `LearnedPositionalEmbedding` init scales with dimension.** The default is now `variance_scaling(1.0, "fan_in", "uniform", out_axis=0)`, giving std `1/sqrt(dim)` so each row starts near unit norm regardless of `dim` and independent of vocabulary or sequence length. Replaces the dimension-blind `truncated_normal(0.02)` constant, matching Flax's `Embed`.
 - **`Sequential.__call__` accepts and returns `Any`.** The annotation now reflects that chained callables may pass non-array values.
 - **New MkDocs documentation site.** Adds guides, API reference, examples, workflows, and sharp-edge documentation under `docs/`.
+- **`Identity` split into its own module and doc page.** Moved out of `linear.py` into `ion/nn/layers/identity.py`.
 
 ## 0.10.2
 

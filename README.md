@@ -133,7 +133,7 @@ Ion ships with standard neural network layers. Each is a `Module` with trainable
 
 | Category        | Layers                                                                    |
 |-----------------|---------------------------------------------------------------------------|
-| Linear          | `Linear`, `Identity`, `LoRALinear`                                        |
+| Linear          | `Linear`, `LoRALinear`                                                    |
 | Convolution     | `Conv`, `ConvTranspose`                                                   |
 | Attention       | `SelfAttention`, `CrossAttention`                                         |
 | Normalization   | `LayerNorm`, `RMSNorm`, `GroupNorm`                                       |
@@ -143,6 +143,7 @@ Ion ships with standard neural network layers. Each is a `Module` with trainable
 | Embedding       | `Embedding`, `LearnedPositionalEmbedding`                                 |
 | Positional      | `RoPE`, `sinusoidal`, `alibi`                                             |
 | Regularization  | `Dropout`                                                                 |
+| Identity        | `Identity`                                                                |
 | Blocks          | `Sequential`, `MLP`                                                       |
 | GNN             | `GCNConv`, `GATConv`, `GATv2Conv`, `GINConv`                              |
 
