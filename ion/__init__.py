@@ -1,4 +1,4 @@
-"""Neural networks in JAX with immutable pytrees and explicit parameters."""
+"""A simple library for neural and graph networks in JAX."""
 
 from importlib.metadata import version
 
@@ -6,18 +6,9 @@ from . import checkpoint as checkpoint
 from . import gnn as gnn
 from . import nn as nn
 from . import tree as tree
-from .checkpoint import (
-    load,
-    save,
-)
+from .checkpoint import load, save
 from .optimizer import Optimizer
-from .tree import (
-    astype,
-    freeze,
-    is_param,
-    is_trainable_param,
-    unfreeze,
-)
+from .tree import astype, freeze, is_param, is_trainable_param, unfreeze
 
 
 def enable_treescope(everything: bool = False) -> None:
@@ -38,12 +29,12 @@ def enable_treescope(everything: bool = False) -> None:
 
             basic_interactive_setup()
         else:
+            import numpy as np
             import treescope
+            from jaxlib._jax import ArrayImpl
 
             html_fmt = ip.display_formatter.formatters["text/html"]  # type: ignore[reportAttributeAccessIssue,reportOptionalMemberAccess]
             render = treescope.render_to_html
-            import numpy as np
-            from jaxlib._jax import ArrayImpl
 
             html_fmt.for_type(nn.Module, lambda obj: render(obj))
             html_fmt.for_type(nn.Param, lambda obj: render(obj))
@@ -56,17 +47,24 @@ def enable_treescope(everything: bool = False) -> None:
 
 
 def disable_treescope() -> None:
-    """Deactivate treescope rendering.
+    """Deactivate all Treescope rendering.
 
     >>> ion.disable_treescope()
     """
     try:
         import IPython  # type: ignore[reportMissingImports]
+        import numpy as np
         import treescope
+        from jaxlib._jax import ArrayImpl
 
         ip = IPython.get_ipython()  # type: ignore[reportPrivateImportUsage]
         if ip is not None:
             html_fmt = ip.display_formatter.formatters["text/html"]  # type: ignore[reportAttributeAccessIssue,reportOptionalMemberAccess]
+            html_fmt.type_printers.pop(nn.Module, None)
+            html_fmt.type_printers.pop(nn.Param, None)
+            html_fmt.type_printers.pop(Optimizer, None)
+            html_fmt.type_printers.pop(ArrayImpl, None)
+            html_fmt.type_printers.pop(np.ndarray, None)
             html_fmt.type_printers.pop(object, None)
 
         treescope.active_autovisualizer.set_globally(None)
