@@ -31,10 +31,6 @@ a : Param
 b : Param
     Up-projection of shape `(rank, out_dim)`.
 
-Notes
------
-Pairs with the optimizer's [auto-partitioning](../../core/optimizer.md), which allocates no state for the frozen base and updates only `A` and `B`.
-
 Example
 -------
 ```python
@@ -46,3 +42,7 @@ lora = nn.LoRALinear(linear, rank, key=key_lora)
 x = jnp.ones((batch, seq, in_dim))
 y = lora(x)  # (4, 16, 64) -> (4, 16, 128)
 ```
+
+Info
+-----
+Pairs with the optimizer's [auto-partitioning](../../core/optimizer.md), which allocates no state for the frozen base and updates only `A` and `B`.

@@ -14,7 +14,7 @@ Returns
 jax.Array["n o", float]
     Aggregated node features with `out_dim` features per node.
 
-Warning
+Note
 -------
 Self-loops are not added automatically. Call `gnn.add_self_loops` first,
 otherwise each node excludes its own features from the aggregation.

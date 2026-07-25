@@ -19,9 +19,3 @@ Returns
 -------
 jax.Array["n o", float]
     Attended node features with the heads concatenated into `out_dim`.
-
-Info
-----
-Attention weights are normalized over edges with the same receiver. Unlike
-GATv1, sender, receiver, and optional edge features are combined before the
-attention nonlinearity.

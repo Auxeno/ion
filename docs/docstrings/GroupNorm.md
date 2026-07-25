@@ -23,10 +23,6 @@ scale : Param
 b : Param
     Per-channel bias of shape `(dim,)`, initialized to zeros.
 
-Warning
--------
-`num_spatial_dims` must match the number of trailing spatial dimensions in the input. A mismatch reduces over the wrong axes and silently produces wrong statistics rather than raising.
-
 Example
 -------
 ```python
@@ -42,3 +38,7 @@ y = norm(x)  # (8, 64) -> (8, 64), per-position over channel groups
 x_batched = jnp.ones((5, batch, height, width, channels))  # extra batch dim
 y_batched = jax.vmap(nn.GroupNorm(channels, 8, 2))(x_batched)  # (5, 8, 32, 32, 64) -> (5, 8, 32, 32, 64)
 ```
+
+Note
+-------
+`num_spatial_dims` must match the number of trailing spatial dimensions in the input. A mismatch reduces over the wrong axes and silently produces wrong statistics rather than raising.

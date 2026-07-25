@@ -13,5 +13,4 @@ jax.Array["... d", float]
 
 Info
 ----
-Channels are last. Takes no `key`: scale and bias are initialized
-deterministically.
+Channels-last format.

@@ -31,10 +31,6 @@ D : Param
 log_dt : Param
     Log-domain discretization timestep, one per feature.
 
-Info
-----
-The output dimension equals `in_dim`.
-
 Example
 -------
 ```python
@@ -44,3 +40,7 @@ x = jnp.ones((batch, in_dim))
 h0 = jnp.zeros((batch, in_dim, state_dim // 2), dtype=jnp.complex64)
 y, h = cell(x, h0)  # (4, 3), (4, 3, 4) -> (4, 3), (4, 3, 4)
 ```
+
+Note
+----
+The output dimension equals `in_dim`.

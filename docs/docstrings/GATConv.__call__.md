@@ -20,7 +20,7 @@ Returns
 jax.Array["n o", float]
     Attended node features with the heads concatenated into `out_dim`.
 
-Info
+Note
 ----
 Attention weights are normalized over edges with the same receiver. `edge_dim`
 and `x_edge` must be used together; setting one without the other raises an

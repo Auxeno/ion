@@ -81,9 +81,8 @@ The complete arrays above produce this graph. The highlighted arrow is edge 0.
   loading="lazy"
 ></iframe>
 
-Edges in Ion are always directed. If the relationship should be undirected,
-include both directions as above. COO storage grows with the number of edges,
-not with the square of the number of nodes.
+Edges in COO are always directed. If the relationship should be undirected,
+include both directions as above.
 
 ### Edge features
 

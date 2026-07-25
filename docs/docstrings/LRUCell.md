@@ -33,10 +33,6 @@ B, C : Param
 D : Param
     Real per-feature skip connection.
 
-Info
-----
-The output dimension equals `in_dim`.
-
 Example
 -------
 ```python
@@ -46,3 +42,7 @@ x = jnp.ones((batch, in_dim))
 h0 = jnp.zeros((batch, hidden_dim), dtype=jnp.complex64)
 y, h = cell(x, h0)  # (4, 3), (4, 16) -> (4, 3), (4, 16)
 ```
+
+Note
+----
+The output dimension equals `in_dim`.

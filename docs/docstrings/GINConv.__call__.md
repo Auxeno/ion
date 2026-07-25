@@ -14,6 +14,6 @@ Returns
 jax.Array["n o", float]
     Node features returned by `mlp` after sum aggregation.
 
-Warning
+Note
 -------
 Do not add self-loops: a node's own features already enter through the `(1 + eps)` term, so adding them double-counts.
