@@ -20,7 +20,7 @@ Ion is a simple neural network library for JAX. The core introduces three concep
 pip install ion-nn
 ```
 
-The [documentation](https://auxeno.github.io/ion/) covers the core, layers, and common workflows in full.
+The [documentation](https://auxeno.github.io/ion/) covers the core, layers, and common workflows.
 
 ## Example
 
@@ -70,12 +70,12 @@ for x, y in data:
 
 ## Documentation
 
-- [Overview](https://auxeno.github.io/ion/overview/) -- the core abstractions and design
-- [Core](https://auxeno.github.io/ion/core/module/) -- `Module`, `Param`, and `Optimizer`
-- [NN guide](https://auxeno.github.io/ion/nn/guide/) and [GNN guide](https://auxeno.github.io/ion/gnn/guide/) -- array formats and shared conventions
-- [Workflows](https://auxeno.github.io/ion/workflows/) -- freezing, mixed precision, serialization, inspecting models
-- [Sharp edges](https://auxeno.github.io/ion/sharp-edges/) -- known constraints and gotchas
-- [Examples](https://auxeno.github.io/ion/examples/) -- end-to-end training scripts and notebooks
+- [Overview](https://auxeno.github.io/ion/overview/) - the core abstractions and design
+- [Core](https://auxeno.github.io/ion/core/module/) - `Module`, `Param`, and `Optimizer`
+- [NN guide](https://auxeno.github.io/ion/nn/guide/) and [GNN guide](https://auxeno.github.io/ion/gnn/guide/) - array formats and shared conventions
+- [Workflows](https://auxeno.github.io/ion/workflows/) - freezing, mixed precision, serialization, inspecting models
+- [Sharp edges](https://auxeno.github.io/ion/sharp-edges/) - known limitations and gotchas
+- [Examples](https://auxeno.github.io/ion/examples/) - end-to-end training scripts and notebooks
 
 ## Layers
 
