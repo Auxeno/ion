@@ -22,7 +22,7 @@ Every distinct set of static values compiles a separate trace, so changing one t
 
 ## Pytrees cannot share references
 
-JAX pytrees are trees, not graphs. If two fields point to the same `Module` or `Param`, JAX silently duplicates the object during flatten/unflatten, and updates to one copy stop affecting the other. For weight tying (e.g. shared embedding and output projection), reference the underlying array instead of storing the module twice:
+JAX [pytrees](https://docs.jax.dev/en/latest/pytrees.html) are trees, not graphs. If two fields point to the same `Module` or `Param`, JAX silently duplicates the object during flatten/unflatten, and updates to one copy stop affecting the other. For weight tying (e.g. shared embedding and output projection), reference the underlying array instead of storing the module twice:
 
 ```python
 # Don't: the two fields become independent copies

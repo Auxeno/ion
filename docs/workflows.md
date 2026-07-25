@@ -38,7 +38,8 @@ model = model.at.classifier.set(model.classifier.unfreeze())
 optimizer = ion.Optimizer(optax.adam(3e-4), model)
 ```
 
-Changing trainability later changes the model's pytree structure, so construct
+Changing trainability later changes the model's
+[pytree](https://docs.jax.dev/en/latest/pytrees.html) structure, so construct
 a new optimizer from the updated model:
 
 ```python

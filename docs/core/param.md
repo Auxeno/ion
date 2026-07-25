@@ -19,7 +19,7 @@ A model field can represent three different things:
 - A bare array is a buffer: it participates in computation but is not treated
   as a parameter.
 
-The `trainable` flag is static pytree metadata. Freezing or unfreezing changes
+The `trainable` flag is static [pytree](https://docs.jax.dev/en/latest/pytrees.html) metadata. Freezing or unfreezing changes
 the pytree structure and therefore requires a new `Optimizer`.
 
 ## Array Behaviour

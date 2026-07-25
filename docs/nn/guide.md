@@ -152,7 +152,7 @@ CNN(
 )
 ```
 
-The fields form one JAX pytree. There is no separate parameter dictionary: `model` is both the callable network and the
+The fields form one JAX [pytree](https://docs.jax.dev/en/latest/pytrees.html). There is no separate parameter dictionary: `model` is both the callable network and the
 value differentiated and updated during training. In IPython and Jupyter, the same model renders as an interactive
 [Treescope](https://github.com/google-deepmind/treescope) tree.
 

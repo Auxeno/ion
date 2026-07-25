@@ -26,7 +26,7 @@ pip install ion-nn
 
     ---
 
-    The neural network layer library and its full API reference.
+    The neural network layer library.
 
     [:octicons-arrow-right-24: Layers](nn/layers/index.md)
 
@@ -42,7 +42,7 @@ pip install ion-nn
 
     ---
 
-    Freezing, mixed precision, checkpointing, and other cross-cutting patterns.
+    Common patterns for training and managing models.
 
     [:octicons-arrow-right-24: Workflows](workflows.md)
 

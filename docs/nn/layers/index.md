@@ -1,6 +1,6 @@
 # Neural network layers
 
-Every `ion.nn` layer is an immutable JAX pytree. Constructors use a keyword-only
+Every `ion.nn` layer is an immutable JAX [pytree](https://docs.jax.dev/en/latest/pytrees.html). Constructors use a keyword-only
 `key` for parameter initialization, and layers work directly with native JAX
 transformations.
 

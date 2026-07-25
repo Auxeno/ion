@@ -1,7 +1,7 @@
 # Optimizer
 
 Wraps an optax `GradientTransformation` with `Param`-aware, immutable updates.
-The optimizer is a JAX pytree and can be threaded directly through `jax.jit`
+The optimizer is a JAX [pytree](https://docs.jax.dev/en/latest/pytrees.html) and can be threaded directly through `jax.jit`
 and `jax.lax.scan`.
 
 ::: ion.Optimizer

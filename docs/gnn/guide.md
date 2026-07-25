@@ -185,9 +185,9 @@ degree-normalized edges. To make the graph operation visible by itself, the
 plot below fixes the linear transformation to the identity and omits the bias
 and activation. It repeatedly applies only the normalized aggregation:
 
-```text
-D^-1/2 A D^-1/2 x
-```
+\[
+D^{-1/2} A D^{-1/2} x
+\]
 
 The input is the one-hot matrix constructed above, with self-loops added.
 Choose a step from 0 to 5. Click any node to follow its original feature, and
@@ -211,7 +211,12 @@ one-step calculation.
 
 ## Building a GNN
 
-`GCNConv` learns the feature transformation that the previous plot held fixed:
+The previous plot fixed the feature transformation to the identity so only the
+graph operation was visible. `GCNConv` restores that transformation and makes it
+learnable: each layer multiplies the node features by a weight matrix, then
+applies the same normalized aggregation as the plot. Training adjusts the weight
+matrix, so the layer learns which projection of the input features to mix across
+edges:
 
 ```python
 key = jax.random.key(0)
@@ -238,7 +243,8 @@ logits.shape  # (6 nodes, 3 classes)
 ```
 
 The linear classifier acts on each node independently after the graph layers
-have mixed information between connected nodes. Ion modules are JAX pytrees, so
+have mixed information between connected nodes. Ion modules are JAX
+[pytrees](https://docs.jax.dev/en/latest/pytrees.html), so
 `jax.jit`, `jax.grad`, and the usual Ion optimizer workflow apply without
 graph-specific transforms.
 
