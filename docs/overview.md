@@ -22,11 +22,11 @@ import optax
 import ion
 from ion import nn
 
-# Two input features, one output
-model = nn.Linear(2, 1, key=jax.random.key(0))
+# Four input features, three outputs
+model = nn.Linear(4, 3, key=jax.random.key(0))
 
-x = jnp.ones((32, 2))
-y = jnp.ones((32, 1))
+x = jnp.ones((32, 4))
+y = jnp.ones((32, 3))
 
 def loss_fn(model, x, y):
     return jnp.mean((model(x) - y) ** 2)
@@ -41,7 +41,7 @@ def train_step(model, optimizer, x, y):
 model, optimizer = train_step(model, optimizer, x, y)
 ```
 
-The sections below introduce the three core abstractions, network layers and common workflows.
+The loss takes the model first so `jax.grad` differentiates with respect to it, and the whole step compiles with `jax.jit`. The sections below introduce the three core abstractions, network layers and common workflows.
 
 ## The core
 
@@ -185,36 +185,6 @@ grads = jax.grad(mse_loss)(model, x, y)
 keys = jax.random.split(jax.random.key(0), 8)
 ensemble = jax.vmap(lambda key: nn.MLP([4, 16, 3], key=key))(keys)
 preds = jax.vmap(lambda m: m(x))(ensemble)
-```
-
-## Training example
-
-A training step is standard JAX. The loss takes the model first so `jax.grad` differentiates with respect to it, and the whole step compiles with `jax.jit`:
-
-```python
-import jax
-import jax.numpy as jnp
-import optax
-
-import ion
-from ion import nn
-
-model = nn.Linear(4, 3, key=jax.random.key(0))
-optimizer = ion.Optimizer(optax.adam(3e-4), model)
-x = jnp.ones((32, 4))
-y = jnp.zeros((32,), dtype=jnp.int32)
-
-def loss_fn(model, x, y):
-    logits = model(x)
-    return optax.softmax_cross_entropy_with_integer_labels(logits, y).mean()
-
-@jax.jit
-def train_step(model, optimizer, x, y):
-    loss, grads = jax.value_and_grad(loss_fn)(model, x, y)
-    model, optimizer = optimizer.update(model, grads)
-    return model, optimizer, loss
-
-model, optimizer, loss = train_step(model, optimizer, x, y)
 ```
 
 ## Checkpointing
