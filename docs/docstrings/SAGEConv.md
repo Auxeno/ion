@@ -11,13 +11,13 @@ out_dim : int
 aggregator : str, default='mean'
     Neighbourhood pooling: `"mean"`, `"max"`, or `"sum"`.
 normalize : bool, default=False
-    Whether to L2 normalize each output node embedding, as in the paper.
+    Whether to L2 normalize each output node embedding.
 root_weight : bool, default=True
     Whether to add the central node's own features through a separate weight.
 bias : bool, default=True
     Whether to include a learnable bias term.
 w_init : Initializer
-    Weight initializer. Glorot uniform by default, matching `Linear`.
+    Weight initializer. Glorot uniform by default.
 b_init : Initializer
     Bias initializer. Zeros by default.
 key : jax.Array
