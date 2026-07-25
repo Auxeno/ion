@@ -259,10 +259,8 @@ body[data-md-color-scheme] .jupyter-wrapper {
   }
 }
 
-/* Keep the repository link in the top header at every width. Material hides the
-   header source below 60em and relocates it into the nav drawer; there is room
-   for it in the header bar even when narrow, so pin it there and never show the
-   drawer copy. */
+/* Keep the repository link in the top header down to 350px. Below that, use
+   Material's drawer placement so the site title still fits without overflow. */
 .ion-header-home {
   color: inherit;
 }
@@ -277,6 +275,15 @@ body[data-md-color-scheme] .jupyter-wrapper {
 }
 .md-nav__source {
   display: none;
+}
+
+@media screen and (max-width: 21.874em) {
+  .md-header__source {
+    display: none;
+  }
+  .md-nav__source {
+    display: block;
+  }
 }
 
 /* Top-level API headings (class ion.nn.RNN, func ion.nn.sinusoidal): a touch

@@ -80,7 +80,7 @@ ignore = ["F722", "E731"]
 "*.ipynb" = ["E501"]
 
 [tool.pyright]
-include = ["ion", "tests"]
+include = ["ion", "tests", "docs"]
 typeCheckingMode = "standard"
 reportIncompatibleMethodOverride = false
 

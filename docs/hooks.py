@@ -21,7 +21,7 @@ from pygments.token import Name, Operator, Punctuation
 def on_config(config, **kwargs):
     if getattr(PythonLexer, "_ion_call_sites", False):
         return
-    PythonLexer._ion_call_sites = True
+    setattr(PythonLexer, "_ion_call_sites", True)
     inner = PythonLexer.get_tokens_unprocessed
 
     def with_call_sites(self, text, *args):
@@ -44,7 +44,7 @@ def on_config(config, **kwargs):
         if pending is not None:
             yield pending[0], Name.Attribute if pending[2] else Name, pending[1]
 
-    PythonLexer.get_tokens_unprocessed = with_call_sites
+    setattr(PythonLexer, "get_tokens_unprocessed", with_call_sites)
 
 # Material reveals the left navigation only from 76.25em, which on a laptop is
 # roughly a full-width window. Shift that breakpoint, and its max-width drawer
@@ -60,7 +60,10 @@ BREAKPOINTS = {
 
 def on_post_build(config, **kwargs):
     site = pathlib.Path(config["site_dir"])
-    assets = [*site.glob("assets/stylesheets/main.*.min.css"), *site.glob("assets/javascripts/bundle.*.min.js")]
+    assets = [
+        *site.glob("assets/stylesheets/main.*.min.css"),
+        *site.glob("assets/javascripts/bundle.*.min.js"),
+    ]
     for path in assets:
         text = path.read_text()
         for old, new in BREAKPOINTS.items():
