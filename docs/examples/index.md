@@ -20,7 +20,7 @@ End-to-end training scripts and notebooks live in the [`examples/`](https://gith
 
 | Example | What it covers |
 |---------|----------------|
-| [GPT on TinyStories](gpt-tinystories.ipynb) | Transformer language model with attention, RoPE, and mixed-precision training. |
+| [GPT on TinyStories](gpt-tinystories.ipynb) | Transformer language model with attention, sinusoidal positional encodings, and mixed-precision training. |
 | [SSM on Pathfinder](ssm-pathfinder.ipynb) | Deep state space model on a long-range dependency benchmark. |
 
 ## Graphs
