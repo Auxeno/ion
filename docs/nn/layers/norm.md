@@ -10,11 +10,12 @@ Feature normalization layers. `LayerNorm` and `RMSNorm` normalize over the last 
 
 ---
 
-## Why No BatchNorm?
+## Why No BatchNorm or SpectralNorm?
 
-BatchNorm carries running statistics that change during training. Ion modules
-are immutable, so those statistics would need a separate update path whose
-omission could silently leave evaluation using their initial values.
-`LayerNorm` and `GroupNorm` do not require running statistics. Applications
-that require BatchNorm can manage its statistics explicitly or use a library
-with mutable model state.
+BatchNorm carries running statistics that change during training, and
+SpectralNorm carries a power-iteration estimate updated on every forward pass.
+Ion modules are immutable, so that state would need a separate update path whose
+omission could silently leave evaluation using its initial values. `LayerNorm`
+and `GroupNorm` do not require running state. Applications that need BatchNorm or
+SpectralNorm can manage the state explicitly or use a library with mutable model
+state.
