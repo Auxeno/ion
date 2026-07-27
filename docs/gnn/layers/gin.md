@@ -1,7 +1,5 @@
-# GIN
+# Graph Isomorphism Network
 
-Graph isomorphism convolution with sum aggregation and a caller-supplied update
-MLP. See the [GNN guide](../guide.md) for the shared array, self-loop, and
-batching conventions.
+Sum-aggregating graph convolution with a caller-supplied update MLP.
 
 ::: ion.gnn.GINConv

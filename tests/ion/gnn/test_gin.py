@@ -14,7 +14,7 @@ class TestGINConv:
         senders = jnp.array([0, 1, 2])
         receivers = jnp.array([1, 2, 0])
         y = gin(x, senders, receivers)
-        agg = jax.ops.segment_sum(x[senders], receivers, 3)
+        agg = gnn.segment_sum(x[senders], receivers, 3)
         expected = mlp(1.5 * x + agg)
         npt.assert_allclose(y, expected, rtol=1e-5, atol=1e-5)
 

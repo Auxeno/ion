@@ -3,6 +3,7 @@ import jax.numpy as jnp
 import numpy.testing as npt
 
 from ion import gnn
+from ion.gnn import ops
 
 
 class TestSegmentSoftmax:
@@ -113,10 +114,14 @@ class TestAddSelfLoops:
 class TestReexports:
     def test_aliases_jax_ops(self):
         """Re-exported segment ops are the jax.ops functions themselves."""
-        assert gnn.segment_sum is jax.ops.segment_sum
-        assert gnn.segment_max is jax.ops.segment_max
-        assert gnn.segment_min is jax.ops.segment_min
-        assert gnn.segment_prod is jax.ops.segment_prod
+        assert ops.segment_sum is jax.ops.segment_sum
+        assert ops.segment_max is jax.ops.segment_max
+        assert ops.segment_min is jax.ops.segment_min
+        assert ops.segment_prod is jax.ops.segment_prod
+        assert gnn.segment_sum is ops.segment_sum
+        assert gnn.segment_max is ops.segment_max
+        assert gnn.segment_min is ops.segment_min
+        assert gnn.segment_prod is ops.segment_prod
 
 
 class TestSegmentMean:

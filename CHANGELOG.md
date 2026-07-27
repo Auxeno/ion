@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.1
+
+- **New `gnn.GraphConv` layer.** Graph convolution from Morris et al. (2019) with
+  independently learned neighbour and root transforms, unnormalized sum aggregation,
+  and optional scalar edge weights.
+
 ## 0.11.0
 
 - **New MkDocs documentation site.** Adds guides, API reference, examples, workflows, and sharp-edge documentation under `docs/`.

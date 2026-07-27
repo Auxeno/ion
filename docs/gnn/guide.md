@@ -86,7 +86,14 @@ include both directions as above.
 
 ### Edge features
 
-`GATConv` and `GATv2Conv` can include one feature row per directed edge:
+`GraphConv` can apply one scalar weight per directed edge:
+
+```python
+edge_weight.shape  # (num_edges,)
+h = conv(x, senders, receivers, edge_weight=edge_weight)
+```
+
+`GATConv` and `GATv2Conv` can instead include one feature row per directed edge:
 
 ```python
 x_edge.shape  # (num_edges, edge_features)
@@ -95,7 +102,7 @@ h = gat(x, senders, receivers, x_edge=x_edge)
 
 Construct the layer with the matching `edge_dim`. If self-loops are required,
 the edge-feature array must also contain features for those appended edges. See
-the [GAT reference](layers/gat.md) for the complete call contract.
+the [Graph Attention reference](layers/gat.md) for the complete call contract.
 
 The complete graph representation consists of JAX arrays:
 
@@ -104,6 +111,7 @@ The complete graph representation consists of JAX arrays:
 | `x` | `(num_nodes, node_dim)` | Feature vector for each node |
 | `senders` | `(num_edges,)` | Source node of each directed edge |
 | `receivers` | `(num_edges,)` | Destination node of each directed edge |
+| `edge_weight` | `(num_edges,)` | Optional scalar weight for each edge |
 | `x_edge` | `(num_edges, edge_dim)` | Optional feature vector for each edge |
 
 ## Message passing
@@ -150,8 +158,8 @@ aggregated[4]  # [0.0, 1.0, 1.0, 1.0, 0.0, 1.0] = x[1] + x[2] + x[3] + x[5]
 
 The four messages are grouped into row 4 because their receiver is 4. Node 4's
 own feature is absent because the graph does not yet contain a `4 -> 4`
-self-loop. This send-then-group operation is the basis of the GCN, GAT, GIN, and
-GraphSAGE layers.
+self-loop. This send-then-group operation is the basis of the GCN, GraphConv,
+GAT, GIN, and GraphSAGE layers.
 
 ## Self-loops
 
@@ -170,6 +178,7 @@ are never added inside a layer.
 | Layer | Add self-loops? | Reason |
 |---|---|---|
 | `GCNConv` | Normally yes | Include the node's current features in aggregation |
+| `GraphConv` | No | The separate root weight already includes the node |
 | `GATConv`, `GATv2Conv` | Normally yes | Let a node attend to itself |
 | `GINConv` | No | The `(1 + eps)` term already includes the node |
 | `SAGEConv` | No | The root weight already includes the node |

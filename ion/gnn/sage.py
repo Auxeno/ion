@@ -18,7 +18,7 @@ from jaxtyping import Array, Float, Int, PRNGKeyArray
 
 from ..nn.module import Module
 from ..nn.param import Param
-from . import segment_max, segment_mean, segment_sum
+from .ops import segment_max, segment_mean, segment_sum
 
 
 class SAGEConv(Module):

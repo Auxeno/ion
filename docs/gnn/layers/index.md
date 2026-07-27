@@ -8,7 +8,7 @@ representation, message passing, self-loops, batching, and pooling.
 
 | Family | Layers | Neighbour aggregation |
 |---|---|---|
-| [GCN](gcn.md) | `GCNConv` | Fixed symmetric degree normalization |
-| [GAT](gat.md) | `GATConv`, `GATv2Conv` | Learned attention weights |
-| [GIN](gin.md) | `GINConv` | Sum plus a separate central-node term |
+| [Graph Convolution](gcn.md) | `GCNConv`, `GraphConv` | Normalized or optionally weighted sum |
+| [Graph Attention](gat.md) | `GATConv`, `GATv2Conv` | Learned attention weights |
+| [Graph Isomorphism Network](gin.md) | `GINConv` | Sum plus a separate central-node term |
 | [GraphSAGE](sage.md) | `SAGEConv` | Mean, max, or sum pooling plus a root term |

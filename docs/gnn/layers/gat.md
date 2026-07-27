@@ -1,9 +1,8 @@
-# GAT
+# Graph Attention
 
-Multi-head graph attention. `GATConv` is the original static-attention
-formulation; `GATv2Conv` is the dynamic-attention variant. Both support edge
-features and edge masking; see the [GNN guide](../guide.md) for the shared
-array, self-loop, and batching conventions.
+Multi-head attention over graph neighbourhoods. `GATConv` is the original
+static-attention formulation; `GATv2Conv` is the dynamic-attention variant.
+Both support edge features and masking.
 
 ::: ion.gnn.GATConv
 

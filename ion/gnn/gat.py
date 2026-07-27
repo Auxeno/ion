@@ -17,7 +17,7 @@ from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 
 from ..nn.module import Module
 from ..nn.param import Param
-from .ops import segment_softmax
+from .ops import segment_softmax, segment_sum
 
 
 class GATConv(Module):
@@ -123,7 +123,7 @@ class GATConv(Module):
 
         # Aggregate sender features weighted by attention
         messages = x[senders] * attention[..., None]
-        x = jax.ops.segment_sum(messages, receivers, n)
+        x = segment_sum(messages, receivers, n)
 
         # Concatenate heads into a flat feature vector
         x = x.reshape(n, -1)
@@ -236,7 +236,7 @@ class GATv2Conv(Module):
 
         # Aggregate sender features weighted by attention
         messages = x_s[senders] * attention[..., None]
-        x = jax.ops.segment_sum(messages, receivers, n)
+        x = segment_sum(messages, receivers, n)
 
         # Concatenate heads into a flat feature vector
         x = x.reshape(n, -1)

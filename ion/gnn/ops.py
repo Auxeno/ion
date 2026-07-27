@@ -1,6 +1,10 @@
 """Graph operations.
 
 Functions:
+    segment_sum      Sum reduction within segments. (Re-exported from jax.ops.)
+    segment_max      Maximum reduction within segments. (Re-exported from jax.ops.)
+    segment_min      Minimum reduction within segments. (Re-exported from jax.ops.)
+    segment_prod     Product reduction within segments. (Re-exported from jax.ops.)
     segment_softmax  Softmax normalized within segments (e.g. per-node neighborhoods).
     segment_mean     Mean reduction within segments.
     mean_pool        Average node features within each graph (graph-level readout).
@@ -9,15 +13,30 @@ Functions:
     batch_graphs     Pack graphs into one disconnected graph for batched message passing.
     add_self_loops   Append identity edges so every node sends a message to itself.
 
-`segment_sum`, `segment_max`, `segment_min` and `segment_prod` are re-exported from
-`jax.ops` in `ion.gnn`, so all segment reductions share one namespace.
+`segment_sum`, `segment_max`, `segment_min` and `segment_prod` are re-exported
+from `jax.ops`, so all graph layers and public segment reductions share this
+module as their canonical namespace.
 """
 
 from collections.abc import Sequence
 
-import jax
 import jax.numpy as jnp
+from jax.ops import segment_max, segment_min, segment_prod, segment_sum
 from jaxtyping import Array, Float, Int
+
+__all__ = [
+    "add_self_loops",
+    "batch_graphs",
+    "max_pool",
+    "mean_pool",
+    "segment_max",
+    "segment_mean",
+    "segment_min",
+    "segment_prod",
+    "segment_softmax",
+    "segment_sum",
+    "sum_pool",
+]
 
 
 def segment_softmax(
@@ -30,12 +49,12 @@ def segment_softmax(
     >>> weights = segment_softmax(logits, receivers, num_nodes)
     """
     # Subtract per-segment max for numerical stability
-    maxes = jax.ops.segment_max(data, segment_ids, num_segments)
+    maxes = segment_max(data, segment_ids, num_segments)
     maxes = jnp.where(jnp.isinf(maxes), 0.0, maxes)
     data = jnp.exp(data - maxes[segment_ids])
 
     # Normalize by per-segment sum; guard empty segments (never indexed) against 0 / 0
-    sums = jax.ops.segment_sum(data, segment_ids, num_segments)
+    sums = segment_sum(data, segment_ids, num_segments)
     return data / jnp.where(sums == 0, 1.0, sums)[segment_ids]
 
 
@@ -48,12 +67,10 @@ def segment_mean(
 
     >>> means = segment_mean(messages, receivers, num_nodes)
     """
-    sums = jax.ops.segment_sum(data, segment_ids, num_segments)
+    sums = segment_sum(data, segment_ids, num_segments)
 
     # Count segment members; guard empty segments against 0 / 0
-    counts = jax.ops.segment_sum(
-        jnp.ones_like(segment_ids, dtype=data.dtype), segment_ids, num_segments
-    )
+    counts = segment_sum(jnp.ones_like(segment_ids, dtype=data.dtype), segment_ids, num_segments)
     counts = jnp.maximum(counts, 1)
     return sums / counts.reshape(-1, *(1,) * (data.ndim - 1))
 
@@ -79,7 +96,7 @@ def sum_pool(
 
     >>> g = sum_pool(x, graph_ids, num_graphs)  # (n, d) -> (g, d)
     """
-    return jax.ops.segment_sum(x, graph_ids, num_graphs)
+    return segment_sum(x, graph_ids, num_graphs)
 
 
 def max_pool(
@@ -91,7 +108,7 @@ def max_pool(
 
     >>> g = max_pool(x, graph_ids, num_graphs)  # (n, d) -> (g, d)
     """
-    maxes = jax.ops.segment_max(x, graph_ids, num_graphs)
+    maxes = segment_max(x, graph_ids, num_graphs)
 
     # segment_max fills empty segments with -inf
     return jnp.where(jnp.isneginf(maxes), 0.0, maxes)

@@ -7,12 +7,12 @@ The update network is passed by the caller; the layer creates no weights of its
 own. Self-loops are not needed: own features enter via the (1 + eps) term.
 """
 
-import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Int
 
 from ..nn.module import Module
 from ..nn.param import Param
+from .ops import segment_sum
 
 
 class GINConv(Module):
@@ -45,6 +45,6 @@ class GINConv(Module):
         n, i = x.shape
 
         # Sum aggregation preserves neighbor multiplicity
-        agg = jax.ops.segment_sum(x[senders], receivers, n)
+        agg = segment_sum(x[senders], receivers, n)
 
         return self.mlp((1 + self.eps) * x + agg)

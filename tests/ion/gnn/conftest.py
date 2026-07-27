@@ -30,6 +30,7 @@ def _build_gnn_layers(key):
     return [
         (gnn.GCNConv(8, 16, key=next(keys)), x, senders, receivers, None),
         (gnn.GCNConv(8, 16, bias=False, key=next(keys)), x, senders, receivers, None),
+        (gnn.GraphConv(8, 16, key=next(keys)), x, senders, receivers, None),
         (gnn.GATConv(8, 16, num_heads=2, key=next(keys)), x, senders, receivers, None),
         (gnn.GATConv(8, 16, num_heads=4, key=next(keys)), x, senders, receivers, None),
         (gnn.GATConv(8, 16, num_heads=2, bias=False, key=next(keys)), x, senders, receivers, None),
@@ -67,6 +68,7 @@ def _build_gnn_layers(key):
 _GNN_PARAM_NAMES = [
     "gcn_conv",
     "gcn_conv_no_bias",
+    "graph_conv",
     "gat_conv",
     "gat_conv_4_heads",
     "gat_conv_no_bias",

@@ -1,7 +1,7 @@
 Maximum node features within each graph.
 
 Empty graphs return zeros rather than the `-inf` fill used by
-`jax.ops.segment_max`.
+`gnn.segment_max`.
 
 Parameters
 ----------

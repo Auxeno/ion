@@ -6,8 +6,8 @@ message-passing layers. The [GNN guide](guide.md) explains the array
 conventions and `graph_ids`.
 
 The `jax.ops` functions `segment_sum`, `segment_max`, `segment_min`, and
-`segment_prod` are also re-exported from `ion.gnn`, so all segment reductions
-share the same namespace.
+`segment_prod` are re-exported through `ion.gnn.ops` and `ion.gnn`, so graph
+layers and public callers share one segment-operation namespace.
 
 ## Segment reductions
 

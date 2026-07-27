@@ -1,10 +1,12 @@
-"""Graph Convolutional Network layer from Kipf & Welling, 2017.
+"""Graph convolutional layers.
 
 Modules:
-    GCNConv  Graph convolutional layer with symmetric degree normalization.
+    GCNConv    Symmetric degree-normalized convolution.  (Kipf & Welling, 2017)
+    GraphConv  Separate neighbour and root transforms.   (Morris et al., 2019)
 
 Glorot uniform weight init, zeros for bias.
-Self-loops are the caller's responsibility, see `gnn.add_self_loops`.
+GCNConv self-loops are the caller's responsibility, see `gnn.add_self_loops`.
+GraphConv does not need self-loops because it has a separate root term.
 """
 
 import jax
@@ -15,6 +17,7 @@ from jaxtyping import Array, Float, Int, PRNGKeyArray
 
 from ..nn.module import Module
 from ..nn.param import Param
+from .ops import segment_sum
 
 
 class GCNConv(Module):
@@ -56,7 +59,7 @@ class GCNConv(Module):
 
         # Compute node degrees by counting incoming edges at each receiver
         edge_counts = jnp.ones(e, dtype=x.dtype)
-        degree = jax.ops.segment_sum(edge_counts, receivers, n)
+        degree = segment_sum(edge_counts, receivers, n)
 
         # Compute symmetric normalization coefficients to stabilize hub activations
         node_norm = jnp.where(degree > 0, lax.rsqrt(degree), 0.0)
@@ -64,9 +67,63 @@ class GCNConv(Module):
 
         # Route, scale, and accumulate features from senders to receivers
         messages = x[senders] * edge_weight[:, None]
-        x = jax.ops.segment_sum(messages, receivers, n)
+        x = segment_sum(messages, receivers, n)
 
         if self.b is not None:
             x = x + self.b
 
         return x
+
+
+class GraphConv(Module):
+    """Graph convolutional layer with separate root and neighbour transforms.
+
+    >>> conv = GraphConv(16, 32, key=key)
+    >>> conv(x, senders, receivers)  # (n, 16) -> (n, 32)
+    >>> conv(x, senders, receivers, edge_weight=edge_weight)
+    """
+
+    w_neigh: Param[Float[Array, "i o"]]
+    w_self: Param[Float[Array, "i o"]]
+    b: Param[Float[Array, " o"]] | None
+
+    def __init__(
+        self,
+        in_dim: int,
+        out_dim: int,
+        bias: bool = True,
+        w_init: Initializer = glorot_uniform(),
+        b_init: Initializer = zeros,
+        *,
+        key: PRNGKeyArray,
+    ) -> None:
+
+        key_neigh, key_self, key_b = jax.random.split(key, 3)
+        self.w_neigh = Param(w_init(shape=(in_dim, out_dim), key=key_neigh))
+        self.w_self = Param(w_init(shape=(in_dim, out_dim), key=key_self))
+        self.b = Param(b_init(shape=(out_dim,), key=key_b)) if bias else None
+
+    def __call__(
+        self,
+        x: Float[Array, "n i"],
+        senders: Int[Array, " e"],
+        receivers: Int[Array, " e"],
+        *,
+        edge_weight: Float[Array, " e"] | None = None,
+    ) -> Float[Array, "n o"]:
+
+        n, i = x.shape
+
+        # Optionally weight sender features, then sum them into each receiver
+        messages = x[senders]
+        if edge_weight is not None:
+            messages = messages * edge_weight[:, None]
+        neigh = segment_sum(messages, receivers, n)
+
+        # Transform neighbourhood and central-node features independently
+        x_out = neigh @ self.w_neigh + x @ self.w_self
+
+        if self.b is not None:
+            x_out = x_out + self.b
+
+        return x_out
