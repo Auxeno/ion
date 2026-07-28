@@ -28,7 +28,10 @@ pip install ion-nn
 
     The neural network layer library.
 
+    <span class="card-actions" markdown>
+    <a class="card-hitbox" href="nn/guide/" aria-label="NN guide"></a>
     [:octicons-arrow-right-24: Layers](nn/layers/index.md)
+    </span>
 
 -   :material-graph-outline:{ .lg .middle } **GNN**
 
@@ -36,7 +39,10 @@ pip install ion-nn
 
     Graph neural network layers and message-passing ops.
 
-    [:octicons-arrow-right-24: Graphs](gnn/guide.md)
+    <span class="card-actions" markdown>
+    <a class="card-hitbox" href="gnn/guide/" aria-label="GNN guide"></a>
+    [:octicons-arrow-right-24: Layers](gnn/layers/index.md)
+    </span>
 
 -   :material-book-open-variant:{ .lg .middle } **Workflows**
 

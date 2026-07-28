@@ -1,9 +1,8 @@
 # Neural networks
 
-This guide follows a batch of MNIST images through an Ion model, from arrays to trained predictions. For individual
-layers and their APIs, see the [NN layer reference](layers/index.md).
+For neural network layers and their APIs, see the [NN layer reference](layers/index.md).
 
-Follow the guide from the beginning for a complete training walkthrough, or jump directly to a topic:
+This guide follows a batch of MNIST images through an Ion model, from arrays to trained predictions.
 
 - [Image batches](#image-batches)
 - [Building the model](#building-the-model)

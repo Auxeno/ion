@@ -1,11 +1,9 @@
 # Graph neural networks
 
-This guide represents a graph with JAX arrays, follows messages through it, and
-builds node-level and graph-level predictors. For individual graph layers and
-their APIs, see the [GNN layer reference](layers/index.md).
+For graph layers and their APIs, see the [GNN layer reference](layers/index.md).
 
-Follow the guide from the beginning for a walkthrough, or jump directly to a
-topic:
+This guide represents a graph with JAX arrays, follows messages through it, and
+builds node-level and graph-level predictors.
 
 - [COO format](#coo-format)
 - [Message passing](#message-passing)

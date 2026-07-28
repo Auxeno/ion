@@ -372,6 +372,13 @@ body[data-md-color-scheme] .jupyter-wrapper {
   position: absolute;
   inset: 0;
 }
+.md-typeset .grid.cards .card-actions a:not(.card-hitbox) {
+  position: relative;
+  z-index: 1;
+}
+.md-typeset .grid.cards .card-actions a:not(.card-hitbox)::after {
+  content: none;
+}
 .md-typeset .grid.cards .md-typeset__scrollwrap svg,
 .md-typeset .grid.cards .twemoji svg {
   fill: var(--ion-brand-purple);
