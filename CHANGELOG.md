@@ -5,6 +5,12 @@
 - **New `gnn.GraphConv` layer.** Graph convolution from Morris et al. (2019) with
   independently learned neighbour and root transforms, unnormalized sum aggregation,
   and optional scalar edge weights.
+- **New `gnn.TransformerConv` layer.** Sparse scaled dot-product graph attention from
+  Shi et al. (2020), with multi-head Q/K/V projections, optional edge features,
+  a root transform, edge masking, and optional gated residuals.
+- **GAT projection weights are now stored as 2D matrices.** `GATConv` and
+  `GATv2Conv` add head axes to activations in the forward pass, matching the
+  attention layers in `ion.nn`. Existing GAT checkpoints are incompatible.
 
 ## 0.11.0
 

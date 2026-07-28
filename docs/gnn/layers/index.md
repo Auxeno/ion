@@ -9,6 +9,6 @@ representation, message passing, self-loops, batching, and pooling.
 | Family | Layers | Neighbour aggregation |
 |---|---|---|
 | [Graph Convolution](gcn.md) | `GCNConv`, `GraphConv` | Normalized or optionally weighted sum |
-| [Graph Attention](gat.md) | `GATConv`, `GATv2Conv` | Learned attention weights |
+| [Graph Attention](gat.md) | `GATConv`, `GATv2Conv`, `TransformerConv` | Learned attention weights |
 | [Graph Isomorphism Network](gin.md) | `GINConv` | Sum plus a separate central-node term |
 | [GraphSAGE](sage.md) | `SAGEConv` | Mean, max, or sum pooling plus a root term |

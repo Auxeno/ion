@@ -28,11 +28,11 @@ class GATConv(Module):
     >>> gat(x, senders, receivers, edge_mask=mask)  # mask: bool (e,)
     """
 
-    w: Param[Float[Array, "i h k"]]
+    w: Param[Float[Array, "i o"]]
     att_sender: Param[Float[Array, "h k"]]
     att_receiver: Param[Float[Array, "h k"]]
     b: Param[Float[Array, " o"]] | None
-    w_edge: Param[Float[Array, "f h k"]] | None
+    w_edge: Param[Float[Array, "f o"]] | None
     att_edge: Param[Float[Array, "h k"]] | None
     num_heads: int
     negative_slope: float
@@ -59,16 +59,13 @@ class GATConv(Module):
         key_w, key_att_s, key_att_r, key_b, key_w_e, key_att_e = jax.random.split(key, 6)
         head_dim = out_dim // num_heads
 
-        # Initialize projections flat so Glorot fans are (in_dim, out_dim), then split heads
-        w = w_init(shape=(in_dim, out_dim), key=key_w)
-        self.w = Param(w.reshape(in_dim, num_heads, head_dim))
+        self.w = Param(w_init(shape=(in_dim, out_dim), key=key_w))
         self.att_sender = Param(att_init(shape=(num_heads, head_dim), key=key_att_s))
         self.att_receiver = Param(att_init(shape=(num_heads, head_dim), key=key_att_r))
         self.b = Param(b_init(shape=(out_dim,), key=key_b)) if bias else None
 
         if edge_dim is not None:
-            w_edge = w_init(shape=(edge_dim, out_dim), key=key_w_e)
-            self.w_edge = Param(w_edge.reshape(edge_dim, num_heads, head_dim))
+            self.w_edge = Param(w_init(shape=(edge_dim, out_dim), key=key_w_e))
             self.att_edge = Param(att_init(shape=(num_heads, head_dim), key=key_att_e))
         else:
             self.w_edge = None
@@ -94,23 +91,24 @@ class GATConv(Module):
         if x_edge is not None and self.edge_dim is None:
             raise ValueError("x_edge passed at call but edge_dim not set at init")
 
-        n, i = x.shape
+        n = x.shape[0]
 
-        # Project input features into multi-head space
-        x = jnp.einsum("ni, ihk -> nhk", x, self.w)
+        # Project nodes, then split the output dimension into attention heads
+        x = (x @ self.w).reshape(n, self.num_heads, -1)
 
         # Compute attention scores at node level, then combine at edges
-        logits_sender = jnp.einsum("nhk, hk -> nh", x, self.att_sender)
-        logits_receiver = jnp.einsum("nhk, hk -> nh", x, self.att_receiver)
+        logits_sender = (x * self.att_sender).sum(axis=-1)
+        logits_receiver = (x * self.att_receiver).sum(axis=-1)
         logits = logits_sender[senders] + logits_receiver[receivers]
 
         # Add edge feature contribution to attention logits
         if x_edge is not None:
+            assert self.w_edge is not None
+            assert self.att_edge is not None
             if edge_mask is not None:
                 x_edge = x_edge * edge_mask[:, None]
-            edge_proj = jnp.einsum("ef, fhk -> ehk", x_edge, self.w_edge)
-            logits_edge = jnp.einsum("ehk, hk -> eh", edge_proj, self.att_edge)
-            logits = logits + logits_edge
+            edge = (x_edge @ self.w_edge).reshape(-1, self.num_heads, x.shape[-1])
+            logits = logits + (edge * self.att_edge).sum(axis=-1)
 
         logits = jax.nn.leaky_relu(logits, self.negative_slope)
 
@@ -142,11 +140,11 @@ class GATv2Conv(Module):
     >>> gat(x, senders, receivers, edge_mask=mask)  # mask: bool (e,)
     """
 
-    w_sender: Param[Float[Array, "i h k"]]
-    w_receiver: Param[Float[Array, "i h k"]]
+    w_sender: Param[Float[Array, "i o"]]
+    w_receiver: Param[Float[Array, "i o"]]
     att: Param[Float[Array, "h k"]]
     b: Param[Float[Array, " o"]] | None
-    w_edge: Param[Float[Array, "f h k"]] | None
+    w_edge: Param[Float[Array, "f o"]] | None
     num_heads: int
     negative_slope: float
     edge_dim: int | None
@@ -172,17 +170,13 @@ class GATv2Conv(Module):
         key_w_s, key_w_r, key_att, key_b, key_w_e = jax.random.split(key, 5)
         head_dim = out_dim // num_heads
 
-        # Initialize projections flat so Glorot fans are (in_dim, out_dim), then split heads
-        w_sender = w_init(shape=(in_dim, out_dim), key=key_w_s)
-        self.w_sender = Param(w_sender.reshape(in_dim, num_heads, head_dim))
-        w_receiver = w_init(shape=(in_dim, out_dim), key=key_w_r)
-        self.w_receiver = Param(w_receiver.reshape(in_dim, num_heads, head_dim))
+        self.w_sender = Param(w_init(shape=(in_dim, out_dim), key=key_w_s))
+        self.w_receiver = Param(w_init(shape=(in_dim, out_dim), key=key_w_r))
         self.att = Param(att_init(shape=(num_heads, head_dim), key=key_att))
         self.b = Param(b_init(shape=(out_dim,), key=key_b)) if bias else None
 
         if edge_dim is not None:
-            w_edge = w_init(shape=(edge_dim, out_dim), key=key_w_e)
-            self.w_edge = Param(w_edge.reshape(edge_dim, num_heads, head_dim))
+            self.w_edge = Param(w_init(shape=(edge_dim, out_dim), key=key_w_e))
         else:
             self.w_edge = None
 
@@ -206,26 +200,26 @@ class GATv2Conv(Module):
         if x_edge is not None and self.edge_dim is None:
             raise ValueError("x_edge passed at call but edge_dim not set at init")
 
-        n, i = x.shape
+        n = x.shape[0]
 
-        # Project with separate sender/receiver weights
-        x_s = jnp.einsum("ni, ihk -> nhk", x, self.w_sender)
-        x_r = jnp.einsum("ni, ihk -> nhk", x, self.w_receiver)
+        # Project nodes, then split the output dimension into attention heads
+        x_s = (x @ self.w_sender).reshape(n, self.num_heads, -1)
+        x_r = (x @ self.w_receiver).reshape(n, self.num_heads, -1)
 
         # Combine at edge level
         edge_h = x_s[senders] + x_r[receivers]
 
         # Edge features go inside the LeakyReLU (unlike GATv1)
         if x_edge is not None:
+            assert self.w_edge is not None
             if edge_mask is not None:
                 x_edge = x_edge * edge_mask[:, None]
-            edge_proj = jnp.einsum("ef, fhk -> ehk", x_edge, self.w_edge)
-            edge_h = edge_h + edge_proj
+            edge = (x_edge @ self.w_edge).reshape(-1, self.num_heads, x_s.shape[-1])
+            edge_h = edge_h + edge
 
         # Apply nonlinearity then dot with attention vector (GATv2 difference)
-        logits = jnp.einsum(
-            "ehk, hk -> eh", jax.nn.leaky_relu(edge_h, self.negative_slope), self.att
-        )
+        edge_h = jax.nn.leaky_relu(edge_h, self.negative_slope)
+        logits = (edge_h * self.att).sum(axis=-1)
 
         # Mask out edges so they receive zero attention weight
         if edge_mask is not None:

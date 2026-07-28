@@ -1,0 +1,68 @@
+Graph Transformer layer ([Shi et al., 2020](https://arxiv.org/abs/2009.03509)).
+
+Applies scaled dot-product multi-head attention over incoming graph edges.
+Receivers produce queries; senders produce keys and values. Optional edge
+features are added to both keys and values. A learned projection of each
+receiving node's features is added to the aggregated messages by default.
+
+Parameters
+----------
+in_dim : int
+    Input node feature dimension.
+out_dim : int
+    Output node feature dimension. Must be divisible by `num_heads`.
+num_heads : int, default=1
+    Number of attention heads. Heads are concatenated into `out_dim`.
+edge_dim : int | None, default=None
+    Per-edge feature dimension. When set, one edge feature row is required for
+    every directed edge.
+root_weight : bool, default=True
+    Add a learned linear projection of each receiving node's features to its
+    aggregated messages.
+beta : bool, default=False
+    Use a learned sigmoid gate between the root projection and aggregated
+    messages. Requires `root_weight=True`.
+bias : bool, default=True
+    Whether to include a learnable output bias.
+w_init : Initializer
+    Projection and gate weight initializer. Glorot uniform by default.
+b_init : Initializer
+    Bias initializer. Zeros by default.
+key : jax.Array
+    RNG key for parameter initialization. Keyword-only.
+
+Attributes
+----------
+w_q, w_k, w_v : Param
+    Query, key, and value projections of shape `(in_dim, out_dim)`.
+w_root : Param | None
+    Projection for each receiving node's own features, with shape
+    `(in_dim, out_dim)`. `None` when `root_weight=False`.
+w_edge : Param | None
+    Edge projection of shape `(edge_dim, out_dim)`. `None` unless `edge_dim`
+    is set.
+w_beta : Param | None
+    Gate projection of shape `(3 * out_dim, 1)`. `None` unless `beta=True`.
+b_out : Param | None
+    Output bias of shape `(out_dim,)`. `None` when `bias=False`.
+
+Example
+-------
+```python
+num_nodes, num_edges = 3, 3
+in_dim, out_dim, edge_dim = 16, 32, 8
+x = jnp.ones((num_nodes, in_dim))
+senders = jnp.array([0, 1, 2])
+receivers = jnp.array([1, 2, 0])
+x_edge = jnp.ones((num_edges, edge_dim))
+
+conv = gnn.TransformerConv(
+    in_dim,
+    out_dim,
+    num_heads=4,
+    edge_dim=edge_dim,
+    beta=True,
+    key=key,
+)
+y = conv(x, senders, receivers, x_edge=x_edge)
+```

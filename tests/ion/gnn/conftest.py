@@ -22,7 +22,7 @@ def triangle_graph_no_self_loops():
 
 
 def _build_gnn_layers(key):
-    keys = iter(jax.random.split(key, 20))
+    keys = iter(jax.random.split(key, 30))
     senders = jnp.array([0, 1, 1, 2, 0, 2, 0, 1, 2])
     receivers = jnp.array([1, 0, 2, 1, 2, 0, 0, 1, 2])
     x = jax.random.normal(next(keys), (3, 8))
@@ -48,6 +48,28 @@ def _build_gnn_layers(key):
             senders,
             receivers,
             x_edge,
+        ),
+        (gnn.TransformerConv(8, 16, num_heads=2, key=next(keys)), x, senders, receivers, None),
+        (
+            gnn.TransformerConv(8, 16, num_heads=2, edge_dim=4, key=next(keys)),
+            x,
+            senders,
+            receivers,
+            x_edge,
+        ),
+        (
+            gnn.TransformerConv(8, 16, num_heads=2, beta=True, key=next(keys)),
+            x,
+            senders,
+            receivers,
+            None,
+        ),
+        (
+            gnn.TransformerConv(8, 16, num_heads=2, root_weight=False, key=next(keys)),
+            x,
+            senders,
+            receivers,
+            None,
         ),
         (gnn.GINConv(nn.MLP([8, 16, 16], key=next(keys))), x, senders, receivers, None),
         (
@@ -75,6 +97,10 @@ _GNN_PARAM_NAMES = [
     "gat_conv_edge_dim",
     "gat_v2_conv",
     "gat_v2_conv_edge_dim",
+    "transformer_conv",
+    "transformer_conv_edge_dim",
+    "transformer_conv_beta",
+    "transformer_conv_no_root",
     "gin_conv",
     "gin_conv_train_eps",
     "sage_conv",

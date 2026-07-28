@@ -137,7 +137,7 @@ available families.
 | Family | Layers |
 |--------|--------|
 | [Graph Convolution](gnn/layers/gcn.md) | `GCNConv`, `GraphConv` |
-| [Graph Attention](gnn/layers/gat.md) | `GATConv`, `GATv2Conv` |
+| [Graph Attention](gnn/layers/gat.md) | `GATConv`, `GATv2Conv`, `TransformerConv` |
 | [Graph Isomorphism Network](gnn/layers/gin.md) | `GINConv` |
 | [GraphSAGE](gnn/layers/sage.md) | `SAGEConv` |
 | [Operations](gnn/operations.md) | segment reductions, graph pooling, `add_self_loops`, `batch_graphs` |

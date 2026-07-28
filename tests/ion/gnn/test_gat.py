@@ -54,6 +54,12 @@ class TestGATConv:
         assert gat.att_sender.dtype == jnp.float32
         assert gat.att_receiver.dtype == jnp.float32
 
+    def test_projection_shapes(self):
+        """Projection parameters stay flat; only activations gain a head axis."""
+        gat = gnn.GATConv(8, 16, num_heads=4, edge_dim=3, key=jax.random.key(0))
+        assert gat.w.shape == (8, 16)
+        assert gat.w_edge.shape == (3, 16)
+
     def test_attention_changes_with_features(self, triangle_graph):
         """Different node features produce different attention-weighted outputs."""
         gat = gnn.GATConv(4, 4, key=jax.random.key(0))
@@ -303,6 +309,13 @@ class TestGATv2Conv:
         assert gat.w_sender.dtype == jnp.float32
         assert gat.w_receiver.dtype == jnp.float32
         assert gat.att.dtype == jnp.float32
+
+    def test_projection_shapes(self):
+        """Projection parameters stay flat; only activations gain a head axis."""
+        gat = gnn.GATv2Conv(8, 16, num_heads=4, edge_dim=3, key=jax.random.key(0))
+        assert gat.w_sender.shape == (8, 16)
+        assert gat.w_receiver.shape == (8, 16)
+        assert gat.w_edge.shape == (3, 16)
 
     def test_glorot_init(self):
         """Glorot fans come from the flat (in_dim, out_dim) projection, including multi-head."""

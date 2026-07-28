@@ -15,6 +15,7 @@ from .ops import (
     sum_pool,
 )
 from .sage import SAGEConv
+from .transformer import TransformerConv
 
 __all__ = [
     "GATConv",
@@ -23,6 +24,7 @@ __all__ = [
     "GraphConv",
     "GINConv",
     "SAGEConv",
+    "TransformerConv",
     "add_self_loops",
     "batch_graphs",
     "max_pool",
