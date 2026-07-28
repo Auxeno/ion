@@ -1,5 +1,17 @@
 Return a copy with all `Param`s set to `trainable=True`.
 
-Examples
---------
->>> unfrozen_model = ion.unfreeze(model)
+Parameters
+----------
+pytree : PyTree
+    Pytree containing `Param` wrappers, plain arrays, or both.
+
+Returns
+-------
+PyTree
+    Copy of the pytree with every `Param` unfrozen.
+
+Example
+-------
+```python
+unfrozen_model = ion.unfreeze(model)
+```

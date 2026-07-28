@@ -58,6 +58,7 @@ class TestGATConv:
         """Projection parameters stay flat; only activations gain a head axis."""
         gat = gnn.GATConv(8, 16, num_heads=4, edge_dim=3, key=jax.random.key(0))
         assert gat.w.shape == (8, 16)
+        assert gat.w_edge is not None
         assert gat.w_edge.shape == (3, 16)
 
     def test_attention_changes_with_features(self, triangle_graph):
@@ -315,6 +316,7 @@ class TestGATv2Conv:
         gat = gnn.GATv2Conv(8, 16, num_heads=4, edge_dim=3, key=jax.random.key(0))
         assert gat.w_sender.shape == (8, 16)
         assert gat.w_receiver.shape == (8, 16)
+        assert gat.w_edge is not None
         assert gat.w_edge.shape == (3, 16)
 
     def test_glorot_init(self):
