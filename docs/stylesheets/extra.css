@@ -153,6 +153,11 @@ body[data-md-color-scheme] .jupyter-wrapper {
   max-width: 80rem;
 }
 
+/* Keep punctuation and suffixes close to inline code. */
+.md-typeset :not(pre) > code {
+  padding-inline: 0.15em;
+}
+
 /* Drop the table of contents before the primary navigation. */
 @media screen and (max-width: 87.49em) {
   .md-sidebar--secondary:not([hidden]) {
@@ -261,6 +266,11 @@ body[data-md-color-scheme] .jupyter-wrapper {
 
 .gnn-plot--propagation {
   height: 484px;
+  margin-top: 0.75rem;
+}
+
+.gnn-plot--molecule {
+  height: 695px;
   margin-top: 0.75rem;
 }
 

@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acetic acid as a feature graph</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --foreground: #252a34;
+      --muted: #6b7688;
+      --edge: rgba(37, 42, 52, 0.52);
+      --label-bg: rgba(255, 255, 255, 0.92);
+      --purple: #7c3aed;
+      --cyan: #0891b2;
+      --blue: #478af5;
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --foreground: #f0f0f0;
+      --muted: #a6adbb;
+      --edge: rgba(240, 240, 240, 0.55);
+      --label-bg: rgba(37, 42, 52, 0.94);
+      --cyan: #22d3ee;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    html,
+    body,
+    .molecule-plot,
+    .js-plotly-plot,
+    .plot-container,
+    .svg-container,
+    .main-svg {
+      background: transparent !important;
+      background-color: transparent !important;
+    }
+    body {
+      margin: 0;
+      color: var(--foreground);
+      font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+    }
+    body > h2 {
+      display: block;
+      width: 100%;
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center !important;
+    }
+    #structure-plot {
+      width: 100%;
+      height: 275px;
+    }
+    #encoded-plot {
+      width: 100%;
+      height: 315px;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.35rem 1rem;
+      margin-top: 0.25rem;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .legend code {
+      color: var(--foreground);
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+  </style>
+</head>
+<body>
+  <h2>Chemical structure</h2>
+  <div
+    id="structure-plot"
+    class="molecule-plot"
+    role="img"
+    aria-label="Acetic acid with all carbon, hydrogen, and oxygen atoms shown"
+  ></div>
+
+  <h2>One-hot graph representation</h2>
+  <div
+    id="encoded-plot"
+    class="molecule-plot"
+    role="img"
+    aria-label="The same acetic acid graph with one-hot atom and bond features"
+  ></div>
+  <div class="legend" aria-hidden="true">
+    <span>atoms: <code>[C, H, O]</code></span>
+    <span>bonds: <code>[single, double]</code></span>
+  </div>
+
+  <script src="https://cdn.plot.ly/plotly-3.4.0.min.js"></script>
+  <script>
+    (() => {
+      const structurePlot = document.getElementById("structure-plot");
+      const encodedPlot = document.getElementById("encoded-plot");
+      const positions = [
+        [-0.70, 0.00],
+        [-1.75, 0.95],
+        [-2.05, 0.00],
+        [-1.75, -0.95],
+        [0.90, 0.00],
+        [0.90, 1.30],
+        [2.40, 0.00],
+        [3.70, 0.00]
+      ];
+      const atoms = ["C", "H", "H", "H", "C", "O", "O", "H"];
+      const atomFeatures = [
+        "[1, 0, 0]",
+        "[0, 1, 0]",
+        "[0, 1, 0]",
+        "[0, 1, 0]",
+        "[1, 0, 0]",
+        "[0, 0, 1]",
+        "[0, 0, 1]",
+        "[0, 1, 0]"
+      ];
+      const bonds = [
+        { nodes: [0, 1], feature: "[1, 0]", shift: [0, -7] },
+        { nodes: [0, 2], feature: "[1, 0]", shift: [0, 18] },
+        { nodes: [0, 3], feature: "[1, 0]", shift: [0, 7] },
+        { nodes: [0, 4], feature: "[1, 0]", shift: [0, -18] },
+        { nodes: [4, 5], feature: "[0, 1]", shift: [35, 0], double: true },
+        { nodes: [4, 6], feature: "[1, 0]", shift: [0, -18] },
+        { nodes: [6, 7], feature: "[1, 0]", shift: [0, -18] }
+      ];
+
+      function setTheme() {
+        let scheme;
+        try {
+          scheme = window.parent.document.body.dataset.mdColorScheme;
+        } catch {
+          scheme = null;
+        }
+        const dark = scheme
+          ? scheme === "slate"
+          : window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+      }
+
+      function atomColor(atom, style) {
+        if (atom === "C") return style.getPropertyValue("--purple").trim();
+        if (atom === "O") return style.getPropertyValue("--cyan").trim();
+        return style.getPropertyValue("--blue").trim();
+      }
+
+      function bondTraces(edgeColor) {
+        return bonds.flatMap(bond => {
+          const [a, b] = bond.nodes;
+          const [x0, y0] = positions[a];
+          const [x1, y1] = positions[b];
+          if (!bond.double) {
+            return [{
+              type: "scatter",
+              mode: "lines",
+              x: [x0, x1],
+              y: [y0, y1],
+              line: { color: edgeColor, width: 3 },
+              hoverinfo: "skip",
+              showlegend: false
+            }];
+          }
+          const dx = x1 - x0;
+          const dy = y1 - y0;
+          const length = Math.hypot(dx, dy);
+          const offsetX = -dy / length * 0.065;
+          const offsetY = dx / length * 0.065;
+          return [-1, 1].map(direction => ({
+            type: "scatter",
+            mode: "lines",
+            x: [
+              x0 + direction * offsetX,
+              x1 + direction * offsetX
+            ],
+            y: [
+              y0 + direction * offsetY,
+              y1 + direction * offsetY
+            ],
+            line: { color: edgeColor, width: 3 },
+            hoverinfo: "skip",
+            showlegend: false
+          }));
+        });
+      }
+
+      function baseLayout(foreground, height) {
+        return {
+          height,
+          margin: { l: 12, r: 12, t: 8, b: 8 },
+          paper_bgcolor: "rgba(0,0,0,0)",
+          plot_bgcolor: "rgba(0,0,0,0)",
+          font: {
+            color: foreground,
+            family: "Space Grotesk, sans-serif"
+          },
+          xaxis: {
+            visible: false,
+            range: [-2.55, 4.20],
+            fixedrange: true
+          },
+          yaxis: {
+            visible: false,
+            range: [-1.55, 1.70],
+            scaleanchor: "x",
+            scaleratio: 1,
+            fixedrange: true
+          },
+          showlegend: false,
+          dragmode: false
+        };
+      }
+
+      function render() {
+        const style = getComputedStyle(document.documentElement);
+        const compact = document.body.clientWidth < 520;
+        const foreground = style.getPropertyValue("--foreground").trim();
+        const edgeColor = style.getPropertyValue("--edge").trim();
+        const labelBg = style.getPropertyValue("--label-bg").trim();
+        const purple = style.getPropertyValue("--purple").trim();
+        const cyan = style.getPropertyValue("--cyan").trim();
+        const colors = atoms.map(atom => atomColor(atom, style));
+
+        const structureNodes = {
+          type: "scatter",
+          mode: "markers+text",
+          x: positions.map(point => point[0]),
+          y: positions.map(point => point[1]),
+          text: atoms,
+          textposition: "middle center",
+          textfont: { color: "#ffffff", size: 15 },
+          customdata: atoms.map((atom, index) => [
+            index,
+            atom,
+            atomFeatures[index]
+          ]),
+          hovertemplate:
+            "<b>atom %{customdata[0]}: %{customdata[1]}</b><br>" +
+            "features: %{customdata[2]}<extra></extra>",
+          marker: {
+            size: atoms.map(atom => atom === "H" ? 42 : 52),
+            color: colors,
+            line: { color: foreground, width: 1.5 }
+          },
+          showlegend: false
+        };
+
+        const encodedNodes = {
+          type: "scatter",
+          mode: "markers+text",
+          x: positions.map(point => point[0]),
+          y: positions.map(point => point[1]),
+          text: atomFeatures.map((feature, index) => compact
+            ? feature.replaceAll(" ", "")
+            : `<b>x[${index}]</b><br>${feature}`
+          ),
+          textposition: "middle center",
+          textfont: {
+            color: "#ffffff",
+            size: compact ? 8 : 10,
+            family: "JetBrains Mono, monospace"
+          },
+          customdata: atoms.map((atom, index) => [
+            index,
+            atom,
+            atomFeatures[index]
+          ]),
+          hovertemplate:
+            "<b>x[%{customdata[0]}]: %{customdata[1]}</b><br>" +
+            "%{customdata[2]}<extra></extra>",
+          marker: {
+            size: compact ? 50 : 72,
+            color: colors,
+            line: { color: foreground, width: 1.5 }
+          },
+          showlegend: false
+        };
+
+        const encodedLayout = baseLayout(foreground, 315);
+        encodedLayout.annotations = bonds.map(bond => {
+          const [a, b] = bond.nodes;
+          return {
+            x: (positions[a][0] + positions[b][0]) / 2,
+            y: (positions[a][1] + positions[b][1]) / 2,
+            xshift: bond.shift[0] * (compact ? 0.6 : 1),
+            yshift: bond.shift[1] * (compact ? 0.6 : 1),
+            text: compact ? bond.feature.replaceAll(" ", "") : bond.feature,
+            showarrow: false,
+            bgcolor: labelBg,
+            bordercolor: bond.double ? cyan : purple,
+            borderpad: compact ? 1 : 3,
+            font: {
+              color: foreground,
+              size: compact ? 8 : 11,
+              family: "JetBrains Mono, monospace"
+            }
+          };
+        });
+
+        const config = {
+          displayModeBar: false,
+          responsive: true
+        };
+        return Promise.all([
+          Plotly.react(
+            structurePlot,
+            [...bondTraces(edgeColor), structureNodes],
+            baseLayout(foreground, 275),
+            config
+          ),
+          Plotly.react(
+            encodedPlot,
+            [...bondTraces(edgeColor), encodedNodes],
+            encodedLayout,
+            config
+          )
+        ]);
+      }
+
+      setTheme();
+      render();
+      let activeTheme = document.documentElement.dataset.theme;
+      window.setInterval(() => {
+        setTheme();
+        const nextTheme = document.documentElement.dataset.theme;
+        if (nextTheme !== activeTheme) {
+          activeTheme = nextTheme;
+          render();
+        }
+      }, 250);
+      window.matchMedia("(prefers-color-scheme: dark)")
+        .addEventListener("change", () => {
+          setTheme();
+          render();
+        });
+      new ResizeObserver(() => render()).observe(document.body);
+    })();
+  </script>
+</body>
+</html>

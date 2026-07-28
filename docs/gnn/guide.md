@@ -84,26 +84,91 @@ The complete arrays above produce this graph. The highlighted arrow is edge 0.
 Edges in COO are always directed. If the relationship should be undirected,
 include both directions as above.
 
-### Edge features
+### Optional edge data
 
-`GraphConv` can apply one scalar weight per directed edge:
+Many graphs only need node features and connectivity. Some applications also
+attach information to each edge. Molecular graphs are a natural example because
+bonds can have different types.
+
+Acetic acid, `CH3COOH`, contains carbon, hydrogen, and oxygen atoms connected by
+single and double bonds. The first plot shows its chemical structure. The second
+replaces every atom and bond with a one-hot feature vector.
+
+<iframe
+  class="gnn-plot gnn-plot--molecule"
+  src="../../assets/gnn-acetic-acid.html"
+  title="Acetic acid and its one-hot graph representation"
+  loading="lazy"
+></iframe>
+
+Use feature order carbon, hydrogen, oxygen for the atoms. The atom rows follow
+the conventional `CH3COOH` formula order:
 
 ```python
-edge_weight.shape  # (num_edges,)
-h = conv(x, senders, receivers, edge_weight=edge_weight)
+x_molecule = jnp.array([
+    [1.0, 0.0, 0.0],  # C
+    [0.0, 1.0, 0.0],  # H
+    [0.0, 1.0, 0.0],  # H
+    [0.0, 1.0, 0.0],  # H
+    [1.0, 0.0, 0.0],  # C
+    [0.0, 0.0, 1.0],  # O
+    [0.0, 0.0, 1.0],  # O
+    [0.0, 1.0, 0.0],  # H
+], dtype=jnp.float32)
 ```
 
-`GATConv`, `GATv2Conv`, and `TransformerConv` can instead include one feature
-row per directed edge:
+As before, each undirected connection becomes two directed edges. The edge
+features use order single bond, double bond:
 
 ```python
-x_edge.shape  # (num_edges, edge_features)
-h = gat(x, senders, receivers, x_edge=x_edge)
+senders_molecule   = jnp.array([0, 1, 0, 2, 0, 3, 0, 4, 4, 5, 4, 6, 6, 7])
+receivers_molecule = jnp.array([1, 0, 2, 0, 3, 0, 4, 0, 5, 4, 6, 4, 7, 6])
+
+x_edge_molecule = jnp.array([
+    [1.0, 0.0], [1.0, 0.0],  # C-H directed edge pair
+    [1.0, 0.0], [1.0, 0.0],  # C-H
+    [1.0, 0.0], [1.0, 0.0],  # C-H
+    [1.0, 0.0], [1.0, 0.0],  # C-C
+    [0.0, 1.0], [0.0, 1.0],  # C=O
+    [1.0, 0.0], [1.0, 0.0],  # C-O
+    [1.0, 0.0], [1.0, 0.0],  # O-H
+], dtype=jnp.float32)
 ```
 
-Construct the layer with the matching `edge_dim`. If self-loops are required,
-the edge-feature array must also contain features for those appended edges. See
-the [Graph Attention reference](layers/gat.md) for the complete call contract.
+`x_edge_molecule[i]` describes the same directed edge as
+`senders_molecule[i]` and `receivers_molecule[i]`. `GATConv`, `GATv2Conv`, and
+`TransformerConv` accept these feature vectors. Construct the layer with the
+matching `edge_dim`:
+
+```python
+key = jax.random.key(0)
+gat = gnn.GATConv(in_dim=3, out_dim=16, edge_dim=2, key=key)
+h = gat(
+    x_molecule,
+    senders_molecule,
+    receivers_molecule,
+    x_edge=x_edge_molecule,
+)
+```
+
+The attention layers also accept one boolean mask value per directed edge.
+`True` keeps an edge and `False` makes the layer ignore it:
+
+```python
+edge_mask = jnp.ones(senders_molecule.shape, dtype=bool)
+edge_mask = edge_mask.at[jnp.array([8, 9])].set(False)  # ignore C=O both ways
+h = gat(
+    x_molecule,
+    senders_molecule,
+    receivers_molecule,
+    x_edge=x_edge_molecule,
+    edge_mask=edge_mask,
+)
+```
+
+For an undirected relationship such as a bond, mask both directed edges to
+exclude it completely. `GraphConv` does not accept feature vectors or a mask,
+but it can scale each message with a scalar `edge_weight`.
 
 The complete graph representation consists of JAX arrays:
 
@@ -114,6 +179,7 @@ The complete graph representation consists of JAX arrays:
 | `receivers` | `(num_edges,)` | Destination node of each directed edge |
 | `edge_weight` | `(num_edges,)` | Optional scalar weight for each edge |
 | `x_edge` | `(num_edges, edge_dim)` | Optional feature vector for each edge |
+| `edge_mask` | `(num_edges,)` | Optional boolean selecting active edges |
 
 ## Message passing
 
@@ -187,7 +253,8 @@ are never added inside a layer.
 
 `add_self_loops` appends one loop for every node. It does not check whether the
 input already contains self-loops, so avoid calling it twice on the same edge
-arrays.
+arrays. When using edge features or a mask, also append one corresponding row or
+value for every new self-loop.
 
 ## Feature propagation
 

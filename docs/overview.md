@@ -212,7 +212,7 @@ model, optimizer = ion.load("checkpoint.ion", (model, optimizer))
 
 See [Checkpointing](workflows.md#checkpointing) for the format and edge cases.
 
-## Module sugar
+## Module helpers
 
 A `Module` is a plain pytree, but it carries a few conveniences for commonly used operations. Since modules are immutable, anything that transforms the model returns a new one:
 
