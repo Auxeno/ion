@@ -148,16 +148,9 @@ body[data-md-color-scheme] .jupyter-wrapper {
   font-weight: normal;
 }
 
-/* Wide code and output area with a readable prose measure */
+/* Let documentation content use the available page width. */
 .md-grid {
   max-width: 80rem;
-}
-
-.md-typeset > p,
-.md-typeset > ul,
-.md-typeset > ol,
-.md-typeset > blockquote {
-  max-width: 45rem;
 }
 
 /* Drop the table of contents before the primary navigation. */
