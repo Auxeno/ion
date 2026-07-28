@@ -252,8 +252,7 @@ body[data-md-color-scheme] .jupyter-wrapper {
 }
 
 /* Embedded Plotly figures */
-.gnn-plot,
-.nn-plot {
+.gnn-plot {
   display: block;
   width: 100%;
   border: 0;
@@ -271,11 +270,6 @@ body[data-md-color-scheme] .jupyter-wrapper {
 
 .gnn-plot--molecule {
   height: 695px;
-  margin-top: 0.75rem;
-}
-
-.nn-plot--training {
-  height: 390px;
   margin-top: 0.75rem;
 }
 
