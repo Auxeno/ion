@@ -32,7 +32,7 @@ jobs:
         run: uv run pyright
 
       - name: Run tests
-        run: uv run pytest --cov=ion --cov-report=xml
+        run: uv run pytest tests --cov=ion --cov-report=xml
 
       - name: Test package install
         if: matrix.python-version == '3.13'
