@@ -293,6 +293,12 @@ body[data-md-color-scheme] .jupyter-wrapper {
 }
 
 /* Benchmark figures */
+.benchmark-plot-scroll {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 .benchmark-plot {
   display: block;
   width: 100%;
@@ -315,9 +321,9 @@ body[data-md-color-scheme] .jupyter-wrapper {
 }
 
 @media screen and (max-width: 44.984375em) {
-  .benchmark-plot,
-  .benchmark-plot--latency {
-    height: 720px;
+  .benchmark-plot-scroll .benchmark-plot {
+    width: 850px;
+    max-width: none;
   }
 }
 

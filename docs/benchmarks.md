@@ -25,12 +25,14 @@ Ion is benchmarked against Equinox, Flax NNX, and PyTorch on three representativ
 
 Samples per second for MLP and ResNet; tokens per second for GPT. Higher is better.
 
-<iframe
-  class="benchmark-plot"
-  src="../assets/benchmarks/throughput.html"
-  title="Training throughput benchmark results"
-  loading="eager"
-></iframe>
+<div class="benchmark-plot-scroll" tabindex="0" role="region" aria-label="Scrollable training throughput chart">
+  <iframe
+    class="benchmark-plot"
+    src="../assets/benchmarks/throughput.html"
+    title="Training throughput benchmark results"
+    loading="eager"
+  ></iframe>
+</div>
 
 !!! note
     PyTorch's compiled GPT uses FlashAttention by default, while the JAX implementations benchmarked here do not, although they can be configured to use it. This gives PyTorch an advantage in GPT throughput and memory usage.
@@ -39,44 +41,52 @@ Samples per second for MLP and ResNet; tokens per second for GPT. Higher is bett
 
 Warmed forward, forward-and-backward, and complete AdamW training-step latency. Lower is better.
 
-<iframe
-  class="benchmark-plot benchmark-plot--latency"
-  src="../assets/benchmarks/latency.html"
-  title="Execution time benchmark results"
-  loading="lazy"
-></iframe>
+<div class="benchmark-plot-scroll" tabindex="0" role="region" aria-label="Scrollable execution time chart">
+  <iframe
+    class="benchmark-plot benchmark-plot--latency"
+    src="../assets/benchmarks/latency.html"
+    title="Execution time benchmark results"
+    loading="eager"
+  ></iframe>
+</div>
 
 ## Compile time
 
 Estimated as first-step latency minus warmed full-step latency. Lower is better.
 
-<iframe
-  class="benchmark-plot"
-  src="../assets/benchmarks/compile-time.html"
-  title="Compile time benchmark results"
-  loading="lazy"
-></iframe>
+<div class="benchmark-plot-scroll" tabindex="0" role="region" aria-label="Scrollable compile time chart">
+  <iframe
+    class="benchmark-plot"
+    src="../assets/benchmarks/compile-time.html"
+    title="Compile time benchmark results"
+    loading="eager"
+  ></iframe>
+</div>
 
 ## First training step
 
 End-to-end latency of the first compiled training step. Lower is better.
 
-<iframe
-  class="benchmark-plot"
-  src="../assets/benchmarks/first-step.html"
-  title="First training step benchmark results"
-  loading="lazy"
-></iframe>
+<div class="benchmark-plot-scroll" tabindex="0" role="region" aria-label="Scrollable first training step chart">
+  <iframe
+    class="benchmark-plot"
+    src="../assets/benchmarks/first-step.html"
+    title="First training step benchmark results"
+    loading="eager"
+  ></iframe>
+</div>
 
 ## Peak device memory
 
 Peak accelerator memory observed during a complete training step. Lower is better.
 
-<iframe
-  class="benchmark-plot"
-  src="../assets/benchmarks/peak-memory.html"
-  title="Peak device memory benchmark results"
-  loading="lazy"
-></iframe>
+<div class="benchmark-plot-scroll" tabindex="0" role="region" aria-label="Scrollable peak device memory chart">
+  <iframe
+    class="benchmark-plot"
+    src="../assets/benchmarks/peak-memory.html"
+    title="Peak device memory benchmark results"
+    loading="eager"
+  ></iframe>
+</div>
 
 The [benchmark source](https://github.com/auxeno/ion/tree/51cba60/benchmarks) contains the model implementations and complete measurement procedure.

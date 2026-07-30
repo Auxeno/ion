@@ -76,6 +76,7 @@ for x, y in data:
 - [Workflows](https://auxeno.github.io/ion/workflows/) - freezing, mixed precision, serialization, inspecting models
 - [Sharp edges](https://auxeno.github.io/ion/sharp-edges/) - known limitations and gotchas
 - [Examples](https://auxeno.github.io/ion/examples/) - end-to-end training scripts and notebooks
+- [Benchmarks](https://auxeno.github.io/ion/benchmarks/) - comparisons with Equinox, Flax NNX, and PyTorch
 
 ## Layers
 

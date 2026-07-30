@@ -225,14 +225,14 @@ from ion import nn
 model = nn.MLP([4, 16, 3], key=jax.random.key(0))
 new_w = jnp.zeros_like(model.layers[1].w)
 
-model.astype(jnp.bfloat16)                         # cast params to another dtype
-model.freeze()                                     # freeze every param
-model.unfreeze()                                   # unfreeze every param
-model.at.layers[0].set(model.layers[0].freeze())   # freeze a single submodule
-model.at.layers[1].w.set(new_w)                    # replace a leaf deep in the tree
+model.astype(jnp.bfloat16)                        # cast params to another dtype
+model.freeze()                                    # freeze every param
+model.unfreeze()                                  # unfreeze every param
+model.at.layers[0].set(model.layers[0].freeze())  # freeze a single submodule
+model.at.layers[1].w.set(new_w)                   # replace a leaf deep in the tree
 
 dropout_model = nn.Sequential(nn.Dropout(0.1))
-dropout_model.at[nn.Dropout].p.set(0.0)             # set every matching layer
+dropout_model.at[nn.Dropout].p.set(0.0)           # set every matching layer
 ```
 
 Read-only introspection returns plain values:
@@ -244,8 +244,8 @@ from ion import nn
 
 model = nn.MLP([4, 16, 3], key=jax.random.key(0))
 
-model.num_params                              # total parameter count
-model.params                                  # Param leaves, everything else None
+model.num_params  # total parameter count
+model.params      # Param leaves, everything else None
 ```
 
 Casting is how Ion does [mixed precision](workflows.md#mixed-precision); see

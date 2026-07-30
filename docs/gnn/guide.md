@@ -76,7 +76,7 @@ The complete arrays above produce this graph. The highlighted arrow is edge 0.
   class="gnn-plot gnn-plot--graph"
   src="../../assets/gnn-coo-graph.html"
   title="Six-node graph built from the COO edge arrays"
-  loading="lazy"
+  loading="eager"
 ></iframe>
 
 Edges in COO are always directed. If the relationship should be undirected,
@@ -96,7 +96,7 @@ replaces every atom and bond with a one-hot feature vector.
   class="gnn-plot gnn-plot--molecule"
   src="../../assets/gnn-acetic-acid.html"
   title="Acetic acid and its one-hot graph representation"
-  loading="lazy"
+  loading="eager"
 ></iframe>
 
 Use feature order carbon, hydrogen, oxygen for the atoms. The atom rows follow
@@ -273,7 +273,7 @@ hover any node to inspect its complete mixed feature vector.
   class="gnn-plot gnn-plot--propagation"
   src="../../assets/gnn-feature-propagation.html"
   title="One-hot node features mixing over five message-passing steps"
-  loading="lazy"
+  loading="eager"
 ></iframe>
 
 One step lets a feature reach immediate neighbours. By two steps, feature
