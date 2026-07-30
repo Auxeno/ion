@@ -1,5 +1,6 @@
 """Equinox benchmark adapter."""
 
+import importlib
 from importlib import metadata
 from typing import Any
 
@@ -9,11 +10,11 @@ import jax.numpy as jnp
 import optax
 
 from ...configs import ModelConfig
-from ...protocol import Metric
+from ...protocol import Operation
 
 
-class EquinoxWorkload:
-    """Equinox implementation of the benchmark protocol."""
+class Workload:
+    """Equinox benchmark workload."""
 
     framework_version = eqx.__version__
     software = {
@@ -23,17 +24,24 @@ class EquinoxWorkload:
     }
 
     def __init__(self, config: ModelConfig, *, seed: int) -> None:
-        module = __import__(
-            f"benchmarks.implementations.equinox.{config.model}",
-            fromlist=["create_model", "forward"],
-        )
+        # Build model and optimizer state
+        module = importlib.import_module(f"{__package__}.{config.model}")
         key_model, key_inputs, key_targets = jax.random.split(jax.random.key(seed), 3)
+
         self.config = config
         self.module = module
         self.model = module.create_model(config, key=key_model)
         self.transform = optax.adamw(3e-4)
         parameters = eqx.filter(self.model, eqx.is_inexact_array)
         self.optimizer = self.transform.init(parameters)
+        self.parameter_count = sum(
+            value.size for value in jax.tree.leaves(parameters) if value is not None
+        )
+
+        device = jax.devices()[0]
+        self.device_name = getattr(device, "device_kind", str(device))
+
+        # Generate fixed inputs and targets outside the timed region
         if config.model == "gpt":
             inputs = jax.random.randint(
                 key_inputs,
@@ -55,15 +63,12 @@ class EquinoxWorkload:
             )
             inputs = jax.random.normal(key_inputs, shape, dtype=jnp.bfloat16)
             targets = jax.random.randint(key_targets, (config.batch_size,), 0, config.num_classes)
-        self.batch = (inputs, targets)
-        self.parameter_count = sum(
-            value.size for value in jax.tree.leaves(parameters) if value is not None
-        )
+        self.batch = inputs, targets
 
     @staticmethod
     def _cast(model):
         return jax.tree.map(
-            lambda x: x.astype(jnp.bfloat16) if eqx.is_inexact_array(x) else x,
+            lambda value: value.astype(jnp.bfloat16) if eqx.is_inexact_array(value) else value,
             model,
         )
 
@@ -85,27 +90,20 @@ class EquinoxWorkload:
         updates, optimizer = self.transform.update(grads, optimizer, parameters)
         return eqx.apply_updates(model, updates), optimizer, loss
 
-    def prepare(self, metric: Metric, *, compiled: bool):
-        if metric == "forward":
-            function = self._forward
-            if compiled:
-                function = eqx.filter_jit(function)
-            return lambda: function(self.model, self.batch)
-        if metric == "forward_backward":
-            function = self._forward_backward
-            if compiled:
-                function = eqx.filter_jit(function)
-            return lambda: function(self.model, self.batch)
-
-        function = self._full_step
+    def prepare(self, operation: Operation, *, compiled: bool):
+        # Select and optionally compile the requested operation
+        function = getattr(self, f"_{operation}")
         if compiled:
             function = eqx.filter_jit(function)
 
-        def operation():
+        if operation != "full_step":
+            return lambda: function(self.model, self.batch)
+
+        def step():
             self.model, self.optimizer, loss = function(self.model, self.optimizer, self.batch)
             return loss
 
-        return operation
+        return step
 
     def synchronize(self, value: Any) -> None:
         jax.block_until_ready(value)
@@ -116,14 +114,3 @@ class EquinoxWorkload:
 
     def reset_peak_memory(self) -> None:
         """JAX does not expose an allocator peak reset."""
-
-
-def create_workload(config: ModelConfig, *, seed: int) -> EquinoxWorkload:
-    """Create an Equinox benchmark workload."""
-    return EquinoxWorkload(config, seed=seed)
-
-
-def device_name() -> str:
-    """Return the active JAX device name."""
-    device = jax.devices()[0]
-    return getattr(device, "device_kind", str(device))

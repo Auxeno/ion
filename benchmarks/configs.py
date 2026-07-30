@@ -6,6 +6,9 @@ from typing import Literal
 ModelName = Literal["mlp", "resnet", "gpt"]
 ModelSize = Literal["tiny", "small", "medium"]
 
+MODELS: tuple[ModelName, ...] = ("mlp", "resnet", "gpt")
+SIZES: tuple[ModelSize, ...] = ("tiny", "small", "medium")
+
 
 @dataclass(frozen=True)
 class ModelConfig:

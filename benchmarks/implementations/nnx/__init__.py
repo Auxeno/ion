@@ -1,5 +1,6 @@
 """Flax NNX benchmark adapter."""
 
+import importlib
 from importlib import metadata
 from typing import Any
 
@@ -10,11 +11,11 @@ import optax
 from flax import nnx
 
 from ...configs import ModelConfig
-from ...protocol import Metric
+from ...protocol import Operation
 
 
-class NNXWorkload:
-    """Flax NNX implementation of the benchmark protocol."""
+class Workload:
+    """Flax NNX benchmark workload."""
 
     framework_version = flax.__version__
     software = {
@@ -24,15 +25,22 @@ class NNXWorkload:
     }
 
     def __init__(self, config: ModelConfig, *, seed: int) -> None:
-        module = __import__(
-            f"benchmarks.implementations.nnx.{config.model}",
-            fromlist=["create_model", "forward"],
-        )
+        # Build model and optimizer state
+        module = importlib.import_module(f"{__package__}.{config.model}")
         key_inputs, key_targets = jax.random.split(jax.random.key(seed))
+
         self.config = config
         self.module = module
         self.model = module.create_model(config, seed=seed)
         self.optimizer = nnx.Optimizer(self.model, optax.adamw(3e-4), wrt=nnx.Param)
+        self.parameter_count = sum(
+            value.size for value in jax.tree.leaves(nnx.state(self.model, nnx.Param))
+        )
+
+        device = jax.devices()[0]
+        self.device_name = getattr(device, "device_kind", str(device))
+
+        # Generate fixed inputs and targets outside the timed region
         if config.model == "gpt":
             inputs = jax.random.randint(
                 key_inputs,
@@ -54,10 +62,7 @@ class NNXWorkload:
             )
             inputs = jax.random.normal(key_inputs, shape, dtype=jnp.bfloat16)
             targets = jax.random.randint(key_targets, (config.batch_size,), 0, config.num_classes)
-        self.batch = (inputs, targets)
-        self.parameter_count = sum(
-            value.size for value in jax.tree.leaves(nnx.state(self.model, nnx.Param))
-        )
+        self.batch = inputs, targets
 
     def _forward(self, model, batch):
         inputs, _ = batch
@@ -76,26 +81,15 @@ class NNXWorkload:
         optimizer.update(model, grads)
         return loss
 
-    def prepare(self, metric: Metric, *, compiled: bool):
-        if metric == "forward":
-            function = self._forward
-            if compiled:
-                function = nnx.jit(function)
-            return lambda: function(self.model, self.batch)
-        if metric == "forward_backward":
-            function = self._forward_backward
-            if compiled:
-                function = nnx.jit(function)
-            return lambda: function(self.model, self.batch)
-
-        function = self._full_step
+    def prepare(self, operation: Operation, *, compiled: bool):
+        # Select and optionally compile the requested operation
+        function = getattr(self, f"_{operation}")
         if compiled:
             function = nnx.jit(function)
 
-        def operation():
-            return function(self.model, self.optimizer, self.batch)
-
-        return operation
+        if operation == "full_step":
+            return lambda: function(self.model, self.optimizer, self.batch)
+        return lambda: function(self.model, self.batch)
 
     def synchronize(self, value: Any) -> None:
         jax.block_until_ready(value)
@@ -106,14 +100,3 @@ class NNXWorkload:
 
     def reset_peak_memory(self) -> None:
         """JAX does not expose an allocator peak reset."""
-
-
-def create_workload(config: ModelConfig, *, seed: int) -> NNXWorkload:
-    """Create a Flax NNX benchmark workload."""
-    return NNXWorkload(config, seed=seed)
-
-
-def device_name() -> str:
-    """Return the active JAX device name."""
-    device = jax.devices()[0]
-    return getattr(device, "device_kind", str(device))

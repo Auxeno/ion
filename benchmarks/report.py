@@ -1,10 +1,13 @@
-"""Summarize benchmark JSON results as Markdown."""
+"""Summarize benchmark results as Markdown."""
 
 import argparse
-import json
 import statistics
 from collections import defaultdict
 from pathlib import Path
+
+from .protocol import Result
+
+TIME_METRICS = ("forward", "forward_backward", "full_step", "compile", "first_step")
 
 
 def _format_time(value: float | None) -> str:
@@ -17,27 +20,21 @@ def _format_time(value: float | None) -> str:
     return f"{value / 1000:.2f} s"
 
 
-def _format_memory(value: int | None) -> str:
-    return "—" if value is None else f"{value / 2**30:.2f} GiB"
+def summarize(path: Path) -> str:
+    """Return a Markdown summary of all results below a path."""
+    results = [Result.read(result) for result in sorted(path.rglob("*.json"))]
+    if not results:
+        raise ValueError(f"No benchmark JSON files found below {path}")
 
-
-def summarize(results: Path) -> str:
-    """Return a Markdown summary of all results below ``results``."""
-    records = [json.loads(path.read_text()) for path in results.rglob("*.json")]
+    # Group repetitions by displayed row and metric
     grouped = defaultdict(list)
-    for record in records:
-        key = (
-            record["model"],
-            record["size"],
-            record["framework"],
-            record["mode"],
-            record["metric"],
-        )
-        grouped[key].append(record)
+    for result in results:
+        key = result.model, result.size, result.framework, result.mode, result.metric
+        grouped[key].append(result)
 
+    # Render one table per model family
     lines = ["# Benchmark results", ""]
-    models = sorted({record["model"] for record in records})
-    for model in models:
+    for model in sorted({result.model for result in results}):
         lines.extend(
             [
                 f"## {model.upper()}",
@@ -49,60 +46,54 @@ def summarize(results: Path) -> str:
         )
         combinations = sorted(
             {
-                (record["size"], record["framework"], record["mode"])
-                for record in records
-                if record["model"] == model
+                (result.size, result.framework, result.mode)
+                for result in results
+                if result.model == model
             }
         )
         for size, framework, mode in combinations:
-
-            def records_for(metric):
-                return grouped[(model, size, framework, mode, metric)]
-
-            def median_time(metric):
-                values = [
-                    sample for record in records_for(metric) for sample in record["samples_ms"]
+            times = {}
+            for metric in TIME_METRICS:
+                samples = [
+                    sample
+                    for result in grouped[(model, size, framework, mode, metric)]
+                    for sample in result.samples_ms
                 ]
-                return statistics.median(values) if values else None
+                times[metric] = statistics.median(samples) if samples else None
 
-            full_step = records_for("full_step")
-            throughput = (
-                statistics.median(
-                    record["throughput"] for record in full_step if record["throughput"] is not None
-                )
-                if any(record["throughput"] is not None for record in full_step)
-                else None
-            )
-            memory = records_for("peak_memory")
-            peak_memory = max(
-                (
-                    record["peak_memory_bytes"]
-                    for record in memory
-                    if record["peak_memory_bytes"] is not None
-                ),
-                default=None,
-            )
-            throughput_text = f"{throughput:,.0f} /s" if throughput is not None else "—"
+            throughput = [
+                result.throughput
+                for result in grouped[(model, size, framework, mode, "full_step")]
+                if result.throughput is not None
+            ]
+            memory = [
+                result.peak_memory_bytes
+                for result in grouped[(model, size, framework, mode, "peak_memory")]
+                if result.peak_memory_bytes is not None
+            ]
+            throughput_text = f"{statistics.median(throughput):,.0f} /s" if throughput else "—"
+            memory_text = f"{max(memory) / 2**30:.2f} GiB" if memory else "—"
             lines.append(
                 f"| {size} | {framework} | {mode} | "
-                f"{_format_time(median_time('forward'))} | "
-                f"{_format_time(median_time('forward_backward'))} | "
-                f"{_format_time(median_time('full_step'))} | "
-                f"{_format_time(median_time('compile'))} | "
-                f"{_format_time(median_time('first_step'))} | "
-                f"{throughput_text} | "
-                f"{_format_memory(peak_memory)} |"
+                f"{_format_time(times['forward'])} | "
+                f"{_format_time(times['forward_backward'])} | "
+                f"{_format_time(times['full_step'])} | "
+                f"{_format_time(times['compile'])} | "
+                f"{_format_time(times['first_step'])} | "
+                f"{throughput_text} | {memory_text} |"
             )
         lines.append("")
+
     return "\n".join(lines)
 
 
 def main() -> None:
-    """Command-line entry point."""
+    """Write a report from the command line."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("results", type=Path)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
+
     report = summarize(args.results)
     if args.output is None:
         print(report)

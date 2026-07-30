@@ -1,5 +1,6 @@
 """Ion benchmark adapter."""
 
+import importlib
 from importlib import metadata
 from typing import Any
 
@@ -10,20 +11,18 @@ import optax
 import ion
 
 from ...configs import ModelConfig
-from ...protocol import Metric
+from ...protocol import Operation
+
+try:
+    ION_VERSION = metadata.version("ion-nn")
+except metadata.PackageNotFoundError:
+    ION_VERSION = "local"
 
 
-def _version() -> str:
-    try:
-        return metadata.version("ion-nn")
-    except metadata.PackageNotFoundError:
-        return "local"
+class Workload:
+    """Ion benchmark workload."""
 
-
-class IonWorkload:
-    """Ion implementation of the benchmark protocol."""
-
-    framework_version = _version()
+    framework_version = ION_VERSION
     software = {
         "ion": framework_version,
         "jax": jax.__version__,
@@ -31,14 +30,19 @@ class IonWorkload:
     }
 
     def __init__(self, config: ModelConfig, *, seed: int) -> None:
-        module = __import__(
-            f"benchmarks.implementations.ion.{config.model}",
-            fromlist=["create_model"],
-        )
+        # Build model and optimizer state
+        module = importlib.import_module(f"{__package__}.{config.model}")
         key_model, key_inputs, key_targets = jax.random.split(jax.random.key(seed), 3)
+
         self.config = config
         self.model = module.create_model(config, key=key_model)
         self.optimizer = ion.Optimizer(optax.adamw(3e-4), self.model)
+        self.parameter_count = self.model.num_params
+
+        device = jax.devices()[0]
+        self.device_name = getattr(device, "device_kind", str(device))
+
+        # Generate fixed inputs and targets outside the timed region
         if config.model == "gpt":
             inputs = jax.random.randint(
                 key_inputs,
@@ -60,8 +64,7 @@ class IonWorkload:
             )
             inputs = jax.random.normal(key_inputs, shape, dtype=jnp.bfloat16)
             targets = jax.random.randint(key_targets, (config.batch_size,), 0, config.num_classes)
-        self.batch = (inputs, targets)
-        self.parameter_count = self.model.num_params
+        self.batch = inputs, targets
 
     @staticmethod
     def _forward(model, batch):
@@ -84,27 +87,20 @@ class IonWorkload:
         model, optimizer = optimizer.update(model, grads)
         return model, optimizer, loss
 
-    def prepare(self, metric: Metric, *, compiled: bool):
-        if metric == "forward":
-            function = self._forward
-            if compiled:
-                function = jax.jit(function)
-            return lambda: function(self.model, self.batch)
-        if metric == "forward_backward":
-            function = self._forward_backward
-            if compiled:
-                function = jax.jit(function)
-            return lambda: function(self.model, self.batch)
-
-        function = self._full_step
+    def prepare(self, operation: Operation, *, compiled: bool):
+        # Select and optionally compile the requested operation
+        function = getattr(self, f"_{operation}")
         if compiled:
             function = jax.jit(function)
 
-        def operation():
+        if operation != "full_step":
+            return lambda: function(self.model, self.batch)
+
+        def step():
             self.model, self.optimizer, loss = function(self.model, self.optimizer, self.batch)
             return loss
 
-        return operation
+        return step
 
     def synchronize(self, value: Any) -> None:
         jax.block_until_ready(value)
@@ -115,14 +111,3 @@ class IonWorkload:
 
     def reset_peak_memory(self) -> None:
         """JAX does not expose an allocator peak reset."""
-
-
-def create_workload(config: ModelConfig, *, seed: int) -> IonWorkload:
-    """Create an Ion benchmark workload."""
-    return IonWorkload(config, seed=seed)
-
-
-def device_name() -> str:
-    """Return the active JAX device name."""
-    device = jax.devices()[0]
-    return getattr(device, "device_kind", str(device))

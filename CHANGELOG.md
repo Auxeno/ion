@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.2
+
+- **New benchmark suite.** Compares Ion with Equinox, Flax NNX, and PyTorch eager
+  and compiled across MLP, ResNet, and GPT workloads, measuring forward, backward,
+  full-step, compilation, first-step, throughput, and peak-memory performance.
+  Includes reproducible JSON results and interactive Plotly reports.
+
 ## 0.11.1
 
 - **New `gnn.GraphConv` layer.** Graph convolution from Morris et al. (2019) with

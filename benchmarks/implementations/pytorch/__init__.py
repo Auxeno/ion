@@ -1,16 +1,17 @@
 """PyTorch benchmark adapter."""
 
+import importlib
 from typing import Any
 
 import torch
 import torch.nn.functional as functional
 
 from ...configs import ModelConfig
-from ...protocol import Metric
+from ...protocol import Operation
 
 
-class PyTorchWorkload:
-    """PyTorch implementation of the benchmark protocol."""
+class Workload:
+    """PyTorch benchmark workload."""
 
     framework_version = torch.__version__
     software = {
@@ -20,15 +21,22 @@ class PyTorchWorkload:
     }
 
     def __init__(self, config: ModelConfig, *, seed: int) -> None:
+        # Build model and optimizer state
         torch.manual_seed(seed)
+        module = importlib.import_module(f"{__package__}.{config.model}")
+
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        module = __import__(
-            f"benchmarks.implementations.pytorch.{config.model}",
-            fromlist=["create_model"],
+        self.device_name = (
+            torch.cuda.get_device_name(self.device)
+            if self.device.type == "cuda"
+            else str(self.device)
         )
         self.model = module.create_model(config).to(self.device)
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=3e-4)
+        self.parameter_count = sum(parameter.numel() for parameter in self.model.parameters())
+
+        # Generate fixed inputs and targets outside the timed region
         if config.model == "gpt":
             inputs = torch.randint(
                 config.vocab_size,
@@ -48,15 +56,11 @@ class PyTorchWorkload:
             )
             inputs = torch.randn(shape, dtype=torch.bfloat16, device=self.device)
             targets = torch.randint(config.num_classes, (config.batch_size,), device=self.device)
-        self.batch = (inputs, targets)
-        self.parameter_count = sum(parameter.numel() for parameter in self.model.parameters())
-
-    def _autocast(self):
-        return torch.autocast(self.device.type, dtype=torch.bfloat16)
+        self.batch = inputs, targets
 
     def _forward(self, model, batch):
         inputs, _ = batch
-        with self._autocast():
+        with torch.autocast(self.device.type, dtype=torch.bfloat16):
             return model(inputs)
 
     def _loss(self, model, batch):
@@ -79,26 +83,15 @@ class PyTorchWorkload:
         optimizer.step()
         return loss
 
-    def prepare(self, metric: Metric, *, compiled: bool):
-        if metric == "forward":
-            function = self._forward
-            if compiled:
-                function = torch.compile(function)
-            return lambda: function(self.model, self.batch)
-        if metric == "forward_backward":
-            function = self._forward_backward
-            if compiled:
-                function = torch.compile(function)
-            return lambda: function(self.model, self.batch)
-
-        function = self._full_step
+    def prepare(self, operation: Operation, *, compiled: bool):
+        # Select and optionally compile the requested operation
+        function = getattr(self, f"_{operation}")
         if compiled:
             function = torch.compile(function)
 
-        def operation():
-            return function(self.model, self.optimizer, self.batch)
-
-        return operation
+        if operation == "full_step":
+            return lambda: function(self.model, self.optimizer, self.batch)
+        return lambda: function(self.model, self.batch)
 
     def synchronize(self, value: Any) -> None:
         if self.device.type == "cuda":
@@ -112,15 +105,3 @@ class PyTorchWorkload:
     def reset_peak_memory(self) -> None:
         if self.device.type == "cuda":
             torch.cuda.reset_peak_memory_stats(self.device)
-
-
-def create_workload(config: ModelConfig, *, seed: int) -> PyTorchWorkload:
-    """Create a PyTorch benchmark workload."""
-    return PyTorchWorkload(config, seed=seed)
-
-
-def device_name() -> str:
-    """Return the active PyTorch device name."""
-    if torch.cuda.is_available():
-        return torch.cuda.get_device_name()
-    return str(torch.device("cpu"))

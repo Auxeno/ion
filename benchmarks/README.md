@@ -25,13 +25,16 @@ GroupNorm so the benchmark does not require mutable running statistics.
   allocator statistics.
 
 Compile is deliberately a user-facing estimate rather than a compiler-internal
-measurement. Every case runs in a fresh process, preventing in-memory caches
-from leaking between results. Persistent compiler caches should be disabled or
-pointed at a fresh directory when collecting publishable results.
+measurement. Every framework, mode, model, size, and repetition runs in a fresh
+process, preventing in-memory caches from leaking between comparable results.
+Forward, forward + backward, and the full training step are compiled once within
+that process. First-step latency, compile time, throughput, and peak memory are
+collected from the same full-step execution. Persistent compiler caches should
+be disabled or pointed at a fresh directory when collecting publishable results.
 
 JAX does not expose a way to reset its allocator's peak counter. Its peak memory
-therefore includes initialization, compilation, warm-up, and the measured step.
-PyTorch's counter is reset immediately before the measured step. This limitation
+therefore includes initialization, compilation, warm-up, and the measured steps.
+PyTorch's counter is reset immediately before the measured steps. This limitation
 must be stated alongside published memory results.
 
 ## Fairness
@@ -71,13 +74,25 @@ uv run --group benchmarks python -m benchmarks.run_all \
   --output benchmarks/results/reference-gpu
 ```
 
-The full matrix contains 270 isolated process runs with the default five
-repetitions. Use filters while developing:
+The full matrix contains 135 isolated process runs with the default three
+repetitions, five warm-up steps, and 50 measured steps. Completed cases are
+skipped automatically, so an interrupted suite can be resumed with the same
+command. Pass `--overwrite` to replace existing results.
+
+Use filters while developing:
 
 ```bash
 uv run --group benchmarks python -m benchmarks.run_all \
   --frameworks ion nnx --models mlp --sizes tiny --repetitions 1 \
   --warmup 2 --steps 10 --output benchmarks/results/smoke
+```
+
+For a more exhaustive publication run:
+
+```bash
+uv run --group benchmarks python -m benchmarks.run_all \
+  --repetitions 5 --warmup 10 --steps 100 \
+  --output benchmarks/results/publication
 ```
 
 Generate a Markdown summary:

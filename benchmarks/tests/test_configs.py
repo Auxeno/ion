@@ -2,16 +2,16 @@
 
 import pytest
 
-from benchmarks.configs import CONFIGS, get_config
+from benchmarks.configs import CONFIGS, MODELS, SIZES, get_config
 
 
-@pytest.mark.parametrize("model", ("mlp", "resnet", "gpt"))
+@pytest.mark.parametrize("model", MODELS)
 def test_sizes(model):
-    assert set(CONFIGS[model]) == {"tiny", "small", "medium"}
+    assert tuple(CONFIGS[model]) == SIZES
 
 
 def test_gpt_units_are_tokens():
-    for size in ("tiny", "small", "medium"):
+    for size in SIZES:
         config = get_config("gpt", size)
         assert config.units_per_step == 4096
 
