@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from benchmarks.plot import balance_results, latency_figure, load_results
+from benchmarks.plot import balance_results, generate, latency_figure, load_results
 
 
 def test_load_results_round_trip(tmp_path, result):
@@ -50,3 +50,26 @@ def test_latency_figure_uses_available_results(result):
     assert len(figure.data) == 1
     assert figure.data[0].name == "Ion"
     assert list(figure.data[0].y) == [None, None, 2.0]
+    assert figure.data[0].marker.line.width == 0
+    assert figure.data[0].error_y.color == "#4d4d4d"
+
+
+def test_latency_figure_formats_resnet_name(result):
+    figure = latency_figure([replace(result, model="resnet")])
+
+    assert figure.layout.annotations[0].text == "ResNet · Tiny"
+
+
+def test_generate_uses_transparent_document_background(tmp_path, result):
+    result.write(tmp_path / "results" / "result.json")
+
+    paths = generate(tmp_path / "results", tmp_path / "plots")
+
+    assert all(
+        path.read_text().startswith("<!doctype html>\n<html>")
+        and "background: transparent !important" in path.read_text()
+        and "--docs-foreground" in path.read_text()
+        and ".main-svg .infolayer text" in path.read_text()
+        and "window.parent.document.body" in path.read_text()
+        for path in paths
+    )

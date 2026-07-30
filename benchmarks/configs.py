@@ -8,6 +8,11 @@ ModelSize = Literal["tiny", "small", "medium"]
 
 MODELS: tuple[ModelName, ...] = ("mlp", "resnet", "gpt")
 SIZES: tuple[ModelSize, ...] = ("tiny", "small", "medium")
+MODEL_LABELS: dict[ModelName, str] = {
+    "mlp": "MLP",
+    "resnet": "ResNet",
+    "gpt": "GPT",
+}
 
 
 @dataclass(frozen=True)

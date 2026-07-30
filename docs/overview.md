@@ -251,6 +251,12 @@ model.params                                  # Param leaves, everything else No
 Casting is how Ion does [mixed precision](workflows.md#mixed-precision); see
 [Freezing](workflows.md#freezing) for working with trainability.
 
+## Benchmarks
+
+Ion has been benchmarked against Equinox, Flax NNX, and PyTorch across MLP, ResNet, and GPT workloads on an NVIDIA H100. 
+
+Results show Ion generally has the best performance. See [Benchmarks](benchmarks.md) for plots and more details.
+
 ## How Ion compares
 
 ### Equinox

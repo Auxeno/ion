@@ -148,6 +148,25 @@ body[data-md-color-scheme] .jupyter-wrapper {
   font-weight: normal;
 }
 
+/* Match notebook Plotly chrome to the active docs palette without touching traces. */
+.jupyter-wrapper .plotly-graph-div .xaxislayer-above text,
+.jupyter-wrapper .plotly-graph-div .xaxislayer-below text,
+.jupyter-wrapper .plotly-graph-div .yaxislayer-above text,
+.jupyter-wrapper .plotly-graph-div .yaxislayer-below text,
+.jupyter-wrapper .plotly-graph-div .infolayer text {
+  fill: var(--md-default-fg-color) !important;
+}
+
+.jupyter-wrapper .plotly-graph-div .gridlayer path {
+  stroke: var(--md-default-fg-color--lightest) !important;
+}
+
+.jupyter-wrapper .plotly-graph-div .zerolinelayer path,
+.jupyter-wrapper .plotly-graph-div .xlines-above,
+.jupyter-wrapper .plotly-graph-div .ylines-above {
+  stroke: var(--md-default-fg-color--lighter) !important;
+}
+
 /* Let documentation content use the available page width. */
 .md-grid {
   max-width: 80rem;
@@ -271,6 +290,35 @@ body[data-md-color-scheme] .jupyter-wrapper {
 .gnn-plot--molecule {
   height: 695px;
   margin-top: 0.75rem;
+}
+
+/* Benchmark figures */
+.benchmark-plot {
+  display: block;
+  width: 100%;
+  height: 460px;
+  margin-top: 0.75rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.5rem;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.benchmark-plot--latency {
+  height: 940px;
+}
+
+.benchmark-direct-link {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+}
+
+@media screen and (max-width: 44.984375em) {
+  .benchmark-plot,
+  .benchmark-plot--latency {
+    height: 720px;
+  }
 }
 
 /* Gradient header rule */

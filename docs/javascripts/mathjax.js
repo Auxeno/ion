@@ -1,14 +1,23 @@
 window.MathJax = {
   tex: {
-    inlineMath: [["\\(", "\\)"]],
-    displayMath: [["\\[", "\\]"]],
+    inlineMath: [
+      ["\\(", "\\)"],
+      ["$", "$"],
+    ],
+    displayMath: [
+      ["\\[", "\\]"],
+      ["$$", "$$"],
+    ],
+    processEscapes: true,
   },
   options: {
     ignoreHtmlClass: ".*|",
-    processHtmlClass: "arithmatex",
+    processHtmlClass: "arithmatex|jupyter-wrapper",
   },
 };
 
 document$.subscribe(() => {
-  MathJax.typesetPromise();
+  if (window.MathJax?.typesetPromise) {
+    MathJax.typesetPromise();
+  }
 });

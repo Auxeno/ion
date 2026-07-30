@@ -67,6 +67,7 @@ nav:
       - Operations: gnn/operations.md
   - Workflows: workflows.md
   - Sharp Edges: sharp-edges.md
+  - Benchmarks: benchmarks.md
   - Examples:
       - examples/index.md
       - Scripts:
@@ -98,7 +99,7 @@ extra_css:
 
 extra_javascript:
   - javascripts/mathjax.js
-  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 markdown_extensions:
   - admonition

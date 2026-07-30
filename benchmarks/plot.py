@@ -3,7 +3,7 @@
 import argparse
 import statistics
 from collections import defaultdict
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -11,7 +11,8 @@ import plotly.graph_objects as go
 import plotly.io as pio
 from plotly.subplots import make_subplots
 
-from .configs import MODELS, SIZES
+from .analysis import balance_results
+from .configs import MODEL_LABELS, MODELS, SIZES
 from .protocol import Framework, Metric, Mode, Result
 
 SERIES: dict[tuple[Framework, Mode], tuple[str, str]] = {
@@ -24,6 +25,61 @@ SERIES: dict[tuple[Framework, Mode], tuple[str, str]] = {
 
 ValueKind = Literal["time", "throughput", "memory"]
 GroupKey = tuple[str, str, str, str, str]
+TRANSPARENT_HTML_STYLE = """
+<style>
+  :root {
+    --docs-background: transparent;
+    --docs-foreground: #6b7688;
+  }
+
+  html,
+  body {
+    margin: 0;
+    background: var(--docs-background) !important;
+    background-color: var(--docs-background) !important;
+  }
+
+  .plotly-graph-div,
+  .plot-container,
+  .svg-container,
+  .main-svg {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  .main-svg .cartesianlayer text,
+  .main-svg .infolayer text {
+    fill: var(--docs-foreground) !important;
+  }
+</style>
+<script>
+  (() => {
+    function syncTheme() {
+      try {
+        const parentStyle = window.parent
+          .getComputedStyle(window.parent.document.body);
+        const background = parentStyle.backgroundColor;
+        const foreground = parentStyle.color;
+        document.documentElement.style.setProperty("--docs-background", background);
+        document.documentElement.style.setProperty("--docs-foreground", foreground);
+      } catch {
+        document.documentElement.style.setProperty("--docs-background", "transparent");
+        document.documentElement.style.setProperty("--docs-foreground", "#6b7688");
+      }
+    }
+
+    syncTheme();
+    try {
+      new MutationObserver(syncTheme).observe(window.parent.document.body, {
+        attributes: true,
+        attributeFilter: ["data-md-color-scheme"]
+      });
+    } catch {
+      // The chart may also be opened directly, without a same-origin parent.
+    }
+  })();
+</script>
+"""
 
 
 @dataclass(frozen=True)
@@ -42,33 +98,6 @@ def load_results(path: Path) -> list[Result]:
     if not results:
         raise ValueError(f"No benchmark JSON files found below {path}")
     return results
-
-
-def balance_results(results: list[Result]) -> list[Result]:
-    """Match repetitions and sample counts across compared series."""
-    comparisons = defaultdict(lambda: defaultdict(list))
-    for result in results:
-        comparison = result.model, result.size, result.metric
-        series = result.framework, result.mode
-        comparisons[comparison][series].append(result)
-
-    balanced = []
-    for series_results in comparisons.values():
-        repetitions = min(map(len, series_results.values()))
-        selected = [result for values in series_results.values() for result in values[:repetitions]]
-        sample_counts = [len(result.samples_ms) for result in selected if result.samples_ms]
-        samples_per_repetition = min(sample_counts, default=0)
-
-        for result in selected:
-            if not samples_per_repetition:
-                balanced.append(result)
-                continue
-            samples = result.samples_ms[:samples_per_repetition]
-            throughput = result.throughput
-            if throughput is not None:
-                throughput = result.units_per_step / (statistics.median(samples) / 1000)
-            balanced.append(replace(result, samples_ms=samples, throughput=throughput))
-    return balanced
 
 
 def _group(results: list[Result]) -> dict[GroupKey, list[Result]]:
@@ -120,9 +149,15 @@ def _bar(
         name=label,
         legendgroup=label,
         showlegend=showlegend,
-        marker_color=color,
+        marker=dict(color=color, line=dict(width=0)),
         opacity=0.85,
-        error_y=dict(type="data", array=upper, arrayminus=lower, symmetric=False),
+        error_y=dict(
+            type="data",
+            array=upper,
+            arrayminus=lower,
+            symmetric=False,
+            color="#4d4d4d",
+        ),
         customdata=counts,
         hovertemplate=(
             f"%{{x}}<br>{label}<br>%{{y:,.3f}} {unit}<br>n=%{{customdata}}<extra></extra>"
@@ -173,7 +208,9 @@ def latency_figure(results: list[Result]) -> go.Figure:
     figure = make_subplots(
         rows=len(models),
         cols=len(sizes),
-        subplot_titles=[f"{model.upper()} · {size.title()}" for model in models for size in sizes],
+        subplot_titles=[
+            f"{MODEL_LABELS[model]} · {size.title()}" for model in models for size in sizes
+        ],
         vertical_spacing=0.1,
         horizontal_spacing=0.06,
     )
@@ -222,7 +259,7 @@ def metric_figure(
     figure = make_subplots(
         rows=1,
         cols=len(models),
-        subplot_titles=[model.upper() for model in models],
+        subplot_titles=[MODEL_LABELS[model] for model in models],
         horizontal_spacing=0.07,
     )
 
@@ -301,12 +338,13 @@ def generate(
     paths = []
     for name, figure in figures.items():
         path = output / name
-        figure.write_html(
-            path,
+        html = figure.to_html(
             include_plotlyjs=include_plotlyjs,
             full_html=True,
             config={"displaylogo": False, "responsive": True},
         )
+        html = html.replace("<head>", f"<head>{TRANSPARENT_HTML_STYLE}", 1)
+        path.write_text(f"<!doctype html>\n{html}")
         paths.append(path)
     return paths
 

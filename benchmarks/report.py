@@ -5,6 +5,8 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
+from .analysis import balance_results
+from .configs import MODEL_LABELS
 from .protocol import Result
 
 TIME_METRICS = ("forward", "forward_backward", "full_step", "compile", "first_step")
@@ -25,6 +27,7 @@ def summarize(path: Path) -> str:
     results = [Result.read(result) for result in sorted(path.rglob("*.json"))]
     if not results:
         raise ValueError(f"No benchmark JSON files found below {path}")
+    results = balance_results(results)
 
     # Group repetitions by displayed row and metric
     grouped = defaultdict(list)
@@ -37,7 +40,7 @@ def summarize(path: Path) -> str:
     for model in sorted({result.model for result in results}):
         lines.extend(
             [
-                f"## {model.upper()}",
+                f"## {MODEL_LABELS[model]}",
                 "",
                 "| Size | Framework | Mode | Forward | Forward + backward | "
                 "Full step | Compile | First step | Throughput | Peak memory |",

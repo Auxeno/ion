@@ -112,6 +112,8 @@ uv run --group benchmarks python -m benchmarks.plot \
 This writes latency, throughput, compile-time, first-step, and peak-memory
 figures to `benchmarks/results/reference-gpu/plots`. Pass `--inline` to create
 fully self-contained HTML files instead of loading Plotly from its CDN.
+Reports and plots automatically use the largest common number of repetitions
+and measured samples for each comparison.
 
 For publishable results, record the GPU, driver, CUDA, Python, JAX, XLA, Flax,
 Equinox, and PyTorch versions. Use an otherwise idle machine with fixed GPU
