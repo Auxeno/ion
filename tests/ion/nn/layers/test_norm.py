@@ -4,7 +4,7 @@ import numpy.testing as npt
 import pytest
 
 from ion import nn
-from ion.nn.buffer import _Buffers
+from ion.nn import Buffers
 
 
 class TestBatchNorm:
@@ -475,7 +475,7 @@ class TestSpectralNorm:
         """Power vectors with stale shapes raise an error."""
         layer = nn.SpectralNorm(nn.Linear(4, 5, key=jax.random.key(0)))
         buffers = layer.init_buffers(key=jax.random.key(1))
-        malformed = _Buffers(buffers._keys, ((jnp.ones(4), jnp.ones(4)),))
+        malformed = Buffers(buffers._keys, ((jnp.ones(4), jnp.ones(4)),))
         with pytest.raises((TypeError, ValueError)):
             layer(jnp.ones((2, 4)), malformed, training=True)
 

@@ -1,4 +1,9 @@
-"""Runtime-buffer infrastructure for immutable modules."""
+"""Non-trainable values updated during forward passes.
+
+Classes:
+    Buffers       Model buffers.
+    BufferModule  Module with one buffer payload.
+"""
 
 import dataclasses
 import functools
@@ -10,12 +15,28 @@ import numpy as np
 from jaxtyping import PRNGKeyArray, PyTree
 
 from .module import Module
+from .param import Param
 
 
 @functools.partial(jtu.register_dataclass, data_fields=["_values"], meta_fields=["_keys"])
-@dataclasses.dataclass(frozen=True, eq=False)
-class _Buffers:
-    """Immutable mapping from private module identities to pytree payloads."""
+@dataclasses.dataclass(frozen=True, eq=False, repr=False)
+class Buffers:
+    """Non-trainable model values updated during forward passes.
+
+    Notes
+    -----
+    Buffers hold values such as BatchNorm running statistics. Create them with
+    `Module.init_buffers` and pass the updated value through each forward call.
+
+    A `BufferModule` reads its value with `buffers[self]` and updates it with
+    `buffers.set(self, value)`.
+
+    Examples
+    --------
+    >>> buffers = model.init_buffers()
+    >>> y, buffers = model(x, buffers, training=True)
+    >>> buffers  # Buffers((f32[64], f32[64]))
+    """
 
     _keys: tuple[object, ...]
     _values: tuple[PyTree, ...]
@@ -28,7 +49,7 @@ class _Buffers:
 
         return jax.tree.map(jax.lax.stop_gradient, value)
 
-    def set(self, module: "BufferModule", value: PyTree) -> "_Buffers":
+    def set(self, module: "BufferModule", value: PyTree) -> "Buffers":
         old_value = self[module]
         layer_name = type(module).__name__
 
@@ -56,11 +77,26 @@ class _Buffers:
         values = list(self._values)
         values[self._keys.index(module._buffer_key)] = jax.tree.map(jax.lax.stop_gradient, value)
 
-        return _Buffers(self._keys, tuple(values))
+        return Buffers(self._keys, tuple(values))
+
+    def __repr__(self) -> str:
+        """Minimal textual pretty printing for pytrees."""
+
+        if not self._values:
+            return "Buffers()"
+
+        parts = ["Buffers("]
+        for value in self._values:
+            leaves = jax.tree.leaves(value)
+            shapes = [f"{Param.short_dtype(leaf.dtype.name)}{list(leaf.shape)}" for leaf in leaves]
+            joined = shapes[0] if len(shapes) == 1 else f"({', '.join(shapes)})"
+            parts.append(f"  {joined},")
+        parts.append(")")
+        return "\n".join(parts)
 
 
 class BufferModule(Module):
-    """A module with one logical payload stored outside the model."""
+    """A module with one non-trainable buffer payload."""
 
     _buffer_key: object = dataclasses.field(init=False, repr=False)
 
@@ -73,7 +109,7 @@ class BufferModule(Module):
         raise NotImplementedError(f"{type(self).__name__} must implement _init_buffer()")
 
 
-def _init_buffers(model: Module, *, key: PRNGKeyArray | None = None) -> _Buffers:
+def _init_buffers(model: Module, *, key: PRNGKeyArray | None = None) -> Buffers:
     is_buffer = lambda value: isinstance(value, BufferModule)
     discovered = [value for value in jax.tree.leaves(model, is_leaf=is_buffer) if is_buffer(value)]
 
@@ -101,4 +137,4 @@ def _init_buffers(model: Module, *, key: PRNGKeyArray | None = None) -> _Buffers
             raise TypeError(f"{layer_name} buffer must be a non-empty pytree of arrays")
         values.append(value)
 
-    return _Buffers(tuple(module._buffer_key for module in modules), tuple(values))
+    return Buffers(tuple(module._buffer_key for module in modules), tuple(values))

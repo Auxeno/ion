@@ -17,13 +17,13 @@ import jax.numpy as jnp
 from jax import lax
 from jaxtyping import Array, Float, PRNGKeyArray
 
-from ..buffer import BufferModule
+from ..buffer import BufferModule, Buffers
 from ..module import Module
 from ..param import Param
 
 
 class BatchNorm(BufferModule):
-    """Batch normalization with running statistics stored in external buffers.
+    """Batch normalization with running mean and variance.
 
     >>> norm = BatchNorm(64)
     >>> buffers = norm.init_buffers()
@@ -66,10 +66,10 @@ class BatchNorm(BufferModule):
     def __call__(
         self,
         x: Float[Array, "... d"],
-        buffers: Any,
+        buffers: Buffers,
         *,
         training: bool,
-    ) -> tuple[Float[Array, "... d"], Any]:
+    ) -> tuple[Float[Array, "... d"], Buffers]:
 
         if x.ndim < 2:
             raise ValueError("BatchNorm input must have at least one reduction dimension")
@@ -217,7 +217,7 @@ class RMSNorm(Module):
 
 
 class SpectralNorm(BufferModule):
-    """Wrap a module and normalize one matrix-like parameter by spectral norm.
+    """Normalize a module parameter by its spectral norm.
 
     >>> layer = SpectralNorm(Linear(64, 64, key=linear_key))
     >>> buffers = layer.init_buffers(key=buffer_key)
@@ -283,10 +283,10 @@ class SpectralNorm(BufferModule):
     def __call__(
         self,
         x: Any,
-        buffers: Any,
+        buffers: Buffers,
         *,
         training: bool,
-    ) -> tuple[Any, Any]:
+    ) -> tuple[Any, Buffers]:
 
         weight = jnp.asarray(getattr(self.module, self.parameter))
         matrix = weight.reshape(-1, weight.shape[-1]).T

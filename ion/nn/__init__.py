@@ -2,7 +2,7 @@
 
 from .blocks.mlp import MLP
 from .blocks.sequential import Sequential
-from .buffer import BufferModule
+from .buffer import BufferModule, Buffers
 from .layers.attention import CrossAttention, SelfAttention
 from .layers.conv import Conv, ConvTranspose
 from .layers.dropout import Dropout
@@ -21,6 +21,7 @@ from .param import Param
 __all__ = [
     "Module",
     "BufferModule",
+    "Buffers",
     "Param",
     "AvgPool",
     "BatchNorm",

@@ -86,7 +86,10 @@ class TestSupplementaryDocstrings:
             assert params is None, f"{name}: properties take no parameters"
             return
 
-        expected = [p for p in inspect.signature(obj).parameters.values() if p.name != "self"]
+        # Classes document their constructor; `__new__` catch-alls are not parameters
+        has_init = inspect.isclass(obj) and obj.__init__ is not object.__init__
+        target = obj.__init__ if has_init else obj
+        expected = [p for p in inspect.signature(target).parameters.values() if p.name != "self"]
 
         if not expected:
             assert params is None, f"{name}: parameterless callable documents parameters"

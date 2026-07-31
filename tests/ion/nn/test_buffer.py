@@ -10,7 +10,7 @@ import pytest
 
 import ion
 from ion import nn
-from ion.nn.buffer import _Buffers
+from ion.nn import Buffers
 
 
 class Counter(nn.BufferModule):
@@ -42,7 +42,7 @@ class RandomBuffer(nn.BufferModule):
 def test_stateless_model_has_empty_buffers():
     """A stateless model initializes an empty buffer collection."""
     buffers = nn.Linear(2, 3, key=jax.random.key(0)).init_buffers()
-    assert isinstance(buffers, _Buffers)
+    assert isinstance(buffers, Buffers)
     assert jax.tree.leaves(buffers) == []
 
 
@@ -284,7 +284,7 @@ def test_checkpoint_roundtrip():
         loaded, loaded_buffers = ion.load(file.name, (reference, reference_buffers))
 
     npt.assert_array_equal(loaded.scale._value, changed.scale._value)
-    loaded_buffers = cast(_Buffers, loaded_buffers)
+    loaded_buffers = cast(Buffers, loaded_buffers)
     npt.assert_array_equal(loaded_buffers[loaded], buffers[changed])
 
 

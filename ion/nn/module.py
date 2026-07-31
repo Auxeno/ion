@@ -13,7 +13,7 @@ import dataclasses
 import functools
 import zlib
 from collections.abc import Iterable, Iterator
-from typing import Any, Generic, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Self, TypeVar
 
 import jax
 import jax.tree_util as jtu
@@ -22,6 +22,9 @@ from jaxtyping import PRNGKeyArray, PyTree
 
 from .. import tree
 from .param import Param
+
+if TYPE_CHECKING:
+    from .buffer import Buffers
 
 M = TypeVar("M")
 
@@ -320,13 +323,13 @@ class Module:
         """
         return _At(self)
 
-    def init_buffers(self, *, key: PRNGKeyArray | None = None) -> PyTree:
-        """Initialize and return this model's runtime buffers.
+    def init_buffers(self, *, key: PRNGKeyArray | None = None) -> "Buffers":
+        """Initialize the model's non-trainable buffers.
 
         Parameters
         ----------
         key : Array, optional
-            Random key used by buffers that require stochastic initialization.
+            Random key for buffer initialization.
 
         Examples
         --------

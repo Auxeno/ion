@@ -15,6 +15,7 @@ from typing import Any
 import jax
 from jaxtyping import PRNGKeyArray
 
+from ..buffer import Buffers
 from ..module import Module
 
 
@@ -37,7 +38,7 @@ class Sequential(Module):
     def __call__(
         self,
         x: Any,
-        buffers: Any = None,
+        buffers: Buffers | None = None,
         *,
         training: bool | None = None,
         key: PRNGKeyArray | None = None,
