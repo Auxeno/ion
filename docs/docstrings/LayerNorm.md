@@ -8,13 +8,15 @@ dim : int
     Size of the feature dimension to normalize.
 eps : float, default=1e-5
     Constant added to the variance for numerical stability.
+bias : bool, default=True
+    Whether to learn an elementwise shift.
 
 Attributes
 ----------
 scale : Param
     Elementwise scale of shape `(dim,)`, initialized to ones.
-b : Param
-    Elementwise bias of shape `(dim,)`, initialized to zeros.
+b : Param | None
+    Elementwise bias of shape `(dim,)`, initialized to zeros. `None` when `bias=False`.
 
 Example
 -------

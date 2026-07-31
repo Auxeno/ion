@@ -8,6 +8,7 @@ Channels-last format: (..., spatial, channels).
 Stride defaults to kernel shape when not specified.
 """
 
+import math
 from typing import Literal
 
 import jax.numpy as jnp
@@ -92,12 +93,14 @@ class AvgPool(Module):
     kernel_shape: tuple[int, ...]
     stride: tuple[int, ...]
     padding: Literal["SAME", "VALID"] | tuple[tuple[int, int], ...]
+    count_include_pad: bool
 
     def __init__(
         self,
         kernel_shape: tuple[int, ...],
         stride: int | tuple[int, ...] | None = None,
         padding: Literal["SAME", "VALID"] | int | tuple[int, ...] = 0,
+        count_include_pad: bool = True,
     ) -> None:
 
         if isinstance(kernel_shape, int):
@@ -106,6 +109,7 @@ class AvgPool(Module):
             raise ValueError("kernel_shape must have at least one element")
 
         self.kernel_shape = kernel_shape
+        self.count_include_pad = count_include_pad
 
         num_spatial = len(kernel_shape)
 
@@ -138,19 +142,21 @@ class AvgPool(Module):
         window_dims = (1, *self.kernel_shape, 1)
         window_strides = (1, *self.stride, 1)
 
-        ones = jnp.ones_like(x)
+        # Counted before the sum, since windows overlapping padding hold fewer real elements
+        if self.count_include_pad:
+            window_counts = math.prod(self.kernel_shape)
+        else:
+            window_counts = lax.reduce_window(
+                operand=jnp.ones_like(x),
+                init_value=0.0,
+                computation=lax.add,
+                window_dimensions=window_dims,
+                window_strides=window_strides,
+                padding=padding,
+            )
 
         x = lax.reduce_window(
             operand=x,
-            init_value=0.0,
-            computation=lax.add,
-            window_dimensions=window_dims,
-            window_strides=window_strides,
-            padding=padding,
-        )
-
-        window_counts = lax.reduce_window(
-            operand=ones,
             init_value=0.0,
             computation=lax.add,
             window_dimensions=window_dims,

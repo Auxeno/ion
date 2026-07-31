@@ -31,7 +31,24 @@ class TestLayerNorm:
     def test_bias_init(self):
         """Bias is initialized to all zeros."""
         layer = nn.LayerNorm(8)
+        assert layer.b is not None
         npt.assert_allclose(layer.b._value, jnp.zeros(8))
+
+    def test_no_bias(self):
+        """bias=False drops the bias parameter."""
+        layer = nn.LayerNorm(8, bias=False)
+        assert layer.b is None
+        assert layer.num_params == 8
+
+    def test_no_bias_matches_zero_bias(self):
+        """A zero bias is equivalent to no bias."""
+        x = jax.random.normal(jax.random.key(0), (4, 8))
+        npt.assert_allclose(nn.LayerNorm(8, bias=False)(x), nn.LayerNorm(8)(x), rtol=1e-6)
+
+    def test_no_bias_is_not_rms_norm(self):
+        """Bias-less LayerNorm still centers the mean, unlike RMSNorm."""
+        x = jax.random.normal(jax.random.key(0), (4, 8)) + 5.0
+        assert not jnp.allclose(nn.LayerNorm(8, bias=False)(x), nn.RMSNorm(8)(x))
 
 
 class TestGroupNorm:

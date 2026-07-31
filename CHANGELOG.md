@@ -2,6 +2,14 @@
 
 ## 0.11.2
 
+- **`AvgPool` gains a `count_include_pad` flag.** Controls whether padded positions
+  count towards the window size. Defaults to `True`, matching `torch.nn.AvgPool2d`
+  and `flax.linen.avg_pool`. This changes existing behaviour: `AvgPool` previously
+  always divided by the real element count. Pass `count_include_pad=False` to
+  restore it. Only affects padded pooling; results without padding are unchanged.
+- **`LayerNorm` gains a `bias` flag.** Pass `bias=False` to drop the learnable shift,
+  as used in LLaMA-style transformers. Note that a bias-less `LayerNorm` still
+  subtracts the mean, so it is not equivalent to `RMSNorm`.
 - **New benchmark suite.** Compares Ion with Equinox, Flax NNX, and PyTorch eager
   and compiled across MLP, ResNet, and GPT workloads, measuring forward, backward,
   full-step, compilation, first-step, throughput, and peak-memory performance.

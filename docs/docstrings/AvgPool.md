@@ -12,6 +12,8 @@ stride : int | tuple[int, ...] | None, default=None
 padding : Literal["SAME", "VALID"] | int | tuple[int, ...], default=0
     `"SAME"`, `"VALID"`, or numeric padding applied to both sides of each
     spatial dimension. A scalar broadcasts; a tuple gives per-dimension control.
+count_include_pad : bool, default=True
+    Whether padded positions count towards the window size.
 
 Example
 -------

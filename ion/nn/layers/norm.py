@@ -25,13 +25,13 @@ class LayerNorm(Module):
     """
 
     scale: Param[Float[Array, " d"]]
-    b: Param[Float[Array, " d"]]
+    b: Param[Float[Array, " d"]] | None
     eps: float
 
-    def __init__(self, dim: int, eps: float = 1e-5) -> None:
+    def __init__(self, dim: int, eps: float = 1e-5, bias: bool = True) -> None:
 
         self.scale = Param(jnp.ones(dim))
-        self.b = Param(jnp.zeros(dim))
+        self.b = Param(jnp.zeros(dim)) if bias else None
 
         self.eps = eps
 
@@ -42,7 +42,12 @@ class LayerNorm(Module):
 
         x = (x - mean) * lax.rsqrt(var + self.eps)
 
-        return x * self.scale + self.b
+        x = x * self.scale
+
+        if self.b is not None:
+            x = x + self.b
+
+        return x
 
 
 class GroupNorm(Module):

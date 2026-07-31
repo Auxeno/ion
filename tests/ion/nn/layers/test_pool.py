@@ -1,3 +1,4 @@
+import jax
 import jax.numpy as jnp
 import numpy.testing as npt
 import pytest
@@ -111,11 +112,19 @@ class TestAvgPool:
         assert y.shape == (1, 4, 3)
 
     def test_1d_padding_averages_only_real_elements(self):
-        """Padding should not count padded zeros in the average."""
-        layer = nn.AvgPool(kernel_shape=(3,), stride=1, padding=1)
+        """With count_include_pad=False, padded zeros are excluded from the average."""
+        layer = nn.AvgPool(kernel_shape=(3,), stride=1, padding=1, count_include_pad=False)
         x = jnp.array([[[6.0], [6.0], [6.0], [6.0]]])  # (1, 4, 1)
         y = layer(x)
         expected = jnp.array([[[6.0], [6.0], [6.0], [6.0]]])  # (1, 4, 1)
+        npt.assert_allclose(y, expected)
+
+    def test_1d_padding_counts_pad_by_default(self):
+        """By default padded zeros count towards the window size."""
+        layer = nn.AvgPool(kernel_shape=(3,), stride=1, padding=1)
+        x = jnp.array([[[6.0], [6.0], [6.0], [6.0]]])  # (1, 4, 1)
+        y = layer(x)
+        expected = jnp.array([[[4.0], [6.0], [6.0], [4.0]]])  # (1, 4, 1)
         npt.assert_allclose(y, expected)
 
     def test_2d_computes_mean(self):
@@ -150,12 +159,27 @@ class TestAvgPool:
         assert y.shape == (1, 4, 4, 3)
 
     def test_2d_padding_averages_only_real_elements(self):
-        """Padding should not count padded zeros in the average."""
-        layer = nn.AvgPool(kernel_shape=(3, 3), stride=1, padding=1)
+        """With count_include_pad=False, padded zeros are excluded from the average."""
+        layer = nn.AvgPool(kernel_shape=(3, 3), stride=1, padding=1, count_include_pad=False)
         x = jnp.full((1, 4, 4, 1), 10.0)  # (1, 4, 4, 1)
         y = layer(x)
         expected = jnp.full((1, 4, 4, 1), 10.0)  # (1, 4, 4, 1)
         npt.assert_allclose(y, expected)
+
+    def test_2d_padding_counts_pad_by_default(self):
+        """A corner window sees 4 of 9 real elements, so the mean is scaled by 4 / 9."""
+        layer = nn.AvgPool(kernel_shape=(3, 3), stride=1, padding=1)
+        x = jnp.full((1, 4, 4, 1), 9.0)  # (1, 4, 4, 1)
+        y = layer(x)
+        npt.assert_allclose(y[0, 0, 0, 0], 4.0)
+        npt.assert_allclose(y[0, 1, 1, 0], 9.0)
+
+    def test_count_include_pad_agree_without_padding(self):
+        """Without padding, both counting modes give the same result."""
+        x = jax.random.normal(jax.random.key(0), (1, 6, 6, 2))
+        included = nn.AvgPool(kernel_shape=(2, 2))
+        excluded = nn.AvgPool(kernel_shape=(2, 2), count_include_pad=False)
+        npt.assert_allclose(included(x), excluded(x), rtol=1e-6)
 
 
 class TestAvgPoolConstructor:
