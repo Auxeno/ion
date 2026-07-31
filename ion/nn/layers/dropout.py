@@ -17,37 +17,34 @@ class Dropout(Module):
     """Stochastic dropout layer.
 
     >>> drop = Dropout(0.5)
-    >>> drop(x, key=key)  # (*, d) -> (*, d)
+    >>> drop(x, training=True, key=key)  # (*, d) -> (*, d)
+    >>> drop(x, training=False)  # evaluation identity
     """
 
     p: float
-    deterministic: bool
 
-    def __init__(self, p: float, deterministic: bool = False) -> None:
+    def __init__(self, p: float) -> None:
 
         if not 0.0 <= p <= 1.0:
             raise ValueError(f"p ({p}) must be in [0, 1]")
 
         self.p = p
-        self.deterministic = deterministic
 
     def __call__(
         self,
         x: Float[Array, "..."],
-        deterministic: bool | None = None,
         *,
+        training: bool,
         key: PRNGKeyArray | None = None,
     ) -> Float[Array, "..."]:
 
-        is_deterministic = self.deterministic if deterministic is None else deterministic
-
-        if is_deterministic or self.p == 0.0:
+        if not training or self.p == 0.0:
             return x
 
         if key is None:
-            raise ValueError("key is required when not in deterministic mode")
+            raise ValueError("key is required when training=True")
 
-        if self.p >= 1.0:
+        if self.p == 1.0:
             return jnp.zeros_like(x)
 
         keep_prob = 1.0 - self.p

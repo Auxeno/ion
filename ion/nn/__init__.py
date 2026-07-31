@@ -2,6 +2,7 @@
 
 from .blocks.mlp import MLP
 from .blocks.sequential import Sequential
+from .buffer import BufferModule
 from .layers.attention import CrossAttention, SelfAttention
 from .layers.conv import Conv, ConvTranspose
 from .layers.dropout import Dropout
@@ -9,7 +10,7 @@ from .layers.embedding import Embedding
 from .layers.identity import Identity
 from .layers.linear import Linear
 from .layers.lora import LoRALinear
-from .layers.norm import GroupNorm, LayerNorm, RMSNorm
+from .layers.norm import BatchNorm, GroupNorm, LayerNorm, RMSNorm, SpectralNorm
 from .layers.pool import AvgPool, MaxPool
 from .layers.positional import LearnedPositionalEmbedding, RoPE, alibi, sinusoidal
 from .layers.recurrent import GRU, LSTM, RNN, GRUCell, LSTMCell, RNNCell
@@ -19,8 +20,10 @@ from .param import Param
 
 __all__ = [
     "Module",
+    "BufferModule",
     "Param",
     "AvgPool",
+    "BatchNorm",
     "Conv",
     "ConvTranspose",
     "CrossAttention",
@@ -50,6 +53,7 @@ __all__ = [
     "S5Cell",
     "SelfAttention",
     "Sequential",
+    "SpectralNorm",
     "alibi",
     "sinusoidal",
 ]

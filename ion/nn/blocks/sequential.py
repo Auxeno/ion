@@ -19,10 +19,10 @@ from ..module import Module
 
 
 class Sequential(Module):
-    """Chains single-argument layers in order, forwarding an optional key to layers that accept one.
+    """Chain layers, routing optional training mode, buffers, and random keys.
 
     >>> model = Sequential(Linear(3, 16, key=keys[0]), Dropout(0.1), Linear(16, 1, key=keys[1]))
-    >>> model(x, key=key)  # (*, 3) -> (*, 1)
+    >>> model(x, training=True, key=key)  # (*, 3) -> (*, 1)
     """
 
     layers: tuple[Callable, ...]
@@ -34,17 +34,36 @@ class Sequential(Module):
                 raise TypeError(f"Sequential expects callable layers, got {type(layer).__name__}")
         self.layers = layers
 
-    def __call__(self, x: Any, *, key: PRNGKeyArray | None = None) -> Any:
+    def __call__(
+        self,
+        x: Any,
+        buffers: Any = None,
+        *,
+        training: bool | None = None,
+        key: PRNGKeyArray | None = None,
+    ) -> Any:
 
         keys = [None] * len(self.layers) if key is None else jax.random.split(key, len(self.layers))
+        return_buffers = buffers is not None
 
         for layer, key_layer in zip(self.layers, keys):
-            if "key" in inspect.signature(layer).parameters:
-                x = layer(x, key=key_layer)
-            else:
-                x = layer(x)
+            parameters = inspect.signature(layer).parameters
+            kwargs = {}
 
-        return x
+            if "training" in parameters:
+                if training is None:
+                    raise ValueError(f"{type(layer).__name__} requires training=True or False")
+                kwargs["training"] = training
+            if "key" in parameters:
+                kwargs["key"] = key_layer
+            if "buffers" in parameters:
+                if buffers is None:
+                    raise ValueError(f"{type(layer).__name__} requires model.init_buffers()")
+                x, buffers = layer(x, buffers, **kwargs)
+            else:
+                x = layer(x, **kwargs)
+
+        return (x, buffers) if return_buffers else x
 
     def __getitem__(self, i: int | slice) -> "Callable | Sequential":
         if isinstance(i, slice):

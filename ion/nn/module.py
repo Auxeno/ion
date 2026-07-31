@@ -18,7 +18,7 @@ from typing import Any, Generic, Self, TypeVar
 import jax
 import jax.tree_util as jtu
 import numpy as np
-from jaxtyping import PyTree
+from jaxtyping import PRNGKeyArray, PyTree
 
 from .. import tree
 from .param import Param
@@ -254,7 +254,11 @@ class Module:
     def __repr__(self) -> str:
         """Minimal textual pretty printing for pytrees."""
 
-        fields = dataclasses.fields(self)  # type: ignore[reportArgumentType]
+        fields = tuple(
+            field
+            for field in dataclasses.fields(self)  # type: ignore[reportArgumentType]
+            if field.repr
+        )
         if not fields:
             return f"{type(self).__name__}()"
 
@@ -288,6 +292,7 @@ class Module:
         child_attributes = {
             field.name: getattr(self, field.name)
             for field in dataclasses.fields(self)  # type: ignore[reportArgumentType]
+            if field.repr
         }
 
         # Hue derived from a salted hash of the class name; the salt tunes the palette
@@ -314,6 +319,25 @@ class Module:
         >>> model = model.at[nn.Dropout].p.set(0.5)               # modify every dropout layer
         """
         return _At(self)
+
+    def init_buffers(self, *, key: PRNGKeyArray | None = None) -> PyTree:
+        """Initialize and return this model's runtime buffers.
+
+        Parameters
+        ----------
+        key : Array, optional
+            Random key used by buffers that require stochastic initialization.
+
+        Examples
+        --------
+        >>> model = BatchNormCNN()
+        >>> buffers = model.init_buffers()
+        >>> y, buffers = model(x, buffers, training=True)
+        """
+
+        from .buffer import _init_buffers
+
+        return _init_buffers(self, key=key)
 
     def freeze(self) -> Self:
         """Return a copy with all parameters frozen (non-trainable). Wraps `ion.freeze`.
