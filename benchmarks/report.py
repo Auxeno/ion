@@ -40,7 +40,7 @@ def summarize(path: Path) -> str:
     for model in sorted({result.model for result in results}):
         lines.extend(
             [
-                f"## {MODEL_LABELS[model]}",
+                f"## {MODEL_LABELS[model]}",  # pyright: ignore[reportArgumentType]
                 "",
                 "| Size | Framework | Mode | Forward | Forward + backward | "
                 "Full step | Compile | First step | Throughput | Peak memory |",

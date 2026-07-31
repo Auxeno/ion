@@ -209,7 +209,9 @@ def latency_figure(results: list[Result]) -> go.Figure:
         rows=len(models),
         cols=len(sizes),
         subplot_titles=[
-            f"{MODEL_LABELS[model]} · {size.title()}" for model in models for size in sizes
+            f"{MODEL_LABELS[model]} · {size.title()}"  # pyright: ignore[reportArgumentType]
+            for model in models
+            for size in sizes
         ],
         vertical_spacing=0.1,
         horizontal_spacing=0.06,
@@ -259,7 +261,7 @@ def metric_figure(
     figure = make_subplots(
         rows=1,
         cols=len(models),
-        subplot_titles=[MODEL_LABELS[model] for model in models],
+        subplot_titles=[MODEL_LABELS[model] for model in models],  # pyright: ignore[reportArgumentType]
         horizontal_spacing=0.07,
     )
 

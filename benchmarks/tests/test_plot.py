@@ -47,11 +47,11 @@ def test_balance_results_matches_repetitions_and_samples(result):
 
 def test_latency_figure_uses_available_results(result):
     figure = latency_figure([result])
-    assert len(figure.data) == 1
-    assert figure.data[0].name == "Ion"
-    assert list(figure.data[0].y) == [None, None, 2.0]
-    assert figure.data[0].marker.line.width == 0
-    assert figure.data[0].error_y.color == "#4d4d4d"
+    assert len(figure.data) == 1  # pyright: ignore[reportArgumentType]
+    assert figure.data[0].name == "Ion"  # pyright: ignore[reportAttributeAccessIssue]
+    assert list(figure.data[0].y) == [None, None, 2.0]  # pyright: ignore[reportAttributeAccessIssue]
+    assert figure.data[0].marker.line.width == 0  # pyright: ignore[reportAttributeAccessIssue]
+    assert figure.data[0].error_y.color == "#4d4d4d"  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_latency_figure_formats_resnet_name(result):
