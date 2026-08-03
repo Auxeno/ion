@@ -13,7 +13,12 @@
 - **New `BatchNorm` and `SpectralNorm` layers.** They use buffers for running
   statistics and power-iteration vectors, and are called normally with
   `y = norm(x, training=True)`, including in `Sequential`. `SpectralNorm` takes a
-  constructor `key` to initialize its vectors.
+  constructor `key` to initialize its vectors, requires real floating parameters,
+  and initializes its power-iteration vectors with JAX's default floating dtype.
+  Both layers preserve their input dtype at the output boundary.
+- **Breaking: `Dropout` uses explicit training mode.** The `deterministic`
+  constructor and call arguments are removed. Pass `training=True` with a key to
+  sample a mask, or `training=False` for the evaluation identity.
 - **Checkpoints include buffers.** `ion.save(path, model)` writes running statistics
   as ordinary named tensors. `ion.load` returns a model with its own buffers, leaving
   the reference model's state untouched. The format version is unchanged.
@@ -24,6 +29,9 @@
   [Sharp edges](docs/sharp-edges.md).
 - **New `ion.is_buffer` predicate.** Companion to `ion.is_param`, for tree code that
   needs to find buffers.
+- **Optimizers exclude buffers from optax state.** This keeps mutable references out
+  of optimizer checkpoints, so a saved `(model, optimizer)` pair resumes normally
+  with the loaded model's independent buffers.
 - **Requires JAX 0.7.2 or newer**, up from 0.5.0. Buffers are built on `jax.new_ref`.
 
 ## 0.11.2

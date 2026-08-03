@@ -2,7 +2,9 @@
 
 The base class for everything in Ion. Subclassing `Module` turns a plain class
 into an immutable JAX [pytree](https://docs.jax.dev/en/latest/pytrees.html), so
-models work directly with `jax.jit`, `jax.grad`, and `jax.vmap`.
+models work directly with `jax.jit`, `jax.grad`, and `jax.vmap`. Mutable buffer
+updates have additional transform constraints described in
+[Sharp edges](../sharp-edges.md#buffer-mutation-and-jax-transforms).
 
 ::: ion.nn.Module
     options:

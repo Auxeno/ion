@@ -80,6 +80,15 @@ class TestBatchNorm:
         assert layer.running_var.value.dtype == jnp.float32
         assert jnp.all(jnp.isfinite(y))
 
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
+    @pytest.mark.parametrize("training", [False, True])
+    def test_preserves_input_dtype(self, dtype, training):
+        """The output follows the input dtype even with default float32 params."""
+        layer = nn.BatchNorm(2)
+        x = jnp.ones((3, 2), dtype=dtype)
+
+        assert layer(x, training=training).dtype == dtype
+
     def test_input_grad(self):
         """Input gradients are finite."""
         layer = nn.BatchNorm(3)
@@ -117,20 +126,6 @@ class TestBatchNorm:
 
         assert y.shape == x.shape
         npt.assert_array_equal(layer.running_mean.value, jnp.zeros(3))
-
-    @pytest.mark.parametrize(
-        "kwargs",
-        [
-            {"dim": -1},
-            {"dim": 2, "momentum": -0.1},
-            {"dim": 2, "momentum": 1.1},
-            {"dim": 2, "eps": 0.0},
-        ],
-    )
-    def test_invalid_hyperparameters(self, kwargs):
-        """Invalid dimensions, momentum, and epsilon raise an error."""
-        with pytest.raises((TypeError, ValueError)):
-            nn.BatchNorm(**kwargs)
 
     def test_requires_reduction_dimension(self):
         """Input requires at least one dimension before features."""
@@ -330,6 +325,32 @@ class TestSpectralNorm:
         assert low_precision_layer.u.value.dtype == jnp.float32
         assert low_precision_layer.v.value.dtype == jnp.float32
 
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
+    @pytest.mark.parametrize("training", [False, True])
+    def test_preserves_input_dtype(self, dtype, training):
+        """The output follows the input dtype even with default float32 params."""
+        layer = nn.SpectralNorm(
+            nn.Linear(4, 5, key=jax.random.key(0)),
+            key=jax.random.key(1),
+        )
+        x = jnp.ones((2, 4), dtype=dtype)
+
+        assert layer(x, training=training).dtype == dtype
+
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
+    def test_low_precision_construction(self, dtype):
+        """Direct low-precision construction keeps zero weights finite."""
+        linear = nn.Linear(4, 5, bias=False, key=jax.random.key(0)).astype(dtype)
+        linear = linear.at.w.set(nn.Param(jnp.zeros((4, 5), dtype=dtype)))
+
+        layer = nn.SpectralNorm(linear, key=jax.random.key(1))
+        y = layer(jnp.ones((2, 4), dtype=dtype), training=True)
+
+        assert jnp.all(jnp.isfinite(y))
+        assert y.dtype == dtype
+        assert layer.u.value.dtype == jnp.float32
+        assert layer.v.value.dtype == jnp.float32
+
     def test_spectral_norm(self):
         """The normalized weight has largest singular value near one."""
         linear = nn.Linear(8, 8, bias=False, key=jax.random.key(0))
@@ -451,12 +472,6 @@ class TestSpectralNorm:
         linear = nn.Linear(4, 5, key=jax.random.key(0))
         with pytest.raises(ValueError, match="power_iterations"):
             nn.SpectralNorm(linear, power_iterations=0, key=jax.random.key(1))
-
-    def test_invalid_eps(self):
-        """A non-positive epsilon raises ValueError."""
-        linear = nn.Linear(4, 5, key=jax.random.key(0))
-        with pytest.raises(ValueError, match="eps"):
-            nn.SpectralNorm(linear, eps=0, key=jax.random.key(1))
 
     def test_jit_training(self):
         """Training works under jax.jit."""

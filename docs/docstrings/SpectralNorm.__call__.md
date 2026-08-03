@@ -2,14 +2,14 @@ Apply the wrapped module with its normalized parameter.
 
 Parameters
 ----------
-x : Any
+x : Float[Array, "..."]
     Input to the wrapped module.
 training : bool
     Whether to update the power-iteration vectors.
 
 Returns
 -------
-Any
+Float[Array, "..."]
     Wrapped module output.
 
 Info

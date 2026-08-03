@@ -349,12 +349,14 @@ class Module:
 
     @property
     def params(self) -> PyTree:
-        """Return only the `Param` leaves, replacing everything else with `None`.
+        """Return `Param` leaves with other dynamic values replaced by `None`.
 
-        >>> model.params  # Param leaves only, rest is None
+        >>> model.params  # Param leaves and static structure
         """
         return jax.tree.map(
-            lambda leaf: leaf if tree.is_param(leaf) else None, self, is_leaf=tree.is_param
+            lambda leaf: leaf if tree.is_param(leaf) else None,
+            self,
+            is_leaf=lambda leaf: isinstance(leaf, (Param, Buffer)),
         )
 
     @property

@@ -99,6 +99,17 @@ mixed-precision workflow cast inside the loss and still update the master
 model's running statistics. `Optimizer.update` shares them too, since a step
 continues one model rather than copying it.
 
+`Module.clone` handles a model; `ion.clone` handles any pytree. `ion.is_buffer`
+is the matching predicate for custom tree traversals:
+
+::: ion.clone
+    options:
+      heading_level: 3
+
+::: ion.is_buffer
+    options:
+      heading_level: 3
+
 See [Stateful training](../workflows.md#stateful-training) for a complete
 training step, and [Sharp edges](../sharp-edges.md) for the cases where
 mutability shows through.

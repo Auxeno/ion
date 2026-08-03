@@ -63,6 +63,14 @@ class TestOptimizerInit:
         optimizer = ion.Optimizer(optax.adam(1e-3), frozen)
         assert optimizer.state is not None
 
+    def test_buffers_are_absent_from_optax_state(self):
+        """Mutable model buffers are projected out before optax initialization."""
+        model = nn.BatchNorm(4)
+        optimizer = ion.Optimizer(optax.adam(1e-3), model)
+
+        leaves = jax.tree.leaves(optimizer.state, is_leaf=ion.is_buffer)
+        assert not any(ion.is_buffer(leaf) for leaf in leaves)
+
 
 class TestOptimizerUpdate:
     def test_returns_model_and_optimizer(self):
@@ -402,6 +410,32 @@ class TestOptimizerCheckpoint:
         finally:
             if os.path.exists(path):
                 os.remove(path)
+
+    def test_stateful_model_and_optimizer_resume(self):
+        """A loaded model owns new buffers without invalidating its optimizer."""
+        model = nn.Sequential(
+            nn.Linear(4, 2, key=jax.random.key(0)),
+            nn.BatchNorm(2),
+        )
+        optimizer = ion.Optimizer(optax.adam(1e-3), model)
+        x = jnp.ones((3, 4))
+
+        def loss_fn(model):
+            return jnp.sum(model(x, training=True))
+
+        grads = jax.grad(loss_fn)(model)
+        model, optimizer = optimizer.update(model, grads)
+
+        with tempfile.NamedTemporaryFile(suffix=".ion") as file:
+            ion.save(file.name, (model, optimizer))
+            loaded_model, loaded_optimizer = ion.load(file.name, (model, optimizer))
+
+        original_mean = model.layers[1].running_mean.value.copy()
+        loaded_grads = jax.grad(loss_fn)(loaded_model)
+        loaded_model, loaded_optimizer = loaded_optimizer.update(loaded_model, loaded_grads)
+
+        assert loaded_optimizer.step == 2
+        npt.assert_array_equal(model.layers[1].running_mean.value, original_mean)
 
 
 class TestOptimizerStructureMismatch:

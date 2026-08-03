@@ -51,8 +51,6 @@ class Conv(Module):
         key: PRNGKeyArray,
     ) -> None:
 
-        if isinstance(kernel_shape, int):
-            raise TypeError(f"kernel_shape must be a tuple of ints, got int {kernel_shape}")
         if len(kernel_shape) < 1:
             raise ValueError("kernel_shape must have at least one element")
         if in_channels % groups != 0:
@@ -138,8 +136,6 @@ class ConvTranspose(Module):
         key: PRNGKeyArray,
     ) -> None:
 
-        if isinstance(kernel_shape, int):
-            raise TypeError(f"kernel_shape must be a tuple of ints, got int {kernel_shape}")
         if len(kernel_shape) < 1:
             raise ValueError("kernel_shape must have at least one element")
         if in_channels % groups != 0:

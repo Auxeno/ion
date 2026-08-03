@@ -9,9 +9,9 @@ Parameters
 dim : int
     Size of the feature dimension to normalize.
 momentum : float, default=0.1
-    Weight given to the current batch statistics.
+    Weight given to the current batch statistics. Expected to be in `[0, 1]`.
 eps : float, default=1e-5
-    Value added to the variance.
+    Positive value added to the variance.
 bias : bool, default=True
     Whether to use a bias.
 
@@ -39,6 +39,6 @@ y = norm(x, training=False)  # (8, 64), running statistics
 
 Note
 ----
-Running statistics are stored in float32. The normalized values return to the
-input dtype before the learned affine transform. Buffers are not changed by
+Running statistics use JAX's default floating dtype. The result returns to the
+input dtype after the learned affine transform. Buffers are not changed by
 `Module.astype` or the optimizer.

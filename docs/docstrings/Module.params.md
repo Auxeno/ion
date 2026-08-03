@@ -1,7 +1,7 @@
-Pytree containing only model parameters.
+Module-shaped pytree containing model parameters.
 
 Returns
 -------
 PyTree
-    Module-shaped pytree with `Param` leaves preserved and all other leaves
-    replaced by `None`.
+    `Param` leaves are preserved, while bare array and `Buffer` fields are
+    replaced by `None`. Static configuration remains unchanged.

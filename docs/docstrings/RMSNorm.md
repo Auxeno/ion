@@ -7,7 +7,7 @@ Parameters
 dim : int
     Size of the feature dimension to normalize.
 eps : float, default=1e-5
-    Constant added inside the square root for numerical stability.
+    Positive constant added inside the square root for numerical stability.
 
 Attributes
 ----------

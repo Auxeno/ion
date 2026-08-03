@@ -1,6 +1,6 @@
 # Overview
 
-Ion introduces three core concepts for building and training neural networks in
+Ion introduces four core concepts for building and training neural networks in
 JAX. Its neural and graph network layers are built on top of them.
 
 ## Quickstart
@@ -44,13 +44,15 @@ model, optimizer = train_step(model, optimizer, x, y)
 
 The loss takes the model first so `jax.grad` differentiates with respect to it,
 and the whole step compiles with `jax.jit`. The sections below introduce the
-three core concepts, network layers, and common workflows.
+four core concepts, network layers, and common workflows.
 
 ## The core
 
 - [**Module**](core/module.md) is the base class for models and layers. A model
   is an immutable [pytree](https://docs.jax.dev/en/latest/pytrees.html).
 - [**Param**](core/param.md) wraps a JAX array and marks it trainable or frozen.
+- [**Buffer**](core/buffers.md) holds mutable, non-trainable model state such as
+  running statistics.
 - [**Optimizer**](core/optimizer.md) wraps any
   [optax](https://github.com/google-deepmind/optax) transform and updates a
   model, automatically partitioning out non-trainable parameters.
@@ -186,7 +188,10 @@ reference](gnn/layers/index.md) compares the available graph convolutions.
 
 ## Native transforms
 
-There is no `ion.jit` or `ion.grad`. A model's only pytree leaves are array params; activations and other config are kept as static metadata, meaning `jax.jit`, `jax.grad`, and `jax.vmap` etc. *always* work on Ion modules:
+There is no `ion.jit` or `ion.grad`. Modules are native pytrees: parameters and
+ordinary array fields are dynamic, while activations and other configuration
+are static metadata. Stateless model calls therefore work directly with
+`jax.jit`, `jax.grad`, `jax.vmap`, and other JAX transforms:
 
 ```python
 import jax
@@ -210,6 +215,11 @@ keys = jax.random.split(jax.random.key(0), 8)
 ensemble = jax.vmap(lambda key: nn.MLP([4, 16, 3], key=key))(keys)
 preds = jax.vmap(lambda m: m(x))(ensemble)
 ```
+
+Stateful calls work directly with `jax.jit`, `jax.grad`, and `jax.lax.scan` too.
+Writing a shared buffer under a parallelizing transform such as `jax.vmap`, or
+inside `jax.checkpoint`, has additional constraints; see
+[Sharp edges](sharp-edges.md#buffer-mutation-and-jax-transforms).
 
 ## Checkpointing
 
@@ -268,7 +278,7 @@ from ion import nn
 model = nn.MLP([4, 16, 3], key=jax.random.key(0))
 
 model.num_params  # total parameter count
-model.params      # Param leaves, everything else None
+model.params      # Param leaves; array data and buffers become None
 ```
 
 Casting is how Ion does [mixed precision](workflows.md#mixed-precision); see

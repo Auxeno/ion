@@ -14,7 +14,11 @@
 
 ---
 
-Ion is a simple neural network library for JAX. The core introduces three concepts (`Module`, `Param`, `Optimizer`) that make it simple to build and train neural networks. Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html) that *always* work directly with `jax.grad`, `jax.jit`, and `jax.vmap`. Ion also ships neural and graph network layers built on the core.
+Ion is a simple neural network library for JAX. The core introduces four concepts
+(`Module`, `Param`, `Buffer`, `Optimizer`) that make it simple to build and train
+neural networks. Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html)
+that work directly with native JAX transforms. Ion also ships neural and graph
+network layers built on the core.
 
 ```bash
 pip install ion-nn
@@ -71,7 +75,7 @@ for x, y in data:
 ## Documentation
 
 - [Overview](https://auxeno.github.io/ion/overview/) - the core abstractions and design
-- [Core](https://auxeno.github.io/ion/core/module/) - `Module`, `Param`, and `Optimizer`
+- [Core](https://auxeno.github.io/ion/core/module/) - `Module`, `Param`, `Buffer`, and `Optimizer`
 - [NN guide](https://auxeno.github.io/ion/nn/guide/) and [GNN guide](https://auxeno.github.io/ion/gnn/guide/) - array formats and shared conventions
 - [Workflows](https://auxeno.github.io/ion/workflows/) - freezing, mixed precision, serialization, inspecting models
 - [Sharp edges](https://auxeno.github.io/ion/sharp-edges/) - known limitations and gotchas
@@ -80,14 +84,15 @@ for x, y in data:
 
 ## Layers
 
-Ion ships with standard neural network layers. Each is a `Module` with trainable `Param` leaves.
+Ion ships with standard neural network layers. Each is a `Module` with trainable
+`Param` leaves; stateful layers also hold non-trainable `Buffer` fields.
 
 | Category        | Layers                                                                    |
 |-----------------|---------------------------------------------------------------------------|
 | Linear          | `Linear`, `LoRALinear`                                                    |
 | Convolution     | `Conv`, `ConvTranspose`                                                   |
 | Attention       | `SelfAttention`, `CrossAttention`                                         |
-| Normalization   | `LayerNorm`, `RMSNorm`, `GroupNorm`                                       |
+| Normalization   | `BatchNorm`, `LayerNorm`, `RMSNorm`, `GroupNorm`, `SpectralNorm`            |
 | Recurrent       | `RNNCell`, `LSTMCell`, `GRUCell`, `RNN`, `LSTM`, `GRU`                    |
 | SSM             | `LRUCell`, `S4DCell`, `S5Cell`, `LRU`, `S4D`, `S5`                        |
 | Pooling         | `MaxPool`, `AvgPool`                                                      |

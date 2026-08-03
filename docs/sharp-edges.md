@@ -40,9 +40,33 @@ inside the loss, and a cast copy with its own buffers would quietly throw away
 every update made through it. `Optimizer.update` shares them for the same
 reason, since a step continues one model rather than copying it.
 
-`jax.vmap` over a model that updates buffers raises, because the update would
-write a batched value into an unbatched buffer. Vectorize over data with the
-layer's own batch dimension instead.
+### Buffer mutation and JAX transforms
+
+`jax.vmap` may read a buffer, so stateful models work normally in evaluation.
+It cannot write one shared buffer from several mapped lanes: those concurrent
+writes have no defined ordering or final value. Ion buffers are unmapped pytree
+metadata, so a training call that writes one under `vmap` raises. Pass the whole
+batch to the layer instead; `BatchNorm` reduces over all leading axes. If an
+update must combine mapped values, compute them with `vmap`, reduce them, then
+call `set` once outside it. Use `jax.lax.scan` when updates must be sequential.
+The same restriction applies to `jax.shard_map` over a shared buffer and to
+transforms implemented with batching, such as `jax.jacfwd`.
+
+`jax.checkpoint` (also called `remat`) is unsafe around buffer writes for a
+different reason: it may replay the forward computation during the backward
+pass, applying the update a second time. Keep stateful operations outside the
+rematerialized function:
+
+```python
+x = norm(x, training=True)
+x = jax.checkpoint(expensive_stateless_block)(x)
+```
+
+Independent buffers also have independent pytree structures because reference
+identity is part of a buffer's static metadata. Two separately constructed,
+cloned, or loaded stateful models therefore cannot be inputs to the same
+multi-tree `jax.tree.map`, and each owns a separate JIT specialization. Operate
+on `model.params` when combining or comparing parameter trees.
 
 ## Pytrees cannot share references
 
@@ -122,4 +146,7 @@ The inner `grad` returns its gradient wrapped as a `Param`, and abstractifying t
 
 ## `Module.params` preserves static fields
 
-`model.params` replaces plain array leaves with `None`, while non-array fields (ints, floats, strings, callables) remain unchanged. This is by design: static fields are structural metadata stored in the treedef, not pytree leaves, so they are naturally unaffected when leaves are replaced.
+`model.params` replaces plain array and `Buffer` fields with `None`, while
+non-array fields (ints, floats, strings, callables) remain unchanged. This is by
+design: static fields are structural metadata stored in the treedef, not pytree
+leaves, so they are naturally unaffected when dynamic values are replaced.

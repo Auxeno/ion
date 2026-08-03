@@ -36,8 +36,6 @@ class MaxPool(Module):
         padding: Literal["SAME", "VALID"] | int | tuple[int, ...] = 0,
     ) -> None:
 
-        if isinstance(kernel_shape, int):
-            raise TypeError(f"kernel_shape must be a tuple of ints, got int {kernel_shape}")
         if len(kernel_shape) < 1:
             raise ValueError("kernel_shape must have at least one element")
 
@@ -103,8 +101,6 @@ class AvgPool(Module):
         count_include_pad: bool = True,
     ) -> None:
 
-        if isinstance(kernel_shape, int):
-            raise TypeError(f"kernel_shape must be a tuple of ints, got int {kernel_shape}")
         if len(kernel_shape) < 1:
             raise ValueError("kernel_shape must have at least one element")
 

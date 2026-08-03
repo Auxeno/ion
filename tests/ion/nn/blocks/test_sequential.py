@@ -123,11 +123,6 @@ class TestSequential:
         expected = jax.nn.relu(noise(x, key=keys[0]))
         npt.assert_allclose(model(x, key=key), expected, rtol=1e-5, atol=1e-5)
 
-    def test_non_callable_raises(self):
-        """Passing a non-callable raises TypeError."""
-        with pytest.raises(TypeError, match="callable"):
-            nn.Sequential(42)  # type: ignore[arg-type]
-
     def test_stateful_layer_updates_in_place(self):
         """A contained stateful layer updates its buffers and returns one value."""
         norm = nn.BatchNorm(4)

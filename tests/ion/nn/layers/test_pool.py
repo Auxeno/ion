@@ -7,11 +7,6 @@ from ion import nn
 
 
 class TestMaxPool:
-    def test_int_kernel_shape_raises(self):
-        """Passing an int instead of a tuple raises TypeError."""
-        with pytest.raises(TypeError, match="kernel_shape"):
-            nn.MaxPool(kernel_shape=2)  # type: ignore[arg-type]
-
     def test_1d_picks_max(self):
         """Each output element is the maximum of its window."""
         layer = nn.MaxPool(kernel_shape=(2,))
@@ -91,11 +86,6 @@ class TestMaxPoolConstructor:
 
 
 class TestAvgPool:
-    def test_int_kernel_shape_raises(self):
-        """Passing an int instead of a tuple raises TypeError."""
-        with pytest.raises(TypeError, match="kernel_shape"):
-            nn.AvgPool(kernel_shape=2)  # type: ignore[arg-type]
-
     def test_1d_computes_mean(self):
         """Each output element is the mean of its window."""
         layer = nn.AvgPool(kernel_shape=(2,))

@@ -8,11 +8,12 @@ Parameters
 module : Module
     Module to wrap.
 parameter : str, default='w'
-    `Param` field to normalize. Must have rank 2 or greater.
+    `Param` field to normalize. Must have rank 2 or greater and a real floating
+    dtype.
 power_iterations : int, default=1
     Power iterations per training call.
 eps : float, default=1e-12
-    Minimum norm and singular value.
+    Positive minimum norm and singular value.
 key : jax.Array
     Random key for the initial power-iteration vectors.
 
@@ -41,5 +42,5 @@ Note
 ----
 The final parameter dimension is the output dimension. Earlier dimensions are
 flattened, supporting linear and convolutional weights. Power-iteration vectors
-use the wrapped parameter dtype at construction. The normalized parameter
-returns to its original dtype before calling the wrapped module.
+use JAX's default floating dtype, so low-precision parameters promote naturally
+during the estimate. The wrapped module's result returns to the input dtype.

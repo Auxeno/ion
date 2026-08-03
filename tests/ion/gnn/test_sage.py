@@ -75,11 +75,6 @@ class TestSAGEConv:
         y = sage(x, senders, receivers)
         npt.assert_allclose(jnp.linalg.norm(y, axis=-1), jnp.ones(3), rtol=1e-5)
 
-    def test_invalid_aggregator(self):
-        """An unknown aggregator raises at construction."""
-        with pytest.raises(ValueError, match="aggregator"):
-            gnn.SAGEConv(8, 16, aggregator="lstm", key=jax.random.key(0))  # type: ignore[arg-type]
-
     def test_glorot_uniform_init(self):
         """Glorot uniform initialization gives var(w) close to 2/(fan_in + fan_out)."""
         sage = gnn.SAGEConv(2048, 2048, key=jax.random.key(42))

@@ -1190,6 +1190,14 @@ class TestParamsWithFrozen:
         assert isinstance(params.w, nn.Param)
         assert params.buf is None
 
+    def test_params_on_buffer_field(self):
+        """Buffer fields become None in params rather than carrying mutable state."""
+        params = nn.BatchNorm(3).params
+
+        assert isinstance(params.scale, nn.Param)
+        assert params.running_mean is None
+        assert params.running_var is None
+
 
 class TestDeepNesting:
     def test_three_level_nesting(self):

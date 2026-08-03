@@ -14,7 +14,7 @@ num_spatial_dims : int
     Match the data's spatial rank for images (the standard GroupNorm);
     `0` normalizes each position over its channel groups only.
 eps : float, default=1e-5
-    Constant added to the variance for numerical stability.
+    Positive constant added to the variance for numerical stability.
 
 Attributes
 ----------

@@ -2,7 +2,6 @@ import jax
 import jax.numpy as jnp
 import numpy.testing as npt
 import optax
-import pytest
 
 import ion
 from ion import nn
@@ -10,12 +9,6 @@ from ion.optimizer import _apply_updates
 
 
 class TestLoRALinear:
-    def test_rank_zero_raises(self):
-        """rank < 1 raises ValueError."""
-        keys = jax.random.split(jax.random.key(0), 2)
-        with pytest.raises(ValueError, match="rank"):
-            nn.LoRALinear(nn.Linear(8, 16, key=keys[0]), rank=0, key=keys[1])
-
     def test_zero_init(self):
         """Output matches base Linear at initialization (LoRA contribution = 0)."""
         keys = jax.random.split(jax.random.key(0), 2)

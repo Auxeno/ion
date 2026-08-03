@@ -25,9 +25,6 @@ class Dropout(Module):
 
     def __init__(self, p: float) -> None:
 
-        if not 0.0 <= p <= 1.0:
-            raise ValueError(f"p ({p}) must be in [0, 1]")
-
         self.p = p
 
     def __call__(

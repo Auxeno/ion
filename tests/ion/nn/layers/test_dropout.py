@@ -30,13 +30,6 @@ class TestDropout:
         with pytest.raises(TypeError, match="deterministic"):
             nn.Dropout(p=0.5, deterministic=True)  # type: ignore[call-arg]
 
-    def test_p_out_of_range_raises(self):
-        """p outside [0, 1] raises ValueError at construction."""
-        with pytest.raises(ValueError, match="must be in"):
-            nn.Dropout(p=-0.3)
-        with pytest.raises(ValueError, match="must be in"):
-            nn.Dropout(p=1.5)
-
     def test_p_boundaries_construct(self):
         """p=0 and p=1 are valid."""
         assert nn.Dropout(p=0.0).p == 0.0

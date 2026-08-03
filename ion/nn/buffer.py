@@ -8,7 +8,7 @@ metadata, so buffers stay invisible to `jax.grad`, `ion.Optimizer` and `astype`.
 Writes go through `set`, which applies `jax.lax.stop_gradient`.
 """
 
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -17,9 +17,11 @@ from jaxtyping import Array
 
 from .param import Param
 
+T = TypeVar("T", bound=Array)
+
 
 @jtu.register_pytree_node_class
-class Buffer:
+class Buffer(Generic[T]):
     """Marks a JAX array as a non-trainable value updated in place.
 
     Parameters
@@ -42,15 +44,15 @@ class Buffer:
 
     __slots__ = ("_ref",)
 
-    def __init__(self, value: Array) -> None:
+    def __init__(self, value: T) -> None:
         self._ref = jax.new_ref(jnp.asarray(value))
 
     @property
-    def value(self) -> Array:
+    def value(self) -> T:
         """Current value of the buffer."""
         return self._ref[...]
 
-    def set(self, value: Array) -> None:
+    def set(self, value: T) -> None:
         """Replace the stored value, applying `stop_gradient`."""
         self._ref[...] = jax.lax.stop_gradient(value)
 
@@ -58,7 +60,7 @@ class Buffer:
         return (), self._ref
 
     @classmethod
-    def tree_unflatten(cls, aux: jax.Ref, children: tuple) -> "Buffer":
+    def tree_unflatten(cls, aux: jax.Ref, children: tuple) -> "Buffer[T]":
         """Rebuild around the existing reference, so copies keep sharing one buffer."""
         buffer = object.__new__(cls)
         buffer._ref = aux

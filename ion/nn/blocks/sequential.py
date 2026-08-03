@@ -29,9 +29,6 @@ class Sequential(Module):
 
     def __init__(self, *layers: Callable) -> None:
 
-        for layer in layers:
-            if not callable(layer):
-                raise TypeError(f"Sequential expects callable layers, got {type(layer).__name__}")
         self.layers = layers
 
     def __call__(

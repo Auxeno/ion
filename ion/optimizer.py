@@ -14,8 +14,18 @@ import jax.tree_util as jtu
 import optax
 from jaxtyping import PyTree
 
+from .nn.buffer import Buffer
 from .nn.param import Param
-from .tree import is_param
+from .tree import is_buffer, is_param
+
+
+def _without_buffers(pytree: PyTree) -> PyTree:
+    """Replace `Buffer` fields with `None` before passing a pytree to optax."""
+    return jax.tree.map(
+        lambda leaf: None if isinstance(leaf, Buffer) else leaf,
+        pytree,
+        is_leaf=is_buffer,
+    )
 
 
 def _apply_updates(model: PyTree, updates: PyTree) -> PyTree:
@@ -31,7 +41,7 @@ def _apply_updates(model: PyTree, updates: PyTree) -> PyTree:
         _apply,
         model,
         updates,
-        is_leaf=lambda x: x is None or isinstance(x, Param),
+        is_leaf=lambda x: x is None or isinstance(x, (Param, Buffer)),
     )
 
 
@@ -134,13 +144,14 @@ class Optimizer:
         | dict[str | tuple[str, ...], optax.GradientTransformation],
         model: PyTree,
     ) -> None:
+        model_without_buffers = _without_buffers(model)
         if isinstance(tx, dict):
             self._transform, self._fields = _field_partition(tx)
         else:
-            self._transform = _auto_partition(tx, model)
+            self._transform = _auto_partition(tx, model_without_buffers)
             self._fields = None
-        self._structure = jax.tree.structure(model)
-        self.state = self._transform.init(model)
+        self._structure = jax.tree.structure(model_without_buffers)
+        self.state = self._transform.init(model_without_buffers)
         self.step = jnp.array(0, dtype=jnp.int32)
 
     def update(self, model: PyTree, grads: PyTree, **kwargs) -> tuple[PyTree, "Optimizer"]:
@@ -160,10 +171,14 @@ class Optimizer:
         tuple[PyTree, Optimizer]
             Updated model and optimizer.
         """
-        if jax.tree.structure(model) != self._structure:
+        model_without_buffers = _without_buffers(model)
+        if jax.tree.structure(model_without_buffers) != self._structure:
             raise ValueError("Model structure or trainability changed, create a new Optimizer")
 
-        updates, new_state = self._transform.update(grads, self.state, model, **kwargs)
+        grads_without_buffers = _without_buffers(grads)
+        updates, new_state = self._transform.update(
+            grads_without_buffers, self.state, model_without_buffers, **kwargs
+        )
         new_model = _apply_updates(model, updates)
         aux = (self._transform, self._fields, self._structure)
         return new_model, Optimizer.tree_unflatten(aux, (new_state, self.step + 1))

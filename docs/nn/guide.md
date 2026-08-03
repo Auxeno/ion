@@ -3,9 +3,9 @@
 For neural network layers and their APIs, see the [NN layer reference](layers/index.md).
 
 Every Ion layer is a pytree of parameters. Stateless layers map arrays to
-arrays, while stateful layers also receive and return a buffer collection.
-This guide covers the two shape contracts those functions use, how layers
-compose into a model, and where state and randomness enter.
+arrays, while stateful layers update declared `Buffer` fields in place. This
+guide covers the two shape contracts those functions use, how layers compose
+into a model, and where state and randomness enter.
 
 - [Feature axes](#feature-axes)
 - [Structured axes](#structured-axes)
@@ -130,11 +130,18 @@ preds = jax.vmap(lambda model: model(jnp.ones((32, 3))))(ensemble)
 preds.shape  # (8, 32, 1)
 ```
 
+These examples do not update buffers. Evaluation calls may read buffers under
+`vmap`, but a training call cannot update one buffer concurrently from multiple
+mapped lanes. `BatchNorm` already reduces over all leading axes, so pass the
+whole batch directly instead. See
+[Sharp edges](../sharp-edges.md#buffer-mutation-and-jax-transforms).
+
 ## Inside a layer
 
-A layer is a `Module`, and a `Module` is a pytree whose only array leaves are
-`Param` objects. Constructing one creates its parameters, and printing it shows
-the structure without printing any values:
+A layer is a `Module`, and trainable arrays in that pytree are `Param` objects.
+Bare array fields remain ordinary model data, while buffers contribute no
+pytree leaves. Constructing a layer creates its parameters, and printing it
+shows the structure without printing any values:
 
 ```python
 mlp = nn.MLP([3, 64, 64, 1], key=key)
@@ -256,9 +263,11 @@ y = model(x, training=False)  # running statistics used
 
 Buffers contribute no pytree leaves, so `jax.grad`, the optimizer, and
 `Module.astype` all leave them alone. They can be read and updated inside
-`jax.jit` and `jax.lax.scan`. See
+`jax.jit` and `jax.lax.scan`. Do not put a buffer update inside `jax.checkpoint`
+or map several writes to one buffer with `jax.vmap`. See
 [Stateful training](../workflows.md#stateful-training) for a complete update
-step.
+step and [Sharp edges](../sharp-edges.md#buffer-mutation-and-jax-transforms) for
+the transform boundaries.
 
 ## Carrying state
 

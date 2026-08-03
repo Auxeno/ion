@@ -10,8 +10,6 @@ Modules:
 Affine scales initialize to ones and biases to zeros. Feature dimensions are always final.
 """
 
-from typing import Any
-
 import jax
 import jax.numpy as jnp
 from jax import lax
@@ -31,8 +29,8 @@ class BatchNorm(Module):
 
     scale: Param[Float[Array, " d"]]
     b: Param[Float[Array, " d"]] | None
-    running_mean: Buffer
-    running_var: Buffer
+    running_mean: Buffer[Float[Array, " d"]]
+    running_var: Buffer[Float[Array, " d"]]
     momentum: float
     eps: float
 
@@ -43,11 +41,6 @@ class BatchNorm(Module):
         eps: float = 1e-5,
         bias: bool = True,
     ) -> None:
-
-        if not 0.0 <= momentum <= 1.0:
-            raise ValueError(f"momentum ({momentum}) must be in [0, 1]")
-        if eps <= 0.0:
-            raise ValueError(f"eps ({eps}) must be greater than 0")
 
         self.scale = Param(jnp.ones(dim))
         self.b = Param(jnp.zeros(dim)) if bias else None
@@ -67,6 +60,7 @@ class BatchNorm(Module):
 
         if x.ndim < 2:
             raise ValueError("BatchNorm input must have at least one reduction dimension")
+        dtype = x.dtype
 
         # Use batch statistics and update the running values during training
         if training:
@@ -85,14 +79,14 @@ class BatchNorm(Module):
             var = self.running_var.value
 
         # Normalize, then apply the learned affine transform
-        x = ((x - mean) * lax.rsqrt(var + self.eps)).astype(x.dtype)
+        x = (x - mean) * lax.rsqrt(var + self.eps)
 
         x = x * self.scale
 
         if self.b is not None:
             x = x + self.b
 
-        return x
+        return x.astype(dtype)
 
 
 class LayerNorm(Module):
@@ -217,8 +211,8 @@ class SpectralNorm(Module):
 
     module: Module
     parameter: str
-    u: Buffer
-    v: Buffer
+    u: Buffer[Float[Array, " u"]]
+    v: Buffer[Float[Array, " v"]]
     power_iterations: int
     eps: float
 
@@ -239,45 +233,42 @@ class SpectralNorm(Module):
             raise ValueError(f"{type(module).__name__}.{parameter} must be at least 2D")
         if power_iterations < 1:
             raise ValueError(f"power_iterations ({power_iterations}) must be at least 1")
-        if eps <= 0.0:
-            raise ValueError(f"eps ({eps}) must be greater than 0")
-
-        weight = param.value
-        matrix = weight.reshape(-1, weight.shape[-1]).T
-
-        u = jax.random.normal(key, (matrix.shape[0],), dtype=matrix.dtype)
-        u, v = self._power_iteration(matrix, u, power_iterations, eps)
-
-        self.u = Buffer(u)
-        self.v = Buffer(v)
 
         self.module = module
         self.parameter = parameter
         self.power_iterations = power_iterations
         self.eps = eps
 
-    @staticmethod
-    def _power_iteration(
-        matrix: Array,
-        u: Array,
-        power_iterations: int,
-        eps: float,
-    ) -> tuple[Array, Array]:
+        weight = param.value
+        matrix = weight.reshape(-1, weight.shape[-1]).T
 
-        for _ in range(power_iterations):
-            v = matrix.T @ u
-            v = v / jnp.maximum(jnp.linalg.norm(v), eps)
-            u = matrix @ v
-            u = u / jnp.maximum(jnp.linalg.norm(u), eps)
+        u = jax.random.normal(key, (matrix.shape[0],))
+        u, v = self._power_iteration(matrix, u)
+        for _ in range(1, self.power_iterations):
+            u, v = self._power_iteration(matrix, u)
+
+        self.u = Buffer(u)
+        self.v = Buffer(v)
+
+    def _power_iteration(
+        self,
+        matrix: Float[Array, "u v"],
+        u: Float[Array, " u"],
+    ) -> tuple[Float[Array, " u"], Float[Array, " v"]]:
+
+        v = matrix.T @ u
+        v = v / jnp.maximum(jnp.linalg.norm(v), self.eps)
+        u = matrix @ v
+        u = u / jnp.maximum(jnp.linalg.norm(u), self.eps)
 
         return lax.stop_gradient((u, v))
 
     def __call__(
         self,
-        x: Any,
+        x: Float[Array, "..."],
         *,
         training: bool,
-    ) -> Any:
+    ) -> Float[Array, "..."]:
 
         param = getattr(self.module, self.parameter)
         weight = param.value
@@ -286,16 +277,16 @@ class SpectralNorm(Module):
 
         # Refine the singular vectors only during training
         if training:
-            u, v = self._power_iteration(matrix, u, self.power_iterations, self.eps)
+            for _ in range(self.power_iterations):
+                u, v = self._power_iteration(matrix, u)
             self.u.set(u)
             self.v.set(v)
 
         # Normalize the parameter without modifying the wrapped module
         sigma = u @ matrix @ v
-        sigma = jnp.maximum(sigma, jnp.asarray(self.eps, dtype=sigma.dtype))
-        weight = (weight / sigma).astype(weight.dtype)
+        weight = weight / jnp.maximum(sigma, self.eps)
 
         normalized = Param(weight, trainable=param.trainable)
         normalized_module = getattr(self.module.at, self.parameter).set(normalized)
 
-        return normalized_module(x)
+        return normalized_module(x).astype(x.dtype)

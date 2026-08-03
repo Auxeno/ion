@@ -7,7 +7,7 @@ Parameters
 dim : int
     Size of the feature dimension to normalize.
 eps : float, default=1e-5
-    Constant added to the variance for numerical stability.
+    Positive constant added to the variance for numerical stability.
 bias : bool, default=True
     Whether to learn an elementwise shift.
 

@@ -53,4 +53,6 @@ trainable, no partition is added.
 
 `update` asks optax for parameter deltas, applies them only to trainable
 `Param` leaves, and returns a new model and optimizer. The `Param` wrappers and
-their trainability metadata are preserved.
+their trainability metadata are preserved. Mutable `Buffer` fields are replaced
+by `None` at the optax boundary, so neither optimizer state nor its saved model
+structure contains buffer references.
