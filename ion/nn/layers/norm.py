@@ -84,10 +84,7 @@ class BatchNorm(BufferModule):
 
             new_mean = (1.0 - self.momentum) * running_mean + self.momentum * mean
             new_var = (1.0 - self.momentum) * running_var + self.momentum * var
-            buffers = buffers.set(
-                self,
-                (new_mean.astype(running_mean.dtype), new_var.astype(running_var.dtype)),
-            )
+            buffers = buffers.set(self, (new_mean, new_var))
         else:
             mean = running_mean
             var = running_var
@@ -278,7 +275,7 @@ class SpectralNorm(BufferModule):
             u = matrix @ v
             u = u / jnp.maximum(jnp.linalg.norm(u), self.eps)
 
-        return u, v
+        return jax.lax.stop_gradient((u, v))
 
     def __call__(
         self,
@@ -294,13 +291,13 @@ class SpectralNorm(BufferModule):
 
         # Refine the singular vectors only during training
         if training:
-            u, v = jax.lax.stop_gradient(self._power_iteration(matrix, u, v))
+            u, v = self._power_iteration(matrix, u, v)
             buffers = buffers.set(self, (u, v))
 
         # Call a temporary module with the normalized parameter
         sigma = u @ matrix @ v
         sigma = jnp.maximum(sigma, jnp.asarray(self.eps, dtype=sigma.dtype))
-        weight = weight / sigma
+        weight = (weight / sigma).astype(weight.dtype)
 
         normalized_module = getattr(self.module.at, self.parameter).set(weight)
 

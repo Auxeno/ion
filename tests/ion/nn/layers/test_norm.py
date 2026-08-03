@@ -80,12 +80,13 @@ class TestBatchNorm:
 
     @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
     def test_mixed_precision(self, dtype):
-        """Low-precision inputs retain their dtype and float32 running statistics."""
+        """Running statistics stay float32 without promoting the output."""
         layer = nn.BatchNorm(2).astype(dtype)
         buffers = layer.init_buffers()
-        x = jnp.array([[1.0, 3.0], [2.0, 7.0]], dtype=dtype)
+        x = jnp.array([[1.0, 3.0], [2.0, 7.0], [4.0, 11.0]], dtype=dtype)
         y, buffers = layer(x, buffers, training=True)
         running_mean, running_var = buffers[layer]
+
         assert y.dtype == dtype
         assert running_mean.dtype == jnp.float32
         assert running_var.dtype == jnp.float32
@@ -339,6 +340,25 @@ class TestSpectralNorm:
         layer = nn.SpectralNorm(nn.Linear(4, 5, key=jax.random.key(0)))
         with pytest.raises(ValueError, match=r"init_buffers\(key=key\)"):
             layer.init_buffers()
+
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
+    def test_mixed_precision(self, dtype):
+        """Power iteration follows its buffer dtype without promoting output."""
+        layer = nn.SpectralNorm(nn.Linear(4, 5, key=jax.random.key(0)))
+        low_precision_layer = layer.astype(dtype)
+        buffers = low_precision_layer.init_buffers(key=jax.random.key(1))
+        x = jnp.ones((2, 4), dtype=dtype)
+
+        y, buffers = low_precision_layer(x, buffers, training=True)
+
+        assert y.dtype == dtype
+        assert all(value.dtype == dtype for value in buffers[low_precision_layer])
+
+        buffers = layer.init_buffers(key=jax.random.key(1))
+        y, buffers = low_precision_layer(x, buffers, training=True)
+
+        assert y.dtype == dtype
+        assert all(value.dtype == jnp.float32 for value in buffers[low_precision_layer])
 
     def test_spectral_norm(self):
         """The normalized weight has largest singular value near one."""

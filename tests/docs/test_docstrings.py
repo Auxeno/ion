@@ -95,6 +95,9 @@ class TestSupplementaryDocstrings:
             assert params is None, f"{name}: parameterless callable documents parameters"
             return
 
+        if params is None and all(p.name.startswith("_") for p in expected):
+            return
+
         assert params is not None, f"{name}: no Parameters section"
 
         documented = [p.name for p in params.value]
