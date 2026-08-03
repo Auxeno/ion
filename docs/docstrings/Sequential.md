@@ -1,6 +1,7 @@
-Chains single-argument layers, applying them in order.
+Chain layers and callables, applying them in order.
 
-Each layer's output feeds the next. Layers that accept a `key` (like `Dropout`) receive a freshly split one when a `key` is passed at call time; the rest are called with just their input.
+Each layer's output feeds the next. `training`, `buffers`, and split random keys
+are forwarded to layers that accept them.
 
 Parameters
 ----------
@@ -25,5 +26,5 @@ model = nn.Sequential(
     nn.Linear(hidden_dim, out_dim, key=key_2),
 )
 x = jnp.ones((batch, in_dim))
-y = model(x, key=key_dropout)  # (32, 3) -> (32, 1)
+y = model(x, training=True, key=key_dropout)  # (32, 3) -> (32, 1)
 ```

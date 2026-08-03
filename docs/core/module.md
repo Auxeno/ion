@@ -8,6 +8,7 @@ models work directly with `jax.jit`, `jax.grad`, and `jax.vmap`.
     options:
       members:
         - at
+        - init_buffers
         - freeze
         - unfreeze
         - astype
@@ -30,6 +31,9 @@ model = model.astype(jnp.bfloat16)
 Untouched subtrees are shared with the original model. Changing pytree
 structure or trainability after constructing an optimizer requires a new
 `Optimizer`. See [Sharp edges](../sharp-edges.md).
+
+Stateful layers keep their non-trainable values in a separate
+[`Buffers`](buffers.md) collection rather than mutating module fields.
 
 ## How does it work?
 

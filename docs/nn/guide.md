@@ -2,15 +2,17 @@
 
 For neural network layers and their APIs, see the [NN layer reference](layers/index.md).
 
-Every Ion layer is a function from arrays to arrays and a pytree of parameters.
+Every Ion layer is a pytree of parameters. Stateless layers map arrays to
+arrays, while stateful layers also receive and return a buffer collection.
 This guide covers the two shape contracts those functions use, how layers
 compose into a model, and where state and randomness enter.
 
 - [Feature axes](#feature-axes)
 - [Structured axes](#structured-axes)
-- [Adding leading axes back](#adding-leading-axes-back)
+- [Adding leading axes](#adding-leading-axes)
 - [Inside a layer](#inside-a-layer)
 - [Composing layers](#composing-layers)
+- [Stateful layers](#stateful-layers)
 - [Carrying state](#carrying-state)
 - [Randomness](#randomness)
 - [Training the model](#training-the-model)
@@ -90,6 +92,7 @@ sequence length being attended over.
 | Layer | Input | Fixed axes |
 |---|---|---|
 | `Linear`, `LayerNorm`, `RMSNorm`, `Embedding`, `Dropout` | `(*, d)` | Feature axis only |
+| `BatchNorm` | `(b, ..., d)` | One or more leading reduction axes |
 | `Conv`, `ConvTranspose`, `MaxPool`, `AvgPool` | `(b, *spatial, c)` | Batch, spatial, channels |
 | `GroupNorm` | `(*, *spatial, c)` | Spatial axes per `num_spatial_dims` |
 | `RNN`, `LSTM`, `GRU`, `S4D`, `S5`, `LRU` | `(b, t, d)` | Batch, time, features |
@@ -233,6 +236,50 @@ self.norm(h)     # (8, 64)
 self.head(x)     # (8, 4)
 ```
 
+## Stateful layers
+
+Some layers update non-trainable values during the forward pass. `BatchNorm`
+tracks a running mean and variance, while `SpectralNorm` tracks singular-vector
+estimates. These values live outside the immutable model in a
+[`Buffers`](../core/buffers.md) collection.
+
+Initialize buffers once from the complete model, then keep the collection
+returned by each training call:
+
+```python
+model = nn.Sequential(
+    nn.Linear(3, 64, key=key),
+    nn.BatchNorm(64),
+    jax.nn.relu,
+)
+buffers = model.init_buffers()
+
+y, buffers = model(x, buffers, training=True)
+y, _ = model(x, buffers, training=False)
+```
+
+Pass a key to `init_buffers` when a stateful layer, such as `SpectralNorm`,
+initializes its value randomly:
+
+```python
+buffers = model.init_buffers(key=key)
+```
+
+`Sequential` forwards buffers to the layers that accept them. A custom module
+does the same explicitly:
+
+```python
+def __call__(self, x, buffers, *, training):
+    x = self.linear(x)
+    x, buffers = self.norm(x, buffers, training=training)
+    return self.head(x), buffers
+```
+
+Buffers are JAX pytrees, so they can be carried through `jax.jit` and
+`jax.lax.scan`. They stay outside differentiation and the optimizer. See
+[Stateful training](../workflows.md#stateful-training) for a complete update
+step.
+
 ## Carrying state
 
 `LSTM` returns its final state alongside the outputs. Passing that state back in
@@ -242,6 +289,9 @@ continues the sequence, which is how a long sequence is processed in chunks:
 outputs_1, state = lstm(chunk_1)
 outputs_2, state = lstm(chunk_2, state)
 ```
+
+This recurrent state belongs to one input sequence. Buffers instead belong to
+the model and usually persist across training batches.
 
 Sequence layers run the scan internally. To control the recurrence directly, use
 the cell that each one wraps. Cells take a single timestep and follow the
@@ -285,7 +335,8 @@ model = nn.MLP([3, 64, 1], key=key)
 
 ```python
 dropout = nn.Dropout(0.1)
-y = dropout(x, key=key)
+y = dropout(x, training=True, key=key)
+y = dropout(x, training=False)
 ```
 
 Ion holds no global RNG and no hidden counter. Any key reaching a layer was
@@ -295,22 +346,21 @@ that accepts a `key` argument:
 
 ```python
 model = nn.Sequential(nn.Linear(3, 64, key=keys[0]), nn.Dropout(0.1))
-y = model(x, key=key)
+y = model(x, training=True, key=key)
 ```
 
 There is no `model.train()` or `model.eval()`. Modules are immutable, so
-evaluation uses a second model with dropout disabled, derived from the trained
-one:
+training mode is passed explicitly to layers that behave differently during
+training and evaluation:
 
 ```python
-eval_model = model.at[nn.Dropout].deterministic.set(True)
-y = eval_model(x)
+y = model(x, training=True, key=key)
+y = model(x, training=False)
 ```
 
-`at` returns a new model with every matching layer updated and leaves the
-original unchanged. In deterministic mode `Dropout` is the identity and needs no
-key. See [Inspecting models](../workflows.md#inspecting-models) for the rest of
-what `at` can reach.
+Evaluation makes `Dropout` the identity and makes stateful layers read buffers
+without updating them. It needs no call-time random key unless another layer
+uses one during evaluation.
 
 ## Training the model
 
@@ -340,6 +390,8 @@ def train_step(model, optimizer, ids, labels):
 The whole step compiles because the model is a pytree: JAX flattens it into
 arrays on the way in and rebuilds it on the way out. Ion adds no training loop,
 data loader, or callbacks, so iterating over batches is ordinary Python.
+Models with stateful layers also carry their buffers through the loss; see
+[Stateful training](../workflows.md#stateful-training).
 
 ## Array conventions
 
@@ -350,7 +402,8 @@ data loader, or callbacks, so iterating over batches is ordinary Python.
 | Images | Channels-last, `(b, h, w, c)` |
 | Sequences | Time or sequence second, `(b, t, d)` |
 | Batching | Explicit in the array, or added with `jax.vmap` |
-| Keys | Keyword-only, at construction for parameters and per call for dropout |
+| Keys | Keyword-only, used for parameter and buffer initialization and stochastic calls |
+| Training mode | Explicit on layers that differ between training and evaluation |
 | Dtypes | No `dtype` argument on layers, cast with `model.astype(...)` |
 
 Casting a whole model is covered in

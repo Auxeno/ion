@@ -3,6 +3,7 @@
 Common workflows that apply across models and layer families:
 
 - [Checkpointing](#checkpointing)
+- [Stateful training](#stateful-training)
 - [Mixed precision](#mixed-precision)
 - [Freezing](#freezing)
 - [Inspecting models](#inspecting-models)
@@ -21,6 +22,19 @@ Save the model and optimizer together to resume training:
 ```python
 ion.save("checkpoint.ion", (model, optimizer))
 model, optimizer = ion.load("checkpoint.ion", (model, optimizer))
+```
+
+Include buffers when checkpointing a stateful model:
+
+```python
+ion.save("checkpoint.ion", (model, buffers, optimizer))
+
+reference = MyModel(key=jax.random.key(0))
+reference_buffers = reference.init_buffers(key=jax.random.key(1))
+reference_optimizer = ion.Optimizer(optax.adam(1e-3), reference)
+model, buffers, optimizer = ion.load(
+    "checkpoint.ion", (reference, reference_buffers, reference_optimizer)
+)
 ```
 
 `load` takes a reference pytree that supplies the structure and non-array
@@ -44,6 +58,47 @@ edges](sharp-edges.md) for how static configuration is handled.
     options:
       heading_level: 3
 
+## Stateful training
+
+Stateful layers return updated [`Buffers`](core/buffers.md) alongside their
+output. Carry those buffers through the loss as auxiliary data so gradients are
+still taken only with respect to the model:
+
+```python
+key_linear, key_output = jax.random.split(key)
+model = nn.Sequential(
+    nn.Linear(4, 16, key=key_linear),
+    nn.BatchNorm(16),
+    jax.nn.relu,
+    nn.Dropout(0.1),
+    nn.Linear(16, 3, key=key_output),
+)
+buffers = model.init_buffers()
+optimizer = ion.Optimizer(optax.adam(1e-3), model)
+
+def loss_fn(model, buffers, x, labels, key):
+    logits, buffers = model(x, buffers, training=True, key=key)
+    loss = optax.softmax_cross_entropy_with_integer_labels(logits, labels).mean()
+    return loss, buffers
+
+@jax.jit
+def train_step(model, buffers, optimizer, x, labels, key):
+    (loss, buffers), grads = jax.value_and_grad(loss_fn, has_aux=True)(
+        model, buffers, x, labels, key
+    )
+    model, optimizer = optimizer.update(model, grads)
+    return model, buffers, optimizer, loss
+```
+
+Evaluation uses the latest buffers without replacing them:
+
+```python
+logits, _ = model(x, buffers, training=False)
+```
+
+Buffers are pytrees with a fixed structure, so passing updated values through a
+compiled step does not itself cause recompilation.
+
 ## Mixed precision
 
 Layer constructors use JAX's default floating dtype and do not take a `dtype`
@@ -61,6 +116,10 @@ def loss_fn(model, x, y):
 The cast is differentiable, so gradients return in float32 to match the master
 parameters and optimizer state. Only the forward and backward computation uses
 bfloat16.
+
+Stateful layers choose their buffer precision independently. Numerically
+sensitive values can remain in float32 without promoting the layer output, so
+buffers do not need to be cast alongside the model.
 
 For low-precision inference, cast the model once:
 
@@ -170,11 +229,11 @@ MLP(
 
 In IPython and Jupyter, [Treescope](https://github.com/google-deepmind/treescope)
 renders the same tree interactively, with collapsible nodes and array
-visualizations. It is enabled on import and covers Ion modules, params, and JAX
-arrays:
+visualizations. It is enabled on import and covers Ion modules, params, buffers,
+and JAX arrays:
 
 ```python
-ion.enable_treescope()                 # Ion modules, params, and arrays (default)
+ion.enable_treescope()                 # Ion types and arrays (default)
 ion.enable_treescope(everything=True)  # every type treescope supports
 ion.disable_treescope()                # fall back to plain text
 ```

@@ -11,7 +11,7 @@ transformations.
 | [Linear](linear.md) | `Linear` |
 | [Convolution](conv.md) | `Conv`, `ConvTranspose` |
 | [Attention](attention.md) | `SelfAttention`, `CrossAttention` |
-| [Normalization](norm.md) | `LayerNorm`, `RMSNorm`, `GroupNorm` |
+| [Normalization](norm.md) | `BatchNorm`, `LayerNorm`, `RMSNorm`, `GroupNorm`, `SpectralNorm` |
 | [Recurrent](recurrent.md) | `RNN`, `LSTM`, `GRU` and their cells |
 | [State Space](ssm.md) | `S4D`, `S5`, `LRU` and their cells |
 | [Embedding](embedding.md) | `Embedding` |

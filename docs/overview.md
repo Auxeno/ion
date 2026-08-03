@@ -1,6 +1,7 @@
 # Overview
 
-Ion introduces three core abstractions for building and training neutral networks in JAX. Its neural and graph network layers are built on top of them.
+Ion introduces three core concepts for building and training neural networks in
+JAX. Its neural and graph network layers are built on top of them.
 
 ## Quickstart
 
@@ -41,13 +42,18 @@ def train_step(model, optimizer, x, y):
 model, optimizer = train_step(model, optimizer, x, y)
 ```
 
-The loss takes the model first so `jax.grad` differentiates with respect to it, and the whole step compiles with `jax.jit`. The sections below introduce the three core abstractions, network layers and common workflows.
+The loss takes the model first so `jax.grad` differentiates with respect to it,
+and the whole step compiles with `jax.jit`. The sections below introduce the
+three core concepts, network layers, and common workflows.
 
 ## The core
 
+- [**Module**](core/module.md) is the base class for models and layers. A model
+  is an immutable [pytree](https://docs.jax.dev/en/latest/pytrees.html).
 - [**Param**](core/param.md) wraps a JAX array and marks it trainable or frozen.
-- [**Module**](core/module.md) is the base class for models and layers. A model is an immutable [pytree](https://docs.jax.dev/en/latest/pytrees.html): params and submodules at the leaves, everything else in the structure.
-- [**Optimizer**](core/optimizer.md) wraps any [optax](https://github.com/google-deepmind/optax) transform and updates a model, automatically partitioning out non-trainable parameters.
+- [**Optimizer**](core/optimizer.md) wraps any
+  [optax](https://github.com/google-deepmind/optax) transform and updates a
+  model, automatically partitioning out non-trainable parameters.
 
 The whole core is under a thousand lines of code, small enough to read in an afternoon.
 
@@ -105,7 +111,7 @@ Each [`ion.nn`](nn/layers/index.md) layer is a `Module`, constructed with a `key
 | [Linear](nn/layers/linear.md) | `Linear` |
 | [Convolution](nn/layers/conv.md) | `Conv`, `ConvTranspose` |
 | [Attention](nn/layers/attention.md) | `SelfAttention`, `CrossAttention` |
-| [Normalization](nn/layers/norm.md) | `LayerNorm`, `RMSNorm`, `GroupNorm` |
+| [Normalization](nn/layers/norm.md) | `BatchNorm`, `LayerNorm`, `RMSNorm`, `GroupNorm`, `SpectralNorm` |
 | [Recurrent](nn/layers/recurrent.md) | `RNN`, `LSTM`, `GRU` |
 | [State Space](nn/layers/ssm.md) | `S4D`, `S5`, `LRU` |
 | [Embedding](nn/layers/embedding.md) | `Embedding` |
@@ -129,6 +135,24 @@ y = attn(jnp.ones((32, 16, 64)))
 The [NN guide](nn/guide.md) builds and trains a model and collects the shared
 array conventions. The [layer reference](nn/layers/index.md) lists the
 available families.
+
+## Stateful layers
+
+Some layers, such as `BatchNorm`, update non-trainable values like running
+statistics during forward passes. To keep models immutable, Ion stores this
+state in a separate [`Buffers`](core/buffers.md) collection that is updated and
+passed between calls.
+
+```python
+import jax.numpy as jnp
+
+from ion import nn
+
+model = nn.BatchNorm(64)
+buffers = model.init_buffers()
+x = jnp.ones((8, 64))
+y, buffers = model(x, buffers, training=True)
+```
 
 ## Graph neural network layers
 

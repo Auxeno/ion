@@ -4,7 +4,10 @@ Known gotchas when using Ion. Some are JAX limitations, others follow from Ion's
 
 ## What Ion leaves out
 
-Some things are left out deliberately. There is no BatchNorm (mutable running statistics conflict with immutable models), no custom transforms, and no training loop abstractions. Ion defines and trains models; JAX does everything else.
+Some things are left out deliberately. There is no hidden mutable module state,
+no custom transforms, and no training loop abstraction. Stateful layers such as
+`BatchNorm` use explicit buffer collections. Ion defines and trains models; JAX
+does everything else.
 
 ## Python scalars are compile-time constants
 
@@ -19,6 +22,21 @@ self.temperature = jnp.array(0.5)
 ```
 
 Every distinct set of static values compiles a separate trace, so changing one triggers recompilation. `Param.trainable` is static too: set trainability once, before training. Calling `freeze()`/`unfreeze()` inside a training loop recompiles every step.
+
+## Buffers belong to their model
+
+Call `model.init_buffers()` once and keep the collection returned by each
+training call. Initializing buffers every step resets state such as BatchNorm
+running statistics.
+
+Buffers are associated with the `BufferModule` instances that created them.
+Parameter updates, `model.at` edits within an existing layer, and JAX
+transformations preserve this identity. Replacing a stateful layer creates a new
+identity, so initialize buffers again for the changed model.
+
+Buffer pytree structure, leaf shapes, and leaf dtypes cannot change after
+initialization. This keeps the structure stable under `jax.jit`; incompatible
+updates raise an error at `buffers.set(...)`.
 
 ## Pytrees cannot share references
 
