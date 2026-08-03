@@ -178,10 +178,10 @@ class S4DCell(Module):
         if state_dim < 2 or state_dim % 2 != 0:
             raise ValueError(f"state_dim ({state_dim}) must be a positive even number")
 
-        key_c, key_d, key_dt = jax.random.split(key, 3)
-
         # Halve for conjugate pairs
         h = state_dim // 2
+
+        key_c, key_d, key_dt = jax.random.split(key, 3)
 
         # Eigenvalues at harmonics (-1/2 + i*pi*n) so each state captures a different frequency
         self.A_log_re = Param(jnp.full((in_dim, h), jnp.log(0.5)))
@@ -302,10 +302,10 @@ class S5Cell(Module):
         if state_dim < 2 or state_dim % 2 != 0:
             raise ValueError(f"state_dim ({state_dim}) must be a positive even number")
 
-        key_b, key_c, key_d, key_dt = jax.random.split(key, 4)
-
         # Halve for conjugate pairs
         h = state_dim // 2
+
+        key_b, key_c, key_d, key_dt = jax.random.split(key, 4)
 
         # Eigenvalues at harmonics (-1/2 + i*pi*n) so each state captures a different frequency
         self.A_log_re = Param(jnp.full(h, jnp.log(0.5)))

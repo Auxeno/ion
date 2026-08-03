@@ -41,15 +41,15 @@ class LoRALinear(Module):
         key: PRNGKeyArray,
     ) -> None:
 
-        self.linear = freeze(linear)
-
-        key_a, key_b = jax.random.split(key)
         in_dim, out_dim = linear.w.shape
-        self.a = Param(a_init(shape=(in_dim, rank), key=key_a))
-        self.b = Param(b_init(shape=(rank, out_dim), key=key_b))
 
+        self.linear = freeze(linear)
         self.alpha = float(rank) if alpha is None else float(alpha)
         self.rank = rank
+
+        key_a, key_b = jax.random.split(key)
+        self.a = Param(a_init(shape=(in_dim, rank), key=key_a))
+        self.b = Param(b_init(shape=(rank, out_dim), key=key_b))
 
     def __call__(self, x: Float[Array, "... i"]) -> Float[Array, "... o"]:
 

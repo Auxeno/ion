@@ -59,19 +59,19 @@ class SelfAttention(Module):
                 f"num_heads ({num_heads}) must be divisible by num_kv_heads ({num_kv_heads})"
             )
 
-        key_q, key_k, key_v, key_out, key_b = jax.random.split(key, 5)
         head_dim = dim // num_heads
-
-        self.w_q = Param(w_init(shape=(dim, num_heads * head_dim), key=key_q))
-        self.w_k = Param(w_init(shape=(dim, num_kv_heads * head_dim), key=key_k))
-        self.w_v = Param(w_init(shape=(dim, num_kv_heads * head_dim), key=key_v))
-        self.w_out = Param(w_init(shape=(num_heads * head_dim, dim), key=key_out))
-        self.b_out = Param(b_init(shape=(dim,), key=key_b)) if bias else None
 
         self.num_heads = num_heads
         self.num_kv_heads = num_kv_heads
         self.causal = causal
         self.window = window
+
+        key_q, key_k, key_v, key_out, key_b = jax.random.split(key, 5)
+        self.w_q = Param(w_init(shape=(dim, num_heads * head_dim), key=key_q))
+        self.w_k = Param(w_init(shape=(dim, num_kv_heads * head_dim), key=key_k))
+        self.w_v = Param(w_init(shape=(dim, num_kv_heads * head_dim), key=key_v))
+        self.w_out = Param(w_init(shape=(num_heads * head_dim, dim), key=key_out))
+        self.b_out = Param(b_init(shape=(dim,), key=key_b)) if bias else None
 
     def __call__(
         self,
@@ -132,16 +132,16 @@ class CrossAttention(Module):
         if dim % num_heads != 0:
             raise ValueError(f"dim ({dim}) must be divisible by num_heads ({num_heads})")
 
-        key_q, key_k, key_v, key_out, key_b = jax.random.split(key, 5)
         head_dim = dim // num_heads
 
+        self.num_heads = num_heads
+
+        key_q, key_k, key_v, key_out, key_b = jax.random.split(key, 5)
         self.w_q = Param(w_init(shape=(dim, num_heads * head_dim), key=key_q))
         self.w_k = Param(w_init(shape=(context_dim, num_heads * head_dim), key=key_k))
         self.w_v = Param(w_init(shape=(context_dim, num_heads * head_dim), key=key_v))
         self.w_out = Param(w_init(shape=(num_heads * head_dim, dim), key=key_out))
         self.b_out = Param(b_init(shape=(dim,), key=key_b)) if bias else None
-
-        self.num_heads = num_heads
 
     def __call__(
         self,

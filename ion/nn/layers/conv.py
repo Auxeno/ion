@@ -61,18 +61,21 @@ class Conv(Module):
             )
 
         num_spatial = len(kernel_shape)
-
-        self.kernel_shape = kernel_shape
-        self.stride = (stride,) * num_spatial if isinstance(stride, int) else stride
-        self.dilation = (dilation,) * num_spatial if isinstance(dilation, int) else dilation
-        self.groups = groups
+        stride = (stride,) * num_spatial if isinstance(stride, int) else stride
+        dilation = (dilation,) * num_spatial if isinstance(dilation, int) else dilation
 
         if isinstance(padding, str):
-            self.padding = padding
+            resolved_padding = padding
         elif isinstance(padding, int):
-            self.padding = tuple((padding, padding) for _ in range(num_spatial))
+            resolved_padding = tuple((padding, padding) for _ in range(num_spatial))
         else:
-            self.padding = tuple((p, p) for p in padding)
+            resolved_padding = tuple((p, p) for p in padding)
+
+        self.kernel_shape = kernel_shape
+        self.stride = stride
+        self.padding = resolved_padding
+        self.dilation = dilation
+        self.groups = groups
 
         key_w, key_b = jax.random.split(key)
         self.w = Param(
@@ -158,11 +161,6 @@ class ConvTranspose(Module):
                     f"output_padding ({output_padding}) must be less than stride ({stride})"
                 )
 
-        self.kernel_shape = kernel_shape
-        self.stride = stride
-        self.dilation = dilation
-        self.groups = groups
-
         # Compute transposed padding
         if isinstance(padding, str):
             if padding == "VALID":
@@ -181,9 +179,15 @@ class ConvTranspose(Module):
             p0 = p1 = tuple(padding)
 
         dk = tuple(d * (k - 1) for k, d in zip(kernel_shape, dilation))
-        self.padding = tuple(
+        resolved_padding = tuple(
             (dk_i - a, dk_i - b + op) for dk_i, a, b, op in zip(dk, p0, p1, output_padding)
         )
+
+        self.kernel_shape = kernel_shape
+        self.stride = stride
+        self.padding = resolved_padding
+        self.dilation = dilation
+        self.groups = groups
 
         key_w, key_b = jax.random.split(key)
         self.w = Param(

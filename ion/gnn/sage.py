@@ -51,13 +51,13 @@ class SAGEConv(Module):
 
         aggregate = {"mean": segment_mean, "max": segment_max, "sum": segment_sum}[aggregator]
 
+        self.aggregate = aggregate
+        self.normalize = normalize
+
         key_neigh, key_self, key_b = jax.random.split(key, 3)
         self.w_neigh = Param(w_init(shape=(in_dim, out_dim), key=key_neigh))
         self.w_self = Param(w_init(shape=(in_dim, out_dim), key=key_self)) if root_weight else None
         self.b = Param(b_init(shape=(out_dim,), key=key_b)) if bias else None
-
-        self.aggregate = aggregate
-        self.normalize = normalize
 
     def __call__(
         self,

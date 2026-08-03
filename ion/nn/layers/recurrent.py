@@ -141,8 +141,9 @@ class LSTMCell(Module):
         key: PRNGKeyArray,
     ) -> None:
 
-        key_wi, key_wh, key_b = jax.random.split(key, 3)
         gate_dim = 4 * hidden_dim
+
+        key_wi, key_wh, key_b = jax.random.split(key, 3)
         self.w_i = Param(w_i_init(shape=(in_dim, gate_dim), key=key_wi))
         self.w_h = Param(w_h_init(shape=(hidden_dim, gate_dim), key=key_wh))
         if bias:
@@ -256,8 +257,9 @@ class GRUCell(Module):
         key: PRNGKeyArray,
     ) -> None:
 
-        key_wi, key_wh, key_b, key_bh = jax.random.split(key, 4)
         gate_dim = 3 * hidden_dim
+
+        key_wi, key_wh, key_b, key_bh = jax.random.split(key, 4)
         self.w_i = Param(w_i_init(shape=(in_dim, gate_dim), key=key_wi))
         self.w_h = Param(w_h_init(shape=(hidden_dim, gate_dim), key=key_wh))
         self.b = Param(b_init(shape=(gate_dim,), key=key_b)) if bias else None

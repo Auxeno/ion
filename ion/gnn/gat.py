@@ -56,9 +56,13 @@ class GATConv(Module):
         if out_dim % num_heads != 0:
             raise ValueError(f"out_dim ({out_dim}) must be divisible by num_heads ({num_heads})")
 
-        key_w, key_att_s, key_att_r, key_b, key_w_e, key_att_e = jax.random.split(key, 6)
         head_dim = out_dim // num_heads
 
+        self.num_heads = num_heads
+        self.negative_slope = negative_slope
+        self.edge_dim = edge_dim
+
+        key_w, key_att_s, key_att_r, key_b, key_w_e, key_att_e = jax.random.split(key, 6)
         self.w = Param(w_init(shape=(in_dim, out_dim), key=key_w))
         self.att_sender = Param(att_init(shape=(num_heads, head_dim), key=key_att_s))
         self.att_receiver = Param(att_init(shape=(num_heads, head_dim), key=key_att_r))
@@ -70,10 +74,6 @@ class GATConv(Module):
         else:
             self.w_edge = None
             self.att_edge = None
-
-        self.num_heads = num_heads
-        self.negative_slope = negative_slope
-        self.edge_dim = edge_dim
 
     def __call__(
         self,
@@ -167,9 +167,13 @@ class GATv2Conv(Module):
         if out_dim % num_heads != 0:
             raise ValueError(f"out_dim ({out_dim}) must be divisible by num_heads ({num_heads})")
 
-        key_w_s, key_w_r, key_att, key_b, key_w_e = jax.random.split(key, 5)
         head_dim = out_dim // num_heads
 
+        self.num_heads = num_heads
+        self.negative_slope = negative_slope
+        self.edge_dim = edge_dim
+
+        key_w_s, key_w_r, key_att, key_b, key_w_e = jax.random.split(key, 5)
         self.w_sender = Param(w_init(shape=(in_dim, out_dim), key=key_w_s))
         self.w_receiver = Param(w_init(shape=(in_dim, out_dim), key=key_w_r))
         self.att = Param(att_init(shape=(num_heads, head_dim), key=key_att))
@@ -179,10 +183,6 @@ class GATv2Conv(Module):
             self.w_edge = Param(w_init(shape=(edge_dim, out_dim), key=key_w_e))
         else:
             self.w_edge = None
-
-        self.num_heads = num_heads
-        self.negative_slope = negative_slope
-        self.edge_dim = edge_dim
 
     def __call__(
         self,

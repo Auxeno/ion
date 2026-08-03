@@ -39,31 +39,31 @@ class MaxPool(Module):
         if len(kernel_shape) < 1:
             raise ValueError("kernel_shape must have at least one element")
 
-        self.kernel_shape = kernel_shape
-
         num_spatial = len(kernel_shape)
 
         if stride is None:
-            self.stride = self.kernel_shape
+            stride = kernel_shape
         elif isinstance(stride, int):
-            self.stride = (stride,) * num_spatial
-        else:
-            self.stride = stride
+            stride = (stride,) * num_spatial
 
         if isinstance(padding, str):
-            self.padding = padding
+            resolved_padding = padding
         elif isinstance(padding, int):
-            self.padding = tuple((padding, padding) for _ in range(num_spatial))
+            resolved_padding = tuple((padding, padding) for _ in range(num_spatial))
         else:
-            self.padding = tuple((p, p) for p in padding)
+            resolved_padding = tuple((p, p) for p in padding)
 
         # A window landing entirely in padding has no real elements to reduce over
-        if not isinstance(self.padding, str) and any(
-            lo >= k or hi >= k for (lo, hi), k in zip(self.padding, self.kernel_shape)
+        if not isinstance(resolved_padding, str) and any(
+            lo >= k or hi >= k for (lo, hi), k in zip(resolved_padding, kernel_shape)
         ):
             raise ValueError(
-                f"padding ({self.padding}) must be smaller than kernel_shape ({self.kernel_shape})"
+                f"padding ({resolved_padding}) must be smaller than kernel_shape ({kernel_shape})"
             )
+
+        self.kernel_shape = kernel_shape
+        self.stride = stride
+        self.padding = resolved_padding
 
     def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
 
@@ -104,32 +104,32 @@ class AvgPool(Module):
         if len(kernel_shape) < 1:
             raise ValueError("kernel_shape must have at least one element")
 
-        self.kernel_shape = kernel_shape
-        self.count_include_pad = count_include_pad
-
         num_spatial = len(kernel_shape)
 
         if stride is None:
-            self.stride = self.kernel_shape
+            stride = kernel_shape
         elif isinstance(stride, int):
-            self.stride = (stride,) * num_spatial
-        else:
-            self.stride = stride
+            stride = (stride,) * num_spatial
 
         if isinstance(padding, str):
-            self.padding = padding
+            resolved_padding = padding
         elif isinstance(padding, int):
-            self.padding = tuple((padding, padding) for _ in range(num_spatial))
+            resolved_padding = tuple((padding, padding) for _ in range(num_spatial))
         else:
-            self.padding = tuple((p, p) for p in padding)
+            resolved_padding = tuple((p, p) for p in padding)
 
         # A window landing entirely in padding has no real elements to reduce over
-        if not isinstance(self.padding, str) and any(
-            lo >= k or hi >= k for (lo, hi), k in zip(self.padding, self.kernel_shape)
+        if not isinstance(resolved_padding, str) and any(
+            lo >= k or hi >= k for (lo, hi), k in zip(resolved_padding, kernel_shape)
         ):
             raise ValueError(
-                f"padding ({self.padding}) must be smaller than kernel_shape ({self.kernel_shape})"
+                f"padding ({resolved_padding}) must be smaller than kernel_shape ({kernel_shape})"
             )
+
+        self.kernel_shape = kernel_shape
+        self.stride = stride
+        self.padding = resolved_padding
+        self.count_include_pad = count_include_pad
 
     def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
 

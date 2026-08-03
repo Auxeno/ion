@@ -59,6 +59,10 @@ class TransformerConv(Module):
         if beta and not root_weight:
             raise ValueError("beta=True requires root_weight=True")
 
+        self.num_heads = num_heads
+        self.edge_dim = edge_dim
+        self.beta = beta
+
         key_q, key_k, key_v, key_root, key_edge, key_beta, key_b = jax.random.split(key, 7)
 
         # Keep projection parameters flat; head axes exist only in activations
@@ -73,10 +77,6 @@ class TransformerConv(Module):
         )
         self.w_beta = Param(w_init(shape=(3 * out_dim, 1), key=key_beta)) if beta else None
         self.b_out = Param(b_init(shape=(out_dim,), key=key_b)) if bias else None
-
-        self.num_heads = num_heads
-        self.edge_dim = edge_dim
-        self.beta = beta
 
     def __call__(
         self,
