@@ -89,13 +89,12 @@ class TestSaveLoad:
             def __init__(self):
                 self.norm = nn.BatchNorm(2)
 
-        buffers = Model().init_buffers()
         with tempfile.NamedTemporaryFile(suffix=".ion") as f:
-            checkpoint.save(f.name, buffers)
+            checkpoint.save(f.name, Model())
             header = read_header(f.name)
 
         array_keys = sorted(k for k in header if k != "__metadata__")
-        assert array_keys == ["norm[0]", "norm[1]"]
+        assert array_keys == ["norm.b", "norm.running_mean", "norm.running_var", "norm.scale"]
 
     def test_field_reorder_loads_correctly(self):
         """Reordering fields in the reference model still loads correctly."""

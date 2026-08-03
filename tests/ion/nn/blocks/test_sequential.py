@@ -128,17 +128,17 @@ class TestSequential:
         with pytest.raises(TypeError, match="callable"):
             nn.Sequential(42)  # type: ignore[arg-type]
 
-    def test_buffers_forwarded(self):
-        """Buffers are forwarded and returned after stateful layers update them."""
-        model = nn.Sequential(nn.BatchNorm(4), jax.nn.relu)
-        buffers = model.init_buffers()
+    def test_stateful_layer_updates_in_place(self):
+        """A contained stateful layer updates its buffers and returns one value."""
+        norm = nn.BatchNorm(4)
+        model = nn.Sequential(norm, jax.nn.relu)
         x = jnp.arange(12, dtype=jnp.float32).reshape(3, 4)
-        y, updated = model(x, buffers, training=True)
+        y = model(x, training=True)
         assert y.shape == x.shape
-        assert updated is not buffers
+        assert not jnp.array_equal(norm.running_mean.value, jnp.zeros(4))
 
     def test_mixed_layer_routing(self):
-        """Buffers, mode, and keys route through mixed layer types."""
+        """Mode and keys route through mixed layer types."""
         key = jax.random.key(0)
         model = nn.Sequential(
             nn.BatchNorm(4),
@@ -146,37 +146,19 @@ class TestSequential:
             nn.Dropout(0.2),
             nn.Linear(4, 2, key=key),
         )
-        buffers = model.init_buffers()
         x = jnp.arange(12, dtype=jnp.float32).reshape(3, 4)
-        y, buffers = model(x, buffers, training=True, key=jax.random.key(1))
+        y = model(x, training=True, key=jax.random.key(1))
         assert y.shape == (3, 2)
-        evaluated, same_buffers = model(x, buffers, training=False)
+        evaluated = model(x, training=False)
         assert evaluated.shape == (3, 2)
-        assert same_buffers is buffers
-
-    def test_stateful_layer_requires_buffers(self):
-        """A contained stateful layer requires initialized buffers."""
-        model = nn.Sequential(nn.BatchNorm(4))
-        with pytest.raises(ValueError, match=r"model.init_buffers\(\)"):
-            model(jnp.ones((2, 4)), training=True)
-
-    def test_explicit_buffers_returns_pair(self):
-        """Passing buffers makes a stateless sequence return an output-buffer pair."""
-        model = nn.Sequential(jax.nn.relu)
-        buffers = model.init_buffers()
-        x = jnp.array([-1.0, 2.0])
-        y, returned = model(x, buffers)
-        npt.assert_array_equal(y, jnp.array([0.0, 2.0]))
-        assert returned is buffers
 
     def test_jit_training_and_evaluation(self):
         """Mixed stateful and stochastic layers work under jax.jit."""
         model = nn.Sequential(nn.BatchNorm(4), nn.Dropout(0.2))
-        buffers = model.init_buffers()
         x = jnp.arange(12, dtype=jnp.float32).reshape(3, 4)
 
-        train = jax.jit(lambda x, b, k: model(x, b, training=True, key=k))
-        evaluate = jax.jit(lambda x, b: model(x, b, training=False))
-        y, buffers = train(x, buffers, jax.random.key(0))
-        eval_y, _ = evaluate(x, buffers)
+        train = jax.jit(lambda x, k: model(x, training=True, key=k))
+        evaluate = jax.jit(lambda x: model(x, training=False))
+        y = train(x, jax.random.key(0))
+        eval_y = evaluate(x)
         assert y.shape == eval_y.shape == x.shape

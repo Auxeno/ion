@@ -22,8 +22,9 @@ import ml_dtypes
 import numpy as np
 from jaxtyping import PyTree
 
+from .nn.buffer import Buffer
 from .nn.param import Param
-from .tree import is_param
+from .tree import _is_param_or_buffer
 
 _FORMAT_VERSION = 2
 _MAX_HEADER_BYTES = 100_000_000
@@ -61,13 +62,14 @@ def save(path: str, pytree: PyTree) -> None:
     path : str
         Destination file path (`.ion` appended if missing).
     pytree : PyTree
-        Pytree to serialize. Only array leaves and `Param` trainable flags are written.
+        Pytree to serialize. Only array leaves, `Buffer` values, and `Param` trainable
+        flags are written.
 
     Examples
     --------
     >>> ion.checkpoint.save("model.ion", model)
     """
-    leaves_with_paths = jax.tree.flatten_with_path(pytree, is_leaf=is_param)[0]
+    leaves_with_paths = jax.tree.flatten_with_path(pytree, is_leaf=_is_param_or_buffer)[0]
 
     # Collect array leaves and Param trainable flags, keyed by tree path
     arrays: dict[str, np.ndarray] = {}
@@ -77,6 +79,8 @@ def save(path: str, pytree: PyTree) -> None:
         if isinstance(leaf, Param):
             arrays[key] = np.asarray(leaf._value)
             trainable_flags[key] = leaf.trainable
+        elif isinstance(leaf, Buffer):
+            arrays[key] = np.asarray(leaf.value)
         elif isinstance(leaf, (jax.Array, np.ndarray)):
             arrays[key] = np.asarray(leaf)
 
@@ -123,11 +127,17 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
     PyTree
         Pytree with arrays and `Param` trainable flags restored from file.
 
+    Notes
+    -----
+    `Buffer`s in the returned pytree are new, so the reference keeps its own state.
+
     Examples
     --------
     >>> model = ion.checkpoint.load("model.ion", model)
     """
-    leaves_with_paths, tree_def = jax.tree.flatten_with_path(reference_pytree, is_leaf=is_param)
+    leaves_with_paths, tree_def = jax.tree.flatten_with_path(
+        reference_pytree, is_leaf=_is_param_or_buffer
+    )
 
     # Parse the 8-byte length prefix and JSON header
     if not path.endswith(".ion"):
@@ -166,11 +176,16 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
     expected_keys: set[str] = set()
     loaded_leaves: list[Any] = []
     for key_path, leaf in leaves_with_paths:
-        if not isinstance(leaf, (Param, jax.Array, np.ndarray)):
+        if not isinstance(leaf, (Param, Buffer, jax.Array, np.ndarray)):
             loaded_leaves.append(leaf)
             continue
         key = _path_key(key_path)
-        ref = leaf._value if isinstance(leaf, Param) else leaf
+        if isinstance(leaf, Param):
+            ref = leaf._value
+        elif isinstance(leaf, Buffer):
+            ref = leaf.value
+        else:
+            ref = leaf
         expected_keys.add(key)
         if key not in header:
             raise ValueError(f"Structure mismatch: reference key '{key}' not found in file")
@@ -188,6 +203,8 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
         if isinstance(leaf, Param):
             trainable = trainable_flags.get(key, leaf.trainable)
             loaded_leaves.append(Param(jnp.array(arr), trainable=trainable))
+        elif isinstance(leaf, Buffer):
+            loaded_leaves.append(Buffer(jnp.array(arr)))
         else:
             loaded_leaves.append(jnp.array(arr))
 

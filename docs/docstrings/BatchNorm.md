@@ -1,8 +1,8 @@
 Batch normalization ([Ioffe & Szegedy, 2015](https://arxiv.org/abs/1502.03167)).
 
 Normalizes each feature over all preceding dimensions. Training updates the
-running mean and variance; evaluation uses them. These statistics are buffer
-values, not trainable parameters.
+running mean and variance; evaluation uses them. These statistics are buffers,
+not trainable parameters.
 
 Parameters
 ----------
@@ -21,17 +21,20 @@ scale : Param
     Scale of shape `(dim,)`.
 b : Param | None
     Bias of shape `(dim,)`, or `None` when disabled.
+running_mean : Buffer
+    Running mean of shape `(dim,)`.
+running_var : Buffer
+    Running variance of shape `(dim,)`.
 
 Example
 -------
 ```python
 batch, dim = 8, 64
 norm = nn.BatchNorm(dim)
-buffers = norm.init_buffers()
 
 x = jnp.ones((batch, dim))
-y, buffers = norm(x, buffers, training=True)  # (8, 64) -> (8, 64), buffers updated
-y, _ = norm(x, buffers, training=False)  # (8, 64), running statistics
+y = norm(x, training=True)  # (8, 64) -> (8, 64), running statistics updated
+y = norm(x, training=False)  # (8, 64), running statistics
 ```
 
 Note

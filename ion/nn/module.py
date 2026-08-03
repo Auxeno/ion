@@ -5,26 +5,22 @@ Classes:
 
 Subclassing `Module` gives you: dataclass conversion, pytree registration,
 and immutability after `__init__`. No manual boilerplate needed.
-
-See docs/internals.md for implementation details.
 """
 
 import dataclasses
 import functools
 import zlib
 from collections.abc import Iterable, Iterator
-from typing import TYPE_CHECKING, Any, Generic, Self, TypeVar
+from typing import Any, Generic, Self, TypeVar
 
 import jax
 import jax.tree_util as jtu
 import numpy as np
-from jaxtyping import PRNGKeyArray, PyTree
+from jaxtyping import PyTree
 
 from .. import tree
+from .buffer import Buffer
 from .param import Param
-
-if TYPE_CHECKING:
-    from .buffer import Buffers
 
 M = TypeVar("M")
 
@@ -108,7 +104,7 @@ class _At(Generic[M]):
 
 def _register_module_as_pytree(cls: type) -> Any:
     """Register a Module subclass as a JAX pytree."""
-    array_like = (jax.Array, np.ndarray, Param, Module)
+    array_like = (jax.Array, np.ndarray, Param, Buffer, Module)
     field_names = tuple(field.name for field in dataclasses.fields(cls))
 
     def _classify(obj: Any) -> tuple[tuple[tuple[str, str], ...], tuple[str, ...]]:
@@ -323,24 +319,12 @@ class Module:
         """
         return _At(self)
 
-    def init_buffers(self, *, key: PRNGKeyArray | None = None) -> "Buffers":
-        """Initialize the model's non-trainable buffers.
+    def clone(self) -> Self:
+        """Return a copy whose `Buffer`s are independent of this model's. Wraps `ion.clone`.
 
-        Parameters
-        ----------
-        key : Array, optional
-            Random key for buffer initialization.
-
-        Examples
-        --------
-        >>> model = BatchNormCNN()
-        >>> buffers = model.init_buffers()
-        >>> y, buffers = model(x, buffers, training=True)
+        >>> independent_model = model.clone()
         """
-
-        from .buffer import _init_buffers
-
-        return _init_buffers(self, key=key)
+        return tree.clone(self)
 
     def freeze(self) -> Self:
         """Return a copy with all parameters frozen (non-trainable). Wraps `ion.freeze`.

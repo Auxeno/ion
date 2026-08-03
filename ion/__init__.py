@@ -8,7 +8,7 @@ from . import nn as nn
 from . import tree as tree
 from .checkpoint import load, save
 from .optimizer import Optimizer
-from .tree import astype, freeze, is_param, is_trainable_param, unfreeze
+from .tree import astype, clone, freeze, is_buffer, is_param, is_trainable_param, unfreeze
 
 
 def enable_treescope(everything: bool = False) -> None:
@@ -40,7 +40,7 @@ def enable_treescope(everything: bool = False) -> None:
 
             html_fmt.for_type(nn.Module, lambda obj: render(obj))
             html_fmt.for_type(nn.Param, lambda obj: render(obj))
-            html_fmt.for_type(nn.Buffers, lambda obj: render(obj))
+            html_fmt.for_type(nn.Buffer, lambda obj: render(obj))
             html_fmt.for_type(Optimizer, lambda obj: render(obj))
             html_fmt.for_type(ArrayImpl, lambda obj: render(obj))
             html_fmt.for_type(np.ndarray, lambda obj: render(obj))
@@ -65,7 +65,7 @@ def disable_treescope() -> None:
             html_fmt = ip.display_formatter.formatters["text/html"]  # type: ignore[reportAttributeAccessIssue,reportOptionalMemberAccess]
             html_fmt.type_printers.pop(nn.Module, None)
             html_fmt.type_printers.pop(nn.Param, None)
-            html_fmt.type_printers.pop(nn.Buffers, None)
+            html_fmt.type_printers.pop(nn.Buffer, None)
             html_fmt.type_printers.pop(Optimizer, None)
             html_fmt.type_printers.pop(ArrayImpl, None)
             html_fmt.type_printers.pop(np.ndarray, None)
@@ -88,9 +88,11 @@ __all__ = [
     "tree",
     "Optimizer",
     "astype",
+    "clone",
     "disable_treescope",
     "enable_treescope",
     "freeze",
+    "is_buffer",
     "is_param",
     "is_trainable_param",
     "load",

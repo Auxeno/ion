@@ -240,11 +240,8 @@ self.head(x)     # (8, 4)
 
 Some layers update non-trainable values during the forward pass. `BatchNorm`
 tracks a running mean and variance, while `SpectralNorm` tracks singular-vector
-estimates. These values live outside the immutable model in a
-[`Buffers`](../core/buffers.md) collection.
-
-Initialize buffers once from the complete model, then keep the collection
-returned by each training call:
+estimates. These values are [`Buffer`](../core/buffers.md) fields, updated in
+place, so a stateful layer is called like any other:
 
 ```python
 model = nn.Sequential(
@@ -252,31 +249,14 @@ model = nn.Sequential(
     nn.BatchNorm(64),
     jax.nn.relu,
 )
-buffers = model.init_buffers()
 
-y, buffers = model(x, buffers, training=True)
-y, _ = model(x, buffers, training=False)
+y = model(x, training=True)   # running statistics updated
+y = model(x, training=False)  # running statistics used
 ```
 
-Pass a key to `init_buffers` when a stateful layer, such as `SpectralNorm`,
-initializes its value randomly:
-
-```python
-buffers = model.init_buffers(key=key)
-```
-
-`Sequential` forwards buffers to the layers that accept them. A custom module
-does the same explicitly:
-
-```python
-def __call__(self, x, buffers, *, training):
-    x = self.linear(x)
-    x, buffers = self.norm(x, buffers, training=training)
-    return self.head(x), buffers
-```
-
-Buffers are JAX pytrees, so they can be carried through `jax.jit` and
-`jax.lax.scan`. They stay outside differentiation and the optimizer. See
+Buffers contribute no pytree leaves, so `jax.grad`, the optimizer, and
+`Module.astype` all leave them alone. They can be read and updated inside
+`jax.jit` and `jax.lax.scan`. See
 [Stateful training](../workflows.md#stateful-training) for a complete update
 step.
 
@@ -290,8 +270,8 @@ outputs_1, state = lstm(chunk_1)
 outputs_2, state = lstm(chunk_2, state)
 ```
 
-This recurrent state belongs to one input sequence. Buffers instead belong to
-the model and usually persist across training batches.
+This recurrent state belongs to one input sequence, and is passed explicitly.
+Buffers instead belong to the model and usually persist across training batches.
 
 Sequence layers run the scan internally. To control the recurrence directly, use
 the cell that each one wraps. Cells take a single timestep and follow the

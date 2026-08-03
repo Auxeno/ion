@@ -4,16 +4,15 @@ Parameters
 ----------
 x : Any
     Input to the wrapped module.
-buffers : Buffers
-    Buffers returned by `model.init_buffers(key=key)`.
 training : bool
     Whether to update the power-iteration vectors.
 
 Returns
 -------
-tuple[Any, Buffers]
-    Wrapped module output and updated buffers.
+Any
+    Wrapped module output.
 
 Info
 ----
-Keep the returned buffers after every training call.
+Training refines the power-iteration vectors in place, so the same layer
+instance carries them into the next call.

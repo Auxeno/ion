@@ -41,7 +41,7 @@ def test_enable_and_disable_treescope_formatters(monkeypatch):
     rendered_types = (
         ion.nn.Module,
         ion.nn.Param,
-        ion.nn.Buffers,
+        ion.nn.Buffer,
         ion.Optimizer,
         ArrayImpl,
         np.ndarray,

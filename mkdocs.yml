@@ -38,7 +38,7 @@ nav:
       - Module: core/module.md
       - Param: core/param.md
       - Optimizer: core/optimizer.md
-      - Stateful buffers: core/buffers.md
+      - Buffers: core/buffers.md
   - NN:
       - Guide: nn/guide.md
       - Layers:

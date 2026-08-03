@@ -4,8 +4,6 @@ Classes:
     Optimizer   Wraps optax with auto-partitioning for frozen Params.
 
 Supports per-field transforms via a dict mapping field names to transforms.
-
-See docs/internals.md for implementation details.
 """
 
 from typing import Any

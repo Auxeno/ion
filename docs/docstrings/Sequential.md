@@ -1,7 +1,7 @@
 Chain layers and callables, applying them in order.
 
-Each layer's output feeds the next. `training`, `buffers`, and split random keys
-are forwarded to layers that accept them.
+Each layer's output feeds the next. `training` and split random keys are
+forwarded to layers that accept them.
 
 Parameters
 ----------

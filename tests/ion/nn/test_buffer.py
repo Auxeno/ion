@@ -1,10 +1,7 @@
-import dataclasses
 import tempfile
-from typing import cast
 
 import jax
 import jax.numpy as jnp
-import jax.tree_util as jtu
 import numpy.testing as npt
 import optax
 import pytest
@@ -12,306 +9,194 @@ import treescope
 
 import ion
 from ion import nn
-from ion.nn import Buffers
 
 
-class Counter(nn.BufferModule):
-    size: int
-
-    def __init__(self, size=2):
-        self.size = size
-
-    def _init_buffer(self, *, key=None):
-        return jnp.zeros((self.size,), dtype=jnp.float32)
-
-    def __call__(self, x, buffers, *, training: bool):
-        value = buffers[self]
-        return x + value, buffers.set(self, value + 1) if training else buffers
-
-
-class RandomBuffer(nn.BufferModule):
-    size: int
+class Counter(nn.Module):
+    count: nn.Buffer
 
     def __init__(self, size=2):
-        self.size = size
+        self.count = nn.Buffer(jnp.zeros(size))
 
-    def _init_buffer(self, *, key=None):
-        if key is None:
-            raise ValueError("call model.init_buffers(key=key)")
-        return jax.random.normal(key, (self.size,))
-
-
-def test_stateless_model_has_empty_buffers():
-    """A stateless model initializes an empty buffer collection."""
-    buffers = nn.Linear(2, 3, key=jax.random.key(0)).init_buffers()
-    assert isinstance(buffers, Buffers)
-    assert jax.tree.leaves(buffers) == []
+    def __call__(self, x, *, training: bool):
+        if training:
+            self.count.set(self.count.value + 1)
+        return x + self.count.value
 
 
-def test_nested_container_discovery():
-    """Nested buffer modules are discovered in structural order."""
-
-    class Model(nn.Module):
-        direct: Counter
-        nested: tuple
-        listed: list
-        mapped: dict
-
-        def __init__(self):
-            self.direct = Counter(1)
-            self.nested = ((Counter(2),),)
-            self.listed = [Counter(3)]
-            self.mapped = {"b": Counter(5), "a": Counter(4)}
-
-    model = Model()
-    buffers = model.init_buffers()
-    assert [leaf.shape for leaf in jax.tree.leaves(buffers)] == [(1,), (2,), (3,), (4,), (5,)]
-    paths = [jtu.keystr(path) for path, _ in jtu.tree_leaves_with_path(buffers)]
-    assert paths == [
-        ".direct",
-        ".nested[0][0]",
-        ".listed[0]",
-        ".mapped['a']",
-        ".mapped['b']",
-    ]
-    rendered = repr(buffers)
-    assert "direct: Counter(f32[1])" in rendered
-    assert "nested[0][0]: Counter(f32[2])" in rendered
-    assert "_module_keys" not in rendered
-
-    rendered = treescope.render_to_text(buffers)
-    assert "direct: Counter" in rendered
-    assert "object at" not in rendered
-
-    with pytest.raises(ValueError, match=r"Counter buffer at 'direct' leaf 0 shape"):
-        buffers.set(model.direct, jnp.zeros(2))
+def test_buffers_contribute_no_leaves():
+    """Buffers are invisible to leaf-based traversal, keeping them out of autodiff."""
+    assert jax.tree.leaves(Counter()) == []
+    assert len(jax.tree.leaves(nn.BatchNorm(2))) == 2
 
 
-def test_sequential_discovery():
-    """Buffer modules inside Sequential are discovered."""
-    layer = Counter()
-    model = nn.Sequential(layer, lambda x: x)
-    buffers = model.init_buffers()
-    assert len(jax.tree.leaves(buffers)) == 1
+def test_buffers_are_discoverable_by_predicate():
+    """Buffers are reachable with is_buffer, at their attribute paths."""
+    model = nn.Sequential(nn.Linear(2, 3, key=jax.random.key(0)), nn.BatchNorm(3))
+    leaves = jax.tree.leaves(model, is_leaf=ion.is_buffer)
+    assert sum(ion.is_buffer(leaf) for leaf in leaves) == 2
 
 
-def test_repeated_instance_deduplicated():
-    """A repeated buffer-module instance receives one buffer value."""
-    repeated = Counter()
-    model = nn.Sequential(repeated, (lambda x: x), repeated)
-    buffers = model.init_buffers()
-    assert len(jax.tree.leaves(buffers)) == 1
-    assert "layers[0] | layers[2]: Counter" in repr(buffers)
+def test_repr():
+    """A buffer reports its dtype and shape, and renders in treescope."""
+    assert repr(nn.Buffer(jnp.zeros(3))) == "Buffer(f32[3])"
+    assert "running_mean=Buffer(f32[2])" in repr(nn.BatchNorm(2))
+    assert "Buffer" in treescope.render_to_text(nn.BatchNorm(2))
 
 
-def test_deterministic_init_without_key():
-    """Deterministic buffers initialize without a random key."""
-    layer = Counter(3)
-    npt.assert_array_equal(layer.init_buffers()[layer], jnp.zeros(3))
-    assert "_buffer_key" not in repr(layer)
-
-
-def test_random_init_reproducible():
-    """The same random key produces identical buffer values."""
-
-    class Model(nn.Module):
-        layers: tuple
-
-        def __init__(self):
-            self.layers = (RandomBuffer(), RandomBuffer())
-
-    model = Model()
-    key = jax.random.key(4)
-    first = model.init_buffers(key=key)
-    second = model.init_buffers(key=key)
-    for layer in model.layers:
-        npt.assert_array_equal(first[layer], second[layer])
-
-
-def test_random_keys_split_per_layer():
-    """Each buffer module receives its structural split of the random key."""
-
-    class Model(nn.Module):
-        layers: tuple
-
-        def __init__(self):
-            self.layers = (RandomBuffer(), RandomBuffer())
-
-    model = Model()
-    key = jax.random.key(4)
-    buffers = model.init_buffers(key=key)
-    expected_keys = jax.random.split(key, 2)
-    for layer, expected_key in zip(model.layers, expected_keys):
-        npt.assert_array_equal(buffers[layer], jax.random.normal(expected_key, (2,)))
-
-
-def test_random_init_requires_key():
-    """A random buffer initializer can require model.init_buffers(key=key)."""
-    with pytest.raises(ValueError, match=r"init_buffers\(key=key\)"):
-        RandomBuffer().init_buffers()
-
-
-def test_set_returns_new_collection():
-    """set returns an updated collection without changing the original."""
-    layer = Counter()
-    buffers = layer.init_buffers()
-    updated = buffers.set(layer, jnp.ones(2))
-    npt.assert_array_equal(buffers[layer], jnp.zeros(2))
-    npt.assert_array_equal(updated[layer], jnp.ones(2))
-
-
-def test_collection_is_immutable():
-    """Buffer collection fields cannot be assigned directly."""
-    buffers = Counter().init_buffers()
-    with pytest.raises(dataclasses.FrozenInstanceError):
-        buffers._values = ()  # type: ignore[misc]
-
-
-def test_jit():
-    """Buffer reads and updates work under jax.jit."""
-    layer = Counter()
-    buffers = layer.init_buffers()
-
-    @jax.jit
-    def step(buffers):
-        return layer(jnp.zeros(2), buffers, training=True)
-
-    _, updated = step(buffers)
-    npt.assert_array_equal(updated[layer], jnp.ones(2))
-
-
-def test_scan():
-    """A buffer collection can be carried through lax.scan."""
-    layer = Counter()
-    buffers = layer.init_buffers()
-
-    def body(buffers, _):
-        _, buffers = layer(jnp.zeros(2), buffers, training=True)
-        return buffers, None
-
-    scanned, _ = jax.lax.scan(body, buffers, xs=None, length=3)
-    npt.assert_array_equal(scanned[layer], jnp.full(2, 3.0))
-
-
-def test_get_stops_gradients():
-    """Reading a buffer blocks gradients through its stored value."""
-    layer = Counter()
-    buffers = layer.init_buffers()
-
-    get_grad = jax.grad(lambda b: jnp.sum(b[layer]))(buffers)
-    npt.assert_array_equal(jax.tree.leaves(get_grad)[0], jnp.zeros(2))
+def test_value_and_set():
+    """A buffer reads back the value it was given, and set replaces it."""
+    buffer = nn.Buffer(jnp.zeros(2))
+    npt.assert_allclose(buffer.value, jnp.zeros(2))
+    buffer.set(jnp.ones(2))
+    npt.assert_allclose(buffer.value, jnp.ones(2))
 
 
 def test_set_stops_gradients():
     """Writing a buffer blocks gradients through the new value."""
     layer = Counter()
-    buffers = layer.init_buffers()
 
     def through_update(value):
-        updated = buffers.set(layer, value)
-        return jnp.sum(updated[layer])
+        layer.count.set(value)
+        return jnp.sum(layer.count.value)
 
-    npt.assert_array_equal(jax.grad(through_update)(jnp.ones(2)), jnp.zeros(2))
-
-
-def test_wrong_model_raises():
-    """Buffers initialized for another model cannot be read."""
-    first = Counter()
-    second = Counter()
-    buffers = first.init_buffers()
-    with pytest.raises(ValueError, match="init_buffers"):
-        buffers[second]
+    npt.assert_allclose(jax.grad(through_update)(jnp.ones(2)), jnp.zeros(2))
 
 
-def test_replaced_layer_raises():
-    """Replacing a BufferModule invalidates its old buffer value."""
+def test_gradients_ignore_buffers():
+    """Differentiating a stateful model yields a tree with no buffer entries."""
+    model = nn.BatchNorm(2)
+    x = jnp.array([[1.0, 3.0], [5.0, 7.0]])
+
+    grads = jax.grad(lambda m: jnp.sum(m(x, training=True)))(model)
+    assert jax.tree.structure(grads) == jax.tree.structure(model)
+
+
+def test_jit():
+    """Buffer updates cross the jit boundary."""
     layer = Counter()
-    buffers = layer.init_buffers()
 
-    replaced = layer.at.set(Counter())
-    with pytest.raises(ValueError, match="init_buffers"):
-        buffers[replaced]
+    @jax.jit
+    def step():
+        return layer(jnp.zeros(2), training=True)
+
+    step()
+    npt.assert_allclose(layer.count.value, jnp.ones(2))
 
 
-def test_parameter_surgery_preserves_buffer_identity():
-    """Editing parameters on an existing layer preserves buffer compatibility."""
-    layer = nn.BatchNorm(2)
-    buffers = layer.init_buffers()
-    modified = layer.at.scale.set(nn.Param(jnp.full(2, 2.0)))
-    npt.assert_array_equal(buffers[modified], buffers[layer])
+def test_scan():
+    """Buffer updates accumulate through lax.scan."""
+    layer = Counter()
+
+    def body(carry, _):
+        return carry, layer(jnp.zeros(2), training=True)
+
+    jax.lax.scan(body, None, xs=None, length=3)
+    npt.assert_allclose(layer.count.value, jnp.full(2, 3.0))
+
+
+def test_vmap_raises():
+    """Mutating a shared buffer under vmap is rejected rather than silently batched."""
+    layer = Counter()
+
+    with pytest.raises(Exception, match="array reference"):
+        jax.vmap(lambda x: layer(x, training=True))(jnp.zeros((4, 2)))
+
+
+def test_tree_map_copies_share_state():
+    """A plain tree.map copy shares buffers with the original."""
+    layer = Counter()
+    copy = jax.tree.map(lambda leaf: leaf, layer)
+
+    copy(jnp.zeros(2), training=True)
+    npt.assert_allclose(layer.count.value, jnp.ones(2))
 
 
 @pytest.mark.parametrize(
-    ("value", "message"),
-    [
-        ((jnp.zeros(2), jnp.zeros(2)), "structure"),
-        ({"value": jnp.zeros(2)}, "structure"),
-        (jnp.zeros(3), "shape"),
-        (jnp.zeros(2, dtype=jnp.int32), "dtype"),
-    ],
+    "derive", [lambda m: m.clone(), lambda m: m.freeze(), lambda m: m.unfreeze()]
 )
-def test_update_validation(value, message):
-    """Updates must preserve buffer structure, shape, and dtype."""
+def test_copies_own_their_buffers(derive):
+    """clone, freeze and unfreeze all give the model they return its own buffers."""
     layer = Counter()
-    buffers = layer.init_buffers()
-    with pytest.raises((TypeError, ValueError), match=message):
-        buffers.set(layer, value)
+    derived = derive(layer)
+
+    derived(jnp.zeros(2), training=True)
+    npt.assert_allclose(layer.count.value, jnp.zeros(2))
+    npt.assert_allclose(derived.count.value, jnp.ones(2))
 
 
-def test_value_must_be_a_nonempty_pytree_of_arrays():
-    """A buffer value must be a non-empty pytree containing only arrays."""
+def test_cast_shares_buffers():
+    """astype shares buffers, which is what lets a cast inside a loss update the master."""
+    layer = Counter()
+    cast = layer.astype(jnp.bfloat16)
 
-    class Invalid(nn.BufferModule):
-        def _init_buffer(self, *, key=None):
-            return {"bad": 1}
-
-    with pytest.raises(TypeError, match="pytree of arrays"):
-        Invalid().init_buffers()  # type: ignore[call-arg]
+    cast(jnp.zeros(2), training=True)
+    npt.assert_allclose(layer.count.value, jnp.ones(2))
 
 
-def test_buffer_module_requires_an_initializer():
-    """A BufferModule subclass must implement _init_buffer."""
-    with pytest.raises(NotImplementedError, match=r"must implement _init_buffer\(\)"):
-        nn.BufferModule().init_buffers()  # type: ignore[call-arg]
+def test_astype_leaves_buffer_dtype_alone():
+    """Casting a model casts its params, while buffers keep the dtype their layer chose."""
+    model = nn.BatchNorm(2).astype(jnp.bfloat16)
+
+    assert model.scale.dtype == jnp.bfloat16
+    assert model.running_mean.value.dtype == jnp.float32
 
 
-def test_nested_buffer_modules_are_rejected():
-    """A BufferModule cannot contain another BufferModule."""
+def test_cast_inside_loss_updates_buffers():
+    """The mixed-precision workflow casts inside the loss and still updates the master."""
+    norm = nn.BatchNorm(8)
+    model = nn.Sequential(nn.Linear(4, 8, key=jax.random.key(0)), norm)
+    x = jax.random.normal(jax.random.key(1), (16, 4))
 
-    class Nested(nn.BufferModule):
-        child: Counter
+    def loss_fn(model, x):
+        model = model.astype(jnp.bfloat16)
+        return model(x.astype(jnp.bfloat16), training=True).sum().astype(jnp.float32)
 
-        def __init__(self):
-            self.child = Counter()
+    jax.grad(loss_fn)(model, x)
 
-        def _init_buffer(self, *, key=None):
-            return jnp.zeros(1)
+    assert not jnp.array_equal(norm.running_mean.value, jnp.zeros(8))
+    assert norm.running_mean.value.dtype == jnp.float32
 
-    with pytest.raises(ValueError, match="cannot contain"):
-        Nested().init_buffers()
+
+def test_optimizer_update_preserves_buffers():
+    """An optimizer step carries buffer state forward, since it continues one model."""
+    layer = Counter()
+    optimizer = ion.Optimizer(optax.adam(1e-3), layer)
+
+    layer(jnp.zeros(2), training=True)
+    updated, _ = optimizer.update(layer, jax.tree.map(jnp.zeros_like, layer))
+    npt.assert_allclose(updated.count.value, jnp.ones(2))
+
+
+def test_sequential():
+    """A stateful layer inside Sequential needs no routing and returns one value."""
+    norm = nn.BatchNorm(3)
+    model = nn.Sequential(nn.Linear(2, 3, key=jax.random.key(0)), norm)
+    x = jnp.array([[1.0, 3.0], [5.0, 7.0]])
+
+    output = model(x, training=True)
+    assert output.shape == (2, 3)
+    assert not jnp.array_equal(norm.running_mean.value, jnp.zeros(3))
 
 
 def test_checkpoint_roundtrip():
-    """Checkpoint roundtrips restore parameters and buffer values."""
+    """Checkpoints carry buffer values, and loading leaves the reference model alone."""
     layer = nn.BatchNorm(2)
-    buffers = layer.init_buffers()
     x = jnp.array([[1.0, 3.0], [5.0, 7.0]])
-    _, buffers = layer(x, buffers, training=True)
+    layer(x, training=True)
     changed = layer.at.scale.set(nn.Param(jnp.array([2.0, 3.0])))
 
     reference = nn.BatchNorm(2)
-    reference_buffers = reference.init_buffers()
     with tempfile.NamedTemporaryFile(suffix=".ion") as file:
-        ion.save(file.name, (changed, buffers))
-        loaded, loaded_buffers = ion.load(file.name, (reference, reference_buffers))
+        ion.save(file.name, changed)
+        loaded = ion.load(file.name, reference)
 
-    npt.assert_array_equal(loaded.scale._value, changed.scale._value)
-    loaded_buffers = cast(Buffers, loaded_buffers)
-    npt.assert_array_equal(loaded_buffers[loaded], buffers[changed])
+    npt.assert_allclose(loaded.scale._value, changed.scale._value)
+    npt.assert_allclose(loaded.running_mean.value, layer.running_mean.value)
+    npt.assert_allclose(reference.running_mean.value, jnp.zeros(2))
 
 
 def test_custom_model_training_step():
-    """A custom buffered model trains with buffers outside differentiation."""
+    """A custom stateful model trains with buffers outside differentiation."""
 
     class Model(nn.Module):
         linear: nn.Linear
@@ -320,43 +205,39 @@ def test_custom_model_training_step():
         output: nn.SpectralNorm
 
         def __init__(self, *, key):
-            keys = jax.random.split(key, 2)
+            keys = jax.random.split(key, 3)
             self.linear = nn.Linear(3, 4, key=keys[0])
             self.norm = nn.BatchNorm(4)
             self.dropout = nn.Dropout(0.2)
-            self.output = nn.SpectralNorm(nn.Linear(4, 2, key=keys[1]))
+            self.output = nn.SpectralNorm(nn.Linear(4, 2, key=keys[1]), key=keys[2])
 
-        def __call__(self, x, buffers, *, training: bool, key=None):
+        def __call__(self, x, *, training: bool, key=None):
             x = self.linear(x)
-            x, buffers = self.norm(x, buffers, training=training)
+            x = self.norm(x, training=training)
             x = jax.nn.relu(x)
             x = self.dropout(x, training=training, key=key)
-            x, buffers = self.output(x, buffers, training=training)
-            return x, buffers
+            return self.output(x, training=training)
 
     model = Model(key=jax.random.key(0))
-    buffers = model.init_buffers(key=jax.random.key(1))
     optimizer = ion.Optimizer(optax.adam(1e-3), model)
     x = jax.random.normal(jax.random.key(2), (8, 3))
     target = jax.random.normal(jax.random.key(3), (8, 2))
 
     @jax.jit
-    def train_step(model, buffers, optimizer, x, target, key):
+    def train_step(model, optimizer, x, target, key):
         def loss_fn(model):
-            prediction, new_buffers = model(x, buffers, training=True, key=key)
-            return jnp.mean(jnp.square(prediction - target)), new_buffers
+            prediction = model(x, training=True, key=key)
+            return jnp.mean(jnp.square(prediction - target))
 
-        (loss, buffers), grads = jax.value_and_grad(loss_fn, has_aux=True)(model)
+        loss, grads = jax.value_and_grad(loss_fn)(model)
         model, optimizer = optimizer.update(model, grads)
-        return model, buffers, optimizer, loss
+        return model, optimizer, loss
 
-    old_mean = buffers[model.norm][0]
-    model, buffers, optimizer, loss = train_step(
-        model, buffers, optimizer, x, target, jax.random.key(4)
-    )
-    prediction, returned = model(x, buffers, training=False)
+    old_mean = model.norm.running_mean.value
+    model, optimizer, loss = train_step(model, optimizer, x, target, jax.random.key(4))
+    prediction = model(x, training=False)
+
     assert jnp.isfinite(loss)
     assert prediction.shape == target.shape
     assert optimizer.step == 1
-    assert not jnp.array_equal(buffers[model.norm][0], old_mean)
-    assert returned is buffers
+    assert not jnp.array_equal(model.norm.running_mean.value, old_mean)

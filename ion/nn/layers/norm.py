@@ -17,21 +17,22 @@ import jax.numpy as jnp
 from jax import lax
 from jaxtyping import Array, Float, PRNGKeyArray
 
-from ..buffer import BufferModule, Buffers
+from ..buffer import Buffer
 from ..module import Module
 from ..param import Param
 
 
-class BatchNorm(BufferModule):
+class BatchNorm(Module):
     """Batch normalization with running mean and variance.
 
     >>> norm = BatchNorm(64)
-    >>> buffers = norm.init_buffers()
-    >>> y, buffers = norm(x, buffers, training=True)
+    >>> norm(x, training=True)  # (*, 64) -> (*, 64)
     """
 
     scale: Param[Float[Array, " d"]]
     b: Param[Float[Array, " d"]] | None
+    running_mean: Buffer
+    running_var: Buffer
     momentum: float
     eps: float
 
@@ -51,30 +52,21 @@ class BatchNorm(BufferModule):
         self.scale = Param(jnp.ones(dim))
         self.b = Param(jnp.zeros(dim)) if bias else None
 
+        self.running_mean = Buffer(jnp.zeros(dim))
+        self.running_var = Buffer(jnp.ones(dim))
+
         self.momentum = momentum
         self.eps = eps
-
-    def _init_buffer(self, *, key: PRNGKeyArray | None = None) -> tuple[Array, Array]:
-
-        dim = self.scale.shape[0]
-
-        return (
-            jnp.zeros(dim, dtype=jnp.float32),
-            jnp.ones(dim, dtype=jnp.float32),
-        )
 
     def __call__(
         self,
         x: Float[Array, "... d"],
-        buffers: Buffers,
         *,
         training: bool,
-    ) -> tuple[Float[Array, "... d"], Buffers]:
+    ) -> Float[Array, "... d"]:
 
         if x.ndim < 2:
             raise ValueError("BatchNorm input must have at least one reduction dimension")
-
-        running_mean, running_var = buffers[self]
 
         # Use batch statistics and update the running values during training
         if training:
@@ -82,12 +74,15 @@ class BatchNorm(BufferModule):
             mean = jnp.mean(x, axis=reduce_axes)
             var = jnp.mean(jnp.square(x - mean), axis=reduce_axes)
 
-            new_mean = (1.0 - self.momentum) * running_mean + self.momentum * mean
-            new_var = (1.0 - self.momentum) * running_var + self.momentum * var
-            buffers = buffers.set(self, (new_mean, new_var))
+            self.running_mean.set(
+                (1.0 - self.momentum) * self.running_mean.value + self.momentum * mean
+            )
+            self.running_var.set(
+                (1.0 - self.momentum) * self.running_var.value + self.momentum * var
+            )
         else:
-            mean = running_mean
-            var = running_var
+            mean = self.running_mean.value
+            var = self.running_var.value
 
         # Normalize, then apply the learned affine transform
         x = ((x - mean) * lax.rsqrt(var + self.eps)).astype(x.dtype)
@@ -97,7 +92,7 @@ class BatchNorm(BufferModule):
         if self.b is not None:
             x = x + self.b
 
-        return x, buffers
+        return x
 
 
 class LayerNorm(Module):
@@ -213,16 +208,17 @@ class RMSNorm(Module):
         return x * self.scale
 
 
-class SpectralNorm(BufferModule):
+class SpectralNorm(Module):
     """Normalize a module parameter by its spectral norm.
 
-    >>> layer = SpectralNorm(Linear(64, 64, key=linear_key))
-    >>> buffers = layer.init_buffers(key=buffer_key)
-    >>> y, buffers = layer(x, buffers, training=True)
+    >>> layer = SpectralNorm(Linear(64, 64, key=linear_key), key=key)
+    >>> layer(x, training=True)  # (*, 64) -> (*, 64)
     """
 
     module: Module
     parameter: str
+    u: Buffer
+    v: Buffer
     power_iterations: int
     eps: float
 
@@ -232,73 +228,72 @@ class SpectralNorm(BufferModule):
         parameter: str = "w",
         power_iterations: int = 1,
         eps: float = 1e-12,
+        *,
+        key: PRNGKeyArray,
     ) -> None:
 
-        parameter_value = getattr(module, parameter)
-        if not isinstance(parameter_value, Param):
+        param = getattr(module, parameter)
+        if not isinstance(param, Param):
             raise TypeError(f"{type(module).__name__}.{parameter} must be a Param")
-        if parameter_value.ndim < 2:
+        if param.ndim < 2:
             raise ValueError(f"{type(module).__name__}.{parameter} must be at least 2D")
         if power_iterations < 1:
             raise ValueError(f"power_iterations ({power_iterations}) must be at least 1")
         if eps <= 0.0:
             raise ValueError(f"eps ({eps}) must be greater than 0")
 
+        weight = jnp.asarray(param)
+        matrix = weight.reshape(-1, weight.shape[-1]).T
+
+        u = jax.random.normal(key, (matrix.shape[0],), dtype=matrix.dtype)
+        u, v = self._power_iteration(matrix, u, power_iterations, eps)
+
+        self.u = Buffer(u)
+        self.v = Buffer(v)
+
         self.module = module
         self.parameter = parameter
-
         self.power_iterations = power_iterations
         self.eps = eps
 
-    def _init_buffer(self, *, key: PRNGKeyArray | None = None) -> tuple[Array, Array]:
+    @staticmethod
+    def _power_iteration(
+        matrix: Array,
+        u: Array,
+        power_iterations: int,
+        eps: float,
+    ) -> tuple[Array, Array]:
 
-        if key is None:
-            raise ValueError("SpectralNorm requires a key; call model.init_buffers(key=key)")
-
-        key_u, key_v = jax.random.split(key)
-        weight = jnp.asarray(getattr(self.module, self.parameter))
-        matrix = weight.reshape(-1, weight.shape[-1]).T
-
-        u = jax.random.normal(key_u, (matrix.shape[0],), dtype=matrix.dtype)
-        v = jax.random.normal(key_v, (matrix.shape[1],), dtype=matrix.dtype)
-
-        u = u / jnp.maximum(jnp.linalg.norm(u), self.eps)
-        v = v / jnp.maximum(jnp.linalg.norm(v), self.eps)
-
-        return self._power_iteration(matrix, u, v)
-
-    def _power_iteration(self, matrix: Array, u: Array, v: Array) -> tuple[Array, Array]:
-
-        for _ in range(self.power_iterations):
+        for _ in range(power_iterations):
             v = matrix.T @ u
-            v = v / jnp.maximum(jnp.linalg.norm(v), self.eps)
+            v = v / jnp.maximum(jnp.linalg.norm(v), eps)
             u = matrix @ v
-            u = u / jnp.maximum(jnp.linalg.norm(u), self.eps)
+            u = u / jnp.maximum(jnp.linalg.norm(u), eps)
 
-        return jax.lax.stop_gradient((u, v))
+        return lax.stop_gradient((u, v))
 
     def __call__(
         self,
         x: Any,
-        buffers: Buffers,
         *,
         training: bool,
-    ) -> tuple[Any, Buffers]:
+    ) -> Any:
 
         weight = jnp.asarray(getattr(self.module, self.parameter))
         matrix = weight.reshape(-1, weight.shape[-1]).T
-        u, v = buffers[self]
+        u, v = self.u.value, self.v.value
 
         # Refine the singular vectors only during training
         if training:
-            u, v = self._power_iteration(matrix, u, v)
-            buffers = buffers.set(self, (u, v))
+            u, v = self._power_iteration(matrix, u, self.power_iterations, self.eps)
+            self.u.set(u)
+            self.v.set(v)
 
-        # Call a temporary module with the normalized parameter
+        # Normalize the parameter without modifying the wrapped module
         sigma = u @ matrix @ v
         sigma = jnp.maximum(sigma, jnp.asarray(self.eps, dtype=sigma.dtype))
         weight = (weight / sigma).astype(weight.dtype)
 
         normalized_module = getattr(self.module.at, self.parameter).set(weight)
 
-        return normalized_module(x), buffers
+        return normalized_module(x)

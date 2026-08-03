@@ -7,8 +7,6 @@ Registered as a JAX pytree: `_value` is a dynamic child, `trainable` is static m
 Implements `__jax_array__` and arithmetic so it works as a drop-in for plain arrays.
 Setting `trainable=False` applies `jax.lax.stop_gradient` inside `__jax_array__`,
 making the parameter invisible to autodiff.
-
-See docs/internals.md for implementation details.
 """
 
 import dataclasses

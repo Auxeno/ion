@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.12.0
+
+- **New `nn.Buffer` for stateful layers.** Buffers hold mutable, non-trainable values
+  directly in a model. Read them with `.value` and update them with `.set`, which
+  applies `stop_gradient`. They contribute no pytree leaves, so `jax.grad`,
+  `ion.Optimizer` and `Module.astype` leave them alone.
+- **New `BatchNorm` and `SpectralNorm` layers.** They use buffers for running
+  statistics and power-iteration vectors, and are called normally with
+  `y = norm(x, training=True)`, including in `Sequential`. `SpectralNorm` takes a
+  constructor `key` to initialize its vectors.
+- **Checkpoints include buffers.** `ion.save(path, model)` writes running statistics
+  as ordinary named tensors. `ion.load` returns a model with its own buffers, leaving
+  the reference model's state untouched. The format version is unchanged.
+- **New `ion.clone` and `Module.clone`.** Returns a copy whose buffers are
+  independent of the original, as do `freeze`, `unfreeze` and `load`. `astype` is the
+  exception and shares them so mixed-precision copies update the model's state;
+  `Optimizer.update` and plain `jax.tree.map` copies share them too. See
+  [Sharp edges](docs/sharp-edges.md).
+- **New `ion.is_buffer` predicate.** Companion to `ion.is_param`, for tree code that
+  needs to find buffers.
+- **Requires JAX 0.7.2 or newer**, up from 0.5.0. Buffers are built on `jax.new_ref`.
+
 ## 0.11.2
 
 - **`AvgPool` gains a `count_include_pad` flag.** Controls whether padded positions

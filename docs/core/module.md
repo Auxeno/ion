@@ -8,7 +8,7 @@ models work directly with `jax.jit`, `jax.grad`, and `jax.vmap`.
     options:
       members:
         - at
-        - init_buffers
+        - clone
         - freeze
         - unfreeze
         - astype
@@ -32,8 +32,8 @@ Untouched subtrees are shared with the original model. Changing pytree
 structure or trainability after constructing an optimizer requires a new
 `Optimizer`. See [Sharp edges](../sharp-edges.md).
 
-Stateful layers keep their non-trainable values in a separate
-[`Buffers`](buffers.md) collection rather than mutating module fields.
+Stateful layers are the one exception: a [`Buffer`](buffers.md) field holds a
+value the layer updates in place, so buffers do not follow the rule above.
 
 ## How does it work?
 

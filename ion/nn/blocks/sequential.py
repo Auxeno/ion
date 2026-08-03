@@ -15,12 +15,11 @@ from typing import Any
 import jax
 from jaxtyping import PRNGKeyArray
 
-from ..buffer import Buffers
 from ..module import Module
 
 
 class Sequential(Module):
-    """Chain layers, routing optional training mode, buffers, and random keys.
+    """Chain layers, routing optional training mode and random keys.
 
     >>> model = Sequential(Linear(3, 16, key=keys[0]), Dropout(0.1), Linear(16, 1, key=keys[1]))
     >>> model(x, training=True, key=key)  # (*, 3) -> (*, 1)
@@ -38,14 +37,12 @@ class Sequential(Module):
     def __call__(
         self,
         x: Any,
-        buffers: Buffers | None = None,
         *,
         training: bool | None = None,
         key: PRNGKeyArray | None = None,
     ) -> Any:
 
         keys = [None] * len(self.layers) if key is None else jax.random.split(key, len(self.layers))
-        return_buffers = buffers is not None
 
         for layer, layer_key in zip(self.layers, keys):
             parameters = inspect.signature(layer).parameters
@@ -57,14 +54,10 @@ class Sequential(Module):
                 kwargs["training"] = training
             if "key" in parameters:
                 kwargs["key"] = layer_key
-            if "buffers" in parameters:
-                if buffers is None:
-                    raise ValueError(f"{type(layer).__name__} requires model.init_buffers()")
-                x, buffers = layer(x, buffers, **kwargs)
-            else:
-                x = layer(x, **kwargs)
 
-        return (x, buffers) if return_buffers else x
+            x = layer(x, **kwargs)
+
+        return x
 
     def __getitem__(self, i: int | slice) -> "Callable | Sequential":
         if isinstance(i, slice):

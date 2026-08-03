@@ -19,8 +19,8 @@ A model field can represent three different things:
 - A bare array is ordinary model data: it participates in computation but is
   not treated as a parameter.
 
-Values updated by stateful layers live outside the model in a
-[`Buffers`](buffers.md) collection.
+Values updated by stateful layers are [`Buffer`](buffers.md)s, which are
+mutable and contribute no pytree leaves.
 
 The `trainable` flag is static [pytree](https://docs.jax.dev/en/latest/pytrees.html) metadata. Freezing or unfreezing changes
 the pytree structure and therefore requires a new `Optimizer`.

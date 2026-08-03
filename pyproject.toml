@@ -15,7 +15,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "jax>=0.5.0",
+    "jax>=0.7.2",
     "jaxtyping>=0.3.0",
     "optax",
     "treescope",

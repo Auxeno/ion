@@ -24,18 +24,8 @@ ion.save("checkpoint.ion", (model, optimizer))
 model, optimizer = ion.load("checkpoint.ion", (model, optimizer))
 ```
 
-Include buffers when checkpointing a stateful model:
-
-```python
-ion.save("checkpoint.ion", (model, buffers, optimizer))
-
-reference = MyModel(key=jax.random.key(0))
-reference_buffers = reference.init_buffers(key=jax.random.key(1))
-reference_optimizer = ion.Optimizer(optax.adam(1e-3), reference)
-model, buffers, optimizer = ion.load(
-    "checkpoint.ion", (reference, reference_buffers, reference_optimizer)
-)
-```
+A stateful model needs nothing extra. Buffers live in the model, so running
+statistics are written and restored along with the parameters.
 
 `load` takes a reference pytree that supplies the structure and non-array
 fields. Array values and `Param.trainable` flags come from the checkpoint:
@@ -60,9 +50,8 @@ edges](sharp-edges.md) for how static configuration is handled.
 
 ## Stateful training
 
-Stateful layers return updated [`Buffers`](core/buffers.md) alongside their
-output. Carry those buffers through the loss as auxiliary data so gradients are
-still taken only with respect to the model:
+Stateful layers update their [`Buffer`](core/buffers.md) fields in place, so a
+training step looks the same as a stateless one:
 
 ```python
 key_linear, key_output = jax.random.split(key)
@@ -73,31 +62,26 @@ model = nn.Sequential(
     nn.Dropout(0.1),
     nn.Linear(16, 3, key=key_output),
 )
-buffers = model.init_buffers()
 optimizer = ion.Optimizer(optax.adam(1e-3), model)
 
-def loss_fn(model, buffers, x, labels, key):
-    logits, buffers = model(x, buffers, training=True, key=key)
-    loss = optax.softmax_cross_entropy_with_integer_labels(logits, labels).mean()
-    return loss, buffers
+def loss_fn(model, x, labels, key):
+    logits = model(x, training=True, key=key)
+    return optax.softmax_cross_entropy_with_integer_labels(logits, labels).mean()
 
 @jax.jit
-def train_step(model, buffers, optimizer, x, labels, key):
-    (loss, buffers), grads = jax.value_and_grad(loss_fn, has_aux=True)(
-        model, buffers, x, labels, key
-    )
+def train_step(model, optimizer, x, labels, key):
+    loss, grads = jax.value_and_grad(loss_fn)(model, x, labels, key)
     model, optimizer = optimizer.update(model, grads)
-    return model, buffers, optimizer, loss
+    return model, optimizer, loss
 ```
 
-Evaluation uses the latest buffers without replacing them:
+Buffer updates happen during the forward pass, not through the gradient, so the
+loss needs no auxiliary output. Evaluation reads the running values without
+changing them:
 
 ```python
-logits, _ = model(x, buffers, training=False)
+logits = model(x, training=False)
 ```
-
-Buffers are pytrees with a fixed structure, so passing updated values through a
-compiled step does not itself cause recompilation.
 
 ## Mixed precision
 
@@ -117,9 +101,9 @@ The cast is differentiable, so gradients return in float32 to match the master
 parameters and optimizer state. Only the forward and backward computation uses
 bfloat16.
 
-Stateful layers choose their buffer precision independently. Numerically
-sensitive values can remain in float32 without promoting the layer output, so
-buffers do not need to be cast alongside the model.
+Buffers are not cast, and the cast model shares them with the master rather than
+copying them, so a stateful layer keeps float32 running statistics and keeps
+updating the master's copy of them.
 
 For low-precision inference, cast the model once:
 

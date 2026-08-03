@@ -4,10 +4,10 @@ Known gotchas when using Ion. Some are JAX limitations, others follow from Ion's
 
 ## What Ion leaves out
 
-Some things are left out deliberately. There is no hidden mutable module state,
-no custom transforms, and no training loop abstraction. Stateful layers such as
-`BatchNorm` use explicit buffer collections. Ion defines and trains models; JAX
-does everything else.
+Some things are left out deliberately. There are no custom transforms and no
+training loop abstraction. The only mutable state is a declared `Buffer` field
+on the layer that owns it, as used by `BatchNorm`. Ion defines and trains
+models; JAX does everything else.
 
 ## Python scalars are compile-time constants
 
@@ -23,20 +23,26 @@ self.temperature = jnp.array(0.5)
 
 Every distinct set of static values compiles a separate trace, so changing one triggers recompilation. `Param.trainable` is static too: set trainability once, before training. Calling `freeze()`/`unfreeze()` inside a training loop recompiles every step.
 
-## Buffers belong to their model
+## Models with buffers are not plain values
 
-Call `model.init_buffers()` once and keep the collection returned by each
-training call. Initializing buffers every step resets state such as BatchNorm
-running statistics.
+A [`Buffer`](core/buffers.md) is mutable, so a model owning one breaks the value
+semantics that hold everywhere else in Ion. A copy made with `jax.tree.map`
+shares its buffers with the original, and updating one updates both.
 
-Buffers are associated with the `BufferModule` instances that created them.
-Parameter updates, `model.at` edits within an existing layer, and JAX
-transformations preserve this identity. Replacing a stateful layer creates a new
-identity, so initialize buffers again for the changed model.
+```python
+copy = jax.tree.map(lambda leaf: leaf, model)  # shares running statistics
+independent = model.clone()                    # owns running statistics
+```
 
-Buffer pytree structure, leaf shapes, and leaf dtypes cannot change after
-initialization. This keeps the structure stable under `jax.jit`; incompatible
-updates raise an error at `buffers.set(...)`.
+`clone`, `freeze`, `unfreeze` and `load` all return models with their own
+buffers. `astype` deliberately does not: the mixed-precision workflow casts
+inside the loss, and a cast copy with its own buffers would quietly throw away
+every update made through it. `Optimizer.update` shares them for the same
+reason, since a step continues one model rather than copying it.
+
+`jax.vmap` over a model that updates buffers raises, because the update would
+write a batched value into an unbatched buffer. Vectorize over data with the
+layer's own batch dimension instead.
 
 ## Pytrees cannot share references
 

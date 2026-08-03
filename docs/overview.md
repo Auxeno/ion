@@ -139,9 +139,9 @@ available families.
 ## Stateful layers
 
 Some layers, such as `BatchNorm`, update non-trainable values like running
-statistics during forward passes. To keep models immutable, Ion stores this
-state in a separate [`Buffers`](core/buffers.md) collection that is updated and
-passed between calls.
+statistics during forward passes. Ion holds these in
+[`Buffer`](core/buffers.md) fields, which the layer updates in place, so a
+stateful layer is called exactly like any other.
 
 ```python
 import jax.numpy as jnp
@@ -149,9 +149,8 @@ import jax.numpy as jnp
 from ion import nn
 
 model = nn.BatchNorm(64)
-buffers = model.init_buffers()
 x = jnp.ones((8, 64))
-y, buffers = model(x, buffers, training=True)
+y = model(x, training=True)
 ```
 
 ## Graph neural network layers

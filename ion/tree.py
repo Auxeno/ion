@@ -3,15 +3,15 @@
 Functions:
     is_param            Check if a leaf is a Param.
     is_trainable_param  Check if a leaf is a trainable Param.
+    is_buffer           Check if a leaf is a Buffer.
     astype              Cast all floating-point leaves to a given dtype.
     freeze              Set all Params to trainable=False.
     unfreeze            Set all Params to trainable=True.
+    clone               Copy with independent Buffers.
 
 Neural network pytrees mix `Param` wrappers, plain arrays, and static Python
 values. Standard `jax.tree_util` treats every leaf uniformly, these utilities
 provide selective filtering by type and trainability.
-
-See docs/internals.md for implementation details.
 """
 
 from typing import Any
@@ -20,6 +20,7 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import PyTree
 
+from .nn.buffer import Buffer
 from .nn.param import Param
 
 
@@ -31,6 +32,16 @@ def is_param(x: Any) -> bool:
 def is_trainable_param(x: Any) -> bool:
     """Check if an object is a trainable `Param`."""
     return isinstance(x, Param) and x.trainable
+
+
+def is_buffer(x: Any) -> bool:
+    """Check if an object is a `Buffer`."""
+    return isinstance(x, Buffer)
+
+
+def _is_param_or_buffer(x: Any) -> bool:
+    """Check if an object is either wrapper type, for traversals that handle both."""
+    return isinstance(x, (Param, Buffer))
 
 
 def astype(pytree: PyTree, dtype: jnp.dtype, *, params_only: bool = False) -> PyTree:
@@ -52,6 +63,10 @@ def astype(pytree: PyTree, dtype: jnp.dtype, *, params_only: bool = False) -> Py
     -------
     PyTree
         Pytree with matching leaves cast and `Param` wrappers preserved.
+
+    Notes
+    -----
+    Any `Buffer` references are shared and dtypes are not updated.
 
     Examples
     --------
@@ -89,9 +104,11 @@ def freeze(pytree: PyTree) -> PyTree:
     def _freeze_leaf(leaf: Any) -> Any:
         if isinstance(leaf, Param) and leaf.trainable:
             return Param(leaf._value, trainable=False)
+        if isinstance(leaf, Buffer):
+            return Buffer(leaf.value)
         return leaf
 
-    return jax.tree.map(_freeze_leaf, pytree, is_leaf=is_param)
+    return jax.tree.map(_freeze_leaf, pytree, is_leaf=_is_param_or_buffer)
 
 
 def unfreeze(pytree: PyTree) -> PyTree:
@@ -103,6 +120,22 @@ def unfreeze(pytree: PyTree) -> PyTree:
     def _unfreeze_leaf(leaf: Any) -> Any:
         if isinstance(leaf, Param) and not leaf.trainable:
             return Param(leaf._value, trainable=True)
+        if isinstance(leaf, Buffer):
+            return Buffer(leaf.value)
         return leaf
 
-    return jax.tree.map(_unfreeze_leaf, pytree, is_leaf=is_param)
+    return jax.tree.map(_unfreeze_leaf, pytree, is_leaf=_is_param_or_buffer)
+
+
+def clone(pytree: PyTree) -> PyTree:
+    """Return a copy whose `Buffer`s are independent of the original.
+
+    >>> independent_model = ion.tree.clone(model)
+    """
+
+    def _clone_leaf(leaf: Any) -> Any:
+        if isinstance(leaf, Buffer):
+            return Buffer(leaf.value)
+        return leaf
+
+    return jax.tree.map(_clone_leaf, pytree, is_leaf=is_buffer)
