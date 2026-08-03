@@ -38,7 +38,14 @@ def test_enable_and_disable_treescope_formatters(monkeypatch):
     """Disable removes both concrete and all-types Treescope formatters."""
     ip = _IPython()
     html_fmt = ip.display_formatter.formatters["text/html"]
-    rendered_types = (ion.nn.Module, ion.nn.Param, ion.Optimizer, ArrayImpl, np.ndarray)
+    rendered_types = (
+        ion.nn.Module,
+        ion.nn.Param,
+        ion.nn.Buffers,
+        ion.Optimizer,
+        ArrayImpl,
+        np.ndarray,
+    )
     monkeypatch.setattr(IPython, "get_ipython", lambda: ip)
 
     ion.enable_treescope()

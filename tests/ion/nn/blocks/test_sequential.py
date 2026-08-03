@@ -95,9 +95,7 @@ class TestSequential:
             training=True,
             key=keys[2],
         )
-        npt.assert_allclose(
-            model(x, training=True, key=key), expected, rtol=1e-5, atol=1e-5
-        )
+        npt.assert_allclose(model(x, training=True, key=key), expected, rtol=1e-5, atol=1e-5)
 
     def test_dropout_requires_training(self):
         """A contained Dropout requires an explicit training mode."""

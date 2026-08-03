@@ -4,9 +4,11 @@ from typing import cast
 
 import jax
 import jax.numpy as jnp
+import jax.tree_util as jtu
 import numpy.testing as npt
 import optax
 import pytest
+import treescope
 
 import ion
 from ion import nn
@@ -35,7 +37,7 @@ class RandomBuffer(nn.BufferModule):
 
     def _init_buffer(self, *, key=None):
         if key is None:
-            raise ValueError("call `model.init_buffers(key=key)`")
+            raise ValueError("call model.init_buffers(key=key)")
         return jax.random.normal(key, (self.size,))
 
 
@@ -64,6 +66,25 @@ def test_nested_container_discovery():
     model = Model()
     buffers = model.init_buffers()
     assert [leaf.shape for leaf in jax.tree.leaves(buffers)] == [(1,), (2,), (3,), (4,), (5,)]
+    paths = [jtu.keystr(path) for path, _ in jtu.tree_leaves_with_path(buffers)]
+    assert paths == [
+        ".direct",
+        ".nested[0][0]",
+        ".listed[0]",
+        ".mapped['a']",
+        ".mapped['b']",
+    ]
+    rendered = repr(buffers)
+    assert "direct: Counter(f32[1])" in rendered
+    assert "nested[0][0]: Counter(f32[2])" in rendered
+    assert "_module_keys" not in rendered
+
+    rendered = treescope.render_to_text(buffers)
+    assert "direct: Counter" in rendered
+    assert "object at" not in rendered
+
+    with pytest.raises(ValueError, match=r"Counter buffer at 'direct' leaf 0 shape"):
+        buffers.set(model.direct, jnp.zeros(2))
 
 
 def test_sequential_discovery():
@@ -75,11 +96,12 @@ def test_sequential_discovery():
 
 
 def test_repeated_instance_deduplicated():
-    """A repeated buffer-module instance receives one payload."""
+    """A repeated buffer-module instance receives one buffer value."""
     repeated = Counter()
     model = nn.Sequential(repeated, (lambda x: x), repeated)
     buffers = model.init_buffers()
     assert len(jax.tree.leaves(buffers)) == 1
+    assert "layers[0] | layers[2]: Counter" in repr(buffers)
 
 
 def test_deterministic_init_without_key():
@@ -202,7 +224,7 @@ def test_wrong_model_raises():
 
 
 def test_replaced_layer_raises():
-    """Replacing a BufferModule invalidates its old payload."""
+    """Replacing a BufferModule invalidates its old buffer value."""
     layer = Counter()
     buffers = layer.init_buffers()
 
@@ -229,15 +251,15 @@ def test_parameter_surgery_preserves_buffer_identity():
     ],
 )
 def test_update_validation(value, message):
-    """Updates must preserve payload structure, shape, and dtype."""
+    """Updates must preserve buffer structure, shape, and dtype."""
     layer = Counter()
     buffers = layer.init_buffers()
     with pytest.raises((TypeError, ValueError), match=message):
         buffers.set(layer, value)
 
 
-def test_payload_must_be_a_nonempty_pytree_of_arrays():
-    """A buffer payload must be a non-empty pytree containing only arrays."""
+def test_value_must_be_a_nonempty_pytree_of_arrays():
+    """A buffer value must be a non-empty pytree containing only arrays."""
 
     class Invalid(nn.BufferModule):
         def _init_buffer(self, *, key=None):

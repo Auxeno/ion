@@ -80,6 +80,23 @@ class TestSaveLoad:
         array_keys = sorted(k for k in header if k != "__metadata__")
         assert array_keys == ["b", "w"]
 
+    def test_buffer_keys_include_module_paths(self):
+        """Buffer tensor names preserve the owning module path."""
+
+        class Model(nn.Module):
+            norm: nn.BatchNorm
+
+            def __init__(self):
+                self.norm = nn.BatchNorm(2)
+
+        buffers = Model().init_buffers()
+        with tempfile.NamedTemporaryFile(suffix=".ion") as f:
+            checkpoint.save(f.name, buffers)
+            header = read_header(f.name)
+
+        array_keys = sorted(k for k in header if k != "__metadata__")
+        assert array_keys == ["norm[0]", "norm[1]"]
+
     def test_field_reorder_loads_correctly(self):
         """Reordering fields in the reference model still loads correctly."""
 
@@ -144,6 +161,7 @@ class TestSaveLoad:
             assert os.path.exists(os.path.join(d, "model.ion"))
             loaded = checkpoint.load(os.path.join(d, "model"), model)
         npt.assert_array_equal(loaded.w._value, model.w._value)
+
 
 class TestSaveLoadCallable:
     def test_callable_comes_from_reference_not_file(self):

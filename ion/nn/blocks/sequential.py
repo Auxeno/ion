@@ -47,7 +47,7 @@ class Sequential(Module):
         keys = [None] * len(self.layers) if key is None else jax.random.split(key, len(self.layers))
         return_buffers = buffers is not None
 
-        for layer, key_layer in zip(self.layers, keys):
+        for layer, layer_key in zip(self.layers, keys):
             parameters = inspect.signature(layer).parameters
             kwargs = {}
 
@@ -56,7 +56,7 @@ class Sequential(Module):
                     raise ValueError(f"{type(layer).__name__} requires training=True or False")
                 kwargs["training"] = training
             if "key" in parameters:
-                kwargs["key"] = key_layer
+                kwargs["key"] = layer_key
             if "buffers" in parameters:
                 if buffers is None:
                     raise ValueError(f"{type(layer).__name__} requires model.init_buffers()")

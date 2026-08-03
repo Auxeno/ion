@@ -1,10 +1,11 @@
+import dataclasses
+
 import jax
 import jax.numpy as jnp
 import numpy.testing as npt
 import pytest
 
 from ion import nn
-from ion.nn import Buffers
 
 
 class TestBatchNorm:
@@ -46,9 +47,7 @@ class TestBatchNorm:
         )
         x = jnp.array([[3.0, 5.0]])
         y, _ = layer(x, buffers, training=False)
-        expected = (x - jnp.array([1.0, 2.0])) / jnp.sqrt(
-            jnp.array([4.0, 9.0]) + layer.eps
-        )
+        expected = (x - jnp.array([1.0, 2.0])) / jnp.sqrt(jnp.array([4.0, 9.0]) + layer.eps)
         npt.assert_allclose(y, expected)
 
     def test_evaluation_preserves_buffers(self):
@@ -108,9 +107,9 @@ class TestBatchNorm:
         layer = nn.BatchNorm(3)
         buffers = layer.init_buffers()
         x = jax.random.normal(jax.random.key(0), (4, 3))
-        model_grad = jax.grad(
-            lambda model: jnp.square(model(x, buffers, training=True)[0]).sum()
-        )(layer)
+        model_grad = jax.grad(lambda model: jnp.square(model(x, buffers, training=True)[0]).sum())(
+            layer
+        )
 
         assert jnp.all(jnp.isfinite(model_grad.scale._value))
         assert model_grad.b is not None
@@ -407,9 +406,7 @@ class TestSpectralNorm:
 
     def test_conv(self):
         """Convolutional weights flatten across non-output dimensions."""
-        conv = nn.SpectralNorm(
-            nn.Conv(3, 6, kernel_shape=(3, 3), padding=1, key=jax.random.key(2))
-        )
+        conv = nn.SpectralNorm(nn.Conv(3, 6, kernel_shape=(3, 3), padding=1, key=jax.random.key(2)))
         conv_buffers = conv.init_buffers(key=jax.random.key(3))
         y, _ = conv(jnp.ones((2, 8, 8, 3)), conv_buffers, training=True)
         assert y.shape == (2, 8, 8, 6)
@@ -475,7 +472,7 @@ class TestSpectralNorm:
         """Power vectors with stale shapes raise an error."""
         layer = nn.SpectralNorm(nn.Linear(4, 5, key=jax.random.key(0)))
         buffers = layer.init_buffers(key=jax.random.key(1))
-        malformed = Buffers(buffers._keys, ((jnp.ones(4), jnp.ones(4)),))
+        malformed = dataclasses.replace(buffers, _values=((jnp.ones(4), jnp.ones(4)),))
         with pytest.raises((TypeError, ValueError)):
             layer(jnp.ones((2, 4)), malformed, training=True)
 

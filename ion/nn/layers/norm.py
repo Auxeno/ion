@@ -78,9 +78,9 @@ class BatchNorm(BufferModule):
 
         # Use batch statistics and update the running values during training
         if training:
-            reduction_axes = tuple(range(x.ndim - 1))
-            mean = jnp.mean(x, axis=reduction_axes)
-            var = jnp.mean(jnp.square(x - mean), axis=reduction_axes)
+            reduce_axes = tuple(range(x.ndim - 1))
+            mean = jnp.mean(x, axis=reduce_axes)
+            var = jnp.mean(jnp.square(x - mean), axis=reduce_axes)
 
             new_mean = (1.0 - self.momentum) * running_mean + self.momentum * mean
             new_var = (1.0 - self.momentum) * running_var + self.momentum * var
@@ -237,10 +237,10 @@ class SpectralNorm(BufferModule):
         eps: float = 1e-12,
     ) -> None:
 
-        value = getattr(module, parameter)
-        if not isinstance(value, Param):
+        parameter_value = getattr(module, parameter)
+        if not isinstance(parameter_value, Param):
             raise TypeError(f"{type(module).__name__}.{parameter} must be a Param")
-        if value.ndim < 2:
+        if parameter_value.ndim < 2:
             raise ValueError(f"{type(module).__name__}.{parameter} must be at least 2D")
         if power_iterations < 1:
             raise ValueError(f"power_iterations ({power_iterations}) must be at least 1")
@@ -256,7 +256,7 @@ class SpectralNorm(BufferModule):
     def _init_buffer(self, *, key: PRNGKeyArray | None = None) -> tuple[Array, Array]:
 
         if key is None:
-            raise ValueError("SpectralNorm requires a key; call `model.init_buffers(key=key)`")
+            raise ValueError("SpectralNorm requires a key; call model.init_buffers(key=key)")
 
         key_u, key_v = jax.random.split(key)
         weight = jnp.asarray(getattr(self.module, self.parameter))
@@ -302,6 +302,6 @@ class SpectralNorm(BufferModule):
         sigma = jnp.maximum(sigma, jnp.asarray(self.eps, dtype=sigma.dtype))
         weight = weight / sigma
 
-        module = getattr(self.module.at, self.parameter).set(weight)
+        normalized_module = getattr(self.module.at, self.parameter).set(weight)
 
-        return module(x), buffers
+        return normalized_module(x), buffers
