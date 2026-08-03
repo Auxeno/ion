@@ -35,11 +35,13 @@ parameters.
 ```python
 y = x @ w
 w.shape
-jnp.asarray(w)
+w.value
 ```
 
-Use `jnp.asarray(param)` when the underlying array is needed. Accessing the
-private `param._value` bypasses `stop_gradient` for frozen parameters.
+Use `param.value` when the underlying array is needed, such as for a function
+that requires a plain array. It is the parameter as autodiff sees it, with
+`stop_gradient` applied when frozen. The private `param._value` is the raw
+stored array and bypasses `stop_gradient`.
 
 ## How does it work?
 

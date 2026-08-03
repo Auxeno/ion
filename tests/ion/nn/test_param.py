@@ -38,6 +38,23 @@ class TestPytreeRegistration:
         npt.assert_array_equal(doubled._value, jnp.array([2.0, 4.0]))
 
 
+class TestValue:
+    def test_value_returns_array(self):
+        p = nn.Param(jnp.array([1.0, 2.0]))
+        assert isinstance(p.value, jax.Array)
+        npt.assert_array_equal(p.value, jnp.array([1.0, 2.0]))
+
+    def test_value_stops_gradient_when_frozen(self):
+        frozen = nn.Param(jnp.array([1.0, 2.0]), trainable=False)
+        grads = jax.grad(lambda p: jnp.sum(p.value**2))(frozen)
+        npt.assert_array_equal(grads._value, jnp.zeros(2))
+
+    def test_value_passes_gradient_when_trainable(self):
+        p = nn.Param(jnp.array([1.0, 2.0]))
+        grads = jax.grad(lambda p: jnp.sum(p.value**2))(p)
+        npt.assert_allclose(grads._value, jnp.array([2.0, 4.0]))
+
+
 class TestJaxArrayProtocol:
     def test_jax_array_protocol(self):
         """__jax_array__ lets jnp operations work directly on Param."""

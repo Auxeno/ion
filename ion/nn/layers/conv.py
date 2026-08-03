@@ -11,7 +11,6 @@ Glorot uniform weight init, zeros for bias.
 from typing import Literal
 
 import jax
-import jax.numpy as jnp
 from jax import lax
 from jax.nn.initializers import Initializer, glorot_uniform, zeros
 from jaxtyping import Array, Float, PRNGKeyArray
@@ -92,7 +91,7 @@ class Conv(Module):
 
         x = lax.conv_general_dilated(
             lhs=x,
-            rhs=jnp.asarray(self.w),
+            rhs=self.w.value,
             window_strides=self.stride,
             padding=self.padding,
             rhs_dilation=self.dilation,
@@ -205,7 +204,7 @@ class ConvTranspose(Module):
 
         x = lax.conv_general_dilated(
             lhs=x,
-            rhs=jnp.asarray(self.w),
+            rhs=self.w.value,
             window_strides=(1,) * num_spatial,
             padding=self.padding,
             lhs_dilation=self.stride,

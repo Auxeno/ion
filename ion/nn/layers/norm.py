@@ -242,7 +242,7 @@ class SpectralNorm(Module):
         if eps <= 0.0:
             raise ValueError(f"eps ({eps}) must be greater than 0")
 
-        weight = jnp.asarray(param)
+        weight = param.value
         matrix = weight.reshape(-1, weight.shape[-1]).T
 
         u = jax.random.normal(key, (matrix.shape[0],), dtype=matrix.dtype)
@@ -279,7 +279,8 @@ class SpectralNorm(Module):
         training: bool,
     ) -> Any:
 
-        weight = jnp.asarray(getattr(self.module, self.parameter))
+        param = getattr(self.module, self.parameter)
+        weight = param.value
         matrix = weight.reshape(-1, weight.shape[-1]).T
         u, v = self.u.value, self.v.value
 
@@ -294,6 +295,7 @@ class SpectralNorm(Module):
         sigma = jnp.maximum(sigma, jnp.asarray(self.eps, dtype=sigma.dtype))
         weight = (weight / sigma).astype(weight.dtype)
 
-        normalized_module = getattr(self.module.at, self.parameter).set(weight)
+        normalized = Param(weight, trainable=param.trainable)
+        normalized_module = getattr(self.module.at, self.parameter).set(normalized)
 
         return normalized_module(x)

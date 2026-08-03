@@ -88,7 +88,7 @@ Rebuilding resets momentum buffers, which is what you want: newly unfrozen param
 
 ## Some lower-level LAX functions don't accept `Param` directly
 
-Most `jnp` operations accept `Param` transparently. Lower-level functions like `lax.conv_general_dilated` require plain arrays: convert with `jnp.asarray(param)`, which goes through `__jax_array__` and applies `stop_gradient` for frozen params, so autograd correctness is preserved. **Never use `param._value` for this.** It bypasses `stop_gradient`, so frozen params receive real gradients during the backward pass, breaking the guarantee that frozen params produce zero gradients. The field is private, reserved for internal code that deliberately needs the raw array.
+Most `jnp` operations accept `Param` transparently. Lower-level functions like `lax.conv_general_dilated` require plain arrays: use `param.value`, which applies `stop_gradient` for frozen params, so autograd correctness is preserved. **Never use `param._value` for this.** It is the raw stored array and bypasses `stop_gradient`, so frozen params receive real gradients during the backward pass, breaking the guarantee that frozen params produce zero gradients. It is reserved for internal code that deliberately needs raw storage, such as checkpointing and dtype casting.
 
 ## A `bfloat16` model with `float32` inputs promotes back to `float32`
 

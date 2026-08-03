@@ -2,6 +2,10 @@
 
 ## 0.12.0
 
+- **New `Param.value` property.** Reads the parameter as autodiff sees it, applying
+  `stop_gradient` when frozen, and matches `Buffer.value`. Use it instead of
+  `jnp.asarray(param)` where a plain array is needed. The private `_value` field is
+  unchanged and still holds the raw stored array.
 - **New `nn.Buffer` for stateful layers.** Buffers hold mutable, non-trainable values
   directly in a model. Read them with `.value` and update them with `.set`, which
   applies `stop_gradient`. They contribute no pytree leaves, so `jax.grad`,
