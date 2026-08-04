@@ -11,6 +11,8 @@
   `CrossAttention` now zero their attention contribution when no keys are valid.
 - **BatchNorm stores unbiased running variance.** Training still normalizes with the
   biased batch variance, while the running estimate applies `n / (n - 1)`.
+- **Checkpoint writes are atomic.** Interrupted saves no longer destroy an existing
+  checkpoint at the destination path.
 
 ## 0.12.0
 

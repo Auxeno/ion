@@ -10,9 +10,12 @@ complex64. Array leaves and Param trainable flags are saved; non-array leaves
 (ints, floats, callables) come from the reference tree on load.
 """
 
+import contextlib
 import json
 import math
+import os
 import struct
+import tempfile
 import warnings
 from typing import Any
 
@@ -102,14 +105,22 @@ def save(path: str, pytree: PyTree) -> None:
     header_bytes = json.dumps(header).encode()
     header_bytes += b" " * (-(8 + len(header_bytes)) % 8)
 
-    # Write the length prefix, header and raw tensor bytes
+    # Write beside the destination, then atomically replace it
     if not path.endswith(".ion"):
         path += ".ion"
-    with open(path, "wb") as f:
-        f.write(struct.pack("<Q", len(header_bytes)))
-        f.write(header_bytes)
-        for array in arrays.values():
-            f.write(np.ascontiguousarray(array).tobytes())
+    fd, temporary_path = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)))
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(struct.pack("<Q", len(header_bytes)))
+            f.write(header_bytes)
+            for array in arrays.values():
+                f.write(np.ascontiguousarray(array).tobytes())
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary_path, path)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(temporary_path)
 
 
 def load(path: str, reference_pytree: PyTree) -> PyTree:

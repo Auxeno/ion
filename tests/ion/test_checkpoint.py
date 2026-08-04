@@ -23,6 +23,21 @@ def read_header(path):
 
 
 class TestSaveLoad:
+    def test_failed_save_preserves_existing_checkpoint(self, tmp_path, monkeypatch):
+        """A failed write leaves the destination and directory unchanged."""
+        path = tmp_path / "model.ion"
+        path.write_bytes(b"existing checkpoint")
+
+        def fail(_):
+            raise OSError("write failed")
+
+        monkeypatch.setattr(checkpoint.np, "ascontiguousarray", fail)
+        with pytest.raises(OSError, match="write failed"):
+            checkpoint.save(str(path), {"x": jnp.ones(1)})
+
+        assert path.read_bytes() == b"existing checkpoint"
+        assert list(tmp_path.iterdir()) == [path]
+
     def test_roundtrip_on_module(self):
         """Saving and loading a module preserves all parameter values."""
 
