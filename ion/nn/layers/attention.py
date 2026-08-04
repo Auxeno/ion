@@ -11,6 +11,7 @@ Masks may be (s, t) shared, (b, s, t) per batch, or (b, h, s, t) per head.
 """
 
 import jax
+import jax.numpy as jnp
 from jax.nn.initializers import Initializer, glorot_uniform, zeros
 from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
@@ -85,12 +86,17 @@ class SelfAttention(Module):
         k = (x @ self.w_k).reshape(b, s, self.num_kv_heads, -1)
         v = (x @ self.w_v).reshape(b, s, self.num_kv_heads, -1)
 
-        if mask is not None and mask.ndim == 3:
-            mask = mask[:, None]
+        if mask is not None and mask.ndim < 4:
+            mask = mask.reshape(-1, 1, *mask.shape[-2:])
 
         x = jax.nn.dot_product_attention(
             q, k, v, mask=mask, is_causal=self.causal, local_window_size=self.window
         )
+
+        # Zero out fully masked query rows
+        if mask is not None:
+            valid = mask.any(axis=-1).swapaxes(-1, -2)[..., None]
+            x = jnp.where(valid, x, 0.0)
 
         x = x.reshape(b, s, -1) @ self.w_out
 
@@ -157,10 +163,15 @@ class CrossAttention(Module):
         k = (context @ self.w_k).reshape(b, t, self.num_heads, -1)
         v = (context @ self.w_v).reshape(b, t, self.num_heads, -1)
 
-        if mask is not None and mask.ndim == 3:
-            mask = mask[:, None]
+        if mask is not None and mask.ndim < 4:
+            mask = mask.reshape(-1, 1, *mask.shape[-2:])
 
         x = jax.nn.dot_product_attention(q, k, v, mask=mask)
+
+        # Zero out fully masked query rows
+        if mask is not None:
+            valid = mask.any(axis=-1).swapaxes(-1, -2)[..., None]
+            x = jnp.where(valid, x, 0.0)
 
         x = x.reshape(b, s, -1) @ self.w_out
 

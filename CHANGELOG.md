@@ -7,6 +7,8 @@
 - **Numerically sensitive reductions compute in `float32`.** Normalization and
   pooling layers, plus segment sum, mean, and softmax, cast results back to the
   input dtype for improved reduced-precision stability.
+- **Fully masked attention rows no longer leak values.** `SelfAttention` and
+  `CrossAttention` now zero their attention contribution when no keys are valid.
 
 ## 0.12.0
 

@@ -7,7 +7,7 @@ x : jax.Array["b s d", float]
 mask : jax.Array["...", bool] | None, default=None
     Optional boolean mask where `True` means attend and `False` means ignore.
     Accepts `(s, s)`, `(b, s, s)`, or `(b, h, s, s)`. Composes with `causal`
-    and `window`.
+    and `window`. Fully masked query heads contribute zeros.
 
 Returns
 -------

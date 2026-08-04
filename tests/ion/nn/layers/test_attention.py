@@ -138,13 +138,13 @@ class TestSelfAttention:
         y = layer(x, mask=mask)
         assert y.shape == (2, 4, 8)
 
-    def test_fully_masked_row_finite(self):
-        """A query row with no attendable positions stays finite (mean of values, not NaN)."""
+    def test_fully_masked_row_zero(self):
+        """A query row with no attendable positions contributes zero."""
         layer = nn.SelfAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 4, 8))
         mask = jnp.ones((2, 4, 4), dtype=bool).at[0, 2].set(False)
         y = layer(x, mask=mask)
-        assert jnp.all(jnp.isfinite(y))
+        npt.assert_array_equal(y[0, 2], 0.0)
 
     def test_fully_masked_row_other_rows_unchanged(self):
         """Rows with attendable positions are unaffected by a fully masked row."""
@@ -158,20 +158,20 @@ class TestSelfAttention:
         npt.assert_allclose(y[1], y_full[1], atol=1e-6)
 
     def test_fully_masked_row_with_causal(self):
-        """Fully masked query row stays finite when combined with causal masking."""
+        """A fully masked query row contributes zero with causal masking."""
         layer = nn.SelfAttention(8, num_heads=2, causal=True, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 4, 8))
         mask = jnp.ones((2, 4, 4), dtype=bool).at[0, 2].set(False)
         y = layer(x, mask=mask)
-        assert jnp.all(jnp.isfinite(y))
+        npt.assert_array_equal(y[0, 2], 0.0)
 
     def test_fully_masked_row_gradients_finite(self):
-        """Gradients stay finite when a query row is fully masked."""
+        """A fully masked query row has zero input gradient."""
         layer = nn.SelfAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 4, 8))
         mask = jnp.ones((2, 4, 4), dtype=bool).at[0, 2].set(False)
-        grads = jax.grad(lambda x: layer(x, mask=mask).sum())(x)
-        assert jnp.all(jnp.isfinite(grads))
+        grads = jax.grad(lambda x: layer(x, mask=mask)[0, 2].sum())(x)
+        npt.assert_array_equal(grads, 0.0)
 
     def test_grouped_query_attention(self):
         """num_kv_heads below num_heads (GQA) gives fewer kv heads and correct output shape."""
@@ -346,14 +346,14 @@ class TestCrossAttention:
         y = layer(x, ctx, mask=mask)
         assert y.shape == (2, 3, 8)
 
-    def test_fully_masked_row_finite(self):
-        """A query row with no attendable context positions stays finite (not NaN)."""
+    def test_fully_masked_row_zero(self):
+        """A query row with no attendable context positions contributes zero."""
         layer = nn.CrossAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 3, 8))
         ctx = jax.random.normal(jax.random.key(2), (2, 5, 8))
         mask = jnp.ones((2, 3, 5), dtype=bool).at[0, 1].set(False)
         y = layer(x, ctx, mask=mask)
-        assert jnp.all(jnp.isfinite(y))
+        npt.assert_array_equal(y[0, 1], 0.0)
 
     def test_fully_masked_row_other_rows_unchanged(self):
         """Rows with attendable positions are unaffected by a fully masked row."""
@@ -368,13 +368,13 @@ class TestCrossAttention:
         npt.assert_allclose(y[1], y_full[1], atol=1e-6)
 
     def test_fully_masked_row_gradients_finite(self):
-        """Gradients stay finite when a query row is fully masked."""
+        """A fully masked query row has zero context gradient."""
         layer = nn.CrossAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 3, 8))
         ctx = jax.random.normal(jax.random.key(2), (2, 5, 8))
         mask = jnp.ones((2, 3, 5), dtype=bool).at[0, 1].set(False)
-        grads = jax.grad(lambda c: layer(x, c, mask=mask).sum())(ctx)
-        assert jnp.all(jnp.isfinite(grads))
+        grads = jax.grad(lambda c: layer(x, c, mask=mask)[0, 1].sum())(ctx)
+        npt.assert_array_equal(grads, 0.0)
 
 
 class TestCrossAttentionValidation:

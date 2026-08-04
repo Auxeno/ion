@@ -10,6 +10,7 @@ context : jax.Array["b t c", float]
 mask : jax.Array["...", bool] | None, default=None
     Optional boolean mask over query-key pairs, where `True` means attend and
     `False` means ignore. Accepts `(s, t)`, `(b, s, t)`, or `(b, h, s, t)`.
+    Fully masked query heads contribute zeros.
 
 Returns
 -------
