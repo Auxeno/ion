@@ -9,6 +9,8 @@
   input dtype for improved reduced-precision stability.
 - **Fully masked attention rows no longer leak values.** `SelfAttention` and
   `CrossAttention` now zero their attention contribution when no keys are valid.
+- **BatchNorm stores unbiased running variance.** Training still normalizes with the
+  biased batch variance, while the running estimate applies `n / (n - 1)`.
 
 ## 0.12.0
 

@@ -22,14 +22,23 @@ class TestBatchNorm:
         npt.assert_allclose(jnp.var(y, axis=(0, 1)), 1.0, atol=1e-5)
 
     def test_running_stats_update(self):
-        """Training applies the configured momentum to running statistics."""
+        """Running variance uses the Bessel-corrected batch estimate."""
         layer = nn.BatchNorm(2, momentum=0.25)
         x = jnp.array([[1.0, 2.0], [5.0, 8.0]])
         layer(x, training=True)
         batch_mean = jnp.mean(x, axis=0)
-        batch_var = jnp.var(x, axis=0)
+        batch_var = jnp.var(x, axis=0, ddof=1)
         npt.assert_allclose(layer.running_mean.value, 0.25 * batch_mean)
         npt.assert_allclose(layer.running_var.value, 0.75 + 0.25 * batch_var)
+
+    def test_running_variance_counts_all_reduction_axes(self):
+        """The variance correction includes batch and spatial positions."""
+        layer = nn.BatchNorm(2, momentum=1.0)
+        x = jnp.arange(24, dtype=jnp.float32).reshape(2, 3, 2, 2)
+
+        layer(x, training=True)
+
+        npt.assert_allclose(layer.running_var.value, jnp.var(x, axis=(0, 1, 2), ddof=1))
 
     def test_evaluation_uses_running_stats(self):
         """Evaluation normalizes with stored running statistics."""

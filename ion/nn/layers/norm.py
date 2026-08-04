@@ -69,12 +69,13 @@ class BatchNorm(Module):
             reduce_axes = tuple(range(x.ndim - 1))
             mean = jnp.mean(x, axis=reduce_axes)
             var = jnp.mean(jnp.square(x - mean), axis=reduce_axes)
+            n = x.size // x.shape[-1]
 
             self.running_mean.set(
                 (1.0 - self.momentum) * self.running_mean.value + self.momentum * mean
             )
             self.running_var.set(
-                (1.0 - self.momentum) * self.running_var.value + self.momentum * var
+                (1.0 - self.momentum) * self.running_var.value + self.momentum * var * n / (n - 1)
             )
         else:
             mean = self.running_mean.value
