@@ -31,12 +31,12 @@ class TestOptimizerInit:
         assert optimizer.state is not None
         assert len(jax.tree.leaves(optimizer.state)) > 0
 
-    def test_step_is_zero_int32(self):
-        """Initial step counter is zero with int32 dtype."""
+    def test_step_is_zero_uint32(self):
+        """Initial step counter is zero with uint32 dtype."""
         model = nn.Linear(4, 2, key=jax.random.key(0))
         optimizer = ion.Optimizer(optax.adam(1e-3), model)
         assert optimizer.step == 0
-        assert optimizer.step.dtype == jnp.int32
+        assert optimizer.step.dtype == jnp.uint32
 
     def test_auto_partitions_frozen(self):
         """Optimizer auto-partitions when all params are frozen."""
@@ -95,6 +95,18 @@ class TestOptimizerUpdate:
         grads = jax.grad(lambda m: jnp.mean(m(x) ** 2))(model)
         model, optimizer = optimizer.update(model, grads)
         assert optimizer.step == 2
+
+    def test_step_increments_past_int32_max(self):
+        """The uint32 counter continues beyond the signed int32 range."""
+        model = nn.Linear(4, 1, key=jax.random.key(0))
+        optimizer = ion.Optimizer(optax.sgd(1e-3), model)
+        optimizer.step = jnp.array(jnp.iinfo(jnp.int32).max, dtype=jnp.uint32)
+
+        grads = jax.grad(lambda m: jnp.mean(m(jnp.ones((2, 4))) ** 2))(model)
+        _, optimizer = optimizer.update(model, grads)
+
+        assert optimizer.step == jnp.uint32(jnp.iinfo(jnp.int32).max + 1)
+        assert optimizer.step.dtype == jnp.uint32
 
     def test_decreases_loss(self):
         """10-step training loop decreases MSE."""

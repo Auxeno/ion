@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.12.1
+
+- **Optimizer step counters use `uint32`.** This raises the maximum update count
+  from roughly 2.1 billion to 4.3 billion.
+
 ## 0.12.0
 
 - **New `Param.value` property.** Reads the parameter as autodiff sees it, applying

@@ -152,7 +152,7 @@ class Optimizer:
             self._fields = None
         self._structure = jax.tree.structure(model_without_buffers)
         self.state = self._transform.init(model_without_buffers)
-        self.step = jnp.array(0, dtype=jnp.int32)
+        self.step = jnp.array(0, dtype=jnp.uint32)
 
     def update(self, model: PyTree, grads: PyTree, **kwargs) -> tuple[PyTree, "Optimizer"]:
         """Apply gradients to the model and advance optimizer state.
