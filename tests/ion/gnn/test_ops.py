@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 import numpy.testing as npt
+import pytest
 
 from ion import gnn
 from ion.gnn import ops
@@ -74,6 +75,16 @@ class TestSegmentSoftmax:
         jitted = jax.jit(gnn.segment_softmax, static_argnums=2)(data, segment_ids, 1)
         npt.assert_allclose(eager, jitted, atol=1e-6)
 
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
+    def test_mixed_precision(self, dtype):
+        """Normalization uses float32 while preserving the input dtype."""
+        data = jnp.zeros(4096, dtype=dtype)
+        segment_ids = jnp.zeros(4096, dtype=jnp.int32)
+        result = gnn.segment_softmax(data, segment_ids, num_segments=1)
+
+        assert result.dtype == dtype
+        npt.assert_array_equal(result, jnp.full(4096, 1 / 4096, dtype=dtype))
+
 
 class TestAddSelfLoops:
     def test_output_length(self):
@@ -113,8 +124,8 @@ class TestAddSelfLoops:
 
 class TestReexports:
     def test_aliases_jax_ops(self):
-        """Re-exported segment ops are the jax.ops functions themselves."""
-        assert ops.segment_sum is jax.ops.segment_sum
+        """Unwrapped segment ops are the jax.ops functions themselves."""
+        assert ops.segment_sum is not jax.ops.segment_sum
         assert ops.segment_max is jax.ops.segment_max
         assert ops.segment_min is jax.ops.segment_min
         assert ops.segment_prod is jax.ops.segment_prod
@@ -122,6 +133,24 @@ class TestReexports:
         assert gnn.segment_max is ops.segment_max
         assert gnn.segment_min is ops.segment_min
         assert gnn.segment_prod is ops.segment_prod
+
+
+class TestSegmentSum:
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
+    def test_mixed_precision(self, dtype):
+        """Floating-point sums accumulate in float32 and return the input dtype."""
+        data = jnp.ones(4096, dtype=dtype)
+        segment_ids = jnp.zeros(4096, dtype=jnp.int32)
+        result = gnn.segment_sum(data, segment_ids, num_segments=1)
+
+        assert result.dtype == dtype
+        npt.assert_array_equal(result, jnp.array([4096], dtype=dtype))
+
+    def test_integer_data_is_not_cast_to_float32(self):
+        """Integer segment sums retain exact integer behavior."""
+        data = jnp.array([2**24, 1], dtype=jnp.int32)
+        result = gnn.segment_sum(data, jnp.array([0, 0]), num_segments=1)
+        npt.assert_array_equal(result, jnp.array([2**24 + 1], dtype=jnp.int32))
 
 
 class TestSegmentMean:
@@ -154,6 +183,16 @@ class TestSegmentMean:
         eager = gnn.segment_mean(data, segment_ids, 2)
         jitted = jax.jit(gnn.segment_mean, static_argnums=2)(data, segment_ids, 2)
         npt.assert_allclose(eager, jitted, atol=1e-6)
+
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
+    def test_mixed_precision(self, dtype):
+        """Sums and counts use float32 while preserving the input dtype."""
+        data = jnp.concatenate((jnp.zeros(2048, dtype=dtype), jnp.ones(2048, dtype=dtype)))
+        segment_ids = jnp.zeros(4096, dtype=jnp.int32)
+        result = gnn.segment_mean(data, segment_ids, num_segments=1)
+
+        assert result.dtype == dtype
+        npt.assert_array_equal(result, jnp.array([0.5], dtype=dtype))
 
 
 class TestMeanPool:

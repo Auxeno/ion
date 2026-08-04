@@ -53,6 +53,15 @@ class TestMaxPool:
         y = layer(x)
         assert y.shape == (1, 4, 4, 3)
 
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
+    def test_mixed_precision(self, dtype):
+        """Pooling uses float32 while preserving the input dtype."""
+        x = jnp.arange(16, dtype=dtype).reshape(1, 4, 4, 1)
+        y = nn.MaxPool(kernel_shape=(2, 2))(x)
+
+        assert y.dtype == dtype
+        npt.assert_array_equal(y, jnp.array([[[[5], [7]], [[13], [15]]]], dtype=dtype))
+
 
 class TestMaxPoolConstructor:
     def test_empty_kernel_shape_raises(self):
@@ -170,6 +179,15 @@ class TestAvgPool:
         included = nn.AvgPool(kernel_shape=(2, 2))
         excluded = nn.AvgPool(kernel_shape=(2, 2), count_include_pad=False)
         npt.assert_allclose(included(x), excluded(x), rtol=1e-6)
+
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
+    def test_mixed_precision(self, dtype):
+        """Window sums use float32 while preserving the input dtype."""
+        x = jnp.ones((1, 4096, 1), dtype=dtype)
+        y = nn.AvgPool(kernel_shape=(4096,))(x)
+
+        assert y.dtype == dtype
+        npt.assert_array_equal(y, jnp.ones((1, 1, 1), dtype=dtype))
 
 
 class TestAvgPoolConstructor:

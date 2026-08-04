@@ -4,6 +4,8 @@
 
 `BatchNorm` and `SpectralNorm` hold their non-trainable state in [`Buffer`](../../core/buffers.md) fields, updated in place during training calls.
 
+`BatchNorm`, `LayerNorm`, `GroupNorm`, and `RMSNorm` compute in `float32` for numerical stability, then cast back to the input dtype.
+
 ::: ion.nn.BatchNorm
 
 ::: ion.nn.LayerNorm

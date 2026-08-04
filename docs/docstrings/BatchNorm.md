@@ -39,6 +39,5 @@ y = norm(x, training=False)  # (8, 64), running statistics
 
 Note
 ----
-Running statistics use JAX's default floating dtype. The result returns to the
-input dtype after the learned affine transform. Buffers are not changed by
-`Module.astype` or the optimizer.
+Running statistics use JAX's default floating dtype. Buffers are not changed
+by `Module.astype` or the optimizer.

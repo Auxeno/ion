@@ -99,6 +99,10 @@ model = model.astype(jnp.bfloat16)
 y = model(x.astype(jnp.bfloat16))
 ```
 
+## Numerically sensitive reductions use `float32`
+
+Normalization layers, pooling layers, and floating-point segment reductions compute in `float32`, even when JAX's 64-bit mode is enabled, and cast results back to the input dtype. Write a custom operation if a reduction itself must use `float64`.
+
 ## Module immutability is shallow
 
 `_frozen` prevents field reassignment, but mutable containers (lists, dicts, numpy arrays) stored in fields can still be mutated in place: `model.layers.append(...)` bypasses the freeze. Worse, mutating a static field in place does **not** trigger JIT recompilation, because JAX identifies pytree aux data by object identity, so the mutated list still hits the stale cached trace with the old value baked in. Use `at` to create a new module with the updated field.

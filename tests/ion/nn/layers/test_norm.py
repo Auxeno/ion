@@ -70,15 +70,19 @@ class TestBatchNorm:
 
     @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
     def test_mixed_precision(self, dtype):
-        """Running statistics stay float32 without promoting the output."""
+        """Statistics use float32 without promoting the output."""
         layer = nn.BatchNorm(2).astype(dtype)
-        x = jnp.array([[1.0, 3.0], [2.0, 7.0], [4.0, 11.0]], dtype=dtype)
+        x = (100 * jax.random.normal(jax.random.key(0), (2, 4096, 2))).astype(dtype)
         y = layer(x, training=True)
+        expected_layer = nn.BatchNorm(2)
+        expected = expected_layer(x.astype(jnp.float32), training=True).astype(dtype)
 
         assert y.dtype == dtype
         assert layer.running_mean.value.dtype == jnp.float32
         assert layer.running_var.value.dtype == jnp.float32
-        assert jnp.all(jnp.isfinite(y))
+        npt.assert_allclose(y, expected, rtol=1e-2, atol=1e-2)
+        npt.assert_allclose(layer.running_mean.value, expected_layer.running_mean.value)
+        npt.assert_allclose(layer.running_var.value, expected_layer.running_var.value)
 
     @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
     @pytest.mark.parametrize("training", [False, True])
@@ -184,6 +188,18 @@ class TestLayerNorm:
         x = jax.random.normal(jax.random.key(0), (4, 8)) + 5.0
         assert not jnp.allclose(nn.LayerNorm(8, bias=False)(x), nn.RMSNorm(8)(x))
 
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
+    def test_mixed_precision(self, dtype):
+        """Normalization uses float32 while preserving the input dtype."""
+        layer = nn.LayerNorm(4096).astype(dtype)
+        x = (100 * jax.random.normal(jax.random.key(0), (2, 4096))).astype(dtype)
+
+        y = layer(x)
+        expected = nn.LayerNorm(4096)(x.astype(jnp.float32)).astype(dtype)
+
+        assert y.dtype == dtype
+        npt.assert_allclose(y, expected, rtol=1e-2, atol=1e-2)
+
 
 class TestGroupNorm:
     def test_zero_mean_per_group(self):
@@ -282,6 +298,18 @@ class TestGroupNorm:
         means = jnp.mean(y, axis=(1, 2))
         npt.assert_allclose(means, 0.0, atol=1e-5)
 
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
+    def test_mixed_precision(self, dtype):
+        """Normalization uses float32 while preserving the input dtype."""
+        layer = nn.GroupNorm(8, 2, num_spatial_dims=2).astype(dtype)
+        x = (100 * jax.random.normal(jax.random.key(0), (2, 32, 32, 8))).astype(dtype)
+
+        y = layer(x)
+        expected = nn.GroupNorm(8, 2, num_spatial_dims=2)(x.astype(jnp.float32)).astype(dtype)
+
+        assert y.dtype == dtype
+        npt.assert_allclose(y, expected, rtol=1e-2, atol=1e-2)
+
 
 class TestRMSNorm:
     def test_unit_rms(self):
@@ -296,6 +324,18 @@ class TestRMSNorm:
         """Scale is initialized to all ones."""
         layer = nn.RMSNorm(8)
         npt.assert_allclose(layer.scale._value, jnp.ones(8))
+
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
+    def test_mixed_precision(self, dtype):
+        """Normalization uses float32 while preserving the input dtype."""
+        layer = nn.RMSNorm(4096).astype(dtype)
+        x = (100 * jax.random.normal(jax.random.key(0), (2, 4096))).astype(dtype)
+
+        y = layer(x)
+        expected = nn.RMSNorm(4096)(x.astype(jnp.float32)).astype(dtype)
+
+        assert y.dtype == dtype
+        npt.assert_allclose(y, expected, rtol=1e-2, atol=1e-2)
 
 
 class TestSpectralNorm:

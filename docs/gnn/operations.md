@@ -2,9 +2,15 @@
 
 Segment reductions, graph-level pooling, and graph-building helpers. These functions back the GNN layers and can also be composed into custom message-passing layers. The [GNN guide](guide.md) explains the array conventions and `graph_ids`.
 
-The `jax.ops` functions `segment_sum`, `segment_max`, `segment_min`, and `segment_prod` are re-exported through `ion.gnn.ops` and `ion.gnn`, so graph layers and public callers share one segment-operation namespace.
+Floating-point segment sum, mean, and softmax operations, including graph sum and mean pooling, compute in `float32` for numerical stability, then cast back to the input dtype.
+
+`segment_max`, `segment_min`, and `segment_prod` are re-exported from `jax.ops`.
 
 ## Segment reductions
+
+::: ion.gnn.segment_sum
+    options:
+      heading_level: 3
 
 ::: ion.gnn.segment_softmax
     options:

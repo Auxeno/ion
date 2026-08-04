@@ -60,7 +60,9 @@ class BatchNorm(Module):
 
         if x.ndim < 2:
             raise ValueError("BatchNorm input must have at least one reduction dimension")
+
         dtype = x.dtype
+        x = x.astype(jnp.float32)
 
         # Use batch statistics and update the running values during training
         if training:
@@ -108,6 +110,8 @@ class LayerNorm(Module):
         self.b = Param(jnp.zeros(dim)) if bias else None
 
     def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
+        dtype = x.dtype
+        x = x.astype(jnp.float32)
 
         mean = jnp.mean(x, axis=-1, keepdims=True)
         var = jnp.mean(jnp.square(x - mean), axis=-1, keepdims=True)
@@ -119,7 +123,7 @@ class LayerNorm(Module):
         if self.b is not None:
             x = x + self.b
 
-        return x
+        return x.astype(dtype)
 
 
 class GroupNorm(Module):
@@ -157,6 +161,8 @@ class GroupNorm(Module):
         self.b = Param(jnp.zeros(dim))
 
     def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
+        dtype = x.dtype
+        x = x.astype(jnp.float32)
 
         num_spatial = self.num_spatial_dims
 
@@ -175,7 +181,7 @@ class GroupNorm(Module):
         # Merge groups back
         x = x.reshape(*x.shape[:-2], -1)
 
-        return x * self.scale + self.b
+        return (x * self.scale + self.b).astype(dtype)
 
 
 class RMSNorm(Module):
@@ -195,12 +201,14 @@ class RMSNorm(Module):
         self.scale = Param(jnp.ones(dim))
 
     def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
+        dtype = x.dtype
+        x = x.astype(jnp.float32)
 
         rms = jnp.mean(jnp.square(x), axis=-1, keepdims=True)
 
         x = x * lax.rsqrt(rms + self.eps)
 
-        return x * self.scale
+        return (x * self.scale).astype(dtype)
 
 
 class SpectralNorm(Module):

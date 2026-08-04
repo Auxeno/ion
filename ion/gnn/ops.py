@@ -1,7 +1,7 @@
 """Graph operations.
 
 Functions:
-    segment_sum      Sum reduction within segments. (Re-exported from jax.ops.)
+    segment_sum      Sum reduction within segments with float32 accumulation.
     segment_max      Maximum reduction within segments. (Re-exported from jax.ops.)
     segment_min      Minimum reduction within segments. (Re-exported from jax.ops.)
     segment_prod     Product reduction within segments. (Re-exported from jax.ops.)
@@ -13,15 +13,16 @@ Functions:
     batch_graphs     Pack graphs into one disconnected graph for batched message passing.
     add_self_loops   Append identity edges so every node sends a message to itself.
 
-`segment_sum`, `segment_max`, `segment_min` and `segment_prod` are re-exported
-from `jax.ops`, so all graph layers and public segment reductions share this
-module as their canonical namespace.
+`segment_max`, `segment_min` and `segment_prod` are re-exported from `jax.ops`.
+`segment_sum` wraps the JAX operation with float32 accumulation for floating-point data.
 """
 
 from collections.abc import Sequence
+from typing import Any
 
+import jax
 import jax.numpy as jnp
-from jax.ops import segment_max, segment_min, segment_prod, segment_sum
+from jax.ops import segment_max, segment_min, segment_prod
 from jaxtyping import Array, Float, Int
 
 __all__ = [
@@ -39,6 +40,36 @@ __all__ = [
 ]
 
 
+def segment_sum(
+    data: Array,
+    segment_ids: Int[Array, " e"],
+    num_segments: int | None = None,
+    indices_are_sorted: bool = False,
+    unique_indices: bool = False,
+    bucket_size: int | None = None,
+    mode: Any = None,
+) -> Array:
+    """Sum values within each segment.
+
+    >>> sums = segment_sum(messages, receivers, num_nodes)
+    """
+    dtype = data.dtype
+    if jnp.issubdtype(dtype, jnp.floating):
+        data = data.astype(jnp.float32)
+
+    result = jax.ops.segment_sum(
+        data,
+        segment_ids,
+        num_segments,
+        indices_are_sorted=indices_are_sorted,
+        unique_indices=unique_indices,
+        bucket_size=bucket_size,
+        mode=mode,
+    )
+
+    return result.astype(dtype)
+
+
 def segment_softmax(
     data: Float[Array, "e ..."],
     segment_ids: Int[Array, " e"],
@@ -48,6 +79,9 @@ def segment_softmax(
 
     >>> weights = segment_softmax(logits, receivers, num_nodes)
     """
+    dtype = data.dtype
+    data = data.astype(jnp.float32)
+
     # Subtract per-segment max for numerical stability
     maxes = segment_max(data, segment_ids, num_segments)
     maxes = jnp.where(jnp.isinf(maxes), 0.0, maxes)
@@ -55,7 +89,7 @@ def segment_softmax(
 
     # Normalize by per-segment sum; guard empty segments (never indexed) against 0 / 0
     sums = segment_sum(data, segment_ids, num_segments)
-    return data / jnp.where(sums == 0, 1.0, sums)[segment_ids]
+    return (data / jnp.where(sums == 0, 1.0, sums)[segment_ids]).astype(dtype)
 
 
 def segment_mean(
@@ -67,12 +101,15 @@ def segment_mean(
 
     >>> means = segment_mean(messages, receivers, num_nodes)
     """
+    dtype = data.dtype
+    data = data.astype(jnp.float32)
+
     sums = segment_sum(data, segment_ids, num_segments)
 
     # Count segment members; guard empty segments against 0 / 0
     counts = segment_sum(jnp.ones_like(segment_ids, dtype=data.dtype), segment_ids, num_segments)
     counts = jnp.maximum(counts, 1)
-    return sums / counts.reshape(-1, *(1,) * (data.ndim - 1))
+    return (sums / counts.reshape(-1, *(1,) * (data.ndim - 1))).astype(dtype)
 
 
 def mean_pool(

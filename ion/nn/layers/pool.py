@@ -66,6 +66,8 @@ class MaxPool(Module):
         self.padding = resolved_padding
 
     def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
+        dtype = x.dtype
+        x = x.astype(jnp.float32)
 
         padding = self.padding if isinstance(self.padding, str) else ((0, 0), *self.padding, (0, 0))
 
@@ -78,7 +80,7 @@ class MaxPool(Module):
             padding=padding,
         )
 
-        return x
+        return x.astype(dtype)
 
 
 class AvgPool(Module):
@@ -132,6 +134,8 @@ class AvgPool(Module):
         self.count_include_pad = count_include_pad
 
     def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
+        dtype = x.dtype
+        x = x.astype(jnp.float32)
 
         padding = self.padding if isinstance(self.padding, str) else ((0, 0), *self.padding, (0, 0))
 
@@ -162,4 +166,4 @@ class AvgPool(Module):
 
         x = x / window_counts
 
-        return x
+        return x.astype(dtype)

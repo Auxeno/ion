@@ -4,6 +4,9 @@
 
 - **Optimizer step counters use `uint32`.** This raises the maximum update count
   from roughly 2.1 billion to 4.3 billion.
+- **Numerically sensitive reductions compute in `float32`.** Normalization and
+  pooling layers, plus segment sum, mean, and softmax, cast results back to the
+  input dtype for improved reduced-precision stability.
 
 ## 0.12.0
 
