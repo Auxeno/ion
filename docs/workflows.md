@@ -51,10 +51,12 @@ def loss_fn(model, x, y):
     model = model.astype(jnp.bfloat16)
     x = x.astype(jnp.bfloat16)
     logits = model(x)
-    return optax.softmax_cross_entropy_with_integer_labels(logits, y).mean()
+    return optax.softmax_cross_entropy_with_integer_labels(
+        logits.astype(jnp.float32), y
+    ).mean()
 ```
 
-The cast is differentiable, so gradients return in float32 to match the master parameters and optimizer state. Only the forward and backward computation uses bfloat16.
+The casts are differentiable, so gradients return in float32 to match the master parameters and optimizer state. The model's forward and backward computation uses bfloat16, while cross-entropy stays in float32 for numerical stability.
 
 Buffers are not cast, and the cast model shares them with the master rather than copying them, so a stateful layer keeps float32 running statistics and keeps updating the master's copy of them.
 
