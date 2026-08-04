@@ -3,7 +3,7 @@
 from .blocks.mlp import MLP
 from .blocks.sequential import Sequential
 from .buffer import Buffer
-from .layers.attention import CrossAttention, SelfAttention
+from .layers.attention import Attention, dot_product_attention_with_rope
 from .layers.conv import Conv, ConvTranspose
 from .layers.dropout import Dropout
 from .layers.embedding import Embedding
@@ -22,11 +22,11 @@ __all__ = [
     "Module",
     "Buffer",
     "Param",
+    "Attention",
     "AvgPool",
     "BatchNorm",
     "Conv",
     "ConvTranspose",
-    "CrossAttention",
     "Dropout",
     "Embedding",
     "GroupNorm",
@@ -51,9 +51,9 @@ __all__ = [
     "S4DCell",
     "S5",
     "S5Cell",
-    "SelfAttention",
     "Sequential",
     "SpectralNorm",
     "alibi",
+    "dot_product_attention_with_rope",
     "sinusoidal",
 ]
