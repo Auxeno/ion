@@ -13,6 +13,7 @@ from typing import Any, Generic, TypeVar
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
+from jax.core import Tracer
 from jaxtyping import Array
 
 from .param import Param
@@ -22,7 +23,7 @@ T = TypeVar("T", bound=Array)
 
 @jtu.register_pytree_node_class
 class Buffer(Generic[T]):
-    """Marks a JAX array as a non-trainable value updated in place.
+    """Holds persistent, non-trainable array state mutated by a forward pass.
 
     Parameters
     ----------
@@ -31,21 +32,27 @@ class Buffer(Generic[T]):
 
     Notes
     -----
-    Buffers hold state such as BatchNorm running statistics. They are updated
-    during a forward pass rather than by an optimizer, and `set` applies
-    `stop_gradient` so they stay out of autodiff.
+    Buffers are for state such as BatchNorm running statistics: values owned by
+    a layer and updated during its forward pass rather than by an optimizer.
+    `set` applies `stop_gradient` so buffer state stays out of autodiff.
     A buffer is mutable, so copies sharing one buffer share its state.
+    Use an ordinary JAX array for non-parameter data that does not require mutation.
 
     Examples
     --------
     >>> running_mean = Buffer(jnp.zeros(16))
-    >>> running_mean.set(0.9 * running_mean.value + 0.1 * mean)
+    >>> running_mean.set(jnp.ones(16))
+    >>> running_mean.value.shape
+    (16,)
     """
 
     __slots__ = ("_ref",)
 
     def __init__(self, value: T) -> None:
-        self._ref = jax.new_ref(jnp.asarray(value))
+        array = jnp.asarray(value)
+        if isinstance(array, Tracer):
+            raise ValueError("Cannot create a Buffer inside a JAX transform, build models eagerly")
+        self._ref = jax.new_ref(array)
 
     @property
     def value(self) -> T:

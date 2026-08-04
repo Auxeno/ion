@@ -11,8 +11,3 @@ Returns
 -------
 Float[Array, "..."]
     Wrapped module output.
-
-Info
-----
-Training refines the power-iteration vectors in place, so the same layer
-instance carries them into the next call.

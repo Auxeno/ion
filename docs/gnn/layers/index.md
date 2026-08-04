@@ -1,8 +1,6 @@
 # Graph neural network layers
 
-Every graph layer receives a node feature matrix and parallel COO
-`senders`/`receivers` arrays. See the [GNN guide](../guide.md) for graph
-representation, message passing, self-loops, batching, and pooling.
+Every graph layer receives a node feature matrix and parallel COO `senders`/`receivers` arrays. See the [GNN guide](../guide.md) for graph representation, message passing, self-loops, batching, and pooling.
 
 ## Choose a layer
 

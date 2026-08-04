@@ -18,8 +18,7 @@ Recurrent layers over `(batch, time, features)` inputs. `RNN`, `LSTM`, and `GRU`
 
 ## Recurrent State
 
-Sequence layers default to a zero initial state. Pass `hx` to start from a
-custom state or continue a recurrence across sequence chunks.
+Sequence layers default to a zero initial state. Pass `hx` to start from a custom state or continue a recurrence across sequence chunks.
 
 ```python
 rnn = nn.RNN(3, 16, key=key)

@@ -1,7 +1,6 @@
 # Param
 
-Wraps an array to mark it as a trainable or frozen model parameter. Bare arrays
-remain ordinary model data rather than parameters.
+`Param` marks a JAX array as a model parameter. Ion uses it for parameter inspection and to tell the [`Optimizer`](optimizer.md) what it may update.
 
 ::: ion.nn.Param
     options:
@@ -11,26 +10,18 @@ remain ordinary model data rather than parameters.
 
 ## Trainability
 
-A model field can represent three different things:
+| Value | Meaning |
+|---|---|
+| `Param(array)` | Trainable parameter. |
+| `Param(array, trainable=False)` | Frozen parameter. |
+| Bare JAX array | Ordinary, non-parameter model data. |
+| [`Buffer(array)`](buffers.md) | Non-trainable state mutated during a forward pass. |
 
-- `Param(array)` is trainable: gradients flow and the optimizer updates it.
-- `Param(array, trainable=False)` is frozen: `stop_gradient` produces zero
-  gradients and no optimizer state is allocated.
-- A bare array is ordinary model data: it participates in computation but is
-  not treated as a parameter.
+Frozen params apply `jax.lax.stop_gradient`, receive no optimizer state, and remain identifiable as parameters. Freezing or unfreezing changes the pytree structure, so create a new optimizer afterwards.
 
-Values updated by stateful layers are [`Buffer`](buffers.md)s, which are
-mutable and contribute no pytree leaves.
+## Array behaviour
 
-The `trainable` flag is static [pytree](https://docs.jax.dev/en/latest/pytrees.html) metadata. Freezing or unfreezing changes
-the pytree structure and therefore requires a new `Optimizer`.
-
-## Array Behaviour
-
-`Param` implements JAX's array protocol, so it works in array expressions and
-proxies attributes such as `.shape`, `.dtype`, `.T`, and `.reshape(...)`.
-Arithmetic returns ordinary JAX arrays because intermediate results are not
-parameters.
+`Param` implements JAX's array protocol, so it works in array expressions and proxies attributes such as `.shape`, `.dtype`, `.T`, and `.reshape(...)`. Arithmetic returns ordinary JAX arrays because intermediate results are not parameters.
 
 ```python
 y = x @ w
@@ -38,17 +29,4 @@ w.shape
 w.value
 ```
 
-Use `param.value` when the underlying array is needed, such as for a function
-that requires a plain array. It is the parameter as autodiff sees it, with
-`stop_gradient` applied when frozen. The private `param._value` is the raw
-stored array and bypasses `stop_gradient`.
-
-## How does it work?
-
-`Param` is a JAX pytree with its array as a dynamic child and `trainable` as
-static metadata. Its array protocol returns the underlying array for trainable
-parameters and applies `jax.lax.stop_gradient` for frozen parameters.
-
-Arithmetic and attribute access pass through that protocol, which keeps frozen
-parameters outside autodiff even when using operations such as `.reshape()` or
-`.T`.
+Use `param.value` when a function requires a plain array. It respects `stop_gradient` for frozen params; the private `param._value` does not.

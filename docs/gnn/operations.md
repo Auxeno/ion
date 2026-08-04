@@ -1,13 +1,8 @@
 # Graph operations
 
-Segment reductions, graph-level pooling, and graph-building helpers. These
-functions back the GNN layers and can also be composed into custom
-message-passing layers. The [GNN guide](guide.md) explains the array
-conventions and `graph_ids`.
+Segment reductions, graph-level pooling, and graph-building helpers. These functions back the GNN layers and can also be composed into custom message-passing layers. The [GNN guide](guide.md) explains the array conventions and `graph_ids`.
 
-The `jax.ops` functions `segment_sum`, `segment_max`, `segment_min`, and
-`segment_prod` are re-exported through `ion.gnn.ops` and `ion.gnn`, so graph
-layers and public callers share one segment-operation namespace.
+The `jax.ops` functions `segment_sum`, `segment_max`, `segment_min`, and `segment_prod` are re-exported through `ion.gnn.ops` and `ion.gnn`, so graph layers and public callers share one segment-operation namespace.
 
 ## Segment reductions
 

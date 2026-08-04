@@ -21,6 +21,8 @@ Ion is benchmarked against Equinox, Flax NNX, and PyTorch on three representativ
 | **ResNet** | 1/1/1/1, width 32 (1.49M) | 2/2/2/2, width 64 (11.69M) | 3/4/23/3, width 64 (41.87M) |
 | **GPT** | 2L/128D/4H, seq 128 (4.49M) | 6L/384D/6H, seq 256 (22.91M) | 12L/768D/12H, seq 512 (109.55M) |
 
+The ResNets use GroupNorm, so the suite does not measure mutable running state or compare stateful-layer APIs.
+
 ## Training throughput
 
 Samples per second for MLP and ResNet; tokens per second for GPT. Higher is better.

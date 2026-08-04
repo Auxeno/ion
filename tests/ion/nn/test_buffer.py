@@ -102,6 +102,15 @@ def test_vmap_raises():
         jax.vmap(lambda x: layer(x, training=True))(jnp.zeros((4, 2)))
 
 
+@pytest.mark.parametrize("build", [lambda m: Counter(), lambda m: m.clone(), lambda m: m.freeze()])
+def test_construction_inside_a_transform_raises(build):
+    """Buffers reject traced values, since a reference built inside a trace dies with it."""
+    layer = Counter()
+
+    with pytest.raises(ValueError, match="inside a JAX transform"):
+        jax.jit(build)(layer)
+
+
 def test_tree_map_copies_share_state():
     """A plain tree.map copy shares buffers with the original."""
     layer = Counter()

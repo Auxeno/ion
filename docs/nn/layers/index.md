@@ -1,8 +1,6 @@
 # Neural network layers
 
-Every `ion.nn` layer is an immutable JAX [pytree](https://docs.jax.dev/en/latest/pytrees.html). Constructors use a keyword-only
-`key` for parameter initialization, and layers work directly with native JAX
-transformations.
+Every `ion.nn` layer is an immutable JAX [pytree](https://docs.jax.dev/en/latest/pytrees.html). Constructors use a keyword-only `key` for parameter initialization, and layers work directly with native JAX transformations.
 
 ## Choose a layer
 
@@ -23,6 +21,4 @@ transformations.
 | [MLP](mlp.md) | `MLP` |
 | [Sequential](sequential.md) | `Sequential` |
 
-`MLP` and `Sequential` assemble other layers but remain ordinary `Module`
-pytrees. The [NN guide](../guide.md#array-conventions) documents the shared
-array, batching, shape, and dtype conventions.
+`MLP` and `Sequential` assemble other layers but remain ordinary `Module` pytrees. The [NN guide](../guide.md#array-conventions) documents the shared array, batching, shape, and dtype conventions.

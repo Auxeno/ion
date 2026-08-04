@@ -1,10 +1,6 @@
 # Module
 
-The base class for everything in Ion. Subclassing `Module` turns a plain class
-into an immutable JAX [pytree](https://docs.jax.dev/en/latest/pytrees.html), so
-models work directly with `jax.jit`, `jax.grad`, and `jax.vmap`. Mutable buffer
-updates have additional transform constraints described in
-[Sharp edges](../sharp-edges.md#buffer-mutation-and-jax-transforms).
+`Module` gives an Ion model its structure. Modules contain arrays, params, buffers, configuration, and other modules, forming a JAX [pytree](https://docs.jax.dev/en/latest/pytrees.html).
 
 ::: ion.nn.Module
     options:
@@ -19,10 +15,34 @@ updates have additional transform constraints described in
 
 ---
 
+## Fields
+
+Declare fields with class annotations and assign them in `__init__`:
+
+| Value | Use it for |
+|---|---|
+| [`Param`](param.md) | Model parameters. |
+| [`Buffer`](buffers.md) | Non-trainable array state mutated during a forward pass. |
+| JAX array | Other array data. |
+| `Module` | Child layers. |
+| Python value | Static configuration. |
+
+```python
+class Block(nn.Module):
+    linear: nn.Linear
+    activation: Callable
+
+    def __init__(self, dim, activation=jax.nn.relu, *, key):
+        self.linear = nn.Linear(dim, dim, key=key)
+        self.activation = activation
+
+    def __call__(self, x):
+        return self.activation(self.linear(x))
+```
+
 ## Immutability
 
-Modules are frozen after `__init__`. Direct assignment raises
-`AttributeError`; methods that change a module return a new value instead.
+Fields are frozen after `__init__`. Model edits return a new module:
 
 ```python
 model = model.at.encoder.layers[0].set(new_layer)
@@ -30,32 +50,8 @@ model = model.freeze()
 model = model.astype(jnp.bfloat16)
 ```
 
-Untouched subtrees are shared with the original model. Changing pytree
-structure or trainability after constructing an optimizer requires a new
-`Optimizer`. See [Sharp edges](../sharp-edges.md).
-
-Stateful layers are the one exception: a [`Buffer`](buffers.md) field holds a
-value the layer updates in place, so buffers do not follow the rule above.
+[`Buffer`](buffers.md) contents are the exception: a module cannot replace the field, but may update the array inside it during a forward pass.
 
 ## How does it work?
 
-Fields containing a `Param`, `Module`, array, or a container of those values
-become dynamic pytree children. JAX traces, differentiates, and transforms
-them. Configuration values such as integers, strings, callables, and `None`
-become static metadata stored in the pytree structure.
-
-```python
-class Block(nn.Module):
-    linear: nn.Linear     # dynamic
-    activation: Callable  # static
-    width: int            # static
-```
-
-Static values are compile-time constants, so changing one creates a new JIT
-specialization. Field classification happens once after construction and is
-then fixed by module immutability.
-
-Ion registers each subclass as a keyed JAX pytree and reconstructs transformed
-modules without rerunning their constructors. This allows constructors to
-create stored parameters from dimensions and an RNG key while JAX transforms
-operate directly on the resulting fields.
+Modules, params, and arrays become dynamic pytree children. Python values such as integers, strings, callables, and `None` become static metadata. Ion reconstructs transformed modules without rerunning their constructors, so models work directly with `jax.jit`, `jax.grad`, and `jax.vmap`.

@@ -15,7 +15,7 @@ Returns
 tuple[PyTree, Optimizer]
     Updated model and new optimizer. Neither input is mutated.
 
-Warning
+Note
 -------
 Changing model structure or trainability requires constructing a new
 `Optimizer`; otherwise `update` raises `ValueError`.

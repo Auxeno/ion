@@ -4,10 +4,7 @@ Known gotchas when using Ion. Some are JAX limitations, others follow from Ion's
 
 ## What Ion leaves out
 
-Some things are left out deliberately. There are no custom transforms and no
-training loop abstraction. The only mutable state is a declared `Buffer` field
-on the layer that owns it, as used by `BatchNorm`. Ion defines and trains
-models; JAX does everything else.
+Some things are left out deliberately. There are no custom transforms and no training loop abstraction. The only mutable state is a declared `Buffer` field on the layer that owns it, as used by `BatchNorm`. Ion defines and trains models; JAX does everything else.
 
 ## Python scalars are compile-time constants
 
@@ -25,48 +22,27 @@ Every distinct set of static values compiles a separate trace, so changing one t
 
 ## Models with buffers are not plain values
 
-A [`Buffer`](core/buffers.md) is mutable, so a model owning one breaks the value
-semantics that hold everywhere else in Ion. A copy made with `jax.tree.map`
-shares its buffers with the original, and updating one updates both.
+A [`Buffer`](core/buffers.md) is mutable, so a model owning one breaks the value semantics that hold everywhere else in Ion. A copy made with `jax.tree.map` shares its buffers with the original, and updating one updates both.
 
 ```python
 copy = jax.tree.map(lambda leaf: leaf, model)  # shares running statistics
 independent = model.clone()                    # owns running statistics
 ```
 
-`clone`, `freeze`, `unfreeze` and `load` all return models with their own
-buffers. `astype` deliberately does not: the mixed-precision workflow casts
-inside the loss, and a cast copy with its own buffers would quietly throw away
-every update made through it. `Optimizer.update` shares them for the same
-reason, since a step continues one model rather than copying it.
+`clone`, `freeze`, `unfreeze` and `load` all return models with their own buffers. `astype` deliberately does not: the mixed-precision workflow casts inside the loss, and a cast copy with its own buffers would quietly throw away every update made through it. `Optimizer.update` shares them for the same reason, since a step continues one model rather than copying it.
 
 ### Buffer mutation and JAX transforms
 
-`jax.vmap` may read a buffer, so stateful models work normally in evaluation.
-It cannot write one shared buffer from several mapped lanes: those concurrent
-writes have no defined ordering or final value. Ion buffers are unmapped pytree
-metadata, so a training call that writes one under `vmap` raises. Pass the whole
-batch to the layer instead; `BatchNorm` reduces over all leading axes. If an
-update must combine mapped values, compute them with `vmap`, reduce them, then
-call `set` once outside it. Use `jax.lax.scan` when updates must be sequential.
-The same restriction applies to `jax.shard_map` over a shared buffer and to
-transforms implemented with batching, such as `jax.jacfwd`.
+`jax.vmap` may read a buffer, so stateful models work normally in evaluation. It cannot write one shared buffer from several mapped lanes: those concurrent writes have no defined ordering or final value. Ion buffers are unmapped pytree metadata, so a training call that writes one under `vmap` raises. Pass the whole batch to the layer instead; `BatchNorm` reduces over all leading axes. If an update must combine mapped values, compute them with `vmap`, reduce them, then call `set` once outside it. Use `jax.lax.scan` when updates must be sequential. The same restriction applies to `jax.shard_map` over a shared buffer and to transforms implemented with batching, such as `jax.jacfwd`.
 
-`jax.checkpoint` (also called `remat`) is unsafe around buffer writes for a
-different reason: it may replay the forward computation during the backward
-pass, applying the update a second time. Keep stateful operations outside the
-rematerialized function:
+`jax.checkpoint` (also called `remat`) is unsafe around buffer writes for a different reason: it may replay the forward computation during the backward pass, applying the update a second time. Keep stateful operations outside the rematerialized function:
 
 ```python
 x = norm(x, training=True)
 x = jax.checkpoint(expensive_stateless_block)(x)
 ```
 
-Independent buffers also have independent pytree structures because reference
-identity is part of a buffer's static metadata. Two separately constructed,
-cloned, or loaded stateful models therefore cannot be inputs to the same
-multi-tree `jax.tree.map`, and each owns a separate JIT specialization. Operate
-on `model.params` when combining or comparing parameter trees.
+Independent buffers also have independent pytree structures because reference identity is part of a buffer's static metadata. Two separately constructed, cloned, or loaded stateful models therefore cannot be inputs to the same multi-tree `jax.tree.map`, and each owns a separate JIT specialization. Operate on `model.params` when combining or comparing parameter trees.
 
 ## Pytrees cannot share references
 
@@ -146,7 +122,4 @@ The inner `grad` returns its gradient wrapped as a `Param`, and abstractifying t
 
 ## `Module.params` preserves static fields
 
-`model.params` replaces plain array and `Buffer` fields with `None`, while
-non-array fields (ints, floats, strings, callables) remain unchanged. This is by
-design: static fields are structural metadata stored in the treedef, not pytree
-leaves, so they are naturally unaffected when dynamic values are replaced.
+`model.params` replaces plain array and `Buffer` fields with `None`, while non-array fields (ints, floats, strings, callables) remain unchanged. This is by design: static fields are structural metadata stored in the treedef, not pytree leaves, so they are naturally unaffected when dynamic values are replaced.
