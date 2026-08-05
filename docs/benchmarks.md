@@ -8,10 +8,10 @@ Ion is benchmarked against Equinox, Flax NNX, and PyTorch on three representativ
 |---|---|
 | **Accelerator** | NVIDIA H100 80GB HBM3 |
 | **Precision** | float32 master parameters, bfloat16 computation |
-| **Ion** | 0.11.1 |
+| **Ion** | 0.13.0 |
 | **JAX stack** | JAX 0.11.0, jaxlib 0.11.0 |
-| **Other frameworks** | Equinox 0.13.8, Flax 0.12.8, PyTorch 2.13.0+cu130 |
-| **Runtime** | Python 3.12.3, CUDA 13.0, cuDNN 9.2 |
+| **Other frameworks** | Equinox 0.13.8, Flax 0.12.8, PyTorch 2.9.1+cu128 |
+| **Runtime** | Python 3.12.3, CUDA 12.8, cuDNN 9.10.2 |
 
 ## Workloads
 
@@ -20,8 +20,6 @@ Ion is benchmarked against Equinox, Flax NNX, and PyTorch on three representativ
 | **MLP** | 4 × 128 (0.29M) | 8 × 512 (2.61M) | 12 × 2048 (46.11M) |
 | **ResNet** | 1/1/1/1, width 32 (1.49M) | 2/2/2/2, width 64 (11.69M) | 3/4/23/3, width 64 (41.87M) |
 | **GPT** | 2L/128D/4H, seq 128 (4.49M) | 6L/384D/6H, seq 256 (22.91M) | 12L/768D/12H, seq 512 (109.55M) |
-
-The ResNets use GroupNorm, so the suite does not measure mutable running state or compare stateful-layer APIs.
 
 ## Training throughput
 
@@ -37,7 +35,7 @@ Samples per second for MLP and ResNet; tokens per second for GPT. Higher is bett
 </div>
 
 !!! note
-    PyTorch's compiled GPT uses FlashAttention by default, while the JAX implementations benchmarked here do not, although they can be configured to use it. This gives PyTorch an advantage in GPT throughput and memory usage.
+    Each framework uses the fastest attention kernel available to it. PyTorch picks one automatically. Ion and Flax NNX ask for JAX's cuDNN backend on the small and medium GPT, and stay on XLA for the tiny GPT, where fusing saves little at sequence length 128. Equinox uses its own einsum attention, since `eqx.nn.MultiheadAttention` cannot swap the attention function.
 
 ## Execution time
 
@@ -78,4 +76,7 @@ Peak accelerator memory observed during a complete training step. Lower is bette
   ></iframe>
 </div>
 
-The [benchmark source](https://github.com/auxeno/ion/tree/51cba60/benchmarks) contains the model implementations and complete measurement procedure.
+!!! note
+    JAX does not expose a way to reset its allocator's peak counter, so the JAX figures also include initialization, compilation, and warm-up. PyTorch's counter is reset immediately before the measured steps.
+
+The [benchmark source](https://github.com/auxeno/ion/tree/3215b8b/benchmarks) contains the model implementations and complete measurement procedure.

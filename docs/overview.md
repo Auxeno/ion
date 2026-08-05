@@ -271,7 +271,7 @@ Casting is how Ion does [mixed precision](workflows.md#mixed-precision); see [Fr
 
 Ion has been benchmarked against Equinox, Flax NNX, and PyTorch across MLP, ResNet, and GPT workloads on an NVIDIA H100.
 
-Ion generally records the best performance across these measured workloads. See [Benchmarks](benchmarks.md) for plots, scope, and methodology.
+Ion performs on par with the fastest of the compared frameworks. See [Benchmarks](benchmarks.md) for plots, scope, and methodology.
 
 ## How Ion compares
 

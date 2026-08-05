@@ -270,11 +270,14 @@ class TestRoPEPrefixTokens:
 
     def test_attention_integration(self):
         """A 2D RoPE composes with MultiHeadAttention through a custom attention_fn."""
+        def attention_with_rope(q, k, v, *, rope, **kwargs):
+            return jax.nn.dot_product_attention(rope(q), rope(k), v, **kwargs)
+
         rope = nn.RoPE(shape=(4, 4), num_prefix_tokens=1)
         attn = nn.MultiHeadAttention(
             8,
             num_heads=2,
-            attention_fn=partial(nn.dot_product_attention_with_rope, rope=rope),
+            attention_fn=partial(attention_with_rope, rope=rope),
             key=jax.random.key(0),
         )
         x = jax.random.normal(jax.random.key(1), (2, 17, 8))

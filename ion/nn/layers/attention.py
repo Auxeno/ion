@@ -3,9 +3,6 @@
 Modules:
     MultiHeadAttention  Multi-head self and cross-attention.
 
-Functions:
-    dot_product_attention_with_rope  Apply RoPE before dot-product attention.
-
 Glorot uniform weight init, zeros for bias.
 Keys and values come from the input unless a separate context is passed.
 Grouped-query and multi-query attention use fewer key/value heads than query heads.
@@ -14,7 +11,6 @@ Masks may be (s, t) shared, (b, s, t) per batch, or (b, h, s, t) per head.
 """
 
 from collections.abc import Callable
-from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -23,7 +19,6 @@ from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
 from ..module import Module
 from ..param import Param
-from .positional import RoPE
 
 
 class MultiHeadAttention(Module):
@@ -119,15 +114,3 @@ class MultiHeadAttention(Module):
             x = x + self.b_out
 
         return x
-
-
-def dot_product_attention_with_rope(
-    query: Float[Array, "b s h k"],
-    key: Float[Array, "b t j k"],
-    value: Float[Array, "b t j k"],
-    *,
-    rope: RoPE,
-    **kwargs: Any,
-) -> Float[Array, "b s h k"]:
-    """Apply rotary embeddings to query and key before dot-product attention."""
-    return jax.nn.dot_product_attention(rope(query), rope(key), value, **kwargs)

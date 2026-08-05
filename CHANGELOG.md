@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.14.0
+
+- **Breaking: `dot_product_attention_with_rope` removed.** The helper saved one composition and did not earn a slot in the public API. 
+
 ## 0.13.0
 
 - **Breaking: optional constructor arguments are keyword-only.** Every layer now places `*` immediately after its last required argument, so the arguments that define a layer's shape stay positional and everything that configures its behaviour is passed by name. `Linear(3, 16)` and `Conv(3, 64, (3, 3))` are unchanged, while `MultiHeadAttention(64, 8)` becomes `MultiHeadAttention(64, num_heads=8)` and `Conv(3, 64, (3, 3), 2, 1)` becomes `Conv(3, 64, (3, 3), stride=2, padding=1)`.
@@ -7,8 +11,8 @@
 - **Breaking: booleans that toggle a component take a `use_` prefix.** `bias` becomes `use_bias` (19 layers), `root_weight` becomes `use_root_weight`, and `beta` becomes `use_beta`, matching `flax.nnx`, `flax.linen`, and `equinox`. Booleans that describe behaviour rather than switch a component on keep their names: `causal`, `normalize`, `count_include_pad`, and `train_eps` are unchanged.
 - **Constructors assign fields in declaration order.** Every layer now builds its pytree children (sub-modules, params, buffers) before its static configuration, matching the order the fields are declared in the class body. Argument defaulting and derived values come first, then validation, then the assignments. Behaviour is unchanged.
 - **Breaking: `SelfAttention` and `CrossAttention` merged into `MultiHeadAttention`.** One layer covers both. `attn(x)` draws keys and values from `x`; `attn(x, x_kv)` draws them from a context sequence. `SelfAttention(dim, num_heads)` becomes `MultiHeadAttention(dim, num_heads=num_heads)`, and `CrossAttention(dim, num_heads, context_dim=c)` becomes `MultiHeadAttention(dim, num_heads=num_heads, kv_dim=c)`. Cross-attention gains grouped-query and multi-query attention, sliding windows, causal masking, and `attention_fn`, none of which it previously supported. Parameter names are unchanged, so existing checkpoints still load.
-- **`MultiHeadAttention` accepts a custom `attention_fn`.** Use a partial to select JAX's cuDNN backend or compose attention with the new RoPE helper.
-- **Breaking: `RoPE` takes the sequence `axis` as constructor config, defaulting to `-3`.** The default matches the `(batch, sequence, heads, head_dim)` queries and keys that `MultiHeadAttention` builds and `jax.nn.dot_product_attention` consumes, so `dot_product_attention_with_rope` no longer overrides it. Under the old default of `-2`, that layout silently rotated across heads rather than positions. Pass `RoPE(axis=-2)` for a head-first layout or a single unbatched head shaped `(sequence, head_dim)`.
+- **`MultiHeadAttention` accepts a custom `attention_fn`.** Use a partial to select JAX's cuDNN backend, or wrap `jax.nn.dot_product_attention` to rotate query and key with `RoPE` first.
+- **Breaking: `RoPE` takes the sequence `axis` as constructor config, defaulting to `-3`.** The default matches the `(batch, sequence, heads, head_dim)` queries and keys that `MultiHeadAttention` builds and `jax.nn.dot_product_attention` consumes, so composing the two through `attention_fn` needs no override. Under the old default of `-2`, that layout silently rotated across heads rather than positions. Pass `RoPE(axis=-2)` for a head-first layout or a single unbatched head shaped `(sequence, head_dim)`.
 - **Breaking: `sinusoidal` is now the `SinusoidalPositionalEmbedding` layer.** The function returned a table for the caller to add; the layer adds it, matching `LearnedPositionalEmbedding` so the two are interchangeable at a call site. Sequence length and feature dimension come from the input, so the layer takes only `theta`, and `dtype` is gone in favour of following the input. `x + nn.sinusoidal(s, d)` becomes `nn.SinusoidalPositionalEmbedding()(x)`.
 - **Breaking: `alibi` removed.** The ALiBi position bias was the one positional feature that could not be composed through `attention_fn`, and materializing its `(heads, seq, seq)` bias defeats fused attention kernels. Use `RoPE`, or build the bias inline and pass it to `jax.nn.dot_product_attention` through its `bias` argument.
 - **Benchmark ResNets use BatchNorm.** Ion's `nn.BatchNorm` and its buffers replace the `GroupNorm` stand-in that existed only because the suite could not carry mutable running statistics, and Equinox, Flax NNX, and PyTorch follow. Parameter counts are unchanged, so the cross-framework parity checks are unaffected, but every stored ResNet result needs re-running.
@@ -84,7 +88,7 @@
 
 ## 0.8.1
 
-- **Style consistency pass.** Source, tests, and vault docs audited against house style. No behavioural changes.
+- **Style consistency pass.** Source, tests, and docs audited against house style. No behavioural changes.
 - **Error messages compacted and unified.** Every `raise` is now at most three lines, shaped `name (value) must be ...`.
 - **`MLP.__call__` annotation fixed.**
 - **Line length enforced.** Ruff now checks `E501` with a 100 character limit.

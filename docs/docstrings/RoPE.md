@@ -29,18 +29,21 @@ k = jnp.ones((4, 16, 8, 32))
 q = rope(q)  # (4, 16, 8, 32) -> (4, 16, 8, 32)
 k = rope(k)  # (4, 16, 8, 32) -> (4, 16, 8, 32)
 
+# Bound into an attention layer, which applies it to query and key
+def attention_with_rope(q, k, v, *, rope, **kwargs):
+    return jax.nn.dot_product_attention(rope(q), rope(k), v, **kwargs)
+
+attn = nn.MultiHeadAttention(
+    768,
+    num_heads=12,
+    attention_fn=functools.partial(attention_with_rope, rope=rope),
+    key=key,
+)
+x = jnp.ones((4, 128, 768))
+y = attn(x)  # (4, 128, 768) -> (4, 128, 768)
+
 # 2D lattice over a 14x14 patch grid, behind a single CLS token
 rope_2d = nn.RoPE(shape=(14, 14), num_prefix_tokens=1)
 q = jnp.ones((4, 197, 8, 32))
 q = rope_2d(q)  # (4, 197, 8, 32) -> (4, 197, 8, 32)
-
-# Bound into an attention layer, which applies it to query and key
-attn = nn.MultiHeadAttention(
-    768,
-    num_heads=12,
-    attention_fn=functools.partial(nn.dot_product_attention_with_rope, rope=rope_2d),
-    key=key,
-)
-x = jnp.ones((4, 197, 768))
-y = attn(x)  # (4, 197, 768) -> (4, 197, 768)
 ```
