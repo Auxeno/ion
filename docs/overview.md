@@ -114,7 +114,7 @@ Each [`ion.nn`](nn/layers/index.md) layer is a `Module`, constructed with a `key
 | [Recurrent](nn/layers/recurrent.md) | `RNN`, `LSTM`, `GRU` |
 | [State Space](nn/layers/ssm.md) | `S4D`, `S5`, `LRU` |
 | [Embedding](nn/layers/embedding.md) | `Embedding` |
-| [Positional](nn/layers/positional.md) | `RoPE`, `LearnedPositionalEmbedding`, `sinusoidal`, `alibi` |
+| [Positional](nn/layers/positional.md) | `RoPE`, `LearnedPositionalEmbedding`, `SinusoidalPositionalEmbedding` |
 | [Pooling](nn/layers/pool.md) | `MaxPool`, `AvgPool` |
 | [Dropout](nn/layers/dropout.md) | `Dropout` |
 | [LoRA](nn/layers/lora.md) | `LoRALinear` |

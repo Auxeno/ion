@@ -113,6 +113,7 @@ def test_params_property(layer_and_input):
             nn.AvgPool,
             nn.Dropout,
             nn.RoPE,
+            nn.SinusoidalPositionalEmbedding,
         ),
     ):
         return  # No params expected

@@ -122,12 +122,12 @@ class MultiHeadAttention(Module):
 
 
 def dot_product_attention_with_rope(
-    query: Array,
-    key: Array,
-    value: Array,
+    query: Float[Array, "b s h k"],
+    key: Float[Array, "b t j k"],
+    value: Float[Array, "b t j k"],
     *,
     rope: RoPE,
     **kwargs: Any,
-) -> Array:
+) -> Float[Array, "b s h k"]:
     """Apply rotary embeddings to query and key before dot-product attention."""
-    return jax.nn.dot_product_attention(rope(query, axis=-3), rope(key, axis=-3), value, **kwargs)
+    return jax.nn.dot_product_attention(rope(query), rope(key), value, **kwargs)

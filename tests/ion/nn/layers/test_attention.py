@@ -100,11 +100,10 @@ class TestMultiHeadAttention:
         query = jax.random.normal(keys[0], (2, 5, 2, 4))
         key = jax.random.normal(keys[1], (2, 5, 2, 4))
         value = jax.random.normal(keys[2], (2, 5, 2, 4))
-        rope = nn.RoPE()
-        apply_rope = jax.vmap(rope, in_axes=-2, out_axes=-2)
+        apply_rope = jax.vmap(nn.RoPE(axis=-2), in_axes=-2, out_axes=-2)
 
         expected = jax.nn.dot_product_attention(apply_rope(query), apply_rope(key), value)
-        actual = nn.dot_product_attention_with_rope(query, key, value, rope=rope)
+        actual = nn.dot_product_attention_with_rope(query, key, value, rope=nn.RoPE())
 
         npt.assert_allclose(actual, expected, rtol=1e-6, atol=1e-6)
 

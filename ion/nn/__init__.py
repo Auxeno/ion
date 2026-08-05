@@ -12,7 +12,7 @@ from .layers.linear import Linear
 from .layers.lora import LoRALinear
 from .layers.norm import BatchNorm, GroupNorm, LayerNorm, RMSNorm, SpectralNorm
 from .layers.pool import AvgPool, MaxPool
-from .layers.positional import LearnedPositionalEmbedding, RoPE, alibi, sinusoidal
+from .layers.positional import LearnedPositionalEmbedding, RoPE, SinusoidalPositionalEmbedding
 from .layers.recurrent import GRU, LSTM, RNN, GRUCell, LSTMCell, RNNCell
 from .layers.ssm import LRU, S4D, S5, LRUCell, S4DCell, S5Cell
 from .module import Module
@@ -52,8 +52,7 @@ __all__ = [
     "S5",
     "S5Cell",
     "Sequential",
+    "SinusoidalPositionalEmbedding",
     "SpectralNorm",
-    "alibi",
     "dot_product_attention_with_rope",
-    "sinusoidal",
 ]

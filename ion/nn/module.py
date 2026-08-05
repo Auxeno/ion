@@ -3,8 +3,8 @@
 Classes:
     Module   Auto-registers subclasses as frozen JAX pytrees.
 
-Subclassing `Module` gives you: dataclass conversion, pytree registration,
-and immutability after `__init__`. No manual boilerplate needed.
+Subclassing `Module` gives you dataclass conversion, pytree registration,
+and immutability after `__init__`.
 """
 
 import dataclasses
@@ -31,14 +31,14 @@ class _Static:
 
     __slots__ = ("value",)
 
-    def __init__(self, value):
+    def __init__(self, value: Any) -> None:
         self.value = value
 
-    def tree_flatten(self):
+    def tree_flatten(self) -> tuple[list[Any], Any]:
         return [], self.value
 
     @classmethod
-    def tree_unflatten(cls, aux, children):
+    def tree_unflatten(cls, aux: Any, children: Iterable[Any]) -> "_Static":
         return cls(aux)
 
 

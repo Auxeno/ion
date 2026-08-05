@@ -2,123 +2,49 @@
 
 ## 0.13.0
 
-- **Breaking: optional constructor arguments are keyword-only.** Every layer now places
-  `*` immediately after its last required argument, so the arguments that define a layer's
-  shape stay positional and everything that configures its behaviour is passed by name.
-  `Linear(3, 16)` and `Conv(3, 64, (3, 3))` are unchanged, while
-  `MultiHeadAttention(64, 8)` becomes `MultiHeadAttention(64, num_heads=8)` and
-  `Conv(3, 64, (3, 3), 2, 1)` becomes `Conv(3, 64, (3, 3), stride=2, padding=1)`.
-- **Breaking: `GATConv` and `GATv2Conv` rename `b` to `b_out`.** The output bias now matches
-  `MultiHeadAttention` and `TransformerConv`, and moves after the edge projections so it is
-  declared last among the parameters. Checkpoints holding a GAT bias no longer load, since
-  tensor names follow attribute paths.
-- **Breaking: GAT layers split their RNG key in declaration order.** The key for the output
-  bias moved from the middle of the split to the end, so with `edge_dim` set, `w_edge` and
-  `att_edge` now draw different subkeys and initialize to different values for a given seed.
-  `w`, `att_sender`, `att_receiver`, and `w_sender`/`w_receiver` are unaffected. Checkpoints
-  are unaffected, since only initialization changes.
-- **Breaking: booleans that toggle a component take a `use_` prefix.** `bias` becomes
-  `use_bias` (19 layers), `root_weight` becomes `use_root_weight`, and `beta` becomes
-  `use_beta`, matching `flax.nnx`, `flax.linen`, and `equinox`. Booleans that describe
-  behaviour rather than switch a component on keep their names: `causal`, `normalize`,
-  `count_include_pad`, and `train_eps` are unchanged.
-- **Constructors assign fields in declaration order.** Every layer now builds its pytree
-  children (sub-modules, params, buffers) before its static configuration, matching the
-  order the fields are declared in the class body. Argument defaulting and derived values
-  come first, then validation, then the assignments. Behaviour is unchanged.
-- **Breaking: `SelfAttention` and `CrossAttention` merged into `MultiHeadAttention`.** One
-  layer covers both. `attn(x)` draws keys and values from `x`; `attn(x, x_kv)` draws them
-  from a context sequence. `SelfAttention(dim, num_heads)` becomes
-  `MultiHeadAttention(dim, num_heads=num_heads)`, and
-  `CrossAttention(dim, num_heads, context_dim=c)` becomes
-  `MultiHeadAttention(dim, num_heads=num_heads, kv_dim=c)`. Cross-attention gains
-  grouped-query and multi-query attention, sliding windows, causal masking, and
-  `attention_fn`, none of which it previously supported. Parameter names are unchanged, so
-  existing checkpoints still load.
-- **`MultiHeadAttention` accepts a custom `attention_fn`.** Use a partial to select JAX's
-  cuDNN backend or compose attention with the new RoPE helper. RoPE now accepts an
-  explicit sequence axis for projected multi-head inputs.
-- **RoPE handles N-dimensional positions.** Pass `shape` to lay positions on a lattice
-  instead of a flat sequence, splitting the head dimension evenly across its axes, as
-  axial RoPE does for images. `num_prefix_tokens` holds leading CLS or register tokens
-  at position 0, where the rotation is the identity. `head_dim` must be divisible by
-  `2 * len(shape)`. Breaking: `theta` moves to the end of the constructor, so pass it
-  by keyword.
+- **Breaking: optional constructor arguments are keyword-only.** Every layer now places `*` immediately after its last required argument, so the arguments that define a layer's shape stay positional and everything that configures its behaviour is passed by name. `Linear(3, 16)` and `Conv(3, 64, (3, 3))` are unchanged, while `MultiHeadAttention(64, 8)` becomes `MultiHeadAttention(64, num_heads=8)` and `Conv(3, 64, (3, 3), 2, 1)` becomes `Conv(3, 64, (3, 3), stride=2, padding=1)`.
+- **Breaking: `GATConv` and `GATv2Conv` rename `b` to `b_out`.** The output bias now matches `MultiHeadAttention` and `TransformerConv`, and moves after the edge projections so it is declared last among the parameters. Checkpoints holding a GAT bias no longer load, since tensor names follow attribute paths.
+- **Breaking: GAT layers split their RNG key in declaration order.** The key for the output bias moved from the middle of the split to the end, so with `edge_dim` set, `w_edge` and `att_edge` now draw different subkeys and initialize to different values for a given seed. `w`, `att_sender`, `att_receiver`, and `w_sender`/`w_receiver` are unaffected. Checkpoints are unaffected, since only initialization changes.
+- **Breaking: booleans that toggle a component take a `use_` prefix.** `bias` becomes `use_bias` (19 layers), `root_weight` becomes `use_root_weight`, and `beta` becomes `use_beta`, matching `flax.nnx`, `flax.linen`, and `equinox`. Booleans that describe behaviour rather than switch a component on keep their names: `causal`, `normalize`, `count_include_pad`, and `train_eps` are unchanged.
+- **Constructors assign fields in declaration order.** Every layer now builds its pytree children (sub-modules, params, buffers) before its static configuration, matching the order the fields are declared in the class body. Argument defaulting and derived values come first, then validation, then the assignments. Behaviour is unchanged.
+- **Breaking: `SelfAttention` and `CrossAttention` merged into `MultiHeadAttention`.** One layer covers both. `attn(x)` draws keys and values from `x`; `attn(x, x_kv)` draws them from a context sequence. `SelfAttention(dim, num_heads)` becomes `MultiHeadAttention(dim, num_heads=num_heads)`, and `CrossAttention(dim, num_heads, context_dim=c)` becomes `MultiHeadAttention(dim, num_heads=num_heads, kv_dim=c)`. Cross-attention gains grouped-query and multi-query attention, sliding windows, causal masking, and `attention_fn`, none of which it previously supported. Parameter names are unchanged, so existing checkpoints still load.
+- **`MultiHeadAttention` accepts a custom `attention_fn`.** Use a partial to select JAX's cuDNN backend or compose attention with the new RoPE helper.
+- **Breaking: `RoPE` takes the sequence `axis` as constructor config, defaulting to `-3`.** The default matches the `(batch, sequence, heads, head_dim)` queries and keys that `MultiHeadAttention` builds and `jax.nn.dot_product_attention` consumes, so `dot_product_attention_with_rope` no longer overrides it. Under the old default of `-2`, that layout silently rotated across heads rather than positions. Pass `RoPE(axis=-2)` for a head-first layout or a single unbatched head shaped `(sequence, head_dim)`.
+- **Breaking: `sinusoidal` is now the `SinusoidalPositionalEmbedding` layer.** The function returned a table for the caller to add; the layer adds it, matching `LearnedPositionalEmbedding` so the two are interchangeable at a call site. Sequence length and feature dimension come from the input, so the layer takes only `theta`, and `dtype` is gone in favour of following the input. `x + nn.sinusoidal(s, d)` becomes `nn.SinusoidalPositionalEmbedding()(x)`.
+- **Breaking: `alibi` removed.** The ALiBi position bias was the one positional feature that could not be composed through `attention_fn`, and materializing its `(heads, seq, seq)` bias defeats fused attention kernels. Use `RoPE`, or build the bias inline and pass it to `jax.nn.dot_product_attention` through its `bias` argument.
+- **RoPE handles N-dimensional positions.** Pass `shape` to lay positions on a lattice instead of a flat sequence, splitting the head dimension evenly across its axes, as axial RoPE does for images. `num_prefix_tokens` holds leading CLS or register tokens at position 0, where the rotation is the identity. `head_dim` must be divisible by `2 * len(shape)`. Breaking: `theta` moves to the end of the constructor, so pass it by keyword.
 
 ## 0.12.1
 
-- **Optimizer step counters use `uint32`.** This raises the maximum update count
-  from roughly 2.1 billion to 4.3 billion.
-- **Numerically sensitive reductions compute in `float32`.** Normalization and
-  pooling layers, plus segment sum, mean, and softmax, cast results back to the
-  input dtype for improved reduced-precision stability.
-- **Fully masked attention rows no longer leak values.** `SelfAttention` and
-  `CrossAttention` now zero their attention contribution when no keys are valid.
-- **BatchNorm stores unbiased running variance.** Training still normalizes with the
-  biased batch variance, while the running estimate applies `n / (n - 1)`.
-- **Checkpoint writes are atomic.** Interrupted saves no longer destroy an existing
-  checkpoint at the destination path.
+- **Optimizer step counters use `uint32`.** This raises the maximum update count from roughly 2.1 billion to 4.3 billion.
+- **Numerically sensitive reductions compute in `float32`.** Normalization and pooling layers, plus segment sum, mean, and softmax, cast results back to the input dtype for improved reduced-precision stability.
+- **Fully masked attention rows no longer leak values.** `SelfAttention` and `CrossAttention` now zero their attention contribution when no keys are valid.
+- **BatchNorm stores unbiased running variance.** Training still normalizes with the biased batch variance, while the running estimate applies `n / (n - 1)`.
+- **Checkpoint writes are atomic.** Interrupted saves no longer destroy an existing checkpoint at the destination path.
 
 ## 0.12.0
 
-- **New `Param.value` property.** Reads the parameter as autodiff sees it, applying
-  `stop_gradient` when frozen, and matches `Buffer.value`. Use it instead of
-  `jnp.asarray(param)` where a plain array is needed. The private `_value` field is
-  unchanged and still holds the raw stored array.
-- **New `nn.Buffer` for stateful layers.** Buffers hold mutable, non-trainable values
-  directly in a model. Read them with `.value` and update them with `.set`, which
-  applies `stop_gradient`. They contribute no pytree leaves, so `jax.grad`,
-  `ion.Optimizer` and `Module.astype` leave them alone.
-- **New `BatchNorm` and `SpectralNorm` layers.** They use buffers for running
-  statistics and power-iteration vectors, and are called normally with
-  `y = norm(x, training=True)`, including in `Sequential`. `SpectralNorm` takes a
-  constructor `key` to initialize its vectors, requires real floating parameters,
-  and initializes its power-iteration vectors with JAX's default floating dtype.
-  Both layers preserve their input dtype at the output boundary.
-- **Breaking: `Dropout` uses explicit training mode.** The `deterministic`
-  constructor and call arguments are removed. Pass `training=True` with a key to
-  sample a mask, or `training=False` for the evaluation identity.
-- **Checkpoints include buffers.** `ion.save(path, model)` writes running statistics
-  as ordinary named tensors. `ion.load` returns a model with its own buffers, leaving
-  the reference model's state untouched. The format version is unchanged.
-- **New `ion.clone` and `Module.clone`.** Returns a copy whose buffers are
-  independent of the original, as do `freeze`, `unfreeze` and `load`. `astype` is the
-  exception and shares them so mixed-precision copies update the model's state;
-  `Optimizer.update` and plain `jax.tree.map` copies share them too. See
-  [Sharp edges](docs/sharp-edges.md).
-- **New `ion.is_buffer` predicate.** Companion to `ion.is_param`, for tree code that
-  needs to find buffers.
-- **Optimizers exclude buffers from optax state.** This keeps mutable references out
-  of optimizer checkpoints, so a saved `(model, optimizer)` pair resumes normally
-  with the loaded model's independent buffers.
+- **New `Param.value` property.** Reads the parameter as autodiff sees it, applying `stop_gradient` when frozen, and matches `Buffer.value`. Use it instead of `jnp.asarray(param)` where a plain array is needed. The private `_value` field is unchanged and still holds the raw stored array.
+- **New `nn.Buffer` for stateful layers.** Buffers hold mutable, non-trainable values directly in a model. Read them with `.value` and update them with `.set`, which applies `stop_gradient`. They contribute no pytree leaves, so `jax.grad`, `ion.Optimizer` and `Module.astype` leave them alone.
+- **New `BatchNorm` and `SpectralNorm` layers.** They use buffers for running statistics and power-iteration vectors, and are called normally with `y = norm(x, training=True)`, including in `Sequential`. `SpectralNorm` takes a constructor `key` to initialize its vectors, requires real floating parameters, and initializes its power-iteration vectors with JAX's default floating dtype. Both layers preserve their input dtype at the output boundary.
+- **Breaking: `Dropout` uses explicit training mode.** The `deterministic` constructor and call arguments are removed. Pass `training=True` with a key to sample a mask, or `training=False` for the evaluation identity.
+- **Checkpoints include buffers.** `ion.save(path, model)` writes running statistics as ordinary named tensors. `ion.load` returns a model with its own buffers, leaving the reference model's state untouched. The format version is unchanged.
+- **New `ion.clone` and `Module.clone`.** Returns a copy whose buffers are independent of the original, as do `freeze`, `unfreeze` and `load`. `astype` is the exception and shares them so mixed-precision copies update the model's state; `Optimizer.update` and plain `jax.tree.map` copies share them too. See [Sharp edges](docs/sharp-edges.md).
+- **New `ion.is_buffer` predicate.** Companion to `ion.is_param`, for tree code that needs to find buffers.
+- **Optimizers exclude buffers from optax state.** This keeps mutable references out of optimizer checkpoints, so a saved `(model, optimizer)` pair resumes normally with the loaded model's independent buffers.
 - **Requires JAX 0.7.2 or newer**, up from 0.5.0. Buffers are built on `jax.new_ref`.
 
 ## 0.11.2
 
-- **`AvgPool` gains a `count_include_pad` flag.** Controls whether padded positions
-  count towards the window size. Defaults to `True`, matching `torch.nn.AvgPool2d`
-  and `flax.linen.avg_pool`. This changes existing behaviour: `AvgPool` previously
-  always divided by the real element count. Pass `count_include_pad=False` to
-  restore it. Only affects padded pooling; results without padding are unchanged.
-- **`LayerNorm` gains a `bias` flag.** Pass `bias=False` to drop the learnable shift,
-  as used in LLaMA-style transformers. Note that a bias-less `LayerNorm` still
-  subtracts the mean, so it is not equivalent to `RMSNorm`.
-- **New benchmark suite.** Compares Ion with Equinox, Flax NNX, and PyTorch eager
-  and compiled across MLP, ResNet, and GPT workloads, measuring forward, backward,
-  full-step, compilation, first-step, throughput, and peak-memory performance.
-  Includes reproducible JSON results and interactive Plotly reports.
+- **`AvgPool` gains a `count_include_pad` flag.** Controls whether padded positions count towards the window size. Defaults to `True`, matching `torch.nn.AvgPool2d` and `flax.linen.avg_pool`. This changes existing behaviour: `AvgPool` previously always divided by the real element count. Pass `count_include_pad=False` to restore it. Only affects padded pooling; results without padding are unchanged.
+- **`LayerNorm` gains a `bias` flag.** Pass `bias=False` to drop the learnable shift, as used in LLaMA-style transformers. Note that a bias-less `LayerNorm` still subtracts the mean, so it is not equivalent to `RMSNorm`.
+- **New benchmark suite.** Compares Ion with Equinox, Flax NNX, and PyTorch eager and compiled across MLP, ResNet, and GPT workloads, measuring forward, backward, full-step, compilation, first-step, throughput, and peak-memory performance. Includes reproducible JSON results and interactive Plotly reports.
 
 ## 0.11.1
 
-- **New `gnn.GraphConv` layer.** Graph convolution from Morris et al. (2019) with
-  independently learned neighbour and root transforms, unnormalized sum aggregation,
-  and optional scalar edge weights.
-- **New `gnn.TransformerConv` layer.** Sparse scaled dot-product graph attention from
-  Shi et al. (2020), with multi-head Q/K/V projections, optional edge features,
-  a root transform, edge masking, and optional gated residuals.
-- **GAT projection weights are now stored as 2D matrices.** `GATConv` and
-  `GATv2Conv` add head axes to activations in the forward pass, matching the
-  attention layers in `ion.nn`. Existing GAT checkpoints are incompatible.
+- **New `gnn.GraphConv` layer.** Graph convolution from Morris et al. (2019) with independently learned neighbour and root transforms, unnormalized sum aggregation, and optional scalar edge weights.
+- **New `gnn.TransformerConv` layer.** Sparse scaled dot-product graph attention from Shi et al. (2020), with multi-head Q/K/V projections, optional edge features, a root transform, edge masking, and optional gated residuals.
+- **GAT projection weights are now stored as 2D matrices.** `GATConv` and `GATv2Conv` add head axes to activations in the forward pass, matching the attention layers in `ion.nn`. Existing GAT checkpoints are incompatible.
 
 ## 0.11.0
 

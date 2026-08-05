@@ -39,14 +39,14 @@ class GPT(nn.Module):
     """Decoder-only transformer with tied token embeddings."""
 
     embedding: nn.Embedding
-    position: Array
+    position: nn.SinusoidalPositionalEmbedding
     blocks: tuple[TransformerBlock, ...]
     norm: nn.LayerNorm
 
     def __init__(self, config: ModelConfig, *, key: PRNGKeyArray) -> None:
         keys = jax.random.split(key, config.depth + 1)
         self.embedding = nn.Embedding(config.vocab_size, config.width, key=keys[0])
-        self.position = nn.sinusoidal(config.seq_len, config.width)
+        self.position = nn.SinusoidalPositionalEmbedding()
         self.blocks = tuple(
             TransformerBlock(config.width, config.num_heads, key=keys[index + 1])
             for index in range(config.depth)
@@ -54,7 +54,7 @@ class GPT(nn.Module):
         self.norm = nn.LayerNorm(config.width)
 
     def __call__(self, tokens: Int[Array, "b s"]) -> Float[Array, "b s vocab"]:
-        x = self.embedding(tokens) + self.position[: tokens.shape[1]]
+        x = self.position(self.embedding(tokens))
         for block in self.blocks:
             x = block(x)
         return self.norm(x) @ self.embedding.w.T

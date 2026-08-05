@@ -154,7 +154,7 @@ class Optimizer:
         self.state = self._transform.init(model_without_buffers)
         self.step = jnp.array(0, dtype=jnp.uint32)
 
-    def update(self, model: PyTree, grads: PyTree, **kwargs) -> tuple[PyTree, "Optimizer"]:
+    def update(self, model: PyTree, grads: PyTree, **kwargs: Any) -> tuple[PyTree, "Optimizer"]:
         """Apply gradients to the model and advance optimizer state.
 
         Parameters

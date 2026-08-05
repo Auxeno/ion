@@ -97,7 +97,7 @@ Ion ships with standard neural network layers. Each is a `Module` with trainable
 | SSM             | `LRUCell`, `S4DCell`, `S5Cell`, `LRU`, `S4D`, `S5`                        |
 | Pooling         | `MaxPool`, `AvgPool`                                                      |
 | Embedding       | `Embedding`, `LearnedPositionalEmbedding`                                 |
-| Positional      | `RoPE`, `sinusoidal`, `alibi`                                             |
+| Positional      | `RoPE`, `SinusoidalPositionalEmbedding`                                   |
 | Regularization  | `Dropout`                                                                 |
 | Identity        | `Identity`                                                                |
 | Blocks          | `Sequential`, `MLP`                                                       |
