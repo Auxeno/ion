@@ -12,17 +12,15 @@ class ResBlock(nn.Module):
     def __init__(self, in_channels: int, channels: int, stride: int) -> None:
         super().__init__()
         self.conv_1 = nn.Conv2d(in_channels, channels, 3, stride=stride, padding=1, bias=False)
-        self.norm_1 = nn.GroupNorm(min(32, channels), channels)
+        self.norm_1 = nn.BatchNorm2d(channels)
         self.conv_2 = nn.Conv2d(channels, channels, 3, padding=1, bias=False)
-        self.norm_2 = nn.GroupNorm(min(32, channels), channels)
+        self.norm_2 = nn.BatchNorm2d(channels)
         self.projection = (
             nn.Conv2d(in_channels, channels, 1, stride=stride, bias=False)
             if stride != 1 or in_channels != channels
             else None
         )
-        self.projection_norm = (
-            nn.GroupNorm(min(32, channels), channels) if self.projection is not None else None
-        )
+        self.projection_norm = nn.BatchNorm2d(channels) if self.projection is not None else None
 
     def forward(self, x: Tensor) -> Tensor:
         residual = x
@@ -35,13 +33,13 @@ class ResBlock(nn.Module):
 
 
 class ResNet(nn.Module):
-    """Group-normalized residual image classifier."""
+    """Batch-normalized residual image classifier."""
 
     def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         width = config.resnet_width
         self.stem = nn.Conv2d(3, width, 7, stride=2, padding=3, bias=False)
-        self.stem_norm = nn.GroupNorm(min(32, width), width)
+        self.stem_norm = nn.BatchNorm2d(width)
         self.pool = nn.MaxPool2d(3, stride=2, padding=1)
         in_channels = width
         blocks = []

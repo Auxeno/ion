@@ -9,7 +9,7 @@ from .analysis import balance_results
 from .configs import MODEL_LABELS
 from .protocol import Result
 
-TIME_METRICS = ("forward", "forward_backward", "full_step", "compile", "first_step")
+TIME_METRICS = ("forward", "forward_backward", "full_step", "compile")
 
 
 def _format_time(value: float | None) -> str:
@@ -43,8 +43,8 @@ def summarize(path: Path) -> str:
                 f"## {MODEL_LABELS[model]}",  # pyright: ignore[reportArgumentType]
                 "",
                 "| Size | Framework | Mode | Forward | Forward + backward | "
-                "Full step | Compile | First step | Throughput | Peak memory |",
-                "|---|---|---|---:|---:|---:|---:|---:|---:|---:|",
+                "Full step | Compile | Throughput | Peak memory |",
+                "|---|---|---|---:|---:|---:|---:|---:|---:|",
             ]
         )
         combinations = sorted(
@@ -82,7 +82,6 @@ def summarize(path: Path) -> str:
                 f"{_format_time(times['forward_backward'])} | "
                 f"{_format_time(times['full_step'])} | "
                 f"{_format_time(times['compile'])} | "
-                f"{_format_time(times['first_step'])} | "
                 f"{throughput_text} | {memory_text} |"
             )
         lines.append("")

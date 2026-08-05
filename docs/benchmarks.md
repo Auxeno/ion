@@ -65,19 +65,6 @@ Estimated as first-step latency minus warmed full-step latency. Lower is better.
   ></iframe>
 </div>
 
-## First training step
-
-End-to-end latency of the first compiled training step. Lower is better.
-
-<div class="benchmark-plot-scroll" tabindex="0" role="region" aria-label="Scrollable first training step chart">
-  <iframe
-    class="benchmark-plot"
-    src="../assets/benchmarks/first-step.html"
-    title="First training step benchmark results"
-    loading="eager"
-  ></iframe>
-</div>
-
 ## Peak device memory
 
 Peak accelerator memory observed during a complete training step. Lower is better.

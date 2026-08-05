@@ -77,7 +77,6 @@ def test_run_metrics_reuses_full_step(workload):
     assert tuple(results) == (
         "full_step",
         "compile",
-        "first_step",
         "peak_memory",
         "forward",
         "forward_backward",
@@ -107,22 +106,6 @@ def test_run_metrics_honours_filters(workload):
 
     assert tuple(results) == ("forward",)
     assert workload.prepared == [("forward", False)]
-
-
-def test_first_step_does_not_run_warmups(workload):
-    result = run_metrics(
-        "ion",
-        "compiled",
-        "mlp",
-        "tiny",
-        warmup_steps=5,
-        measured_steps=10,
-        metrics=("first_step",),
-    )["first_step"]
-
-    assert workload.calls["full_step"] == 1
-    assert result.warmup_steps == 0
-    assert result.measured_steps == 1
 
 
 @pytest.mark.parametrize(

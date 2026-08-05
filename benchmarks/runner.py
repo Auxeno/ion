@@ -101,18 +101,16 @@ def run_metrics(
         )
 
     # Measure the first full step before compiling related operations can prime caches
-    full_metrics = {"full_step", "compile", "first_step", "peak_memory"} & set(metrics)
+    full_metrics = {"full_step", "compile", "peak_memory"} & set(metrics)
     if full_metrics:
         operation = workload.prepare("full_step", compiled=compiled)
         first_step = _time(operation, workload)
-        samples = []
 
-        if full_metrics != {"first_step"}:
-            for _ in range(warmup_steps):
-                _time(operation, workload)
-            if "peak_memory" in full_metrics:
-                workload.reset_peak_memory()
-            samples = [_time(operation, workload) for _ in range(measured_steps)]
+        for _ in range(warmup_steps):
+            _time(operation, workload)
+        if "peak_memory" in full_metrics:
+            workload.reset_peak_memory()
+        samples = [_time(operation, workload) for _ in range(measured_steps)]
 
         if "full_step" in full_metrics:
             results["full_step"] = result("full_step", samples, warmup_steps, measured_steps)
@@ -123,8 +121,6 @@ def run_metrics(
                 0,
                 1,
             )
-        if "first_step" in full_metrics:
-            results["first_step"] = result("first_step", [first_step], 0, 1)
         if "peak_memory" in full_metrics:
             results["peak_memory"] = result(
                 "peak_memory",

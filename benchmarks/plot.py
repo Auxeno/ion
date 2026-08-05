@@ -23,7 +23,7 @@ SERIES: dict[tuple[Framework, Mode], tuple[str, str]] = {
     ("pytorch", "eager"): ("PyTorch eager", "#f57e2c"),
 }
 
-ValueKind = Literal["time", "throughput", "memory"]
+ValueKind = Literal["time", "seconds", "throughput", "memory"]
 GroupKey = tuple[str, str, str, str, str]
 TRANSPARENT_HTML_STYLE = """
 <style>
@@ -111,6 +111,8 @@ def _group(results: list[Result]) -> dict[GroupKey, list[Result]]:
 def _point(results: list[Result], kind: ValueKind) -> Point | None:
     if kind == "time":
         values = [sample for result in results for sample in result.samples_ms]
+    elif kind == "seconds":
+        values = [sample / 1000 for result in results for sample in result.samples_ms]
     elif kind == "throughput":
         values = [result.throughput for result in results if result.throughput is not None]
     else:
@@ -313,18 +315,10 @@ def generate(
         "compile-time.html": metric_figure(
             records,
             "compile",
-            "time",
+            "seconds",
             "Compile time",
-            "Estimated compile time (ms)",
-            "ms",
-        ),
-        "first-step.html": metric_figure(
-            records,
-            "first_step",
-            "time",
-            "First training step",
-            "First-step latency (ms)",
-            "ms",
+            "Estimated compile time (s)",
+            "s",
         ),
         "peak-memory.html": metric_figure(
             records,

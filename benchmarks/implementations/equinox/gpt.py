@@ -8,13 +8,13 @@ from jaxtyping import Array, Float, Int, PRNGKeyArray
 from ...configs import ModelConfig
 
 
-def _linear(layer: eqx.nn.Linear, x: Array) -> Array:
+def linear(layer: eqx.nn.Linear, x: Array) -> Array:
     shape = x.shape
     x = jax.vmap(layer)(x.reshape(-1, shape[-1]))
     return x.reshape(*shape[:-1], -1)
 
 
-def _sinusoidal(length: int, dim: int) -> Array:
+def sinusoidal(length: int, dim: int) -> Array:
     position = jnp.arange(length)[:, None]
     frequency = jnp.exp(jnp.arange(0, dim, 2) * (-jnp.log(10_000.0) / dim))
     encoding = jnp.zeros((length, dim))
@@ -44,8 +44,8 @@ class TransformerBlock(eqx.Module):
         mask = jnp.tril(jnp.ones((x.shape[0], x.shape[0]), dtype=bool))
         x = x + self.attention(normalized, normalized, normalized, mask=mask)
         normalized = jax.vmap(self.mlp_norm)(x)
-        hidden = jax.nn.gelu(_linear(self.mlp_in, normalized))
-        return x + _linear(self.mlp_out, hidden)
+        hidden = jax.nn.gelu(linear(self.mlp_in, normalized))
+        return x + linear(self.mlp_out, hidden)
 
 
 class GPT(eqx.Module):
@@ -69,7 +69,7 @@ class GPT(eqx.Module):
         self.dim = config.width
 
     def __call__(self, tokens: Int[Array, " s"]) -> Float[Array, "s vocab"]:
-        position = _sinusoidal(self.seq_len, self.dim)
+        position = sinusoidal(self.seq_len, self.dim)
         x = jax.vmap(self.embedding)(tokens) + position[: tokens.shape[0]]
         for block in self.blocks:
             x = block(x)
@@ -77,11 +77,11 @@ class GPT(eqx.Module):
         return x @ self.embedding.weight.T
 
 
-def create_model(config: ModelConfig, *, key: PRNGKeyArray) -> GPT:
+def create_model(config: ModelConfig, *, key: PRNGKeyArray) -> tuple[GPT, None]:
     """Create the benchmark model."""
-    return GPT(config, key=key)
+    return GPT(config, key=key), None
 
 
-def forward(model: GPT, inputs: Array) -> Array:
+def forward(model: GPT, state: None, inputs: Array) -> tuple[Array, None]:
     """Apply the model to a batch."""
-    return jax.vmap(model)(inputs)
+    return jax.vmap(model)(inputs), state

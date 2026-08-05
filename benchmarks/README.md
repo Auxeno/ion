@@ -11,14 +11,16 @@ three sizes:
 | GPT | 2L/128D/4H, seq 128 (4.49M) | 6L/384D/6H, seq 256 (22.91M) | 12L/768D/12H, seq 512 (109.55M) |
 
 All models use float32 master parameters and bfloat16 computation. ResNets use
-GroupNorm so the benchmark does not require mutable running statistics.
+BatchNorm, so every framework carries mutable running statistics through the
+timed training step. Only the small ResNet is a standard architecture
+(ResNet-18); tiny is a half-width variant and medium pairs ResNet-101's block
+depths with basic rather than bottleneck blocks.
 
 ## Metrics
 
 - **Forward** measures the model call without its loss.
 - **Forward + backward** measures the loss and gradient calculation.
 - **Full step** additionally applies an AdamW update.
-- **First step** measures the first call to the compiled full training step.
 - **Compile** is first-step latency minus median warmed-step latency.
 - **Throughput** is derived from median full-step latency.
 - **Peak memory** measures a full training step using the framework's native
@@ -28,9 +30,9 @@ Compile is deliberately a user-facing estimate rather than a compiler-internal
 measurement. Every framework, mode, model, size, and repetition runs in a fresh
 process, preventing in-memory caches from leaking between comparable results.
 Forward, forward + backward, and the full training step are compiled once within
-that process. First-step latency, compile time, throughput, and peak memory are
-collected from the same full-step execution. Persistent compiler caches should
-be disabled or pointed at a fresh directory when collecting publishable results.
+that process. Compile time, throughput, and peak memory are collected from the
+same full-step execution. Persistent compiler caches should be disabled or
+pointed at a fresh directory when collecting publishable results.
 
 JAX does not expose a way to reset its allocator's peak counter. Its peak memory
 therefore includes initialization, compilation, warm-up, and the measured steps.
@@ -45,7 +47,17 @@ must be stated alongside published memory results.
   equivalent across frameworks.
 - Ion and NNX use channels-last convolution layouts. Equinox and PyTorch use
   their native channels-first layouts.
-- GPT uses causal scaled dot-product attention and tied token embeddings.
+- GPT uses causal scaled dot-product attention and tied token embeddings. Each
+  framework uses the fastest attention kernel available to it for that shape.
+  PyTorch reaches this automatically, since `scaled_dot_product_attention`
+  selects among its flash, memory-efficient, and math backends per shape. Ion
+  and NNX opt in explicitly through `use_flash`, which routes `attention_fn` to
+  JAX's cuDNN backend, and is set for the small and medium GPT. The tiny GPT
+  stays on XLA: at sequence length 128 the fused kernel saves little, and
+  routing through an opaque custom call costs the surrounding XLA fusion.
+  Equinox stays on its own einsum attention throughout, because
+  `eqx.nn.MultiheadAttention` exposes no hook for substituting the attention
+  function. Ion and NNX fall back to XLA when no GPU is present.
 - Dropout, data loading, distributed execution, and gradient accumulation are
   outside the timed region.
 
@@ -109,8 +121,7 @@ uv run --group benchmarks python -m benchmarks.plot \
   benchmarks/results/reference-gpu
 ```
 
-This writes latency, throughput, compile-time, first-step, and peak-memory
-figures to `benchmarks/results/reference-gpu/plots`. Pass `--inline` to create
+This writes latency, throughput, compile-time, and peak-memory figures to `benchmarks/results/reference-gpu/plots`. Pass `--inline` to create
 fully self-contained HTML files instead of loading Plotly from its CDN.
 Reports and plots automatically use the largest common number of repetitions
 and measured samples for each comparison.

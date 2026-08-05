@@ -9,7 +9,7 @@ from torch import Tensor, nn
 from ...configs import ModelConfig
 
 
-def _sinusoidal(length: int, dim: int) -> Tensor:
+def sinusoidal(length: int, dim: int) -> Tensor:
     position = torch.arange(length)[:, None]
     frequency = torch.exp(torch.arange(0, dim, 2) * (-math.log(10_000.0) / dim))
     encoding = torch.zeros(length, dim)
@@ -52,9 +52,7 @@ class GPT(nn.Module):
     def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         self.embedding = nn.Embedding(config.vocab_size, config.width)
-        self.register_buffer(
-            "position", _sinusoidal(config.seq_len, config.width), persistent=False
-        )
+        self.register_buffer("position", sinusoidal(config.seq_len, config.width), persistent=False)
         self.register_buffer(
             "mask",
             torch.triu(torch.ones(config.seq_len, config.seq_len, dtype=torch.bool), diagonal=1),

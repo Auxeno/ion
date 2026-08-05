@@ -1,5 +1,7 @@
 """Flax NNX GPT benchmark."""
 
+from functools import partial
+
 import jax
 import jax.numpy as jnp
 from flax import nnx
@@ -8,7 +10,7 @@ from jaxtyping import Array, Float, Int
 from ...configs import ModelConfig
 
 
-def _sinusoidal(length: int, dim: int) -> Array:
+def sinusoidal(length: int, dim: int) -> Array:
     position = jnp.arange(length)[:, None]
     frequency = jnp.exp(jnp.arange(0, dim, 2) * (-jnp.log(10_000.0) / dim))
     encoding = jnp.zeros((length, dim))
@@ -16,10 +18,15 @@ def _sinusoidal(length: int, dim: int) -> Array:
     return encoding.at[:, 1::2].set(jnp.cos(position * frequency[: dim // 2]))
 
 
+def attention_fn(query, key, value, mask=None, *, implementation, **kwargs):
+    """Flax attention_fn selecting a JAX dot-product attention backend."""
+    return jax.nn.dot_product_attention(query, key, value, mask=mask, implementation=implementation)
+
+
 class TransformerBlock(nnx.Module):
     """Pre-norm causal transformer block."""
 
-    def __init__(self, dim: int, num_heads: int, *, rngs: nnx.Rngs) -> None:
+    def __init__(self, dim: int, num_heads: int, implementation: str, *, rngs: nnx.Rngs) -> None:
         self.attention = nnx.MultiHeadAttention(
             num_heads,
             dim,
@@ -27,6 +34,7 @@ class TransformerBlock(nnx.Module):
             dtype=jnp.bfloat16,
             param_dtype=jnp.float32,
             decode=False,
+            attention_fn=partial(attention_fn, implementation=implementation),
             rngs=rngs,
         )
         self.attention_norm = nnx.LayerNorm(
@@ -52,7 +60,7 @@ class TransformerBlock(nnx.Module):
 
     def __call__(self, x: Float[Array, "b s d"]) -> Float[Array, "b s d"]:
         normalized = self.attention_norm(x)
-        mask = nnx.make_causal_mask(jnp.ones(x.shape[:-1], dtype=bool))
+        mask = nnx.make_causal_mask(jnp.ones(x.shape[:-1], dtype=bool), dtype=jnp.bool_)
         x = x + self.attention(normalized, mask=mask)
         return x + self.mlp_out(jax.nn.gelu(self.mlp_in(self.mlp_norm(x))))
 
@@ -68,9 +76,13 @@ class GPT(nnx.Module):
             param_dtype=jnp.float32,
             rngs=rngs,
         )
-        self.position = nnx.data(_sinusoidal(config.seq_len, config.width))
+        self.position = nnx.data(sinusoidal(config.seq_len, config.width))
+
+        # cuDNN flash attention is unavailable off GPU, so fall back to the XLA backend
+        implementation = "cudnn" if config.use_flash and jax.default_backend() == "gpu" else "xla"
         self.blocks = nnx.List(
-            TransformerBlock(config.width, config.num_heads, rngs=rngs) for _ in range(config.depth)
+            TransformerBlock(config.width, config.num_heads, implementation, rngs=rngs)
+            for _ in range(config.depth)
         )
         self.norm = nnx.LayerNorm(
             config.width,

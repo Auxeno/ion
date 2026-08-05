@@ -32,6 +32,7 @@ class ModelConfig:
     vocab_size: int = 32_000
     seq_len: int = 512
     num_heads: int = 0
+    use_flash: bool = False
 
     @property
     def units_per_step(self) -> int:
@@ -87,8 +88,17 @@ _GPT: dict[ModelSize, ModelConfig] = {
         depth=6,
         seq_len=256,
         num_heads=6,
+        use_flash=True,
     ),
-    "medium": ModelConfig("gpt", "medium", batch_size=8, width=768, depth=12, num_heads=12),
+    "medium": ModelConfig(
+        "gpt",
+        "medium",
+        batch_size=8,
+        width=768,
+        depth=12,
+        num_heads=12,
+        use_flash=True,
+    ),
 }
 
 CONFIGS: dict[ModelName, dict[ModelSize, ModelConfig]] = {

@@ -7,9 +7,9 @@ from jaxtyping import Array, PRNGKeyArray
 from ...configs import ModelConfig
 
 
-def create_model(config: ModelConfig, *, key: PRNGKeyArray) -> eqx.nn.MLP:
+def create_model(config: ModelConfig, *, key: PRNGKeyArray) -> tuple[eqx.nn.MLP, None]:
     """Create the benchmark model."""
-    return eqx.nn.MLP(
+    model = eqx.nn.MLP(
         config.input_dim,
         config.num_classes,
         config.width,
@@ -17,8 +17,9 @@ def create_model(config: ModelConfig, *, key: PRNGKeyArray) -> eqx.nn.MLP:
         activation=jax.nn.relu,
         key=key,
     )
+    return model, None
 
 
-def forward(model: eqx.nn.MLP, inputs: Array) -> Array:
+def forward(model: eqx.nn.MLP, state: None, inputs: Array) -> tuple[Array, None]:
     """Apply the model to a batch."""
-    return jax.vmap(model)(inputs)
+    return jax.vmap(model)(inputs), state

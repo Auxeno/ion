@@ -30,9 +30,8 @@ class ResBlock(nnx.Module):
             param_dtype=jnp.float32,
             rngs=rngs,
         )
-        self.norm_1 = nnx.GroupNorm(
+        self.norm_1 = nnx.BatchNorm(
             channels,
-            num_groups=min(32, channels),
             dtype=jnp.bfloat16,
             param_dtype=jnp.float32,
             rngs=rngs,
@@ -47,9 +46,8 @@ class ResBlock(nnx.Module):
             param_dtype=jnp.float32,
             rngs=rngs,
         )
-        self.norm_2 = nnx.GroupNorm(
+        self.norm_2 = nnx.BatchNorm(
             channels,
-            num_groups=min(32, channels),
             dtype=jnp.bfloat16,
             param_dtype=jnp.float32,
             rngs=rngs,
@@ -69,9 +67,8 @@ class ResBlock(nnx.Module):
             else None
         )
         self.projection_norm = (
-            nnx.GroupNorm(
+            nnx.BatchNorm(
                 channels,
-                num_groups=min(32, channels),
                 dtype=jnp.bfloat16,
                 param_dtype=jnp.float32,
                 rngs=rngs,
@@ -91,7 +88,7 @@ class ResBlock(nnx.Module):
 
 
 class ResNet(nnx.Module):
-    """Group-normalized residual image classifier."""
+    """Batch-normalized residual image classifier."""
 
     def __init__(self, config: ModelConfig, *, rngs: nnx.Rngs) -> None:
         width = config.resnet_width
@@ -106,8 +103,8 @@ class ResNet(nnx.Module):
             param_dtype=jnp.float32,
             rngs=rngs,
         )
-        self.stem_norm = nnx.GroupNorm(
-            width, num_groups=min(32, width), dtype=jnp.bfloat16, param_dtype=jnp.float32, rngs=rngs
+        self.stem_norm = nnx.BatchNorm(
+            width, dtype=jnp.bfloat16, param_dtype=jnp.float32, rngs=rngs
         )
         in_channels = width
         blocks = []

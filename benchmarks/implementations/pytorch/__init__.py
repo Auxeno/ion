@@ -32,7 +32,7 @@ class Workload:
             if self.device.type == "cuda"
             else str(self.device)
         )
-        self.model = module.create_model(config).to(self.device)
+        self.model = module.create_model(config).to(self.device).train()
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=3e-4)
         self.parameter_count = sum(parameter.numel() for parameter in self.model.parameters())
 

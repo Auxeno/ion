@@ -18,7 +18,6 @@ Metric = Literal[
     "forward_backward",
     "full_step",
     "compile",
-    "first_step",
     "peak_memory",
 ]
 Operation = Literal["forward", "forward_backward", "full_step"]
@@ -30,7 +29,6 @@ METRICS: tuple[Metric, ...] = (
     "forward_backward",
     "full_step",
     "compile",
-    "first_step",
     "peak_memory",
 )
 

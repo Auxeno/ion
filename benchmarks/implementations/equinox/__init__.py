@@ -30,7 +30,7 @@ class Workload:
 
         self.config = config
         self.module = module
-        self.model = module.create_model(config, key=key_model)
+        self.model, self.state = module.create_model(config, key=key_model)
         self.transform = optax.adamw(3e-4)
         parameters = eqx.filter(self.model, eqx.is_inexact_array)
         self.optimizer = self.transform.init(parameters)
@@ -72,23 +72,28 @@ class Workload:
             model,
         )
 
-    def _forward(self, model, batch):
+    def _forward(self, model, state, batch):
         inputs, _ = batch
-        return self.module.forward(self._cast(model), inputs)
+        return self.module.forward(self._cast(model), state, inputs)
 
-    def _loss(self, model, batch):
+    def _loss(self, model, state, batch):
         _, targets = batch
-        logits = self._forward(model, batch).astype(jnp.float32)
-        return optax.softmax_cross_entropy_with_integer_labels(logits, targets).mean()
+        logits, state = self._forward(model, state, batch)
+        loss = optax.softmax_cross_entropy_with_integer_labels(
+            logits.astype(jnp.float32), targets
+        ).mean()
+        return loss, state
 
-    def _forward_backward(self, model, batch):
-        return eqx.filter_value_and_grad(self._loss)(model, batch)
+    def _forward_backward(self, model, state, batch):
+        return eqx.filter_value_and_grad(self._loss, has_aux=True)(model, state, batch)
 
-    def _full_step(self, model, optimizer, batch):
-        loss, grads = eqx.filter_value_and_grad(self._loss)(model, batch)
+    def _full_step(self, model, state, optimizer, batch):
+        (loss, state), grads = eqx.filter_value_and_grad(self._loss, has_aux=True)(
+            model, state, batch
+        )
         parameters = eqx.filter(model, eqx.is_inexact_array)
         updates, optimizer = self.transform.update(grads, optimizer, parameters)
-        return eqx.apply_updates(model, updates), optimizer, loss
+        return eqx.apply_updates(model, updates), state, optimizer, loss
 
     def prepare(self, operation: Operation, *, compiled: bool):
         # Select and optionally compile the requested operation
@@ -97,10 +102,12 @@ class Workload:
             function = eqx.filter_jit(function)
 
         if operation != "full_step":
-            return lambda: function(self.model, self.batch)
+            return lambda: function(self.model, self.state, self.batch)
 
         def step():
-            self.model, self.optimizer, loss = function(self.model, self.optimizer, self.batch)
+            self.model, self.state, self.optimizer, loss = function(
+                self.model, self.state, self.optimizer, self.batch
+            )
             return loss
 
         return step
