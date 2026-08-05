@@ -44,12 +44,6 @@ w_out : Param
 b_out : Param | None
     Output bias of shape `(dim,)`. `None` when `use_bias=False`.
 
-Notes
------
-JAX's `cudnn` implementation uses FlashAttention-2 for supported shapes and
-dtypes. See the [JAX API docs](https://docs.jax.dev/en/latest/_autosummary/jax.nn.dot_product_attention.html)
-and [cuDNN support matrix](https://docs.nvidia.com/deeplearning/cudnn/latest/operations/Attention.html#scaled-dot-product-attention).
-
 Example
 -------
 ```python
@@ -57,6 +51,9 @@ batch, seq, dim = 4, 16, 64
 attn = nn.MultiHeadAttention(dim, num_heads=8, key=key)
 x = jnp.ones((batch, seq, dim))
 y = attn(x)  # (4, 16, 64) -> (4, 16, 64)
+
+x_batched = jnp.ones((5, batch, seq, dim))  # extra batch dim
+y_batched = jax.vmap(attn)(x_batched)  # (5, 4, 16, 64) -> (5, 4, 16, 64)
 
 # GQA, causal, with a sliding window of length 5
 attn_gqa = nn.MultiHeadAttention(dim, num_heads=8, num_kv_heads=2, causal=True, window=5, key=key)
@@ -68,30 +65,13 @@ attn_cross = nn.MultiHeadAttention(dim, num_heads=8, kv_dim=context_dim, key=key
 x_kv = jnp.ones((batch, context_seq, context_dim))
 y = attn_cross(x, x_kv)  # (4, 16, 64), (4, 32, 128) -> (4, 16, 64)
 
-# cuDNN FlashAttention-2 with mixed-precision inputs
-from functools import partial
-
+# cuDNN FlashAttention-2 with bfloat16 on supported hardware
 flash_attn = nn.MultiHeadAttention(
     dim,
     num_heads=8,
-    attention_fn=partial(jax.nn.dot_product_attention, implementation="cudnn"),
+    attention_fn=functools.partial(jax.nn.dot_product_attention, implementation="cudnn"),
     key=key,
 )
 flash_attn = flash_attn.astype(jnp.bfloat16)
 y = flash_attn(x.astype(jnp.bfloat16))
-
-# Compose RoPE with the same cuDNN backend
-rope_attn = nn.MultiHeadAttention(
-    dim,
-    num_heads=8,
-    attention_fn=partial(
-        nn.dot_product_attention_with_rope,
-        rope=nn.RoPE(),
-        implementation="cudnn",
-    ),
-    key=key,
-)
-
-x_batched = jnp.ones((5, batch, seq, dim))  # extra batch dim
-y_batched = jax.vmap(attn)(x_batched)  # (5, 4, 16, 64) -> (5, 4, 16, 64)
 ```
