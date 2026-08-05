@@ -9,7 +9,11 @@ Functions:
     alibi       Linear attention bias.    (Press et al., 2022)
 
 Fan-in variance scaling weight init (std 1/sqrt(dim)) for the learned embedding table.
+RoPE positions are a 1D sequence unless given a shape, which lays them out on an N-dimensional
+lattice and splits the head dimension evenly across its axes.
 """
+
+import math
 
 import jax.numpy as jnp
 from jax.nn.initializers import Initializer, variance_scaling
@@ -56,36 +60,57 @@ class RoPE(Module):
 
     >>> rope = RoPE()
     >>> rope(q)  # (*, s, d) -> (*, s, d)
-    >>> rope(k)  # (*, s, d) -> (*, s, d)
+    >>> rope = RoPE(shape=(14, 14), num_prefix_tokens=1)
+    >>> rope(q)  # 14x14 patch grid behind a CLS token: (*, 197, d) -> (*, 197, d)
     """
 
+    shape: tuple[int, ...] | None
+    num_prefix_tokens: int
     theta: float
 
-    def __init__(self, theta: float = 10_000.0) -> None:
+    def __init__(
+        self,
+        shape: tuple[int, ...] | None = None,
+        num_prefix_tokens: int = 0,
+        theta: float = 10_000.0,
+    ) -> None:
 
+        if shape is not None and len(shape) < 1:
+            raise ValueError("shape must have at least one element")
+
+        self.shape = shape
+        self.num_prefix_tokens = num_prefix_tokens
         self.theta = theta
 
-    def __call__(self, x: Float[Array, "... s d"]) -> Float[Array, "... s d"]:
+    def __call__(self, x: Float[Array, "... d"], axis: int = -2) -> Float[Array, "... d"]:
 
+        x = jnp.moveaxis(x, axis, -2)
         seq_len, head_dim = x.shape[-2], x.shape[-1]
-        if head_dim % 2 != 0:
-            raise ValueError(f"head_dim ({head_dim}) must be even")
+        shape = (seq_len - self.num_prefix_tokens,) if self.shape is None else self.shape
+        num_axes = len(shape)
+        if head_dim % (2 * num_axes) != 0:
+            raise ValueError(f"head_dim ({head_dim}) must be divisible by {2 * num_axes}")
+        if math.prod(shape) + self.num_prefix_tokens != seq_len:
+            raise ValueError(f"lattice {shape} does not fill sequence length ({seq_len})")
 
-        # Inverse frequencies for feature pairs (d / 2,)
-        freq_indices = jnp.arange(0, head_dim, 2, dtype=jnp.float32)
-        inv_freqs = 1.0 / (self.theta ** (freq_indices / head_dim))
+        # Lattice coordinates per axis, behind prefix tokens pinned to position 0 (n, s)
+        positions = jnp.indices(shape, dtype=jnp.float32).reshape(num_axes, -1)
+        positions = jnp.pad(positions, ((0, 0), (self.num_prefix_tokens, 0)))
 
-        # Phase angles from positions and frequencies, duplicated per feature pair (s, d)
-        positions = jnp.arange(seq_len, dtype=jnp.float32)
-        freqs = jnp.repeat(jnp.outer(positions, inv_freqs), 2, axis=-1)
+        # Inverse frequencies for the feature pairs each axis owns (d / 2n,)
+        axis_dim = head_dim // num_axes
+        inv_freqs = 1.0 / (self.theta ** (jnp.arange(0, axis_dim, 2, jnp.float32) / axis_dim))
+
+        # Phase angles per axis, contiguous sections of the head duplicated per pair (s, d)
+        freqs = (positions[..., None] * inv_freqs).swapaxes(0, 1).reshape(seq_len, -1)
+        freqs = jnp.repeat(freqs, 2, axis=-1)
         cos = jnp.cos(freqs).astype(x.dtype)
         sin = jnp.sin(freqs).astype(x.dtype)
 
         # Swap and negate adjacent pairs: [x0, x1, x2, x3] -> [-x1, x0, -x3, x2]
-        x_pairs = x.reshape(x.shape[:-1] + (-1, 2))
-        x_rotated = jnp.stack((-x_pairs[..., 1], x_pairs[..., 0]), axis=-1).reshape(x.shape)
+        x_rotated = jnp.stack((-x[..., 1::2], x[..., ::2]), axis=-1).reshape(x.shape)
 
-        return (x * cos) + (x_rotated * sin)
+        return jnp.moveaxis((x * cos) + (x_rotated * sin), -2, axis)
 
 
 def sinusoidal(

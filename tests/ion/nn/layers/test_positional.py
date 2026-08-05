@@ -1,3 +1,5 @@
+from functools import partial
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -126,7 +128,7 @@ class TestAlibi:
 class TestRoPE:
     def test_odd_head_dim_raises(self):
         """Odd head_dim raises ValueError."""
-        with pytest.raises(ValueError, match="even"):
+        with pytest.raises(ValueError, match="divisible"):
             nn.RoPE()(jnp.ones((4, 7)))
 
     def test_output_manual(self):
@@ -147,6 +149,13 @@ class TestRoPE:
         rope = nn.RoPE()
         assert rope(jnp.ones((16, 8))).shape == (16, 8)
         assert rope(jnp.ones((2, 3, 16, 8))).shape == (2, 3, 16, 8)
+
+    def test_sequence_axis(self):
+        """An explicit sequence axis matches mapping RoPE over attention heads."""
+        rope = nn.RoPE()
+        x = jax.random.normal(jax.random.key(0), (2, 5, 3, 8))
+        expected = jax.vmap(rope, in_axes=-2, out_axes=-2)(x)
+        npt.assert_allclose(rope(x, axis=-3), expected, atol=1e-6)
 
     def test_identity_at_position_zero(self):
         """At position 0 the rotation angle is zero, so output equals input."""
@@ -187,3 +196,99 @@ class TestRoPE:
         rope = nn.RoPE()
         assert rope(jnp.ones((16, 8), dtype=jnp.bfloat16)).dtype == jnp.bfloat16
         assert rope(jnp.ones((16, 8))).dtype == jnp.float32
+
+
+class TestRoPEShape:
+    def test_1d_shape_matches_default(self):
+        """An explicit 1D shape reproduces the implicit sequence positions exactly."""
+        x = jax.random.normal(jax.random.key(0), (16, 8))
+        npt.assert_array_equal(nn.RoPE(shape=(16,))(x), nn.RoPE()(x))
+
+    def test_2d_output_shape(self):
+        """A 2D lattice leaves the input shape untouched."""
+        rope = nn.RoPE(shape=(4, 4))
+        assert rope(jnp.ones((16, 8))).shape == (16, 8)
+        assert rope(jnp.ones((2, 3, 16, 8))).shape == (2, 3, 16, 8)
+
+    def test_2d_differs_from_1d(self):
+        """Laying positions on a grid rotates differently to a flat sequence."""
+        x = jax.random.normal(jax.random.key(0), (16, 8))
+        assert not jnp.allclose(nn.RoPE(shape=(4, 4))(x), nn.RoPE()(x))
+
+    def test_2d_relative_positions(self):
+        """Dot products depend only on the offset between grid coordinates."""
+        rope = nn.RoPE(shape=(4, 4))
+        keys = jax.random.split(jax.random.key(0))
+        u = jax.random.normal(keys[0], (8,))
+        v = jax.random.normal(keys[1], (8,))
+        q = rope(jnp.tile(u, (16, 1)))
+        k = rope(jnp.tile(v, (16, 1)))
+        # Offset of (1, 2) taken from two different absolute grid positions
+        npt.assert_allclose(q[5] @ k[11], q[0] @ k[6], atol=1e-5)
+
+    def test_2d_preserves_norm(self):
+        """A 2D lattice rotation still preserves vector norms."""
+        rope = nn.RoPE(shape=(4, 4))
+        x = jax.random.normal(jax.random.key(0), (16, 8))
+        npt.assert_allclose(
+            jnp.linalg.norm(rope(x), axis=-1), jnp.linalg.norm(x, axis=-1), atol=1e-5
+        )
+
+    def test_3d_output_shape(self):
+        """A 3D lattice works when head_dim divides by twice the axis count."""
+        rope = nn.RoPE(shape=(2, 2, 2))
+        assert rope(jnp.ones((8, 12))).shape == (8, 12)
+
+    def test_head_dim_not_divisible_by_axes_raises(self):
+        """head_dim must divide by 2 * len(shape), not just by 2."""
+        with pytest.raises(ValueError, match="divisible"):
+            nn.RoPE(shape=(4, 4))(jnp.ones((16, 6)))
+
+    def test_position_count_mismatch_raises(self):
+        """The lattice plus its prefix must fill the sequence exactly."""
+        with pytest.raises(ValueError, match="does not fill sequence length"):
+            nn.RoPE(shape=(4, 4))(jnp.ones((15, 8)))
+
+    def test_empty_shape_raises(self):
+        """An empty shape has no axes to split the head dimension across."""
+        with pytest.raises(ValueError, match="at least one element"):
+            nn.RoPE(shape=())
+
+
+class TestRoPEPrefixTokens:
+    def test_prefix_tokens_unrotated(self):
+        """Prefix tokens sit at position 0, so they pass through unchanged."""
+        rope = nn.RoPE(shape=(4, 4), num_prefix_tokens=1)
+        x = jax.random.normal(jax.random.key(0), (17, 8))
+        npt.assert_allclose(rope(x)[0], x[0], atol=1e-6)
+
+    def test_prefix_shifts_grid(self):
+        """Tokens after the prefix are rotated as the grid, not as the flat sequence."""
+        rope = nn.RoPE(shape=(4, 4), num_prefix_tokens=1)
+        x = jax.random.normal(jax.random.key(0), (17, 8))
+        npt.assert_allclose(rope(x)[1:], nn.RoPE(shape=(4, 4))(x[1:]), atol=1e-6)
+
+    def test_multiple_prefix_tokens(self):
+        """Every prefix token is left unrotated, not just the first."""
+        rope = nn.RoPE(shape=(4, 4), num_prefix_tokens=4)
+        x = jax.random.normal(jax.random.key(0), (20, 8))
+        npt.assert_allclose(rope(x)[:4], x[:4], atol=1e-6)
+
+    def test_prefix_without_shape(self):
+        """Without a shape the prefix still offsets the 1D sequence positions."""
+        rope = nn.RoPE(num_prefix_tokens=2)
+        x = jax.random.normal(jax.random.key(0), (18, 8))
+        npt.assert_allclose(rope(x)[:2], x[:2], atol=1e-6)
+        npt.assert_allclose(rope(x)[2:], nn.RoPE()(x[2:]), atol=1e-6)
+
+    def test_attention_integration(self):
+        """A 2D RoPE composes with Attention through a custom attention_fn."""
+        rope = nn.RoPE(shape=(4, 4), num_prefix_tokens=1)
+        attn = nn.Attention(
+            8,
+            num_heads=2,
+            attention_fn=partial(nn.dot_product_attention_with_rope, rope=rope),
+            key=jax.random.key(0),
+        )
+        x = jax.random.normal(jax.random.key(1), (2, 17, 8))
+        assert attn(x).shape == (2, 17, 8)
