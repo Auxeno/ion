@@ -295,7 +295,7 @@ class Module:
         }
 
         # Hue derived from a salted hash of the class name; the salt tunes the palette
-        h = zlib.crc32(f"5g157w:{type(self).__qualname__}".encode())
+        h = zlib.crc32(f"j4h9be:{type(self).__qualname__}".encode())
         color = f"oklch(0.8 0.1 {h % 10_000 / 10_000 * 360:.1f})"
 
         return treescope.repr_lib.render_object_constructor(
