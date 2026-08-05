@@ -11,7 +11,7 @@ in_dim : int
     Input node feature dimension.
 out_dim : int
     Output node feature dimension.
-bias : bool, default=True
+use_bias : bool, default=True
     Whether to include a learnable bias term.
 w_init : Initializer
     Weight initializer for both transforms. Glorot uniform by default.
@@ -27,7 +27,7 @@ w_neigh : Param
 w_self : Param
     Root transform of shape `(in_dim, out_dim)`.
 b : Param | None
-    Bias vector of shape `(out_dim,)`. `None` when `bias=False`.
+    Bias vector of shape `(out_dim,)`. `None` when `use_bias=False`.
 
 Example
 -------
@@ -46,5 +46,5 @@ y = conv(x, senders, receivers, edge_weight=edge_weight)
 Note
 ----
 Without edge weights, this update matches `SAGEConv` with `aggregator="sum"`,
-`normalize=False`, and `root_weight=True`. `GraphConv` provides the narrower
+`normalize=False`, and `use_root_weight=True`. `GraphConv` provides the narrower
 canonical operator and supports scalar edge weights.

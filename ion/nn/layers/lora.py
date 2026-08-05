@@ -33,23 +33,23 @@ class LoRALinear(Module):
     def __init__(
         self,
         linear: Linear,
+        *,
         rank: int = 8,
         alpha: float | None = None,
         a_init: Initializer = he_normal(),
         b_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
         in_dim, out_dim = linear.w.shape
 
-        self.linear = freeze(linear)
-        self.alpha = float(rank) if alpha is None else float(alpha)
-        self.rank = rank
-
         key_a, key_b = jax.random.split(key)
+        self.linear = freeze(linear)
         self.a = Param(a_init(shape=(in_dim, rank), key=key_a))
         self.b = Param(b_init(shape=(rank, out_dim), key=key_b))
+
+        self.alpha = float(rank) if alpha is None else float(alpha)
+        self.rank = rank
 
     def __call__(self, x: Float[Array, "... i"]) -> Float[Array, "... o"]:
 

@@ -18,11 +18,7 @@ def balance_results(results: list[Result]) -> list[Result]:
     balanced = []
     for series_results in comparisons.values():
         repetitions = min(map(len, series_results.values()))
-        selected = [
-            result
-            for values in series_results.values()
-            for result in values[:repetitions]
-        ]
+        selected = [result for values in series_results.values() for result in values[:repetitions]]
         sample_counts = [len(result.samples_ms) for result in selected if result.samples_ms]
         samples_per_repetition = min(sample_counts, default=0)
 

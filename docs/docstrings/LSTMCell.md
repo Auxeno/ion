@@ -8,7 +8,7 @@ in_dim : int
     Input feature dimension.
 hidden_dim : int
     Hidden state dimension. The four gates share a `4 * hidden_dim` projection.
-bias : bool, default=True
+use_bias : bool, default=True
     Whether to include a learnable bias term.
 w_i_init : Initializer
     Input-to-hidden initializer. Glorot uniform by default.
@@ -27,7 +27,7 @@ w_i : Param
 w_h : Param
     Hidden-to-gates weight of shape `(hidden_dim, 4 * hidden_dim)`.
 b : Param | None
-    Gate bias of shape `(4 * hidden_dim,)`. `None` when `bias=False`.
+    Gate bias of shape `(4 * hidden_dim,)`. `None` when `use_bias=False`.
 
 Example
 -------

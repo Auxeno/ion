@@ -54,12 +54,12 @@ class LRUCell(Module):
         self,
         in_dim: int,
         hidden_dim: int,
+        *,
         r_min: float = 0.0,
         r_max: float = 1.0,
         max_phase: float = 2 * pi,
         w_init: Initializer = glorot_uniform(),
         d_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
@@ -115,16 +115,25 @@ class LRU(Module):
         self,
         in_dim: int,
         hidden_dim: int,
+        *,
         r_min: float = 0.0,
         r_max: float = 1.0,
         max_phase: float = 2 * pi,
         w_init: Initializer = glorot_uniform(),
         d_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
-        self.cell = LRUCell(in_dim, hidden_dim, r_min, r_max, max_phase, w_init, d_init, key=key)
+        self.cell = LRUCell(
+            in_dim,
+            hidden_dim,
+            r_min=r_min,
+            r_max=r_max,
+            max_phase=max_phase,
+            w_init=w_init,
+            d_init=d_init,
+            key=key,
+        )
 
     def __call__(
         self,
@@ -167,11 +176,11 @@ class S4DCell(Module):
         self,
         in_dim: int,
         state_dim: int,
+        *,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
         w_init: Initializer = glorot_uniform(),
         d_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
@@ -237,15 +246,17 @@ class S4D(Module):
         self,
         in_dim: int,
         state_dim: int,
+        *,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
         w_init: Initializer = glorot_uniform(),
         d_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
-        self.cell = S4DCell(in_dim, state_dim, dt_min, dt_max, w_init, d_init, key=key)
+        self.cell = S4DCell(
+            in_dim, state_dim, dt_min=dt_min, dt_max=dt_max, w_init=w_init, d_init=d_init, key=key
+        )
 
     def __call__(
         self,
@@ -291,11 +302,11 @@ class S5Cell(Module):
         self,
         in_dim: int,
         state_dim: int,
+        *,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
         w_init: Initializer = glorot_uniform(),
         d_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
@@ -362,15 +373,17 @@ class S5(Module):
         self,
         in_dim: int,
         state_dim: int,
+        *,
         dt_min: float = 0.001,
         dt_max: float = 0.1,
         w_init: Initializer = glorot_uniform(),
         d_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
-        self.cell = S5Cell(in_dim, state_dim, dt_min, dt_max, w_init, d_init, key=key)
+        self.cell = S5Cell(
+            in_dim, state_dim, dt_min=dt_min, dt_max=dt_max, w_init=w_init, d_init=d_init, key=key
+        )
 
     def __call__(
         self,

@@ -14,12 +14,15 @@ def _build_layers(key):
     keys = iter(jax.random.split(key, 100))
     return [
         (nn.Linear(8, 16, key=next(keys)), jnp.ones((2, 8))),
-        (nn.Linear(8, 16, bias=False, key=next(keys)), jnp.ones((2, 8))),
+        (nn.Linear(8, 16, use_bias=False, key=next(keys)), jnp.ones((2, 8))),
         (nn.Conv(3, 8, kernel_shape=(3,), padding=1, key=next(keys)), jnp.ones((2, 10, 3))),
         (nn.Conv(3, 8, kernel_shape=(3, 3), padding=1, key=next(keys)), jnp.ones((2, 6, 6, 3))),
-        (nn.Attention(8, num_heads=2, key=next(keys)), jnp.ones((2, 4, 8))),
-        (nn.Attention(8, num_heads=2, causal=True, key=next(keys)), jnp.ones((2, 4, 8))),
-        (nn.Attention(8, num_heads=4, num_kv_heads=2, key=next(keys)), jnp.ones((2, 4, 8))),
+        (nn.MultiHeadAttention(8, num_heads=2, key=next(keys)), jnp.ones((2, 4, 8))),
+        (nn.MultiHeadAttention(8, num_heads=2, causal=True, key=next(keys)), jnp.ones((2, 4, 8))),
+        (
+            nn.MultiHeadAttention(8, num_heads=4, num_kv_heads=2, key=next(keys)),
+            jnp.ones((2, 4, 8)),
+        ),
         (nn.LayerNorm(8), jnp.ones((2, 4, 8))),
         (nn.RMSNorm(8), jnp.ones((2, 4, 8))),
         (nn.MaxPool(kernel_shape=(2,)), jnp.ones((2, 10, 3))),

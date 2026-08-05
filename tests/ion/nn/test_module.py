@@ -534,7 +534,7 @@ class TestNumParams:
 
     def test_no_bias(self):
         """Linear without bias only counts weights."""
-        model = nn.Linear(4, 8, bias=False, key=jax.random.key(0))
+        model = nn.Linear(4, 8, use_bias=False, key=jax.random.key(0))
         assert model.num_params == 32
 
     def test_nested(self):
@@ -756,12 +756,12 @@ class TestAstype:
 class TestNoneField:
     def test_module_with_none_field(self):
         """Module can store None as a field value (e.g., optional bias)."""
-        linear = nn.Linear(4, 8, bias=False, key=jax.random.key(0))
+        linear = nn.Linear(4, 8, use_bias=False, key=jax.random.key(0))
         assert linear.b is None
 
     def test_none_field_survives_pytree_roundtrip(self):
         """None field is preserved through flatten/unflatten."""
-        linear = nn.Linear(4, 8, bias=False, key=jax.random.key(0))
+        linear = nn.Linear(4, 8, use_bias=False, key=jax.random.key(0))
         leaves, treedef = jax.tree.flatten(linear)
         reconstructed = treedef.unflatten(leaves)
         assert reconstructed.b is None
@@ -769,7 +769,7 @@ class TestNoneField:
 
     def test_none_field_works_under_jit(self):
         """Module with a None field works correctly under jit."""
-        linear = nn.Linear(4, 8, bias=False, key=jax.random.key(0))
+        linear = nn.Linear(4, 8, use_bias=False, key=jax.random.key(0))
         x = jnp.ones((1, 4))
         eager = linear(x)
         jitted = jax.jit(linear)(x)
@@ -1805,7 +1805,7 @@ class TestFieldPartitioning:
 
     def test_set_none_to_param_changes_treedef(self):
         """Setting a None field to a Param moves it from static aux to dynamic child."""
-        model = nn.Linear(3, 4, bias=False, key=jax.random.key(0))
+        model = nn.Linear(3, 4, use_bias=False, key=jax.random.key(0))
         assert model.b is None
         leaves_before = jax.tree.leaves(model)
         assert len(leaves_before) == 1

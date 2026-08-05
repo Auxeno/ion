@@ -37,6 +37,7 @@ def on_config(config, **kwargs):
 
     setattr(PythonLexer, "get_tokens_unprocessed", highlight_call_sites)
 
+
 # Show Material's desktop navigation from 60em. Both values occur in the
 # compiled CSS and JavaScript media queries.
 BREAKPOINTS = {

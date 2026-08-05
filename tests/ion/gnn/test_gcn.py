@@ -39,7 +39,7 @@ class TestGCNConv:
 
     def test_no_bias(self, triangle_graph):
         """No-bias mode: bias field is None, output still has correct shape."""
-        gcn = gnn.GCNConv(8, 16, bias=False, key=jax.random.key(0))
+        gcn = gnn.GCNConv(8, 16, use_bias=False, key=jax.random.key(0))
         assert gcn.b is None
         x = jnp.ones((3, 8))
         senders, receivers = triangle_graph

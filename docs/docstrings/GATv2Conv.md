@@ -16,7 +16,7 @@ edge_dim : int | None, default=None
     and edge information. When `None`, no edge parameters are created.
 negative_slope : float, default=0.2
     Negative slope of the LeakyReLU used to combine features.
-bias : bool, default=True
+use_bias : bool, default=True
     Whether to include a learnable bias term.
 w_init : Initializer
     Projection weight initializer. Glorot uniform by default.
@@ -33,8 +33,8 @@ w_sender, w_receiver : Param
     Separate sender and receiver projections of shape `(in_dim, out_dim)`.
 att : Param
     Per-head attention vector of shape `(num_heads, out_dim // num_heads)`.
-b : Param | None
-    Bias vector of shape `(out_dim,)`. `None` when `bias=False`.
+b_out : Param | None
+    Bias vector of shape `(out_dim,)`. `None` when `use_bias=False`.
 w_edge : Param | None
     Edge projection. `None` unless `edge_dim` is set.
 

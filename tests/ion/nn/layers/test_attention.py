@@ -8,10 +8,10 @@ import pytest
 from ion import nn
 
 
-class TestAttention:
+class TestMultiHeadAttention:
     def test_causal_mask(self):
         """Causal attention: jacobian upper triangle is zero (future masked)."""
-        layer = nn.Attention(8, num_heads=1, causal=True, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=1, causal=True, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (1, 4, 8))
         jac = jax.jacobian(layer)(x)  # (1, 4, 8, 1, 4, 8)
         # Sum over output and input feature dims to get (seq, seq)
@@ -22,7 +22,7 @@ class TestAttention:
 
     def test_non_causal_full_jacobian(self):
         """Non-causal attention: all sequence positions influence each other."""
-        layer = nn.Attention(8, num_heads=1, causal=False, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=1, causal=False, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (1, 4, 8))
         jac = jax.jacobian(layer)(x)  # (1, 4, 8, 1, 4, 8)
         jac_seq = jnp.sum(jnp.abs(jac), axis=(0, 2, 3, 5))  # (4, 4)
@@ -32,27 +32,27 @@ class TestAttention:
     def test_multi_head(self):
         """Various num_heads values all produce correct output shape."""
         for num_heads in [1, 2, 4]:
-            layer = nn.Attention(8, num_heads=num_heads, key=jax.random.key(0))
+            layer = nn.MultiHeadAttention(8, num_heads=num_heads, key=jax.random.key(0))
             x = jnp.ones((1, 4, 8))
             y = layer(x)
             assert y.shape == (1, 4, 8)
 
     def test_with_bias(self):
-        """Output bias is present and output shape is correct when bias=True."""
-        layer = nn.Attention(8, num_heads=2, bias=True, key=jax.random.key(0))
+        """Output bias is present and output shape is correct when use_bias=True."""
+        layer = nn.MultiHeadAttention(8, num_heads=2, use_bias=True, key=jax.random.key(0))
         assert layer.b_out is not None
         x = jnp.ones((1, 4, 8))
         y = layer(x)
         assert y.shape == (1, 4, 8)
 
     def test_without_bias(self):
-        """Output bias is None when bias=False."""
-        layer = nn.Attention(8, num_heads=2, bias=False, key=jax.random.key(0))
+        """Output bias is None when use_bias=False."""
+        layer = nn.MultiHeadAttention(8, num_heads=2, use_bias=False, key=jax.random.key(0))
         assert layer.b_out is None
 
     def test_glorot_uniform_init(self):
         """Glorot uniform init gives std close to sqrt(2/(fan_in + fan_out))."""
-        layer = nn.Attention(256, num_heads=4, key=jax.random.key(42))
+        layer = nn.MultiHeadAttention(256, num_heads=4, key=jax.random.key(42))
         std = jnp.std(layer.w_q._value)
         expected_std = (2 / (256 + 256)) ** 0.5
         npt.assert_allclose(std, expected_std, rtol=0.1)
@@ -60,7 +60,7 @@ class TestAttention:
     def test_variance_scaling_init_fans(self):
         """Variance-scaling init sees the true (dim, features) fans despite the head split."""
         he = jax.nn.initializers.he_normal()
-        layer = nn.Attention(64, num_heads=8, w_init=he, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(64, num_heads=8, w_init=he, key=jax.random.key(0))
         expected_std = (2 / 64) ** 0.5
         npt.assert_allclose(jnp.std(layer.w_q._value), expected_std, rtol=0.15)
         npt.assert_allclose(jnp.std(layer.w_k._value), expected_std, rtol=0.15)
@@ -69,7 +69,7 @@ class TestAttention:
 
     def test_default_dtype(self):
         """Weights default to float32."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         assert layer.w_q.dtype == jnp.float32
         assert layer.w_k.dtype == jnp.float32
         assert layer.w_v.dtype == jnp.float32
@@ -84,7 +84,7 @@ class TestAttention:
             implementation = backend
             return query
 
-        layer = nn.Attention(
+        layer = nn.MultiHeadAttention(
             8,
             num_heads=2,
             attention_fn=partial(attention, backend="cudnn"),
@@ -110,7 +110,7 @@ class TestAttention:
 
     def test_mask_blocks_positions(self):
         """Masked positions have zero gradient (no information flow)."""
-        layer = nn.Attention(8, num_heads=1, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=1, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (1, 4, 8))
         # Block position 2 from attending to position 0
         mask = jnp.ones((1, 4, 4), dtype=bool).at[0, 2, 0].set(False)
@@ -120,7 +120,7 @@ class TestAttention:
 
     def test_mask_with_causal(self):
         """Mask combines with causal: both causal future and masked positions are blocked."""
-        layer = nn.Attention(8, num_heads=1, causal=True, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=1, causal=True, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (1, 4, 8))
         # Additionally block position 1 from attending to position 0
         mask = jnp.ones((1, 4, 4), dtype=bool).at[0, 1, 0].set(False)
@@ -134,7 +134,7 @@ class TestAttention:
 
     def test_mask_per_head(self):
         """Per-head mask (... 1 s s) broadcasts across heads."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (1, 4, 8))
         mask = jnp.ones((1, 1, 4, 4), dtype=bool).at[0, 0, 0, 1].set(False)
         y = layer(x, mask=mask)
@@ -142,7 +142,7 @@ class TestAttention:
 
     def test_no_mask_unchanged(self):
         """mask=None produces identical output to omitting it."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (1, 4, 8))
         y1 = layer(x)
         y2 = layer(x, mask=None)
@@ -150,7 +150,7 @@ class TestAttention:
 
     def test_mask_ss(self):
         """(s, s) mask broadcasts across batch and heads."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 4, 8))
         mask = jnp.ones((4, 4), dtype=bool).at[0, 1].set(False)
         y = layer(x, mask=mask)
@@ -158,7 +158,7 @@ class TestAttention:
 
     def test_mask_bss(self):
         """(b, s, s) mask applies per batch, shared across heads."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 4, 8))
         # b == num_heads: regression for rank-3 masks broadcasting onto the head axis
         mask = jnp.ones((2, 4, 4), dtype=bool).at[0, 0, 1].set(False)
@@ -167,7 +167,7 @@ class TestAttention:
 
     def test_mask_bhss(self):
         """(b, h, s, s) per-head mask works with batched input."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 4, 8))
         mask = jnp.ones((2, 2, 4, 4), dtype=bool).at[0, 0, 0, 1].set(False)
         y = layer(x, mask=mask)
@@ -175,7 +175,7 @@ class TestAttention:
 
     def test_fully_masked_row_zero(self):
         """A query row with no attendable positions contributes zero."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 4, 8))
         mask = jnp.ones((2, 4, 4), dtype=bool).at[0, 2].set(False)
         y = layer(x, mask=mask)
@@ -183,7 +183,7 @@ class TestAttention:
 
     def test_fully_masked_row_other_rows_unchanged(self):
         """Rows with attendable positions are unaffected by a fully masked row."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 4, 8))
         mask = jnp.ones((2, 4, 4), dtype=bool).at[0, 2].set(False)
         y = layer(x, mask=mask)
@@ -194,7 +194,7 @@ class TestAttention:
 
     def test_fully_masked_row_with_causal(self):
         """A fully masked query row contributes zero with causal masking."""
-        layer = nn.Attention(8, num_heads=2, causal=True, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, causal=True, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 4, 8))
         mask = jnp.ones((2, 4, 4), dtype=bool).at[0, 2].set(False)
         y = layer(x, mask=mask)
@@ -202,7 +202,7 @@ class TestAttention:
 
     def test_fully_masked_row_gradients_finite(self):
         """A fully masked query row has zero input gradient."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 4, 8))
         mask = jnp.ones((2, 4, 4), dtype=bool).at[0, 2].set(False)
         grads = jax.grad(lambda x: layer(x, mask=mask)[0, 2].sum())(x)
@@ -210,7 +210,7 @@ class TestAttention:
 
     def test_grouped_query_attention(self):
         """num_kv_heads below num_heads (GQA) gives fewer kv heads and correct output shape."""
-        layer = nn.Attention(8, num_heads=4, num_kv_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=4, num_kv_heads=2, key=jax.random.key(0))
         assert layer.w_q.shape == (8, 8)  # (dim, num_heads * head_dim)
         assert layer.w_k.shape == (8, 4)  # (dim, num_kv_heads * head_dim)
         assert layer.w_v.shape == (8, 4)
@@ -219,7 +219,7 @@ class TestAttention:
 
     def test_multi_query_attention(self):
         """num_kv_heads=1 (MQA) shares a single kv head across all query heads."""
-        layer = nn.Attention(8, num_heads=4, num_kv_heads=1, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=4, num_kv_heads=1, key=jax.random.key(0))
         assert layer.w_k.shape == (8, 2)
         assert layer.w_v.shape == (8, 2)
         x = jnp.ones((2, 5, 8))
@@ -227,7 +227,7 @@ class TestAttention:
 
     def test_sliding_window(self):
         """Sliding window blocks attention between positions farther apart than the window."""
-        layer = nn.Attention(8, num_heads=1, window=1, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=1, window=1, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (1, 5, 8))
         jac = jax.jacobian(layer)(x)  # (1, 5, 8, 1, 5, 8)
         jac_seq = jnp.sum(jnp.abs(jac), axis=(0, 2, 3, 5))  # (5, 5)
@@ -237,22 +237,22 @@ class TestAttention:
         npt.assert_allclose(jac_seq * far, 0.0, atol=1e-5)
 
 
-class TestAttentionValidation:
+class TestMultiHeadAttentionValidation:
     def test_dim_not_divisible_by_num_heads_raises(self):
         """dim must be divisible by num_heads."""
         with pytest.raises(ValueError, match="divisible"):
-            nn.Attention(dim=7, num_heads=3, key=jax.random.key(0))
+            nn.MultiHeadAttention(dim=7, num_heads=3, key=jax.random.key(0))
 
     def test_num_heads_not_divisible_by_num_kv_heads_raises(self):
         """num_heads must be divisible by num_kv_heads."""
         with pytest.raises(ValueError, match="divisible"):
-            nn.Attention(dim=8, num_heads=4, num_kv_heads=3, key=jax.random.key(0))
+            nn.MultiHeadAttention(dim=8, num_heads=4, num_kv_heads=3, key=jax.random.key(0))
 
 
-class TestCrossAttention:
+class TestMultiHeadAttentionCross:
     def test_output_shape(self):
         """Output shape matches query sequence shape."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jnp.ones((1, 4, 8))
         x_kv = jnp.ones((1, 6, 8))
         y = layer(x, x_kv)
@@ -260,7 +260,7 @@ class TestCrossAttention:
 
     def test_different_sequence_lengths(self):
         """Query and context can have different sequence lengths."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         for s, t in [(3, 7), (1, 10), (5, 5)]:
             x = jnp.ones((1, s, 8))
             x_kv = jnp.ones((1, t, 8))
@@ -270,15 +270,15 @@ class TestCrossAttention:
     def test_multi_head(self):
         """Various num_heads values all produce correct output shape."""
         for num_heads in [1, 2, 4]:
-            layer = nn.Attention(8, num_heads=num_heads, key=jax.random.key(0))
+            layer = nn.MultiHeadAttention(8, num_heads=num_heads, key=jax.random.key(0))
             x = jnp.ones((1, 4, 8))
             x_kv = jnp.ones((1, 6, 8))
             y = layer(x, x_kv)
             assert y.shape == (1, 4, 8)
 
     def test_with_bias(self):
-        """Output bias is present and output shape is correct when bias=True."""
-        layer = nn.Attention(8, num_heads=2, bias=True, key=jax.random.key(0))
+        """Output bias is present and output shape is correct when use_bias=True."""
+        layer = nn.MultiHeadAttention(8, num_heads=2, use_bias=True, key=jax.random.key(0))
         assert layer.b_out is not None
         x = jnp.ones((1, 4, 8))
         x_kv = jnp.ones((1, 6, 8))
@@ -286,13 +286,13 @@ class TestCrossAttention:
         assert y.shape == (1, 4, 8)
 
     def test_without_bias(self):
-        """Output bias is None when bias=False."""
-        layer = nn.Attention(8, num_heads=2, bias=False, key=jax.random.key(0))
+        """Output bias is None when use_bias=False."""
+        layer = nn.MultiHeadAttention(8, num_heads=2, use_bias=False, key=jax.random.key(0))
         assert layer.b_out is None
 
     def test_kv_dim(self):
         """kv_dim lets the context have a different feature dim than the query input."""
-        layer = nn.Attention(8, num_heads=2, kv_dim=12, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, kv_dim=12, key=jax.random.key(0))
         assert layer.w_k.shape == (12, 8)  # (kv_dim, num_kv_heads * head_dim)
         assert layer.w_v.shape == (12, 8)
         x = jnp.ones((1, 4, 8))
@@ -302,13 +302,13 @@ class TestCrossAttention:
 
     def test_kv_dim_defaults_to_dim(self):
         """kv_dim=None gives the same kv shapes as kv_dim=dim."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         assert layer.w_k.shape == (8, 8)
         assert layer.w_v.shape == (8, 8)
 
     def test_x_kv_influences_output(self):
         """Changing the context changes the output (verifies cross-attention wiring)."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (1, 4, 8))
         x_kv1 = jax.random.normal(jax.random.key(2), (1, 6, 8))
         x_kv2 = jax.random.normal(jax.random.key(3), (1, 6, 8))
@@ -318,7 +318,7 @@ class TestCrossAttention:
 
     def test_default_dtype(self):
         """Weights default to float32."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         assert layer.w_q.dtype == jnp.float32
         assert layer.w_k.dtype == jnp.float32
         assert layer.w_v.dtype == jnp.float32
@@ -326,7 +326,7 @@ class TestCrossAttention:
 
     def test_mask_blocks_context_positions(self):
         """Masked context positions have zero gradient (no information flow)."""
-        layer = nn.Attention(8, num_heads=1, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=1, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (1, 3, 8))
         x_kv = jax.random.normal(jax.random.key(2), (1, 5, 8))
         # Block query position 0 from attending to context position 2
@@ -337,7 +337,7 @@ class TestCrossAttention:
 
     def test_mask_per_head(self):
         """Per-head mask (... 1 s t) broadcasts across heads."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (1, 3, 8))
         x_kv = jax.random.normal(jax.random.key(2), (1, 5, 8))
         mask = jnp.ones((1, 1, 3, 5), dtype=bool).at[0, 0, 0, 0].set(False)
@@ -346,7 +346,7 @@ class TestCrossAttention:
 
     def test_no_mask_unchanged(self):
         """mask=None produces identical output to omitting it."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (1, 3, 8))
         x_kv = jax.random.normal(jax.random.key(2), (1, 5, 8))
         y1 = layer(x, x_kv)
@@ -355,7 +355,7 @@ class TestCrossAttention:
 
     def test_mask_st(self):
         """(s, t) mask broadcasts across batch and heads."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 3, 8))
         x_kv = jax.random.normal(jax.random.key(2), (2, 5, 8))
         mask = jnp.ones((3, 5), dtype=bool).at[0, 0].set(False)
@@ -364,7 +364,7 @@ class TestCrossAttention:
 
     def test_mask_bst(self):
         """(b, s, t) mask applies per batch, shared across heads."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 3, 8))
         x_kv = jax.random.normal(jax.random.key(2), (2, 5, 8))
         # b == num_heads: regression for rank-3 masks broadcasting onto the head axis
@@ -374,7 +374,7 @@ class TestCrossAttention:
 
     def test_mask_bhst(self):
         """(b, h, s, t) per-head mask works with batched input."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 3, 8))
         x_kv = jax.random.normal(jax.random.key(2), (2, 5, 8))
         mask = jnp.ones((2, 2, 3, 5), dtype=bool).at[0, 0, 0, 0].set(False)
@@ -383,7 +383,7 @@ class TestCrossAttention:
 
     def test_fully_masked_row_zero(self):
         """A query row with no attendable context positions contributes zero."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 3, 8))
         x_kv = jax.random.normal(jax.random.key(2), (2, 5, 8))
         mask = jnp.ones((2, 3, 5), dtype=bool).at[0, 1].set(False)
@@ -392,7 +392,7 @@ class TestCrossAttention:
 
     def test_fully_masked_row_other_rows_unchanged(self):
         """Rows with attendable positions are unaffected by a fully masked row."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 3, 8))
         x_kv = jax.random.normal(jax.random.key(2), (2, 5, 8))
         mask = jnp.ones((2, 3, 5), dtype=bool).at[0, 1].set(False)
@@ -404,7 +404,7 @@ class TestCrossAttention:
 
     def test_fully_masked_row_gradients_finite(self):
         """A fully masked query row has zero context gradient."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 3, 8))
         x_kv = jax.random.normal(jax.random.key(2), (2, 5, 8))
         mask = jnp.ones((2, 3, 5), dtype=bool).at[0, 1].set(False)
@@ -413,13 +413,15 @@ class TestCrossAttention:
 
     def test_x_kv_none_is_self_attention(self):
         """Omitting x_kv is identical to passing the input as its own context."""
-        layer = nn.Attention(8, num_heads=2, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (2, 4, 8))
         npt.assert_array_equal(layer(x), layer(x, x))
 
     def test_grouped_query_attention(self):
         """num_kv_heads below num_heads applies to the context projections too."""
-        layer = nn.Attention(8, num_heads=4, num_kv_heads=2, kv_dim=12, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(
+            8, num_heads=4, num_kv_heads=2, kv_dim=12, key=jax.random.key(0)
+        )
         assert layer.w_k.shape == (12, 4)  # (kv_dim, num_kv_heads * head_dim)
         assert layer.w_v.shape == (12, 4)
         x = jax.random.normal(jax.random.key(1), (2, 3, 8))
@@ -435,7 +437,7 @@ class TestCrossAttention:
             shapes = (query.shape, key.shape, value.shape)
             return query
 
-        layer = nn.Attention(8, num_heads=2, attention_fn=attention, key=jax.random.key(0))
+        layer = nn.MultiHeadAttention(8, num_heads=2, attention_fn=attention, key=jax.random.key(0))
         layer(jnp.ones((1, 3, 8)), jnp.ones((1, 5, 8)))
 
         assert shapes == ((1, 3, 2, 4), (1, 5, 2, 4), (1, 5, 2, 4))

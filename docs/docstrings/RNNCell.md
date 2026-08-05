@@ -8,7 +8,7 @@ in_dim : int
     Input feature dimension.
 hidden_dim : int
     Hidden state dimension.
-bias : bool, default=True
+use_bias : bool, default=True
     Whether to include a learnable bias term.
 w_i_init : Initializer
     Input-to-hidden initializer. Glorot uniform by default.
@@ -27,7 +27,7 @@ w_i : Param
 w_h : Param
     Hidden-to-hidden weight of shape `(hidden_dim, hidden_dim)`.
 b : Param | None
-    Bias of shape `(hidden_dim,)`. `None` when `bias=False`.
+    Bias of shape `(hidden_dim,)`. `None` when `use_bias=False`.
 
 Example
 -------

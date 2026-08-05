@@ -22,13 +22,15 @@ class ResBlock(nn.Module):
     def __init__(self, in_channels: int, channels: int, stride: int, *, key) -> None:
         key_1, key_2, key_projection = jax.random.split(key, 3)
         self.conv_1 = nn.Conv(
-            in_channels, channels, (3, 3), stride=stride, padding=1, bias=False, key=key_1
+            in_channels, channels, (3, 3), stride=stride, padding=1, use_bias=False, key=key_1
         )
         self.norm_1 = nn.GroupNorm(channels, min(32, channels), 2)
-        self.conv_2 = nn.Conv(channels, channels, (3, 3), padding=1, bias=False, key=key_2)
+        self.conv_2 = nn.Conv(channels, channels, (3, 3), padding=1, use_bias=False, key=key_2)
         self.norm_2 = nn.GroupNorm(channels, min(32, channels), 2)
         self.projection = (
-            nn.Conv(in_channels, channels, (1, 1), stride=stride, bias=False, key=key_projection)
+            nn.Conv(
+                in_channels, channels, (1, 1), stride=stride, use_bias=False, key=key_projection
+            )
             if stride != 1 or in_channels != channels
             else None
         )
@@ -59,7 +61,7 @@ class ResNet(nn.Module):
         num_blocks = sum(config.block_depths)
         keys = iter(jax.random.split(key, num_blocks + 2))
         width = config.resnet_width
-        self.stem = nn.Conv(3, width, (7, 7), stride=2, padding=3, bias=False, key=next(keys))
+        self.stem = nn.Conv(3, width, (7, 7), stride=2, padding=3, use_bias=False, key=next(keys))
         self.stem_norm = nn.GroupNorm(width, min(32, width), 2)
         self.pool = nn.MaxPool((3, 3), stride=2, padding=1)
 

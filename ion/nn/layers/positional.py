@@ -36,8 +36,8 @@ class LearnedPositionalEmbedding(Module):
         self,
         max_len: int,
         dim: int,
-        w_init: Initializer = variance_scaling(1.0, "fan_in", "uniform", out_axis=0),
         *,
+        w_init: Initializer = variance_scaling(1.0, "fan_in", "uniform", out_axis=0),
         key: PRNGKeyArray,
     ) -> None:
 
@@ -70,6 +70,7 @@ class RoPE(Module):
 
     def __init__(
         self,
+        *,
         shape: tuple[int, ...] | None = None,
         num_prefix_tokens: int = 0,
         theta: float = 10_000.0,

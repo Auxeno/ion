@@ -28,6 +28,7 @@ class GINConv(Module):
     def __init__(
         self,
         mlp: Module,
+        *,
         eps: float = 0.0,
         train_eps: bool = False,
     ) -> None:

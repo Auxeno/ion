@@ -1,7 +1,7 @@
 """Multi-head attention layers from Vaswani et al., 2017.
 
 Modules:
-    Attention  Multi-head self and cross-attention.
+    MultiHeadAttention  Multi-head self and cross-attention.
 
 Functions:
     dot_product_attention_with_rope  Apply RoPE before dot-product attention.
@@ -26,11 +26,12 @@ from ..param import Param
 from .positional import RoPE
 
 
-class Attention(Module):
+class MultiHeadAttention(Module):
     """Multi-head attention.
 
-    >>> attn = Attention(64, num_heads=8, key=key)
+    >>> attn = MultiHeadAttention(64, num_heads=8, key=key)
     >>> attn(x)  # self-attention: (b, s, 64) -> (b, s, 64)
+    >>> attn(x, x_kv)  # cross-attention: (b, s, 64), (b, t, 64) -> (b, s, 64)
     >>> attn(x, mask=mask)  # mask: bool (s, t), (b, s, t) or (b, h, s, t)
     """
 
@@ -48,16 +49,16 @@ class Attention(Module):
     def __init__(
         self,
         dim: int,
+        *,
         num_heads: int = 1,
         num_kv_heads: int | None = None,
         kv_dim: int | None = None,
-        bias: bool = False,
+        use_bias: bool = False,
         causal: bool = False,
         window: int | tuple[int, int] | None = None,
         w_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
         attention_fn: Callable[..., Array] = jax.nn.dot_product_attention,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
@@ -72,18 +73,18 @@ class Attention(Module):
                 f"num_heads ({num_heads}) must be divisible by num_kv_heads ({num_kv_heads})"
             )
 
-        self.num_heads = num_heads
-        self.num_kv_heads = num_kv_heads
-        self.causal = causal
-        self.window = window
-        self.attention_fn = attention_fn
-
         key_q, key_k, key_v, key_out, key_b = jax.random.split(key, 5)
         self.w_q = Param(w_init(shape=(dim, num_heads * head_dim), key=key_q))
         self.w_k = Param(w_init(shape=(kv_dim, num_kv_heads * head_dim), key=key_k))
         self.w_v = Param(w_init(shape=(kv_dim, num_kv_heads * head_dim), key=key_v))
         self.w_out = Param(w_init(shape=(num_heads * head_dim, dim), key=key_out))
-        self.b_out = Param(b_init(shape=(dim,), key=key_b)) if bias else None
+        self.b_out = Param(b_init(shape=(dim,), key=key_b)) if use_bias else None
+
+        self.num_heads = num_heads
+        self.num_kv_heads = num_kv_heads
+        self.causal = causal
+        self.window = window
+        self.attention_fn = attention_fn
 
     def __call__(
         self,

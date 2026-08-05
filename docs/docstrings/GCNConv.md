@@ -8,7 +8,7 @@ in_dim : int
     Input node feature dimension.
 out_dim : int
     Output node feature dimension.
-bias : bool, default=True
+use_bias : bool, default=True
     Whether to include a learnable bias term.
 w_init : Initializer
     Weight initializer. Glorot uniform by default.
@@ -22,7 +22,7 @@ Attributes
 w : Param
     Weight matrix of shape `(in_dim, out_dim)`.
 b : Param | None
-    Bias vector of shape `(out_dim,)`. `None` when `bias=False`.
+    Bias vector of shape `(out_dim,)`. `None` when `use_bias=False`.
 
 Example
 -------

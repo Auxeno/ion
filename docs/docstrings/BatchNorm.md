@@ -12,7 +12,7 @@ momentum : float, default=0.1
     Weight given to the current batch statistics. Expected to be in `[0, 1]`.
 eps : float, default=1e-5
     Positive value added to the variance.
-bias : bool, default=True
+use_bias : bool, default=True
     Whether to use a bias.
 
 Attributes

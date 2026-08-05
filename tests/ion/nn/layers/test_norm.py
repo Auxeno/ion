@@ -72,8 +72,8 @@ class TestBatchNorm:
         )
 
     def test_no_bias(self):
-        """bias=False drops the bias parameter."""
-        layer = nn.BatchNorm(4, bias=False)
+        """use_bias=False drops the bias parameter."""
+        layer = nn.BatchNorm(4, use_bias=False)
         assert layer.b is None
         assert layer.num_params == 4
 
@@ -182,20 +182,20 @@ class TestLayerNorm:
         npt.assert_allclose(layer.b._value, jnp.zeros(8))
 
     def test_no_bias(self):
-        """bias=False drops the bias parameter."""
-        layer = nn.LayerNorm(8, bias=False)
+        """use_bias=False drops the bias parameter."""
+        layer = nn.LayerNorm(8, use_bias=False)
         assert layer.b is None
         assert layer.num_params == 8
 
     def test_no_bias_matches_zero_bias(self):
         """A zero bias is equivalent to no bias."""
         x = jax.random.normal(jax.random.key(0), (4, 8))
-        npt.assert_allclose(nn.LayerNorm(8, bias=False)(x), nn.LayerNorm(8)(x), rtol=1e-6)
+        npt.assert_allclose(nn.LayerNorm(8, use_bias=False)(x), nn.LayerNorm(8)(x), rtol=1e-6)
 
     def test_no_bias_is_not_rms_norm(self):
         """Bias-less LayerNorm still centers the mean, unlike RMSNorm."""
         x = jax.random.normal(jax.random.key(0), (4, 8)) + 5.0
-        assert not jnp.allclose(nn.LayerNorm(8, bias=False)(x), nn.RMSNorm(8)(x))
+        assert not jnp.allclose(nn.LayerNorm(8, use_bias=False)(x), nn.RMSNorm(8)(x))
 
     @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
     def test_mixed_precision(self, dtype):
@@ -389,7 +389,7 @@ class TestSpectralNorm:
     @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
     def test_low_precision_construction(self, dtype):
         """Direct low-precision construction keeps zero weights finite."""
-        linear = nn.Linear(4, 5, bias=False, key=jax.random.key(0)).astype(dtype)
+        linear = nn.Linear(4, 5, use_bias=False, key=jax.random.key(0)).astype(dtype)
         linear = linear.at.w.set(nn.Param(jnp.zeros((4, 5), dtype=dtype)))
 
         layer = nn.SpectralNorm(linear, key=jax.random.key(1))
@@ -402,7 +402,7 @@ class TestSpectralNorm:
 
     def test_spectral_norm(self):
         """The normalized weight has largest singular value near one."""
-        linear = nn.Linear(8, 8, bias=False, key=jax.random.key(0))
+        linear = nn.Linear(8, 8, use_bias=False, key=jax.random.key(0))
         layer = nn.SpectralNorm(linear, power_iterations=20, key=jax.random.key(1))
         weight = jnp.asarray(linear.w)
         matrix = weight.reshape(-1, weight.shape[-1]).T

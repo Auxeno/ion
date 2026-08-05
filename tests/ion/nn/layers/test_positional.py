@@ -282,9 +282,9 @@ class TestRoPEPrefixTokens:
         npt.assert_allclose(rope(x)[2:], nn.RoPE()(x[2:]), atol=1e-6)
 
     def test_attention_integration(self):
-        """A 2D RoPE composes with Attention through a custom attention_fn."""
+        """A 2D RoPE composes with MultiHeadAttention through a custom attention_fn."""
         rope = nn.RoPE(shape=(4, 4), num_prefix_tokens=1)
-        attn = nn.Attention(
+        attn = nn.MultiHeadAttention(
             8,
             num_heads=2,
             attention_fn=partial(nn.dot_product_attention_with_rope, rope=rope),

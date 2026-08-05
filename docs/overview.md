@@ -109,7 +109,7 @@ Each [`ion.nn`](nn/layers/index.md) layer is a `Module`, constructed with a `key
 |--------|--------|
 | [Linear](nn/layers/linear.md) | `Linear` |
 | [Convolution](nn/layers/conv.md) | `Conv`, `ConvTranspose` |
-| [Attention](nn/layers/attention.md) | `SelfAttention`, `CrossAttention` |
+| [Attention](nn/layers/attention.md) | `MultiHeadAttention` |
 | [Normalization](nn/layers/norm.md) | `BatchNorm`, `LayerNorm`, `RMSNorm`, `GroupNorm`, `SpectralNorm` |
 | [Recurrent](nn/layers/recurrent.md) | `RNN`, `LSTM`, `GRU` |
 | [State Space](nn/layers/ssm.md) | `S4D`, `S5`, `LRU` |
@@ -127,7 +127,7 @@ import jax.numpy as jnp
 
 from ion import nn
 
-attn = nn.SelfAttention(64, num_heads=8, key=jax.random.key(0))
+attn = nn.MultiHeadAttention(64, num_heads=8, key=jax.random.key(0))
 y = attn(jnp.ones((32, 16, 64)))
 ```
 

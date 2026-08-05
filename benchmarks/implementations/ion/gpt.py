@@ -11,7 +11,7 @@ from ...configs import ModelConfig
 class TransformerBlock(nn.Module):
     """Pre-norm causal transformer block."""
 
-    attention: nn.Attention
+    attention: nn.MultiHeadAttention
     attention_norm: nn.LayerNorm
     mlp_norm: nn.LayerNorm
     mlp_in: nn.Linear
@@ -19,16 +19,16 @@ class TransformerBlock(nn.Module):
 
     def __init__(self, dim: int, num_heads: int, *, key: PRNGKeyArray) -> None:
         key_attention, key_in, key_out = jax.random.split(key, 3)
-        self.attention = nn.Attention(
+        self.attention = nn.MultiHeadAttention(
             dim,
-            num_heads,
+            num_heads=num_heads,
             causal=True,
             key=key_attention,
         )
         self.attention_norm = nn.LayerNorm(dim)
         self.mlp_norm = nn.LayerNorm(dim)
-        self.mlp_in = nn.Linear(dim, 4 * dim, bias=False, key=key_in)
-        self.mlp_out = nn.Linear(4 * dim, dim, bias=False, key=key_out)
+        self.mlp_in = nn.Linear(dim, 4 * dim, use_bias=False, key=key_in)
+        self.mlp_out = nn.Linear(4 * dim, dim, use_bias=False, key=key_out)
 
     def __call__(self, x: Float[Array, "b s d"]) -> Float[Array, "b s d"]:
         x = x + self.attention(self.attention_norm(x))

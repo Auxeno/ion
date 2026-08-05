@@ -69,9 +69,9 @@ class TestLoRALinear:
         assert lora(x).shape == (3, 5, 16)
 
     def test_no_bias(self):
-        """Works with bias=False Linear."""
+        """Works with use_bias=False Linear."""
         keys = jax.random.split(jax.random.key(0), 2)
-        linear = nn.Linear(8, 16, bias=False, key=keys[0])
+        linear = nn.Linear(8, 16, use_bias=False, key=keys[0])
         lora = nn.LoRALinear(linear, rank=4, key=keys[1])
         x = jax.random.normal(jax.random.key(1), (8,))
         npt.assert_allclose(lora(x), linear(x), rtol=1e-5, atol=1e-5)

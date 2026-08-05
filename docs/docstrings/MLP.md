@@ -11,7 +11,7 @@ activation : Callable, default=jax.nn.relu
     Activation applied after each hidden layer.
 final_activation : Callable | None, default=None
     Activation applied to the output. `None` leaves the output linear.
-bias : bool, default=True
+use_bias : bool, default=True
     Whether the linear layers include bias terms.
 w_init : Initializer
     Weight initializer for every linear layer. He uniform by default.

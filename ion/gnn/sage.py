@@ -4,7 +4,7 @@ Modules:
     SAGEConv  Sample-and-aggregate graph convolution with a separate root term.
 
 Glorot uniform weight init, zeros for bias.
-Neighbour aggregation is `mean`, `max`, or `sum`; the central node enters through
+Neighbor aggregation is `mean`, `max`, or `sum`; the central node enters through
 the root weight, so self-loops are not needed.
 """
 
@@ -39,25 +39,27 @@ class SAGEConv(Module):
         self,
         in_dim: int,
         out_dim: int,
+        *,
         aggregator: Literal["mean", "max", "sum"] = "mean",
         normalize: bool = False,
-        root_weight: bool = True,
-        bias: bool = True,
+        use_root_weight: bool = True,
+        use_bias: bool = True,
         w_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
         aggregate = {"mean": segment_mean, "max": segment_max, "sum": segment_sum}[aggregator]
 
-        self.aggregate = aggregate
-        self.normalize = normalize
-
         key_neigh, key_self, key_b = jax.random.split(key, 3)
         self.w_neigh = Param(w_init(shape=(in_dim, out_dim), key=key_neigh))
-        self.w_self = Param(w_init(shape=(in_dim, out_dim), key=key_self)) if root_weight else None
-        self.b = Param(b_init(shape=(out_dim,), key=key_b)) if bias else None
+        self.w_self = (
+            Param(w_init(shape=(in_dim, out_dim), key=key_self)) if use_root_weight else None
+        )
+        self.b = Param(b_init(shape=(out_dim,), key=key_b)) if use_bias else None
+
+        self.aggregate = aggregate
+        self.normalize = normalize
 
     def __call__(
         self,

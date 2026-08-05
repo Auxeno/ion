@@ -31,26 +31,26 @@ class MLP(Module):
     def __init__(
         self,
         dims: Sequence[int],
+        *,
         activation: Callable[[Array], Array] = jax.nn.relu,
         final_activation: Callable[[Array], Array] | None = None,
-        bias: bool = True,
+        use_bias: bool = True,
         w_init: Initializer = he_uniform(),
         b_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
         if len(dims) < 2:
             raise ValueError(f"dims must have at least an input and output dim, got {list(dims)}")
 
-        self.activation = activation
-        self.final_activation = final_activation
-
         keys = jax.random.split(key, len(dims) - 1)
         self.layers = tuple(
-            Linear(d_in, d_out, bias, w_init, b_init, key=layer_key)
+            Linear(d_in, d_out, use_bias=use_bias, w_init=w_init, b_init=b_init, key=layer_key)
             for d_in, d_out, layer_key in zip(dims[:-1], dims[1:], keys)
         )
+
+        self.activation = activation
+        self.final_activation = final_activation
 
     def __call__(self, x: Float[Array, "... i"]) -> Float[Array, "... o"]:
 

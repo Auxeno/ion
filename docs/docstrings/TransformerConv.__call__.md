@@ -22,6 +22,6 @@ jax.Array["n o", float]
 
 Note
 ----
-With `root_weight=True`, a learned projection of each node's features is added
-separately, so self-loops are unnecessary. `beta=True` combines that projection
+With `use_root_weight=True`, a learned projection of each node's features is added
+separately, so self-loops are unnecessary. `use_beta=True` combines that projection
 and the aggregated messages with a sigmoid gate instead.

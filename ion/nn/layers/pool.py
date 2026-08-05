@@ -32,6 +32,7 @@ class MaxPool(Module):
     def __init__(
         self,
         kernel_shape: tuple[int, ...],
+        *,
         stride: int | tuple[int, ...] | None = None,
         padding: Literal["SAME", "VALID"] | int | tuple[int, ...] = 0,
     ) -> None:
@@ -98,6 +99,7 @@ class AvgPool(Module):
     def __init__(
         self,
         kernel_shape: tuple[int, ...],
+        *,
         stride: int | tuple[int, ...] | None = None,
         padding: Literal["SAME", "VALID"] | int | tuple[int, ...] = 0,
         count_include_pad: bool = True,

@@ -2,7 +2,7 @@
 
 Modules:
     GCNConv    Symmetric degree-normalized convolution.  (Kipf & Welling, 2017)
-    GraphConv  Separate neighbour and root transforms.   (Morris et al., 2019)
+    GraphConv  Separate neighbor and root transforms.    (Morris et al., 2019)
 
 Glorot uniform weight init, zeros for bias.
 GCNConv self-loops are the caller's responsibility, see `gnn.add_self_loops`.
@@ -34,16 +34,16 @@ class GCNConv(Module):
         self,
         in_dim: int,
         out_dim: int,
-        bias: bool = True,
+        *,
+        use_bias: bool = True,
         w_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
         key_w, key_b = jax.random.split(key)
         self.w = Param(w_init(shape=(in_dim, out_dim), key=key_w))
-        self.b = Param(b_init(shape=(out_dim,), key=key_b)) if bias else None
+        self.b = Param(b_init(shape=(out_dim,), key=key_b)) if use_bias else None
 
     def __call__(
         self,
@@ -76,7 +76,7 @@ class GCNConv(Module):
 
 
 class GraphConv(Module):
-    """Graph convolutional layer with separate root and neighbour transforms.
+    """Graph convolutional layer with separate root and neighbor transforms.
 
     >>> conv = GraphConv(16, 32, key=key)
     >>> conv(x, senders, receivers)  # (n, 16) -> (n, 32)
@@ -91,17 +91,17 @@ class GraphConv(Module):
         self,
         in_dim: int,
         out_dim: int,
-        bias: bool = True,
+        *,
+        use_bias: bool = True,
         w_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
         key_neigh, key_self, key_b = jax.random.split(key, 3)
         self.w_neigh = Param(w_init(shape=(in_dim, out_dim), key=key_neigh))
         self.w_self = Param(w_init(shape=(in_dim, out_dim), key=key_self))
-        self.b = Param(b_init(shape=(out_dim,), key=key_b)) if bias else None
+        self.b = Param(b_init(shape=(out_dim,), key=key_b)) if use_bias else None
 
     def __call__(
         self,
@@ -120,7 +120,7 @@ class GraphConv(Module):
             messages = messages * edge_weight[:, None]
         neigh = segment_sum(messages, receivers, n)
 
-        # Transform neighbourhood and central-node features independently
+        # Transform neighborhood and central-node features independently
         x_out = neigh @ self.w_neigh + x @ self.w_self
 
         if self.b is not None:

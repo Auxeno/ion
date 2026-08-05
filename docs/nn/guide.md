@@ -68,7 +68,7 @@ outputs.shape  # (8, 20, 16), one hidden state per timestep
 h.shape        # (8, 16), the final hidden state
 ```
 
-`RNN`, `GRU`, `LSTM`, `S4D`, `S5`, and `LRU` all take `(b, t, d)`. `SelfAttention` and `CrossAttention` take `(b, s, d)`, where `s` is the sequence length being attended over.
+`RNN`, `GRU`, `LSTM`, `S4D`, `S5`, and `LRU` all take `(b, t, d)`. `MultiHeadAttention` takes `(b, s, d)`, where `s` is the sequence length being attended over.
 
 | Layer | Input | Fixed axes |
 |---|---|---|
@@ -77,14 +77,14 @@ h.shape        # (8, 16), the final hidden state
 | `Conv`, `ConvTranspose`, `MaxPool`, `AvgPool` | `(b, *spatial, c)` | Batch, spatial, channels |
 | `GroupNorm` | `(*, *spatial, c)` | Spatial axes per `num_spatial_dims` |
 | `RNN`, `LSTM`, `GRU`, `S4D`, `S5`, `LRU` | `(b, t, d)` | Batch, time, features |
-| `SelfAttention`, `CrossAttention` | `(b, s, d)` | Batch, sequence, features |
+| `MultiHeadAttention` | `(b, s, d)` | Batch, sequence, features |
 
 ## Adding leading axes
 
 Fixed rank is not a limit on what can be expressed, because `jax.vmap` maps any layer over an extra axis. An attention layer rejects a fourth axis:
 
 ```python
-attn = nn.SelfAttention(64, num_heads=8, key=key)
+attn = nn.MultiHeadAttention(64, num_heads=8, key=key)
 attn(jnp.ones((2, 4, 16, 64)))  # ValueError
 ```
 

@@ -29,11 +29,17 @@ def _build_gnn_layers(key):
     x_edge = jax.random.normal(next(keys), (9, 4))
     return [
         (gnn.GCNConv(8, 16, key=next(keys)), x, senders, receivers, None),
-        (gnn.GCNConv(8, 16, bias=False, key=next(keys)), x, senders, receivers, None),
+        (gnn.GCNConv(8, 16, use_bias=False, key=next(keys)), x, senders, receivers, None),
         (gnn.GraphConv(8, 16, key=next(keys)), x, senders, receivers, None),
         (gnn.GATConv(8, 16, num_heads=2, key=next(keys)), x, senders, receivers, None),
         (gnn.GATConv(8, 16, num_heads=4, key=next(keys)), x, senders, receivers, None),
-        (gnn.GATConv(8, 16, num_heads=2, bias=False, key=next(keys)), x, senders, receivers, None),
+        (
+            gnn.GATConv(8, 16, num_heads=2, use_bias=False, key=next(keys)),
+            x,
+            senders,
+            receivers,
+            None,
+        ),
         (
             gnn.GATConv(8, 16, num_heads=2, edge_dim=4, key=next(keys)),
             x,
@@ -58,14 +64,14 @@ def _build_gnn_layers(key):
             x_edge,
         ),
         (
-            gnn.TransformerConv(8, 16, num_heads=2, beta=True, key=next(keys)),
+            gnn.TransformerConv(8, 16, num_heads=2, use_beta=True, key=next(keys)),
             x,
             senders,
             receivers,
             None,
         ),
         (
-            gnn.TransformerConv(8, 16, num_heads=2, root_weight=False, key=next(keys)),
+            gnn.TransformerConv(8, 16, num_heads=2, use_root_weight=False, key=next(keys)),
             x,
             senders,
             receivers,
@@ -83,7 +89,7 @@ def _build_gnn_layers(key):
         (gnn.SAGEConv(8, 16, aggregator="max", key=next(keys)), x, senders, receivers, None),
         (gnn.SAGEConv(8, 16, aggregator="sum", key=next(keys)), x, senders, receivers, None),
         (gnn.SAGEConv(8, 16, normalize=True, key=next(keys)), x, senders, receivers, None),
-        (gnn.SAGEConv(8, 16, root_weight=False, key=next(keys)), x, senders, receivers, None),
+        (gnn.SAGEConv(8, 16, use_root_weight=False, key=next(keys)), x, senders, receivers, None),
     ]
 
 

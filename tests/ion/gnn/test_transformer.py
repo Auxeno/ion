@@ -68,15 +68,15 @@ class TestTransformerConv:
 
     def test_no_bias(self, triangle_graph_no_self_loops):
         """No-bias mode creates no bias parameter."""
-        conv = gnn.TransformerConv(4, 8, bias=False, key=jax.random.key(0))
+        conv = gnn.TransformerConv(4, 8, use_bias=False, key=jax.random.key(0))
         assert conv.b_out is None
         x = jnp.ones((3, 4))
         senders, receivers = triangle_graph_no_self_loops
         assert conv(x, senders, receivers).shape == (3, 8)
 
     def test_no_root_weight(self, triangle_graph_no_self_loops):
-        """root_weight=False removes the central-node projection."""
-        conv = gnn.TransformerConv(4, 8, root_weight=False, key=jax.random.key(0))
+        """use_root_weight=False removes the central-node projection."""
+        conv = gnn.TransformerConv(4, 8, use_root_weight=False, key=jax.random.key(0))
         assert conv.w_root is None
         x = jax.random.normal(jax.random.key(1), (3, 4))
         senders, receivers = triangle_graph_no_self_loops
@@ -84,8 +84,8 @@ class TestTransformerConv:
         npt.assert_allclose(conv(x, senders, receivers), expected, rtol=1e-5, atol=1e-5)
 
     def test_beta_gate_manual(self, triangle_graph_no_self_loops):
-        """beta=True gates between root and aggregated neighbourhood features."""
-        conv = gnn.TransformerConv(4, 8, num_heads=2, beta=True, key=jax.random.key(0))
+        """use_beta=True gates between root and aggregated neighbourhood features."""
+        conv = gnn.TransformerConv(4, 8, num_heads=2, use_beta=True, key=jax.random.key(0))
         assert conv.w_beta is not None
         x = jax.random.normal(jax.random.key(1), (3, 4))
         senders, receivers = triangle_graph_no_self_loops
@@ -119,7 +119,7 @@ class TestTransformerConv:
 
     def test_default_dtype(self):
         """Parameters default to float32."""
-        conv = gnn.TransformerConv(8, 16, num_heads=2, beta=True, key=jax.random.key(0))
+        conv = gnn.TransformerConv(8, 16, num_heads=2, use_beta=True, key=jax.random.key(0))
         assert conv.w_q.dtype == jnp.float32
         assert conv.w_k.dtype == jnp.float32
         assert conv.w_v.dtype == jnp.float32
@@ -129,7 +129,7 @@ class TestTransformerConv:
     def test_projection_shapes(self):
         """Projection parameters stay flat; heads exist only in activations."""
         conv = gnn.TransformerConv(
-            8, 16, num_heads=4, edge_dim=3, beta=True, key=jax.random.key(0)
+            8, 16, num_heads=4, edge_dim=3, use_beta=True, key=jax.random.key(0)
         )
         assert conv.w_q.shape == (8, 16)
         assert conv.w_k.shape == (8, 16)
@@ -193,7 +193,7 @@ class TestTransformerConvEdgeMask:
     def test_all_false_removes_messages(self):
         """An all-False mask produces zero without a root term or bias."""
         conv = gnn.TransformerConv(
-            4, 8, root_weight=False, bias=False, key=jax.random.key(0)
+            4, 8, use_root_weight=False, use_bias=False, key=jax.random.key(0)
         )
         x = jax.random.normal(jax.random.key(1), (3, 4))
         senders = jnp.array([0, 1, 2])
@@ -208,11 +208,59 @@ class TestTransformerConvEdgeMask:
         senders, receivers = triangle_graph
         x_edge = jax.random.normal(jax.random.key(2), (senders.shape[0], 3))
         mask = jnp.ones(senders.shape, dtype=bool).at[jnp.array([0, 3])].set(False)
-        expected = _manual_transformer(
-            conv, x, senders, receivers, x_edge=x_edge, edge_mask=mask
-        )
+        expected = _manual_transformer(conv, x, senders, receivers, x_edge=x_edge, edge_mask=mask)
         y = conv(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
         npt.assert_allclose(y, expected, rtol=1e-5, atol=1e-5)
+
+    def test_fully_masked_receiver_zero(self):
+        """A receiver whose incoming edges are all masked contributes zero."""
+        conv = gnn.TransformerConv(
+            4, 4, use_root_weight=False, use_bias=False, key=jax.random.key(0)
+        )
+        x = jax.random.normal(jax.random.key(1), (4, 4))
+        senders = jnp.array([0, 2, 1, 3])
+        receivers = jnp.array([1, 1, 2, 2])
+        mask = jnp.array([False, False, True, True])
+        y = conv(x, senders, receivers, edge_mask=mask)
+        npt.assert_allclose(y[1], 0.0, atol=1e-6)
+
+    def test_fully_masked_receiver_other_nodes_unchanged(self):
+        """Receivers with valid edges are unaffected by a fully masked neighbourhood."""
+        conv = gnn.TransformerConv(
+            4, 4, use_root_weight=False, use_bias=False, key=jax.random.key(0)
+        )
+        x = jax.random.normal(jax.random.key(1), (4, 4))
+        senders = jnp.array([0, 2, 1, 3])
+        receivers = jnp.array([1, 1, 2, 2])
+        mask = jnp.array([False, False, True, True])
+        y = conv(x, senders, receivers, edge_mask=mask)
+        y_full = conv(x, senders, receivers)
+        npt.assert_allclose(y[2], y_full[2], atol=1e-6)
+
+    def test_fully_masked_receiver_with_edge_features(self):
+        """Edge features do not leak into a fully masked neighbourhood."""
+        conv = gnn.TransformerConv(
+            4, 4, edge_dim=3, use_root_weight=False, use_bias=False, key=jax.random.key(0)
+        )
+        x = jax.random.normal(jax.random.key(1), (4, 4))
+        senders = jnp.array([0, 2, 1, 3])
+        receivers = jnp.array([1, 1, 2, 2])
+        x_edge = jax.random.normal(jax.random.key(2), (4, 3))
+        mask = jnp.array([False, False, True, True])
+        y = conv(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
+        npt.assert_allclose(y[1], 0.0, atol=1e-6)
+
+    def test_fully_masked_receiver_gradients_finite(self):
+        """A fully masked neighbourhood has zero input gradient and no NaNs."""
+        conv = gnn.TransformerConv(
+            4, 4, use_root_weight=False, use_bias=False, key=jax.random.key(0)
+        )
+        x = jax.random.normal(jax.random.key(1), (4, 4))
+        senders = jnp.array([0, 2, 1, 3])
+        receivers = jnp.array([1, 1, 2, 2])
+        mask = jnp.array([False, False, True, True])
+        grads = jax.grad(lambda x: conv(x, senders, receivers, edge_mask=mask)[1].sum())(x)
+        npt.assert_array_equal(grads, 0.0)
 
 
 class TestTransformerConvValidation:
@@ -224,4 +272,4 @@ class TestTransformerConvValidation:
     def test_beta_without_root_raises(self):
         """The beta gate requires a root representation."""
         with pytest.raises(ValueError, match="root_weight"):
-            gnn.TransformerConv(8, 16, beta=True, root_weight=False, key=jax.random.key(0))
+            gnn.TransformerConv(8, 16, use_beta=True, use_root_weight=False, key=jax.random.key(0))

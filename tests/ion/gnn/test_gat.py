@@ -27,8 +27,8 @@ class TestGATConv:
 
     def test_no_bias(self, triangle_graph):
         """No-bias mode: bias field is None, output still has correct shape."""
-        gat = gnn.GATConv(8, 16, bias=False, key=jax.random.key(0))
-        assert gat.b is None
+        gat = gnn.GATConv(8, 16, use_bias=False, key=jax.random.key(0))
+        assert gat.b_out is None
         x = jnp.ones((3, 8))
         senders, receivers = triangle_graph
         y = gat(x, senders, receivers)
@@ -45,7 +45,7 @@ class TestGATConv:
     def test_zero_bias_init(self):
         """Bias is initialized to all zeros."""
         gat = gnn.GATConv(8, 16, key=jax.random.key(0))
-        assert jnp.all(gat.b == 0)
+        assert jnp.all(gat.b_out == 0)
 
     def test_default_dtype(self):
         """Weights default to float32."""
@@ -229,7 +229,7 @@ class TestGATConvEdgeMask:
 
     def test_all_false_produces_zero(self):
         """All-False mask zeroes out all messages, producing zero output (no bias)."""
-        gat = gnn.GATConv(4, 4, bias=False, key=jax.random.key(0))
+        gat = gnn.GATConv(4, 4, use_bias=False, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 4))
         senders = jnp.array([0, 1, 2])
         receivers = jnp.array([1, 2, 0])
@@ -268,6 +268,48 @@ class TestGATConvEdgeMask:
         result = jax.jit(gat)(x, senders, receivers, edge_mask=mask)
         npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
 
+    def test_fully_masked_receiver_zero(self):
+        """A receiver whose incoming edges are all masked contributes zero."""
+        conv = gnn.GATConv(4, 4, use_bias=False, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (4, 4))
+        senders = jnp.array([0, 2, 1, 3])
+        receivers = jnp.array([1, 1, 2, 2])
+        mask = jnp.array([False, False, True, True])
+        y = conv(x, senders, receivers, edge_mask=mask)
+        npt.assert_allclose(y[1], 0.0, atol=1e-6)
+
+    def test_fully_masked_receiver_other_nodes_unchanged(self):
+        """Receivers with valid edges are unaffected by a fully masked neighbourhood."""
+        conv = gnn.GATConv(4, 4, use_bias=False, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (4, 4))
+        senders = jnp.array([0, 2, 1, 3])
+        receivers = jnp.array([1, 1, 2, 2])
+        mask = jnp.array([False, False, True, True])
+        y = conv(x, senders, receivers, edge_mask=mask)
+        y_full = conv(x, senders, receivers)
+        npt.assert_allclose(y[2], y_full[2], atol=1e-6)
+
+    def test_fully_masked_receiver_with_edge_features(self):
+        """Edge features do not leak into a fully masked neighbourhood."""
+        conv = gnn.GATConv(4, 4, edge_dim=3, use_bias=False, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (4, 4))
+        senders = jnp.array([0, 2, 1, 3])
+        receivers = jnp.array([1, 1, 2, 2])
+        x_edge = jax.random.normal(jax.random.key(2), (4, 3))
+        mask = jnp.array([False, False, True, True])
+        y = conv(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
+        npt.assert_allclose(y[1], 0.0, atol=1e-6)
+
+    def test_fully_masked_receiver_gradients_finite(self):
+        """A fully masked neighbourhood has zero input gradient and no NaNs."""
+        conv = gnn.GATConv(4, 4, use_bias=False, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (4, 4))
+        senders = jnp.array([0, 2, 1, 3])
+        receivers = jnp.array([1, 1, 2, 2])
+        mask = jnp.array([False, False, True, True])
+        grads = jax.grad(lambda x: conv(x, senders, receivers, edge_mask=mask)[1].sum())(x)
+        npt.assert_array_equal(grads, 0.0)
+
 
 class TestGATConvValidation:
     def test_out_dim_not_divisible_by_num_heads_raises(self):
@@ -297,8 +339,8 @@ class TestGATv2Conv:
 
     def test_no_bias(self, triangle_graph):
         """No-bias mode: bias field is None, output still has correct shape."""
-        gat = gnn.GATv2Conv(8, 16, bias=False, key=jax.random.key(0))
-        assert gat.b is None
+        gat = gnn.GATv2Conv(8, 16, use_bias=False, key=jax.random.key(0))
+        assert gat.b_out is None
         x = jnp.ones((3, 8))
         senders, receivers = triangle_graph
         y = gat(x, senders, receivers)
@@ -476,7 +518,7 @@ class TestGATv2ConvEdgeMask:
 
     def test_all_false_produces_zero(self):
         """All-False mask zeroes out all messages, producing zero output (no bias)."""
-        gat = gnn.GATv2Conv(4, 4, bias=False, key=jax.random.key(0))
+        gat = gnn.GATv2Conv(4, 4, use_bias=False, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 4))
         senders = jnp.array([0, 1, 2])
         receivers = jnp.array([1, 2, 0])
@@ -514,6 +556,48 @@ class TestGATv2ConvEdgeMask:
         expected = gat(x, senders, receivers, edge_mask=mask)
         result = jax.jit(gat)(x, senders, receivers, edge_mask=mask)
         npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
+
+    def test_fully_masked_receiver_zero(self):
+        """A receiver whose incoming edges are all masked contributes zero."""
+        conv = gnn.GATv2Conv(4, 4, use_bias=False, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (4, 4))
+        senders = jnp.array([0, 2, 1, 3])
+        receivers = jnp.array([1, 1, 2, 2])
+        mask = jnp.array([False, False, True, True])
+        y = conv(x, senders, receivers, edge_mask=mask)
+        npt.assert_allclose(y[1], 0.0, atol=1e-6)
+
+    def test_fully_masked_receiver_other_nodes_unchanged(self):
+        """Receivers with valid edges are unaffected by a fully masked neighbourhood."""
+        conv = gnn.GATv2Conv(4, 4, use_bias=False, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (4, 4))
+        senders = jnp.array([0, 2, 1, 3])
+        receivers = jnp.array([1, 1, 2, 2])
+        mask = jnp.array([False, False, True, True])
+        y = conv(x, senders, receivers, edge_mask=mask)
+        y_full = conv(x, senders, receivers)
+        npt.assert_allclose(y[2], y_full[2], atol=1e-6)
+
+    def test_fully_masked_receiver_with_edge_features(self):
+        """Edge features do not leak into a fully masked neighbourhood."""
+        conv = gnn.GATv2Conv(4, 4, edge_dim=3, use_bias=False, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (4, 4))
+        senders = jnp.array([0, 2, 1, 3])
+        receivers = jnp.array([1, 1, 2, 2])
+        x_edge = jax.random.normal(jax.random.key(2), (4, 3))
+        mask = jnp.array([False, False, True, True])
+        y = conv(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
+        npt.assert_allclose(y[1], 0.0, atol=1e-6)
+
+    def test_fully_masked_receiver_gradients_finite(self):
+        """A fully masked neighbourhood has zero input gradient and no NaNs."""
+        conv = gnn.GATv2Conv(4, 4, use_bias=False, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (4, 4))
+        senders = jnp.array([0, 2, 1, 3])
+        receivers = jnp.array([1, 1, 2, 2])
+        mask = jnp.array([False, False, True, True])
+        grads = jax.grad(lambda x: conv(x, senders, receivers, edge_mask=mask)[1].sum())(x)
+        npt.assert_array_equal(grads, 0.0)
 
 
 class TestGATv2ConvValidation:

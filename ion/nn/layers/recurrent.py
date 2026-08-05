@@ -40,18 +40,18 @@ class RNNCell(Module):
         self,
         in_dim: int,
         hidden_dim: int,
-        bias: bool = True,
+        *,
+        use_bias: bool = True,
         w_i_init: Initializer = glorot_uniform(),
         w_h_init: Initializer = orthogonal(),
         b_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
         key_wi, key_wh, key_b = jax.random.split(key, 3)
         self.w_i = Param(w_i_init(shape=(in_dim, hidden_dim), key=key_wi))
         self.w_h = Param(w_h_init(shape=(hidden_dim, hidden_dim), key=key_wh))
-        self.b = Param(b_init(shape=(hidden_dim,), key=key_b)) if bias else None
+        self.b = Param(b_init(shape=(hidden_dim,), key=key_b)) if use_bias else None
 
     def __call__(
         self,
@@ -83,15 +83,23 @@ class RNN(Module):
         self,
         in_dim: int,
         hidden_dim: int,
-        bias: bool = True,
+        *,
+        use_bias: bool = True,
         w_i_init: Initializer = glorot_uniform(),
         w_h_init: Initializer = orthogonal(),
         b_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
-        self.cell = RNNCell(in_dim, hidden_dim, bias, w_i_init, w_h_init, b_init, key=key)
+        self.cell = RNNCell(
+            in_dim,
+            hidden_dim,
+            use_bias=use_bias,
+            w_i_init=w_i_init,
+            w_h_init=w_h_init,
+            b_init=b_init,
+            key=key,
+        )
 
     def __call__(
         self,
@@ -133,11 +141,11 @@ class LSTMCell(Module):
         self,
         in_dim: int,
         hidden_dim: int,
-        bias: bool = True,
+        *,
+        use_bias: bool = True,
         w_i_init: Initializer = glorot_uniform(),
         w_h_init: Initializer = orthogonal(),
         b_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
@@ -146,10 +154,10 @@ class LSTMCell(Module):
         key_wi, key_wh, key_b = jax.random.split(key, 3)
         self.w_i = Param(w_i_init(shape=(in_dim, gate_dim), key=key_wi))
         self.w_h = Param(w_h_init(shape=(hidden_dim, gate_dim), key=key_wh))
-        if bias:
+        if use_bias:
             b = b_init(shape=(gate_dim,), key=key_b)
 
-            # Initialize forget gate bias to 1.0
+            # Initialize forget gate use_bias to 1.0
             i, f, g, o = jnp.split(b, 4)
             self.b = Param(jnp.concatenate((i, jnp.ones_like(f), g, o)))
         else:
@@ -197,15 +205,23 @@ class LSTM(Module):
         self,
         in_dim: int,
         hidden_dim: int,
-        bias: bool = True,
+        *,
+        use_bias: bool = True,
         w_i_init: Initializer = glorot_uniform(),
         w_h_init: Initializer = orthogonal(),
         b_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
-        self.cell = LSTMCell(in_dim, hidden_dim, bias, w_i_init, w_h_init, b_init, key=key)
+        self.cell = LSTMCell(
+            in_dim,
+            hidden_dim,
+            use_bias=use_bias,
+            w_i_init=w_i_init,
+            w_h_init=w_h_init,
+            b_init=b_init,
+            key=key,
+        )
 
     def __call__(
         self,
@@ -249,11 +265,11 @@ class GRUCell(Module):
         self,
         in_dim: int,
         hidden_dim: int,
-        bias: bool = True,
+        *,
+        use_bias: bool = True,
         w_i_init: Initializer = glorot_uniform(),
         w_h_init: Initializer = orthogonal(),
         b_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
@@ -262,8 +278,8 @@ class GRUCell(Module):
         key_wi, key_wh, key_b, key_bh = jax.random.split(key, 4)
         self.w_i = Param(w_i_init(shape=(in_dim, gate_dim), key=key_wi))
         self.w_h = Param(w_h_init(shape=(hidden_dim, gate_dim), key=key_wh))
-        self.b = Param(b_init(shape=(gate_dim,), key=key_b)) if bias else None
-        self.b_h = Param(b_init(shape=(gate_dim,), key=key_bh)) if bias else None
+        self.b = Param(b_init(shape=(gate_dim,), key=key_b)) if use_bias else None
+        self.b_h = Param(b_init(shape=(gate_dim,), key=key_bh)) if use_bias else None
 
     def __call__(
         self,
@@ -308,15 +324,23 @@ class GRU(Module):
         self,
         in_dim: int,
         hidden_dim: int,
-        bias: bool = True,
+        *,
+        use_bias: bool = True,
         w_i_init: Initializer = glorot_uniform(),
         w_h_init: Initializer = orthogonal(),
         b_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
-        self.cell = GRUCell(in_dim, hidden_dim, bias, w_i_init, w_h_init, b_init, key=key)
+        self.cell = GRUCell(
+            in_dim,
+            hidden_dim,
+            use_bias=use_bias,
+            w_i_init=w_i_init,
+            w_h_init=w_h_init,
+            b_init=b_init,
+            key=key,
+        )
 
     def __call__(
         self,

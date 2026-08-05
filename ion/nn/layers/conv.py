@@ -40,14 +40,14 @@ class Conv(Module):
         in_channels: int,
         out_channels: int,
         kernel_shape: tuple[int, ...],
+        *,
         stride: int | tuple[int, ...] = 1,
         padding: Literal["SAME", "VALID"] | int | tuple[int, ...] = 0,
         dilation: int | tuple[int, ...] = 1,
         groups: int = 1,
-        bias: bool = True,
+        use_bias: bool = True,
         w_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
@@ -61,6 +61,7 @@ class Conv(Module):
             )
 
         num_spatial = len(kernel_shape)
+        in_per_group = in_channels // groups
         stride = (stride,) * num_spatial if isinstance(stride, int) else stride
         dilation = (dilation,) * num_spatial if isinstance(dilation, int) else dilation
 
@@ -71,17 +72,15 @@ class Conv(Module):
         else:
             resolved_padding = tuple((p, p) for p in padding)
 
+        key_w, key_b = jax.random.split(key)
+        self.w = Param(w_init(shape=(*kernel_shape, in_per_group, out_channels), key=key_w))
+        self.b = Param(b_init(shape=(out_channels,), key=key_b)) if use_bias else None
+
         self.kernel_shape = kernel_shape
         self.stride = stride
         self.padding = resolved_padding
         self.dilation = dilation
         self.groups = groups
-
-        key_w, key_b = jax.random.split(key)
-        self.w = Param(
-            w_init(shape=(*kernel_shape, in_channels // groups, out_channels), key=key_w)
-        )
-        self.b = Param(b_init(shape=(out_channels,), key=key_b)) if bias else None
 
     def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
 
@@ -127,15 +126,15 @@ class ConvTranspose(Module):
         in_channels: int,
         out_channels: int,
         kernel_shape: tuple[int, ...],
+        *,
         stride: int | tuple[int, ...] = 1,
         padding: Literal["SAME", "VALID"] | int | tuple[int, ...] = 0,
         output_padding: int | tuple[int, ...] = 0,
         dilation: int | tuple[int, ...] = 1,
         groups: int = 1,
-        bias: bool = True,
+        use_bias: bool = True,
         w_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
@@ -149,6 +148,7 @@ class ConvTranspose(Module):
             )
 
         num_spatial = len(kernel_shape)
+        in_per_group = in_channels // groups
         stride = (stride,) * num_spatial if isinstance(stride, int) else stride
         output_padding = (
             (output_padding,) * num_spatial if isinstance(output_padding, int) else output_padding
@@ -183,17 +183,15 @@ class ConvTranspose(Module):
             (dk_i - a, dk_i - b + op) for dk_i, a, b, op in zip(dk, p0, p1, output_padding)
         )
 
+        key_w, key_b = jax.random.split(key)
+        self.w = Param(w_init(shape=(*kernel_shape, in_per_group, out_channels), key=key_w))
+        self.b = Param(b_init(shape=(out_channels,), key=key_b)) if use_bias else None
+
         self.kernel_shape = kernel_shape
         self.stride = stride
         self.padding = resolved_padding
         self.dilation = dilation
         self.groups = groups
-
-        key_w, key_b = jax.random.split(key)
-        self.w = Param(
-            w_init(shape=(*kernel_shape, in_channels // groups, out_channels), key=key_w)
-        )
-        self.b = Param(b_init(shape=(out_channels,), key=key_b)) if bias else None
 
     def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
 

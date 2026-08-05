@@ -18,7 +18,7 @@ class TestLinear:
     def test_no_bias(self):
         """No-bias mode: output matches x @ w with no bias term."""
         key = jax.random.key(0)
-        layer = nn.Linear(4, 8, bias=False, key=key)
+        layer = nn.Linear(4, 8, use_bias=False, key=key)
         assert layer.b is None
         x = jax.random.normal(jax.random.key(1), (4,))
         y = layer(x)

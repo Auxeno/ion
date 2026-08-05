@@ -8,7 +8,7 @@ Every `ion.nn` layer is an immutable JAX [pytree](https://docs.jax.dev/en/latest
 |---|---|
 | [Linear](linear.md) | `Linear` |
 | [Convolution](conv.md) | `Conv`, `ConvTranspose` |
-| [Attention](attention.md) | `SelfAttention`, `CrossAttention` |
+| [Attention](attention.md) | `MultiHeadAttention` |
 | [Normalization](norm.md) | `BatchNorm`, `LayerNorm`, `RMSNorm`, `GroupNorm`, `SpectralNorm` |
 | [Recurrent](recurrent.md) | `RNN`, `LSTM`, `GRU` and their cells |
 | [State Space](ssm.md) | `S4D`, `S5`, `LRU` and their cells |

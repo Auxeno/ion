@@ -47,7 +47,7 @@ class TestSAGEConv:
 
     def test_no_bias(self, triangle_graph):
         """No-bias mode: bias field is None, output still has correct shape."""
-        sage = gnn.SAGEConv(8, 16, bias=False, key=jax.random.key(0))
+        sage = gnn.SAGEConv(8, 16, use_bias=False, key=jax.random.key(0))
         assert sage.b is None
         x = jnp.ones((3, 8))
         senders, receivers = triangle_graph
@@ -55,8 +55,8 @@ class TestSAGEConv:
         assert y.shape == (3, 16)
 
     def test_no_root_weight(self, triangle_graph_no_self_loops):
-        """root_weight=False drops the self weight; output uses only neighbors."""
-        sage = gnn.SAGEConv(2, 3, root_weight=False, key=jax.random.key(0))
+        """use_root_weight=False drops the self weight; output uses only neighbors."""
+        sage = gnn.SAGEConv(2, 3, use_root_weight=False, key=jax.random.key(0))
         assert sage.w_self is None
         x = jax.random.normal(jax.random.key(1), (3, 2))
         senders, receivers = triangle_graph_no_self_loops

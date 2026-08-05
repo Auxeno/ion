@@ -10,6 +10,8 @@ Optional edge features require `edge_dim` at init and `x_edge` at call.
 Optional boolean edge mask: True = keep edge, False = ignore.
 """
 
+import math
+
 import jax
 import jax.numpy as jnp
 from jax.nn.initializers import Initializer, glorot_uniform, zeros
@@ -37,46 +39,44 @@ class TransformerConv(Module):
     b_out: Param[Float[Array, " o"]] | None
     num_heads: int
     edge_dim: int | None
-    beta: bool
+    use_beta: bool
 
     def __init__(
         self,
         in_dim: int,
         out_dim: int,
+        *,
         num_heads: int = 1,
         edge_dim: int | None = None,
-        root_weight: bool = True,
-        beta: bool = False,
-        bias: bool = True,
+        use_root_weight: bool = True,
+        use_beta: bool = False,
+        use_bias: bool = True,
         w_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
         if out_dim % num_heads != 0:
             raise ValueError(f"out_dim ({out_dim}) must be divisible by num_heads ({num_heads})")
-        if beta and not root_weight:
-            raise ValueError("beta=True requires root_weight=True")
-
-        self.num_heads = num_heads
-        self.edge_dim = edge_dim
-        self.beta = beta
+        if use_beta and not use_root_weight:
+            raise ValueError("use_beta=True requires use_root_weight=True")
 
         key_q, key_k, key_v, key_root, key_edge, key_beta, key_b = jax.random.split(key, 7)
-
-        # Keep projection parameters flat; head axes exist only in activations
         self.w_q = Param(w_init(shape=(in_dim, out_dim), key=key_q))
         self.w_k = Param(w_init(shape=(in_dim, out_dim), key=key_k))
         self.w_v = Param(w_init(shape=(in_dim, out_dim), key=key_v))
-
-        # Create the optional root, edge, and gated-residual projections
-        self.w_root = Param(w_init(shape=(in_dim, out_dim), key=key_root)) if root_weight else None
+        self.w_root = (
+            Param(w_init(shape=(in_dim, out_dim), key=key_root)) if use_root_weight else None
+        )
         self.w_edge = (
             Param(w_init(shape=(edge_dim, out_dim), key=key_edge)) if edge_dim is not None else None
         )
-        self.w_beta = Param(w_init(shape=(3 * out_dim, 1), key=key_beta)) if beta else None
-        self.b_out = Param(b_init(shape=(out_dim,), key=key_b)) if bias else None
+        self.w_beta = Param(w_init(shape=(3 * out_dim, 1), key=key_beta)) if use_beta else None
+        self.b_out = Param(b_init(shape=(out_dim,), key=key_b)) if use_bias else None
+
+        self.num_heads = num_heads
+        self.edge_dim = edge_dim
+        self.use_beta = use_beta
 
     def __call__(
         self,
@@ -88,38 +88,41 @@ class TransformerConv(Module):
         edge_mask: Bool[Array, " e"] | None = None,
     ) -> Float[Array, "n o"]:
 
-        # Require edge features exactly when an edge projection was configured
         if x_edge is None and self.edge_dim is not None:
             raise ValueError(f"edge_dim={self.edge_dim} set at init but no x_edge passed at call")
         if x_edge is not None and self.edge_dim is None:
             raise ValueError("x_edge passed at call but edge_dim not set at init")
 
         n, i = x.shape
-        head_dim = self.w_q.shape[-1] // self.num_heads
 
-        # Project nodes, then split the output dimension into attention heads
-        q = (x @ self.w_q).reshape(n, self.num_heads, head_dim)
-        k = (x @ self.w_k).reshape(n, self.num_heads, head_dim)
-        v = (x @ self.w_v).reshape(n, self.num_heads, head_dim)
+        # Project nodes
+        q = (x @ self.w_q).reshape(n, self.num_heads, -1)
+        k = (x @ self.w_k).reshape(n, self.num_heads, -1)
+        v = (x @ self.w_v).reshape(n, self.num_heads, -1)
+        head_dim = q.shape[-1]
 
-        # Inject each edge embedding into its sender key and value
+        # Gather sender keys and values, adding the edge embedding to both
         edge_k = k[senders]
-        messages = v[senders]
+        edge_v = v[senders]
         if x_edge is not None:
             assert self.w_edge is not None
+            if edge_mask is not None:
+                x_edge = jnp.where(edge_mask[:, None], x_edge, 0.0)
             e = (x_edge @ self.w_edge).reshape(-1, self.num_heads, head_dim)
             edge_k = edge_k + e
-            messages = messages + e
+            edge_v = edge_v + e
 
-        # Score edges and normalize over each receiver's incoming neighbourhood
-        logits = (q[receivers] * edge_k).sum(axis=-1)
-        logits = logits * jnp.asarray(head_dim, dtype=logits.dtype) ** -0.5
+        # Scaled dot product between each receiver's query and its senders' keys
+        logits = (q[receivers] * edge_k).sum(axis=-1) / math.sqrt(head_dim)
+
         if edge_mask is not None:
             logits = jnp.where(edge_mask[:, None], logits, -jnp.inf)
-        attn = segment_softmax(logits, receivers, n)
 
-        # Weight sender values and sum them into receiver nodes
-        out = segment_sum(messages * attn[..., None], receivers, n).reshape(n, -1)
+        # Softmax over each receiver's incoming edges
+        attention = segment_softmax(logits, receivers, n)
+
+        # Aggregate sender values weighted by attention
+        out = segment_sum(edge_v * attention[..., None], receivers, n).reshape(n, -1)
 
         # Include the receiving node through its learned root projection
         if self.w_root is not None:

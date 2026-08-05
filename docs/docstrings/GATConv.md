@@ -17,7 +17,7 @@ edge_dim : int | None, default=None
     gate. When `None`, no edge parameters are created.
 negative_slope : float, default=0.2
     Negative slope of the LeakyReLU used to gate attention logits.
-bias : bool, default=True
+use_bias : bool, default=True
     Whether to include a learnable bias term.
 w_init : Initializer
     Projection weight initializer. Glorot uniform by default (activation-
@@ -35,8 +35,8 @@ w : Param
     Projection weight of shape `(in_dim, out_dim)`.
 att_sender, att_receiver : Param
     Per-head attention vectors of shape `(num_heads, out_dim // num_heads)`.
-b : Param | None
-    Bias vector of shape `(out_dim,)`. `None` when `bias=False`.
+b_out : Param | None
+    Bias vector of shape `(out_dim,)`. `None` when `use_bias=False`.
 w_edge, att_edge : Param | None
     Edge projection and attention parameters. `None` unless `edge_dim` is set.
 

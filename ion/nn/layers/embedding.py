@@ -26,8 +26,8 @@ class Embedding(Module):
         self,
         num_embeddings: int,
         dim: int,
-        w_init: Initializer = variance_scaling(1.0, "fan_in", "uniform", out_axis=0),
         *,
+        w_init: Initializer = variance_scaling(1.0, "fan_in", "uniform", out_axis=0),
         key: PRNGKeyArray,
     ) -> None:
 

@@ -20,7 +20,7 @@ dilation : int | tuple[int, ...], default=1
 groups : int, default=1
     Number of groups for grouped convolution. Both `in_channels` and
     `out_channels` must be divisible by `groups`.
-bias : bool, default=True
+use_bias : bool, default=True
     Whether to include a learnable bias term.
 w_init : Initializer
     Weight initializer. Glorot uniform by default.
@@ -34,7 +34,7 @@ Attributes
 w : Param
     Kernel of shape `(*kernel_shape, in_channels // groups, out_channels)`.
 b : Param | None
-    Bias vector of shape `(out_channels,)`. `None` when `bias=False`.
+    Bias vector of shape `(out_channels,)`. `None` when `use_bias=False`.
 
 Example
 -------

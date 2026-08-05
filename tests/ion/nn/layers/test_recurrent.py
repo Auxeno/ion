@@ -30,7 +30,7 @@ class TestRNNCell:
 
     def test_no_bias(self):
         """No-bias mode sets b to None."""
-        cell = nn.RNNCell(8, 16, bias=False, key=jax.random.key(0))
+        cell = nn.RNNCell(8, 16, use_bias=False, key=jax.random.key(0))
         assert cell.b is None
 
     def test_recurrent_weight_init(self):
@@ -124,7 +124,7 @@ class TestRNN:
 
     def test_no_bias(self):
         """No-bias mode works through the wrapper."""
-        rnn = nn.RNN(8, 16, bias=False, key=jax.random.key(0))
+        rnn = nn.RNN(8, 16, use_bias=False, key=jax.random.key(0))
         assert rnn.cell.b is None
         x = jnp.ones((1, 5, 8))
         y, h_n = rnn(x)
@@ -167,7 +167,7 @@ class TestLSTMCell:
 
     def test_no_bias(self):
         """No-bias mode sets b to None."""
-        cell = nn.LSTMCell(8, 16, bias=False, key=jax.random.key(0))
+        cell = nn.LSTMCell(8, 16, use_bias=False, key=jax.random.key(0))
         assert cell.b is None
 
     def test_recurrent_weight_init(self):
@@ -251,7 +251,7 @@ class TestGRUCell:
 
     def test_no_bias(self):
         """No-bias mode sets b and b_h to None."""
-        cell = nn.GRUCell(8, 16, bias=False, key=jax.random.key(0))
+        cell = nn.GRUCell(8, 16, use_bias=False, key=jax.random.key(0))
         assert cell.b is None
         assert cell.b_h is None
 
@@ -361,7 +361,7 @@ class TestLSTM:
 
     def test_no_bias(self):
         """No-bias mode works through the wrapper."""
-        lstm = nn.LSTM(8, 16, bias=False, key=jax.random.key(0))
+        lstm = nn.LSTM(8, 16, use_bias=False, key=jax.random.key(0))
         assert lstm.cell.b is None
         x = jnp.ones((1, 5, 8))
         y, (h_n, c_n) = lstm(x)
@@ -424,7 +424,7 @@ class TestGRU:
 
     def test_no_bias(self):
         """No-bias mode works through the wrapper."""
-        gru = nn.GRU(8, 16, bias=False, key=jax.random.key(0))
+        gru = nn.GRU(8, 16, use_bias=False, key=jax.random.key(0))
         assert gru.cell.b is None
         assert gru.cell.b_h is None
         x = jnp.ones((1, 5, 8))

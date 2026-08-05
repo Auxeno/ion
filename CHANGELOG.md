@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.13.0
+
+- **Breaking: optional constructor arguments are keyword-only.** Every layer now places
+  `*` immediately after its last required argument, so the arguments that define a layer's
+  shape stay positional and everything that configures its behaviour is passed by name.
+  `Linear(3, 16)` and `Conv(3, 64, (3, 3))` are unchanged, while
+  `MultiHeadAttention(64, 8)` becomes `MultiHeadAttention(64, num_heads=8)` and
+  `Conv(3, 64, (3, 3), 2, 1)` becomes `Conv(3, 64, (3, 3), stride=2, padding=1)`.
+- **Breaking: `GATConv` and `GATv2Conv` rename `b` to `b_out`.** The output bias now matches
+  `MultiHeadAttention` and `TransformerConv`, and moves after the edge projections so it is
+  declared last among the parameters. Checkpoints holding a GAT bias no longer load, since
+  tensor names follow attribute paths.
+- **Breaking: GAT layers split their RNG key in declaration order.** The key for the output
+  bias moved from the middle of the split to the end, so with `edge_dim` set, `w_edge` and
+  `att_edge` now draw different subkeys and initialize to different values for a given seed.
+  `w`, `att_sender`, `att_receiver`, and `w_sender`/`w_receiver` are unaffected. Checkpoints
+  are unaffected, since only initialization changes.
+- **Breaking: booleans that toggle a component take a `use_` prefix.** `bias` becomes
+  `use_bias` (19 layers), `root_weight` becomes `use_root_weight`, and `beta` becomes
+  `use_beta`, matching `flax.nnx`, `flax.linen`, and `equinox`. Booleans that describe
+  behaviour rather than switch a component on keep their names: `causal`, `normalize`,
+  `count_include_pad`, and `train_eps` are unchanged.
+- **Constructors assign fields in declaration order.** Every layer now builds its pytree
+  children (sub-modules, params, buffers) before its static configuration, matching the
+  order the fields are declared in the class body. Argument defaulting and derived values
+  come first, then validation, then the assignments. Behaviour is unchanged.
+- **Breaking: `SelfAttention` and `CrossAttention` merged into `MultiHeadAttention`.** One
+  layer covers both. `attn(x)` draws keys and values from `x`; `attn(x, x_kv)` draws them
+  from a context sequence. `SelfAttention(dim, num_heads)` becomes
+  `MultiHeadAttention(dim, num_heads=num_heads)`, and
+  `CrossAttention(dim, num_heads, context_dim=c)` becomes
+  `MultiHeadAttention(dim, num_heads=num_heads, kv_dim=c)`. Cross-attention gains
+  grouped-query and multi-query attention, sliding windows, causal masking, and
+  `attention_fn`, none of which it previously supported. Parameter names are unchanged, so
+  existing checkpoints still load.
+- **`MultiHeadAttention` accepts a custom `attention_fn`.** Use a partial to select JAX's
+  cuDNN backend or compose attention with the new RoPE helper. RoPE now accepts an
+  explicit sequence axis for projected multi-head inputs.
+- **RoPE handles N-dimensional positions.** Pass `shape` to lay positions on a lattice
+  instead of a flat sequence, splitting the head dimension evenly across its axes, as
+  axial RoPE does for images. `num_prefix_tokens` holds leading CLS or register tokens
+  at position 0, where the rotation is the identity. `head_dim` must be divisible by
+  `2 * len(shape)`. Breaking: `theta` moves to the end of the constructor, so pass it
+  by keyword.
+
 ## 0.12.1
 
 - **Optimizer step counters use `uint32`.** This raises the maximum update count

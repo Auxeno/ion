@@ -3,7 +3,7 @@
 from .blocks.mlp import MLP
 from .blocks.sequential import Sequential
 from .buffer import Buffer
-from .layers.attention import Attention, dot_product_attention_with_rope
+from .layers.attention import MultiHeadAttention, dot_product_attention_with_rope
 from .layers.conv import Conv, ConvTranspose
 from .layers.dropout import Dropout
 from .layers.embedding import Embedding
@@ -22,7 +22,6 @@ __all__ = [
     "Module",
     "Buffer",
     "Param",
-    "Attention",
     "AvgPool",
     "BatchNorm",
     "Conv",
@@ -43,6 +42,7 @@ __all__ = [
     "LSTMCell",
     "MaxPool",
     "MLP",
+    "MultiHeadAttention",
     "RMSNorm",
     "RNN",
     "RNNCell",

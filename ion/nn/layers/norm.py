@@ -37,19 +37,20 @@ class BatchNorm(Module):
     def __init__(
         self,
         dim: int,
+        *,
         momentum: float = 0.1,
         eps: float = 1e-5,
-        bias: bool = True,
+        use_bias: bool = True,
     ) -> None:
 
-        self.momentum = momentum
-        self.eps = eps
-
         self.scale = Param(jnp.ones(dim))
-        self.b = Param(jnp.zeros(dim)) if bias else None
+        self.b = Param(jnp.zeros(dim)) if use_bias else None
 
         self.running_mean = Buffer(jnp.zeros(dim))
         self.running_var = Buffer(jnp.ones(dim))
+
+        self.momentum = momentum
+        self.eps = eps
 
     def __call__(
         self,
@@ -103,12 +104,12 @@ class LayerNorm(Module):
     b: Param[Float[Array, " d"]] | None
     eps: float
 
-    def __init__(self, dim: int, eps: float = 1e-5, bias: bool = True) -> None:
-
-        self.eps = eps
+    def __init__(self, dim: int, *, eps: float = 1e-5, use_bias: bool = True) -> None:
 
         self.scale = Param(jnp.ones(dim))
-        self.b = Param(jnp.zeros(dim)) if bias else None
+        self.b = Param(jnp.zeros(dim)) if use_bias else None
+
+        self.eps = eps
 
     def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
         dtype = x.dtype
@@ -148,18 +149,19 @@ class GroupNorm(Module):
         dim: int,
         num_groups: int,
         num_spatial_dims: int,
+        *,
         eps: float = 1e-5,
     ) -> None:
 
         if dim % num_groups != 0:
             raise ValueError(f"dim ({dim}) must be divisible by num_groups ({num_groups})")
 
+        self.scale = Param(jnp.ones(dim))
+        self.b = Param(jnp.zeros(dim))
+
         self.num_groups = num_groups
         self.num_spatial_dims = num_spatial_dims
         self.eps = eps
-
-        self.scale = Param(jnp.ones(dim))
-        self.b = Param(jnp.zeros(dim))
 
     def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
         dtype = x.dtype
@@ -195,11 +197,11 @@ class RMSNorm(Module):
     scale: Param[Float[Array, " d"]]
     eps: float
 
-    def __init__(self, dim: int, eps: float = 1e-5) -> None:
-
-        self.eps = eps
+    def __init__(self, dim: int, *, eps: float = 1e-5) -> None:
 
         self.scale = Param(jnp.ones(dim))
+
+        self.eps = eps
 
     def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
         dtype = x.dtype
@@ -219,20 +221,20 @@ class SpectralNorm(Module):
     >>> layer(x, training=True)  # (*, 64) -> (*, 64)
     """
 
-    module: Module
-    parameter: str
     u: Buffer[Float[Array, " u"]]
     v: Buffer[Float[Array, " v"]]
+    module: Module
+    parameter: str
     power_iterations: int
     eps: float
 
     def __init__(
         self,
         module: Module,
+        *,
         parameter: str = "w",
         power_iterations: int = 1,
         eps: float = 1e-12,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
@@ -244,32 +246,33 @@ class SpectralNorm(Module):
         if power_iterations < 1:
             raise ValueError(f"power_iterations ({power_iterations}) must be at least 1")
 
+        weight = param.value
+        matrix = weight.reshape(-1, weight.shape[-1]).T
+
+        u = jax.random.normal(key, (matrix.shape[0],))
+        u, v = self._power_iteration(matrix, u, eps)
+        for _ in range(1, power_iterations):
+            u, v = self._power_iteration(matrix, u, eps)
+
+        self.u = Buffer(u)
+        self.v = Buffer(v)
+
         self.module = module
         self.parameter = parameter
         self.power_iterations = power_iterations
         self.eps = eps
 
-        weight = param.value
-        matrix = weight.reshape(-1, weight.shape[-1]).T
-
-        u = jax.random.normal(key, (matrix.shape[0],))
-        u, v = self._power_iteration(matrix, u)
-        for _ in range(1, self.power_iterations):
-            u, v = self._power_iteration(matrix, u)
-
-        self.u = Buffer(u)
-        self.v = Buffer(v)
-
     def _power_iteration(
         self,
         matrix: Float[Array, "u v"],
         u: Float[Array, " u"],
+        eps: float,
     ) -> tuple[Float[Array, " u"], Float[Array, " v"]]:
 
         v = matrix.T @ u
-        v = v / jnp.maximum(jnp.linalg.norm(v), self.eps)
+        v = v / jnp.maximum(jnp.linalg.norm(v), eps)
         u = matrix @ v
-        u = u / jnp.maximum(jnp.linalg.norm(u), self.eps)
+        u = u / jnp.maximum(jnp.linalg.norm(u), eps)
 
         return lax.stop_gradient((u, v))
 
@@ -288,7 +291,7 @@ class SpectralNorm(Module):
         # Refine the singular vectors only during training
         if training:
             for _ in range(self.power_iterations):
-                u, v = self._power_iteration(matrix, u)
+                u, v = self._power_iteration(matrix, u, self.eps)
             self.u.set(u)
             self.v.set(v)
 

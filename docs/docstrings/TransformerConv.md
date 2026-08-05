@@ -16,13 +16,13 @@ num_heads : int, default=1
 edge_dim : int | None, default=None
     Per-edge feature dimension. When set, one edge feature row is required for
     every directed edge.
-root_weight : bool, default=True
+use_root_weight : bool, default=True
     Add a learned linear projection of each receiving node's features to its
     aggregated messages.
-beta : bool, default=False
+use_beta : bool, default=False
     Use a learned sigmoid gate between the root projection and aggregated
-    messages. Requires `root_weight=True`.
-bias : bool, default=True
+    messages. Requires `use_root_weight=True`.
+use_bias : bool, default=True
     Whether to include a learnable output bias.
 w_init : Initializer
     Projection and gate weight initializer. Glorot uniform by default.
@@ -37,14 +37,14 @@ w_q, w_k, w_v : Param
     Query, key, and value projections of shape `(in_dim, out_dim)`.
 w_root : Param | None
     Projection for each receiving node's own features, with shape
-    `(in_dim, out_dim)`. `None` when `root_weight=False`.
+    `(in_dim, out_dim)`. `None` when `use_root_weight=False`.
 w_edge : Param | None
     Edge projection of shape `(edge_dim, out_dim)`. `None` unless `edge_dim`
     is set.
 w_beta : Param | None
-    Gate projection of shape `(3 * out_dim, 1)`. `None` unless `beta=True`.
+    Gate projection of shape `(3 * out_dim, 1)`. `None` unless `use_beta=True`.
 b_out : Param | None
-    Output bias of shape `(out_dim,)`. `None` when `bias=False`.
+    Output bias of shape `(out_dim,)`. `None` when `use_bias=False`.
 
 Example
 -------
@@ -61,7 +61,7 @@ conv = gnn.TransformerConv(
     out_dim,
     num_heads=4,
     edge_dim=edge_dim,
-    beta=True,
+    use_beta=True,
     key=key,
 )
 y = conv(x, senders, receivers, x_edge=x_edge)

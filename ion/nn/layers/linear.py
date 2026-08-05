@@ -28,16 +28,16 @@ class Linear(Module):
         self,
         in_dim: int,
         out_dim: int,
-        bias: bool = True,
+        *,
+        use_bias: bool = True,
         w_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        *,
         key: PRNGKeyArray,
     ) -> None:
 
         key_w, key_b = jax.random.split(key)
         self.w = Param(w_init(shape=(in_dim, out_dim), key=key_w))
-        self.b = Param(b_init(shape=(out_dim,), key=key_b)) if bias else None
+        self.b = Param(b_init(shape=(out_dim,), key=key_b)) if use_bias else None
 
     def __call__(self, x: Float[Array, "... i"]) -> Float[Array, "... o"]:
 

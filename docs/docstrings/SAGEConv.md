@@ -12,9 +12,9 @@ aggregator : str, default='mean'
     Neighbourhood pooling: `"mean"`, `"max"`, or `"sum"`.
 normalize : bool, default=False
     Whether to L2 normalize each output node embedding.
-root_weight : bool, default=True
+use_root_weight : bool, default=True
     Whether to add the central node's own features through a separate weight.
-bias : bool, default=True
+use_bias : bool, default=True
     Whether to include a learnable bias term.
 w_init : Initializer
     Weight initializer. Glorot uniform by default.
@@ -28,9 +28,9 @@ Attributes
 w_neigh : Param
     Neighbour transform of shape `(in_dim, out_dim)`.
 w_self : Param | None
-    Root transform of shape `(in_dim, out_dim)`. `None` when `root_weight=False`.
+    Root transform of shape `(in_dim, out_dim)`. `None` when `use_root_weight=False`.
 b : Param | None
-    Bias vector of shape `(out_dim,)`. `None` when `bias=False`.
+    Bias vector of shape `(out_dim,)`. `None` when `use_bias=False`.
 
 Example
 -------

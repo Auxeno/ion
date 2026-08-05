@@ -71,7 +71,7 @@ class TestGraphConv:
 
     def test_no_bias(self, triangle_graph_no_self_loops):
         """No-bias mode has no bias parameter and keeps the output shape."""
-        conv = gnn.GraphConv(8, 16, bias=False, key=jax.random.key(0))
+        conv = gnn.GraphConv(8, 16, use_bias=False, key=jax.random.key(0))
         assert conv.b is None
         x = jnp.ones((3, 8))
         senders, receivers = triangle_graph_no_self_loops
@@ -124,8 +124,8 @@ class TestGraphConv:
         senders, receivers = triangle_graph_no_self_loops
         edge_weight = jax.random.normal(jax.random.key(2), senders.shape)
 
-        grad = jax.grad(
-            lambda weight: conv(x, senders, receivers, edge_weight=weight).sum()
-        )(edge_weight)
+        grad = jax.grad(lambda weight: conv(x, senders, receivers, edge_weight=weight).sum())(
+            edge_weight
+        )
         assert jnp.all(jnp.isfinite(grad))
         assert jnp.any(grad != 0)
