@@ -236,10 +236,10 @@ Every layer here updates node features. Some of them read edge features, but non
 
 ```python
 senders, receivers = gnn.remove_self_loops(senders, receivers)
-senders, receivers, kept = gnn.to_undirected(senders, receivers, num_nodes)
+senders, receivers, kept = gnn.to_undirected(senders, receivers)
 x_edge = jnp.concatenate([x_edge, x_edge])[kept]
 
-line_senders, line_receivers, shared = gnn.line_graph(senders, receivers, num_nodes)
+line_senders, line_receivers, shared = gnn.line_graph(senders, receivers)
 x_edge = conv(x_edge, line_senders, line_receivers)
 ```
 

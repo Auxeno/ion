@@ -24,9 +24,6 @@ senders : jax.Array["e", int]
     Source node index for each edge.
 receivers : jax.Array["e", int]
     Destination node index for each edge.
-num_nodes : int
-    Number of nodes in the graph. Used to pack each edge into a single
-    sort key, so every index must be less than this value.
 
 Returns
 -------
@@ -39,7 +36,7 @@ Example
 ```python
 senders = jnp.array([2, 0, 2, 1])
 receivers = jnp.array([0, 1, 0, 2])
-senders, receivers, kept = gnn.coalesce(senders, receivers, num_nodes=3)
+senders, receivers, kept = gnn.coalesce(senders, receivers)
 # senders: [0, 1, 2]
 # receivers: [1, 2, 0]
 # kept: [1, 3, 0]
@@ -48,7 +45,7 @@ senders, receivers, kept = gnn.coalesce(senders, receivers, num_nodes=3)
 Edge features follow the same indices:
 
 ```python
-senders, receivers, kept = gnn.coalesce(senders, receivers, num_nodes)
+senders, receivers, kept = gnn.coalesce(senders, receivers)
 x_edge = x_edge[kept]
 ```
 

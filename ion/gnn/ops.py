@@ -67,7 +67,7 @@ def segment_sum(
     if jnp.issubdtype(dtype, jnp.floating):
         data = data.astype(jnp.float32)
 
-    result = jax.ops.segment_sum(
+    return jax.ops.segment_sum(
         data,
         segment_ids,
         num_segments,
@@ -75,9 +75,7 @@ def segment_sum(
         unique_indices=unique_indices,
         bucket_size=bucket_size,
         mode=mode,
-    )
-
-    return result.astype(dtype)
+    ).astype(dtype)
 
 
 def segment_softmax(
@@ -97,7 +95,7 @@ def segment_softmax(
     maxes = jnp.where(jnp.isinf(maxes), 0.0, maxes)
     data = jnp.exp(data - maxes[segment_ids])
 
-    # Normalize by per-segment sum; guard empty segments (never indexed) against 0 / 0
+    # Normalize by per-segment sum
     sums = segment_sum(data, segment_ids, num_segments)
     return (data / jnp.where(sums == 0, 1.0, sums)[segment_ids]).astype(dtype)
 
@@ -116,9 +114,8 @@ def segment_mean(
 
     sums = segment_sum(data, segment_ids, num_segments)
 
-    # Count segment members; guard empty segments against 0 / 0
-    counts = segment_sum(jnp.ones_like(segment_ids, dtype=data.dtype), segment_ids, num_segments)
-    counts = jnp.maximum(counts, 1)
+    # Count segment members
+    counts = jnp.maximum(jnp.bincount(segment_ids, length=num_segments), 1)
     return (sums / counts.reshape(-1, *(1,) * (data.ndim - 1))).astype(dtype)
 
 
@@ -228,55 +225,51 @@ def degree(
 def coalesce(
     senders: Int[Array, " e"],
     receivers: Int[Array, " e"],
-    num_nodes: int,
 ) -> tuple[Int[Array, " e2"], Int[Array, " e2"], Int[Array, " e2"]]:
     """Sort edges by (sender, receiver) and drop duplicates.
 
-    >>> senders, receivers, kept = coalesce(senders, receivers, num_nodes)
+    >>> senders, receivers, kept = coalesce(senders, receivers)
     >>> x_edge = x_edge[kept]
     """
-    keys = senders * num_nodes + receivers
-    _, kept = jnp.unique(keys, return_index=True)
+    edges = jnp.stack([senders, receivers], axis=1)
+    _, kept = jnp.unique(edges, axis=0, return_index=True)
     return senders[kept], receivers[kept], kept
 
 
 def to_undirected(
     senders: Int[Array, " e"],
     receivers: Int[Array, " e"],
-    num_nodes: int,
 ) -> tuple[Int[Array, " e2"], Int[Array, " e2"], Int[Array, " e2"]]:
     """Add the reverse of every edge, then coalesce.
 
-    >>> senders, receivers, kept = to_undirected(senders, receivers, num_nodes)
+    >>> senders, receivers, kept = to_undirected(senders, receivers)
     >>> x_edge = jnp.concatenate([x_edge, x_edge])[kept]
     """
     return coalesce(
         jnp.concatenate([senders, receivers]),
         jnp.concatenate([receivers, senders]),
-        num_nodes,
     )
 
 
 def line_graph(
     senders: Int[Array, " e"],
     receivers: Int[Array, " e"],
-    num_nodes: int,
     *,
     non_backtracking: bool = True,
 ) -> tuple[Int[Array, " l"], Int[Array, " l"], Int[Array, " l"]]:
     """Rebuild the graph with edges as nodes, joined head to tail.
 
-    >>> line_senders, line_receivers, shared = line_graph(senders, receivers, num_nodes)
+    >>> line_senders, line_receivers, shared = line_graph(senders, receivers)
     """
     # Edges leaving a node form one contiguous block of the sender-sorted ordering
-    out_degree = degree(senders, num_nodes)
     order = jnp.argsort(senders, stable=True)
-    blocks = jnp.cumsum(out_degree) - out_degree
+    sorted_senders = senders[order]
 
     # Every edge i -> v takes the whole block at v, one slot per successor
-    successors = out_degree[receivers]
+    starts = jnp.searchsorted(sorted_senders, receivers)
+    successors = jnp.searchsorted(sorted_senders, receivers, side="right") - starts
     line_senders = jnp.repeat(jnp.arange(senders.shape[0]), successors)
-    offsets = blocks[receivers] - jnp.cumsum(successors) + successors
+    offsets = starts - jnp.cumsum(successors) + successors
     line_receivers = order[offsets[line_senders] + jnp.arange(line_senders.shape[0])]
 
     # Drop i -> v -> i, which sends each edge straight back down its own reverse

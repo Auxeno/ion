@@ -67,6 +67,13 @@ class TestSegmentSoftmax:
         assert jnp.all(jnp.isfinite(result))
         npt.assert_allclose(result.sum(), 1.0, atol=2e-7)
 
+    def test_fully_masked_segment(self):
+        """A segment of all -inf logits gives zero weights, not NaN."""
+        data = jnp.array([-jnp.inf, -jnp.inf, 1.0])
+        segment_ids = jnp.array([0, 0, 1])
+        result = gnn.segment_softmax(data, segment_ids, num_segments=2)
+        npt.assert_allclose(result, jnp.array([0.0, 0.0, 1.0]), atol=2e-7)
+
     def test_jit_compatible(self):
         """segment_softmax works under jax.jit."""
         data = jnp.array([1.0, 2.0, 3.0])
@@ -210,7 +217,7 @@ class TestCoalesce:
         """Edges come back sorted by (sender, receiver) with duplicates dropped."""
         senders = jnp.array([2, 0, 2, 1])
         receivers = jnp.array([0, 1, 0, 2])
-        s, r, kept = gnn.coalesce(senders, receivers, num_nodes=3)
+        s, r, kept = gnn.coalesce(senders, receivers)
         npt.assert_array_equal(s, jnp.array([0, 1, 2]))
         npt.assert_array_equal(r, jnp.array([1, 2, 0]))
         npt.assert_array_equal(kept, jnp.array([1, 3, 0]))
@@ -219,7 +226,7 @@ class TestCoalesce:
         """The kept indices select the surviving rows of the input."""
         senders = jnp.array([2, 0, 2, 1])
         receivers = jnp.array([0, 1, 0, 2])
-        s, r, kept = gnn.coalesce(senders, receivers, num_nodes=3)
+        s, r, kept = gnn.coalesce(senders, receivers)
         npt.assert_array_equal(senders[kept], s)
         npt.assert_array_equal(receivers[kept], r)
 
@@ -227,15 +234,15 @@ class TestCoalesce:
         """The earliest occurrence of a repeated edge is the one kept."""
         senders = jnp.array([1, 1, 1])
         receivers = jnp.array([2, 2, 2])
-        _, _, kept = gnn.coalesce(senders, receivers, num_nodes=3)
+        _, _, kept = gnn.coalesce(senders, receivers)
         npt.assert_array_equal(kept, jnp.array([0]))
 
     def test_idempotent(self):
         """Coalescing an already-canonical edge list changes nothing."""
         senders = jnp.array([2, 0, 2, 1])
         receivers = jnp.array([0, 1, 0, 2])
-        s, r, _ = gnn.coalesce(senders, receivers, num_nodes=3)
-        s2, r2, _ = gnn.coalesce(s, r, num_nodes=3)
+        s, r, _ = gnn.coalesce(senders, receivers)
+        s2, r2, _ = gnn.coalesce(s, r)
         npt.assert_array_equal(s2, s)
         npt.assert_array_equal(r2, r)
 
@@ -243,7 +250,7 @@ class TestCoalesce:
         """Self-loops are ordinary edges and survive coalescing."""
         senders = jnp.array([1, 0, 1])
         receivers = jnp.array([1, 1, 1])
-        s, r, _ = gnn.coalesce(senders, receivers, num_nodes=2)
+        s, r, _ = gnn.coalesce(senders, receivers)
         npt.assert_array_equal(s, jnp.array([0, 1]))
         npt.assert_array_equal(r, jnp.array([1, 1]))
 
@@ -251,14 +258,14 @@ class TestCoalesce:
         """(i, j) and (j, i) are different edges and both survive."""
         senders = jnp.array([0, 1])
         receivers = jnp.array([1, 0])
-        s, r, _ = gnn.coalesce(senders, receivers, num_nodes=2)
+        s, r, _ = gnn.coalesce(senders, receivers)
         npt.assert_array_equal(s, jnp.array([0, 1]))
         npt.assert_array_equal(r, jnp.array([1, 0]))
 
     def test_empty_graph(self):
         """Works on a graph with no edges."""
         empty = jnp.array([], dtype=jnp.int32)
-        s, r, kept = gnn.coalesce(empty, empty, num_nodes=3)
+        s, r, kept = gnn.coalesce(empty, empty)
         assert s.shape[0] == 0
         assert r.shape[0] == 0
         assert kept.shape[0] == 0
@@ -269,7 +276,7 @@ class TestToUndirected:
         """Edges without a reverse gain one; existing pairs are left alone."""
         senders = jnp.array([0, 1, 1])
         receivers = jnp.array([1, 0, 2])
-        s, r, kept = gnn.to_undirected(senders, receivers, num_nodes=3)
+        s, r, kept = gnn.to_undirected(senders, receivers)
         npt.assert_array_equal(s, jnp.array([0, 1, 1, 2]))
         npt.assert_array_equal(r, jnp.array([1, 0, 2, 1]))
         npt.assert_array_equal(kept, jnp.array([0, 1, 2, 5]))
@@ -278,7 +285,7 @@ class TestToUndirected:
         """Every edge in the result has its reverse in the result."""
         senders = jnp.array([0, 1, 3, 2])
         receivers = jnp.array([1, 2, 0, 3])
-        s, r, _ = gnn.to_undirected(senders, receivers, num_nodes=4)
+        s, r, _ = gnn.to_undirected(senders, receivers)
         forward = {(int(a), int(b)) for a, b in zip(s, r)}
         assert forward == {(b, a) for a, b in forward}
 
@@ -286,15 +293,15 @@ class TestToUndirected:
         """Coalescing means a symmetric graph passes through unchanged."""
         senders = jnp.array([0, 1, 1])
         receivers = jnp.array([1, 0, 2])
-        s, r, _ = gnn.to_undirected(senders, receivers, num_nodes=3)
-        s2, r2, _ = gnn.to_undirected(s, r, num_nodes=3)
+        s, r, _ = gnn.to_undirected(senders, receivers)
+        s2, r2, _ = gnn.to_undirected(s, r)
         npt.assert_array_equal(s2, s)
         npt.assert_array_equal(r2, r)
 
     def test_discards_direction(self):
         """Opposite orientations of the same edge give the same result."""
-        forward = gnn.to_undirected(jnp.array([0]), jnp.array([1]), num_nodes=2)
-        backward = gnn.to_undirected(jnp.array([1]), jnp.array([0]), num_nodes=2)
+        forward = gnn.to_undirected(jnp.array([0]), jnp.array([1]))
+        backward = gnn.to_undirected(jnp.array([1]), jnp.array([0]))
         npt.assert_array_equal(forward[0], backward[0])
         npt.assert_array_equal(forward[1], backward[1])
 
@@ -302,7 +309,7 @@ class TestToUndirected:
         """A self-loop is its own reverse and is not duplicated."""
         senders = jnp.array([1])
         receivers = jnp.array([1])
-        s, r, _ = gnn.to_undirected(senders, receivers, num_nodes=2)
+        s, r, _ = gnn.to_undirected(senders, receivers)
         npt.assert_array_equal(s, jnp.array([1]))
         npt.assert_array_equal(r, jnp.array([1]))
 
@@ -311,7 +318,7 @@ class TestToUndirected:
         senders = jnp.array([0, 1, 1])
         receivers = jnp.array([1, 0, 2])
         x_edge = jnp.array([[10.0], [20.0], [30.0]])
-        _, _, kept = gnn.to_undirected(senders, receivers, num_nodes=3)
+        _, _, kept = gnn.to_undirected(senders, receivers)
         x_edge = jnp.concatenate([x_edge, x_edge])[kept]
         npt.assert_allclose(x_edge.ravel(), jnp.array([10.0, 20.0, 30.0, 30.0]))
 
@@ -320,14 +327,14 @@ class TestToUndirected:
         senders = jnp.array([0, 1, 1])
         receivers = jnp.array([1, 0, 2])
         x_edge = jnp.array([[10.0], [20.0], [30.0]])
-        _, _, kept = gnn.to_undirected(senders, receivers, num_nodes=3)
+        _, _, kept = gnn.to_undirected(senders, receivers)
         x_edge = jnp.concatenate([x_edge, -x_edge])[kept]
         npt.assert_allclose(x_edge.ravel(), jnp.array([10.0, 20.0, 30.0, -30.0]))
 
     def test_empty_graph(self):
         """Works on a graph with no edges."""
         empty = jnp.array([], dtype=jnp.int32)
-        s, r, kept = gnn.to_undirected(empty, empty, num_nodes=3)
+        s, r, kept = gnn.to_undirected(empty, empty)
         assert s.shape[0] == 0
         assert kept.shape[0] == 0
 
@@ -337,7 +344,7 @@ class TestLineGraph:
         """An edge connects to every edge leaving the node it lands on."""
         senders = jnp.array([0, 1, 1])
         receivers = jnp.array([1, 2, 3])
-        ls, lr, shared = gnn.line_graph(senders, receivers, num_nodes=4)
+        ls, lr, shared = gnn.line_graph(senders, receivers)
         npt.assert_array_equal(ls, jnp.array([0, 0]))
         npt.assert_array_equal(lr, jnp.array([1, 2]))
         npt.assert_array_equal(shared, jnp.array([1, 1]))
@@ -346,7 +353,7 @@ class TestLineGraph:
         """Pairs are exactly those where one edge ends where the other begins."""
         senders = jnp.array([0, 1, 2, 1])
         receivers = jnp.array([1, 2, 0, 0])
-        ls, lr, _ = gnn.line_graph(senders, receivers, 3, non_backtracking=False)
+        ls, lr, _ = gnn.line_graph(senders, receivers, non_backtracking=False)
         pairs = sorted(zip(ls.tolist(), lr.tolist()))
         expected = sorted(
             (a, b)
@@ -360,16 +367,16 @@ class TestLineGraph:
         """The i -> v -> i pairs are removed, and only those."""
         senders = jnp.array([0, 1])
         receivers = jnp.array([1, 0])
-        ls, lr, _ = gnn.line_graph(senders, receivers, 2, non_backtracking=False)
+        ls, lr, _ = gnn.line_graph(senders, receivers, non_backtracking=False)
         assert sorted(zip(ls.tolist(), lr.tolist())) == [(0, 1), (1, 0)]
-        ls, lr, _ = gnn.line_graph(senders, receivers, 2, non_backtracking=True)
+        ls, lr, _ = gnn.line_graph(senders, receivers, non_backtracking=True)
         assert ls.shape[0] == 0
 
     def test_shared_is_the_pivot_node(self):
         """Each pair meets at the returned node."""
         senders = jnp.array([0, 1, 2, 1])
         receivers = jnp.array([1, 2, 0, 0])
-        ls, lr, shared = gnn.line_graph(senders, receivers, num_nodes=3)
+        ls, lr, shared = gnn.line_graph(senders, receivers)
         npt.assert_array_equal(receivers[ls], shared)
         npt.assert_array_equal(senders[lr], shared)
 
@@ -377,8 +384,8 @@ class TestLineGraph:
         """A symmetric triangle gives two disjoint 3-cycles, one per orientation."""
         senders = jnp.array([0, 1, 2])
         receivers = jnp.array([1, 2, 0])
-        s, r, _ = gnn.to_undirected(senders, receivers, num_nodes=3)
-        ls, lr, _ = gnn.line_graph(s, r, num_nodes=3)
+        s, r, _ = gnn.to_undirected(senders, receivers)
+        ls, lr, _ = gnn.line_graph(s, r)
         assert s.shape[0] == 6
         assert ls.shape[0] == 6
 
@@ -386,7 +393,7 @@ class TestLineGraph:
         """Backtracking pairs number sum(indeg * outdeg) over nodes."""
         senders = jnp.array([0, 1, 2, 1, 0])
         receivers = jnp.array([1, 2, 0, 0, 2])
-        ls, _, _ = gnn.line_graph(senders, receivers, 3, non_backtracking=False)
+        ls, _, _ = gnn.line_graph(senders, receivers, non_backtracking=False)
         in_degree = gnn.degree(receivers, 3)
         out_degree = gnn.degree(senders, 3)
         assert ls.shape[0] == int((in_degree * out_degree).sum())
@@ -395,7 +402,7 @@ class TestLineGraph:
         """Edges landing on a node with no outgoing edges connect to nothing."""
         senders = jnp.array([0, 2])
         receivers = jnp.array([1, 3])
-        ls, lr, shared = gnn.line_graph(senders, receivers, num_nodes=4)
+        ls, lr, shared = gnn.line_graph(senders, receivers)
         assert ls.shape[0] == 0
         assert lr.shape[0] == 0
         assert shared.shape[0] == 0
@@ -405,7 +412,7 @@ class TestLineGraph:
         senders = jnp.array([0, 1, 1])
         receivers = jnp.array([1, 2, 3])
         x_edge = jnp.array([[1.0], [2.0], [3.0]])
-        ls, lr, _ = gnn.line_graph(senders, receivers, num_nodes=4)
+        ls, lr, _ = gnn.line_graph(senders, receivers)
         out = gnn.segment_sum(x_edge[ls], lr, x_edge.shape[0])
         npt.assert_allclose(out.ravel(), jnp.array([0.0, 1.0, 1.0]))
 

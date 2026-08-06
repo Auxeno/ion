@@ -38,8 +38,6 @@ senders : jax.Array["e", int]
     Source node index for each edge.
 receivers : jax.Array["e", int]
     Destination node index for each edge.
-num_nodes : int
-    Number of nodes in the graph. Every index must be less than this value.
 non_backtracking : bool, default: True
     Drop pairs that return along the reverse of the incoming edge, so an
     edge never sends a message straight back where it came from.
@@ -55,7 +53,7 @@ Example
 ```python
 senders = jnp.array([0, 1, 1])
 receivers = jnp.array([1, 2, 3])
-line_senders, line_receivers, shared = gnn.line_graph(senders, receivers, num_nodes=4)
+line_senders, line_receivers, shared = gnn.line_graph(senders, receivers)
 # line_senders: [0, 0]
 # line_receivers: [1, 2]
 # shared: [1, 1]
@@ -69,10 +67,10 @@ Running a convolution on the line graph updates the edge features:
 
 ```python
 senders, receivers = gnn.remove_self_loops(senders, receivers)
-senders, receivers, kept = gnn.to_undirected(senders, receivers, num_nodes)
+senders, receivers, kept = gnn.to_undirected(senders, receivers)
 x_edge = jnp.concatenate([x_edge, x_edge])[kept]
 
-line_senders, line_receivers, shared = gnn.line_graph(senders, receivers, num_nodes)
+line_senders, line_receivers, shared = gnn.line_graph(senders, receivers)
 x_edge = conv(x_edge, line_senders, line_receivers)
 ```
 

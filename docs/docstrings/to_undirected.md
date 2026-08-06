@@ -29,8 +29,6 @@ senders : jax.Array["e", int]
     Source node index for each edge.
 receivers : jax.Array["e", int]
     Destination node index for each edge.
-num_nodes : int
-    Number of nodes in the graph. Every index must be less than this value.
 
 Returns
 -------
@@ -44,7 +42,7 @@ Example
 ```python
 senders = jnp.array([0, 1, 1])
 receivers = jnp.array([1, 0, 2])
-senders, receivers, kept = gnn.to_undirected(senders, receivers, num_nodes=3)
+senders, receivers, kept = gnn.to_undirected(senders, receivers)
 # senders: [0, 1, 1, 2]
 # receivers: [1, 0, 2, 1]
 # kept: [0, 1, 2, 5]
