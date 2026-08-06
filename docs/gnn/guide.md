@@ -221,6 +221,15 @@ This appends `(0, 0)`, `(1, 1)`, through `(5, 5)`. Self-loops are explicit and a
 
 `add_self_loops` appends one loop for every node. It does not check whether the input already contains self-loops, so avoid calling it twice on the same edge arrays. When using edge features or a mask, also append one corresponding row or value for every new self-loop.
 
+`remove_self_loops` is the inverse and drops every `i -> i` edge, which is useful when a dataset ships with self-loops already present and you want to control them yourself:
+
+```python
+senders, receivers = gnn.remove_self_loops(senders, receivers)
+senders, receivers = gnn.add_self_loops(senders, receivers, num_nodes)
+```
+
+How many edges it removes depends on the data, so the output shape is not known ahead of time and the call cannot go inside `jax.jit`. Treat it as a data preparation step. Edge features and masks are not filtered for you; apply the same `senders != receivers` mask to them.
+
 ## Feature propagation
 
 A GCN applies a shared linear transformation and then combines features using degree-normalized edges. To make the graph operation visible by itself, the plot below fixes the linear transformation to the identity and omits the bias and activation. It repeatedly applies only the normalized aggregation:

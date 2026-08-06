@@ -1,17 +1,18 @@
 """Graph operations.
 
 Functions:
-    segment_sum      Sum reduction within segments with float32 accumulation.
-    segment_max      Maximum reduction within segments. (Re-exported from jax.ops.)
-    segment_min      Minimum reduction within segments. (Re-exported from jax.ops.)
-    segment_prod     Product reduction within segments. (Re-exported from jax.ops.)
-    segment_softmax  Softmax normalized within segments (e.g. per-node neighborhoods).
-    segment_mean     Mean reduction within segments.
-    mean_pool        Average node features within each graph (graph-level readout).
-    sum_pool         Sum node features within each graph.
-    max_pool         Maximum node features within each graph.
-    batch_graphs     Pack graphs into one disconnected graph for batched message passing.
-    add_self_loops   Append identity edges so every node sends a message to itself.
+    segment_sum        Sum reduction within segments with float32 accumulation.
+    segment_max        Maximum reduction within segments. (Re-exported from jax.ops.)
+    segment_min        Minimum reduction within segments. (Re-exported from jax.ops.)
+    segment_prod       Product reduction within segments. (Re-exported from jax.ops.)
+    segment_softmax    Softmax normalized within segments (e.g. per-node neighborhoods).
+    segment_mean       Mean reduction within segments.
+    mean_pool          Average node features within each graph (graph-level readout).
+    sum_pool           Sum node features within each graph.
+    max_pool           Maximum node features within each graph.
+    batch_graphs       Pack graphs into one disconnected graph for batched message passing.
+    add_self_loops     Append identity edges so every node sends a message to itself.
+    remove_self_loops  Drop edges whose sender and receiver are the same node.
 
 `segment_max`, `segment_min` and `segment_prod` are re-exported from `jax.ops`.
 `segment_sum` wraps the JAX operation with float32 accumulation for floating-point data.
@@ -30,6 +31,7 @@ __all__ = [
     "batch_graphs",
     "max_pool",
     "mean_pool",
+    "remove_self_loops",
     "segment_max",
     "segment_mean",
     "segment_min",
@@ -189,3 +191,15 @@ def add_self_loops(
     senders = jnp.concatenate([senders, self_indices])
     receivers = jnp.concatenate([receivers, self_indices])
     return senders, receivers
+
+
+def remove_self_loops(
+    senders: Int[Array, " e"],
+    receivers: Int[Array, " e"],
+) -> tuple[Int[Array, " e2"], Int[Array, " e2"]]:
+    """Remove self-loop edges (i -> i).
+
+    >>> senders, receivers = remove_self_loops(senders, receivers)
+    """
+    keep = senders != receivers
+    return senders[keep], receivers[keep]

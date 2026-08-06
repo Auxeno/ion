@@ -122,6 +122,57 @@ class TestAddSelfLoops:
         npt.assert_array_equal(r, jnp.arange(4))
 
 
+class TestRemoveSelfLoops:
+    def test_drops_self_loops(self):
+        """Edges with matching sender and receiver are dropped."""
+        senders = jnp.array([0, 1, 1])
+        receivers = jnp.array([1, 1, 2])
+        s, r = gnn.remove_self_loops(senders, receivers)
+        npt.assert_array_equal(s, jnp.array([0, 1]))
+        npt.assert_array_equal(r, jnp.array([1, 2]))
+
+    def test_preserves_order(self):
+        """Surviving edges keep their original relative order."""
+        senders = jnp.array([2, 0, 1, 1])
+        receivers = jnp.array([2, 1, 1, 0])
+        s, r = gnn.remove_self_loops(senders, receivers)
+        npt.assert_array_equal(s, jnp.array([0, 1]))
+        npt.assert_array_equal(r, jnp.array([1, 0]))
+
+    def test_no_self_loops_is_identity(self):
+        """A graph without self-loops passes through unchanged."""
+        senders = jnp.array([0, 2, 1])
+        receivers = jnp.array([1, 0, 2])
+        s, r = gnn.remove_self_loops(senders, receivers)
+        npt.assert_array_equal(s, senders)
+        npt.assert_array_equal(r, receivers)
+
+    def test_all_self_loops(self):
+        """Removing every edge yields empty arrays."""
+        senders = jnp.array([0, 1, 2])
+        receivers = jnp.array([0, 1, 2])
+        s, r = gnn.remove_self_loops(senders, receivers)
+        assert s.shape[0] == 0
+        assert r.shape[0] == 0
+
+    def test_empty_graph(self):
+        """Works on a graph with no edges."""
+        senders = jnp.array([], dtype=jnp.int32)
+        receivers = jnp.array([], dtype=jnp.int32)
+        s, r = gnn.remove_self_loops(senders, receivers)
+        assert s.shape[0] == 0
+        assert r.shape[0] == 0
+
+    def test_inverts_add_self_loops(self):
+        """Removing after adding recovers the original edges."""
+        senders = jnp.array([0, 2, 1])
+        receivers = jnp.array([1, 0, 2])
+        s, r = gnn.add_self_loops(senders, receivers, num_nodes=3)
+        s, r = gnn.remove_self_loops(s, r)
+        npt.assert_array_equal(s, senders)
+        npt.assert_array_equal(r, receivers)
+
+
 class TestReexports:
     def test_aliases_jax_ops(self):
         """Unwrapped segment ops are the jax.ops functions themselves."""

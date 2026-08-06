@@ -3,6 +3,7 @@
 ## 0.14.0
 
 - **Breaking: `dot_product_attention_with_rope` removed.** The helper saved one composition and did not earn a slot in the public API. 
+- **`gnn.remove_self_loops`.** Drops every `i -> i` edge, pairing with `add_self_loops` for datasets that ship with self-loops already present. The number of edges removed depends on the data, so it is a data preparation step rather than something to call inside `jax.jit`.
 
 ## 0.13.0
 
