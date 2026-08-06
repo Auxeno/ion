@@ -16,6 +16,7 @@ from .ops import (
     segment_softmax,
     segment_sum,
     sum_pool,
+    to_undirected,
 )
 from .sage import SAGEConv
 from .transformer import TransformerConv
@@ -42,4 +43,5 @@ __all__ = [
     "segment_softmax",
     "segment_sum",
     "sum_pool",
+    "to_undirected",
 ]

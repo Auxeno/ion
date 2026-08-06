@@ -264,6 +264,74 @@ class TestCoalesce:
         assert kept.shape[0] == 0
 
 
+class TestToUndirected:
+    def test_adds_missing_reverses(self):
+        """Edges without a reverse gain one; existing pairs are left alone."""
+        senders = jnp.array([0, 1, 1])
+        receivers = jnp.array([1, 0, 2])
+        s, r, kept = gnn.to_undirected(senders, receivers, num_nodes=3)
+        npt.assert_array_equal(s, jnp.array([0, 1, 1, 2]))
+        npt.assert_array_equal(r, jnp.array([1, 0, 2, 1]))
+        npt.assert_array_equal(kept, jnp.array([0, 1, 2, 5]))
+
+    def test_output_is_symmetric(self):
+        """Every edge in the result has its reverse in the result."""
+        senders = jnp.array([0, 1, 3, 2])
+        receivers = jnp.array([1, 2, 0, 3])
+        s, r, _ = gnn.to_undirected(senders, receivers, num_nodes=4)
+        forward = {(int(a), int(b)) for a, b in zip(s, r)}
+        assert forward == {(b, a) for a, b in forward}
+
+    def test_idempotent(self):
+        """Coalescing means a symmetric graph passes through unchanged."""
+        senders = jnp.array([0, 1, 1])
+        receivers = jnp.array([1, 0, 2])
+        s, r, _ = gnn.to_undirected(senders, receivers, num_nodes=3)
+        s2, r2, _ = gnn.to_undirected(s, r, num_nodes=3)
+        npt.assert_array_equal(s2, s)
+        npt.assert_array_equal(r2, r)
+
+    def test_discards_direction(self):
+        """Opposite orientations of the same edge give the same result."""
+        forward = gnn.to_undirected(jnp.array([0]), jnp.array([1]), num_nodes=2)
+        backward = gnn.to_undirected(jnp.array([1]), jnp.array([0]), num_nodes=2)
+        npt.assert_array_equal(forward[0], backward[0])
+        npt.assert_array_equal(forward[1], backward[1])
+
+    def test_self_loop_appears_once(self):
+        """A self-loop is its own reverse and is not duplicated."""
+        senders = jnp.array([1])
+        receivers = jnp.array([1])
+        s, r, _ = gnn.to_undirected(senders, receivers, num_nodes=2)
+        npt.assert_array_equal(s, jnp.array([1]))
+        npt.assert_array_equal(r, jnp.array([1]))
+
+    def test_copies_edge_features(self):
+        """Symmetric features are duplicated onto the reverse edge."""
+        senders = jnp.array([0, 1, 1])
+        receivers = jnp.array([1, 0, 2])
+        x_edge = jnp.array([[10.0], [20.0], [30.0]])
+        _, _, kept = gnn.to_undirected(senders, receivers, num_nodes=3)
+        x_edge = jnp.concatenate([x_edge, x_edge])[kept]
+        npt.assert_allclose(x_edge.ravel(), jnp.array([10.0, 20.0, 30.0, 30.0]))
+
+    def test_negates_directional_features(self):
+        """Direction-dependent features flip sign on the reverse edge."""
+        senders = jnp.array([0, 1, 1])
+        receivers = jnp.array([1, 0, 2])
+        x_edge = jnp.array([[10.0], [20.0], [30.0]])
+        _, _, kept = gnn.to_undirected(senders, receivers, num_nodes=3)
+        x_edge = jnp.concatenate([x_edge, -x_edge])[kept]
+        npt.assert_allclose(x_edge.ravel(), jnp.array([10.0, 20.0, 30.0, -30.0]))
+
+    def test_empty_graph(self):
+        """Works on a graph with no edges."""
+        empty = jnp.array([], dtype=jnp.int32)
+        s, r, kept = gnn.to_undirected(empty, empty, num_nodes=3)
+        assert s.shape[0] == 0
+        assert kept.shape[0] == 0
+
+
 class TestReexports:
     def test_aliases_jax_ops(self):
         """Unwrapped segment ops are the jax.ops functions themselves."""

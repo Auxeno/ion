@@ -15,6 +15,7 @@ Functions:
     remove_self_loops  Drop edges whose sender and receiver are the same node.
     degree             Count how many edges reference each node.
     coalesce           Sort edges and drop duplicates, returning the rows kept.
+    to_undirected      Add the reverse of every edge so the graph is symmetric.
 
 `segment_max`, `segment_min` and `segment_prod` are re-exported from `jax.ops`.
 `segment_sum` wraps the JAX operation with float32 accumulation for floating-point data.
@@ -43,6 +44,7 @@ __all__ = [
     "segment_softmax",
     "segment_sum",
     "sum_pool",
+    "to_undirected",
 ]
 
 
@@ -234,3 +236,20 @@ def coalesce(
     keys = senders * num_nodes + receivers
     _, kept = jnp.unique(keys, return_index=True)
     return senders[kept], receivers[kept], kept
+
+
+def to_undirected(
+    senders: Int[Array, " e"],
+    receivers: Int[Array, " e"],
+    num_nodes: int,
+) -> tuple[Int[Array, " e2"], Int[Array, " e2"], Int[Array, " e2"]]:
+    """Add the reverse of every edge, then coalesce.
+
+    >>> senders, receivers, kept = to_undirected(senders, receivers, num_nodes)
+    >>> x_edge = jnp.concatenate([x_edge, x_edge])[kept]
+    """
+    return coalesce(
+        jnp.concatenate([senders, receivers]),
+        jnp.concatenate([receivers, senders]),
+        num_nodes,
+    )
