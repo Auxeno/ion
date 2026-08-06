@@ -13,6 +13,7 @@ Functions:
     batch_graphs       Pack graphs into one disconnected graph for batched message passing.
     add_self_loops     Append identity edges so every node sends a message to itself.
     remove_self_loops  Drop edges whose sender and receiver are the same node.
+    degree             Count how many edges reference each node.
 
 `segment_max`, `segment_min` and `segment_prod` are re-exported from `jax.ops`.
 `segment_sum` wraps the JAX operation with float32 accumulation for floating-point data.
@@ -29,6 +30,7 @@ from jaxtyping import Array, Float, Int
 __all__ = [
     "add_self_loops",
     "batch_graphs",
+    "degree",
     "max_pool",
     "mean_pool",
     "remove_self_loops",
@@ -203,3 +205,15 @@ def remove_self_loops(
     """
     keep = senders != receivers
     return senders[keep], receivers[keep]
+
+
+def degree(
+    indices: Int[Array, " e"],
+    num_nodes: int,
+) -> Int[Array, " n"]:
+    """Count how many edges reference each node.
+
+    >>> out_degree = degree(senders, num_nodes)
+    >>> in_degree = degree(receivers, num_nodes)
+    """
+    return jnp.bincount(indices, length=num_nodes)

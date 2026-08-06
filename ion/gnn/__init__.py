@@ -4,6 +4,7 @@ from .gin import GINConv
 from .ops import (
     add_self_loops,
     batch_graphs,
+    degree,
     max_pool,
     mean_pool,
     remove_self_loops,
@@ -28,6 +29,7 @@ __all__ = [
     "TransformerConv",
     "add_self_loops",
     "batch_graphs",
+    "degree",
     "max_pool",
     "mean_pool",
     "remove_self_loops",

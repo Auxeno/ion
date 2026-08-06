@@ -157,7 +157,7 @@ y = model(x, training=True)
 | [Graph Attention](gnn/layers/gat.md) | `GATConv`, `GATv2Conv`, `TransformerConv` |
 | [Graph Isomorphism Network](gnn/layers/gin.md) | `GINConv` |
 | [GraphSAGE](gnn/layers/sage.md) | `SAGEConv` |
-| [Operations](gnn/operations.md) | segment reductions, graph pooling, `add_self_loops`, `remove_self_loops`, `batch_graphs` |
+| [Operations](gnn/operations.md) | segment reductions, graph pooling, `add_self_loops`, `remove_self_loops`, `degree`, `batch_graphs` |
 
 Graphs are plain arrays in COO format: node features plus `senders`/`receivers` edge indices.
 

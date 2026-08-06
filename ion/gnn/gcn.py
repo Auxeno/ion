@@ -17,7 +17,7 @@ from jaxtyping import Array, Float, Int, PRNGKeyArray
 
 from ..nn.module import Module
 from ..nn.param import Param
-from .ops import segment_sum
+from .ops import degree, segment_sum
 
 
 class GCNConv(Module):
@@ -53,16 +53,14 @@ class GCNConv(Module):
     ) -> Float[Array, "n o"]:
 
         n, i = x.shape
-        (e,) = senders.shape
 
         x = x @ self.w
 
-        # Compute node degrees by counting incoming edges at each receiver
-        edge_counts = jnp.ones(e, dtype=x.dtype)
-        degree = segment_sum(edge_counts, receivers, n)
+        # Count incoming edges at each receiver
+        in_degree = degree(receivers, n).astype(x.dtype)
 
         # Compute symmetric normalization coefficients to stabilize hub activations
-        node_norm = jnp.where(degree > 0, lax.rsqrt(degree), 0.0)
+        node_norm = jnp.where(in_degree > 0, lax.rsqrt(in_degree), 0.0)
         edge_weight = node_norm[senders] * node_norm[receivers]
 
         # Route, scale, and accumulate features from senders to receivers

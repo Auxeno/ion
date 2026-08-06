@@ -173,6 +173,38 @@ class TestRemoveSelfLoops:
         npt.assert_array_equal(r, receivers)
 
 
+class TestDegree:
+    def test_out_degree(self):
+        """Counting senders gives the number of edges leaving each node."""
+        senders = jnp.array([0, 0, 1])
+        npt.assert_array_equal(gnn.degree(senders, num_nodes=3), jnp.array([2, 1, 0]))
+
+    def test_in_degree(self):
+        """Counting receivers gives the number of edges arriving at each node."""
+        receivers = jnp.array([1, 2, 2])
+        npt.assert_array_equal(gnn.degree(receivers, num_nodes=3), jnp.array([0, 1, 2]))
+
+    def test_length_matches_num_nodes(self):
+        """Isolated trailing nodes are still counted as zero."""
+        senders = jnp.array([0, 1])
+        assert gnn.degree(senders, num_nodes=6).shape == (6,)
+
+    def test_total_equals_edge_count(self):
+        """Degrees sum to the number of edges."""
+        senders = jnp.array([0, 2, 1, 1])
+        assert int(gnn.degree(senders, num_nodes=3).sum()) == 4
+
+    def test_empty_graph(self):
+        """A graph with no edges has zero degree everywhere."""
+        senders = jnp.array([], dtype=jnp.int32)
+        npt.assert_array_equal(gnn.degree(senders, num_nodes=3), jnp.zeros(3, dtype=int))
+
+    def test_jittable(self):
+        """Output shape is set by num_nodes, so the call traces."""
+        fn = jax.jit(gnn.degree, static_argnums=1)
+        npt.assert_array_equal(fn(jnp.array([0, 0, 2]), 3), jnp.array([2, 0, 1]))
+
+
 class TestReexports:
     def test_aliases_jax_ops(self):
         """Unwrapped segment ops are the jax.ops functions themselves."""
