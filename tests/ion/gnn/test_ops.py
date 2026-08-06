@@ -205,6 +205,65 @@ class TestDegree:
         npt.assert_array_equal(fn(jnp.array([0, 0, 2]), 3), jnp.array([2, 0, 1]))
 
 
+class TestCoalesce:
+    def test_sorts_and_deduplicates(self):
+        """Edges come back sorted by (sender, receiver) with duplicates dropped."""
+        senders = jnp.array([2, 0, 2, 1])
+        receivers = jnp.array([0, 1, 0, 2])
+        s, r, kept = gnn.coalesce(senders, receivers, num_nodes=3)
+        npt.assert_array_equal(s, jnp.array([0, 1, 2]))
+        npt.assert_array_equal(r, jnp.array([1, 2, 0]))
+        npt.assert_array_equal(kept, jnp.array([1, 3, 0]))
+
+    def test_kept_indexes_original_rows(self):
+        """The kept indices select the surviving rows of the input."""
+        senders = jnp.array([2, 0, 2, 1])
+        receivers = jnp.array([0, 1, 0, 2])
+        s, r, kept = gnn.coalesce(senders, receivers, num_nodes=3)
+        npt.assert_array_equal(senders[kept], s)
+        npt.assert_array_equal(receivers[kept], r)
+
+    def test_keeps_first_duplicate(self):
+        """The earliest occurrence of a repeated edge is the one kept."""
+        senders = jnp.array([1, 1, 1])
+        receivers = jnp.array([2, 2, 2])
+        _, _, kept = gnn.coalesce(senders, receivers, num_nodes=3)
+        npt.assert_array_equal(kept, jnp.array([0]))
+
+    def test_idempotent(self):
+        """Coalescing an already-canonical edge list changes nothing."""
+        senders = jnp.array([2, 0, 2, 1])
+        receivers = jnp.array([0, 1, 0, 2])
+        s, r, _ = gnn.coalesce(senders, receivers, num_nodes=3)
+        s2, r2, _ = gnn.coalesce(s, r, num_nodes=3)
+        npt.assert_array_equal(s2, s)
+        npt.assert_array_equal(r2, r)
+
+    def test_preserves_self_loops(self):
+        """Self-loops are ordinary edges and survive coalescing."""
+        senders = jnp.array([1, 0, 1])
+        receivers = jnp.array([1, 1, 1])
+        s, r, _ = gnn.coalesce(senders, receivers, num_nodes=2)
+        npt.assert_array_equal(s, jnp.array([0, 1]))
+        npt.assert_array_equal(r, jnp.array([1, 1]))
+
+    def test_distinguishes_direction(self):
+        """(i, j) and (j, i) are different edges and both survive."""
+        senders = jnp.array([0, 1])
+        receivers = jnp.array([1, 0])
+        s, r, _ = gnn.coalesce(senders, receivers, num_nodes=2)
+        npt.assert_array_equal(s, jnp.array([0, 1]))
+        npt.assert_array_equal(r, jnp.array([1, 0]))
+
+    def test_empty_graph(self):
+        """Works on a graph with no edges."""
+        empty = jnp.array([], dtype=jnp.int32)
+        s, r, kept = gnn.coalesce(empty, empty, num_nodes=3)
+        assert s.shape[0] == 0
+        assert r.shape[0] == 0
+        assert kept.shape[0] == 0
+
+
 class TestReexports:
     def test_aliases_jax_ops(self):
         """Unwrapped segment ops are the jax.ops functions themselves."""

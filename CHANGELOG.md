@@ -3,6 +3,7 @@
 ## 0.14.0
 
 - **Breaking: `dot_product_attention_with_rope` removed.** The helper saved one composition and did not earn a slot in the public API. 
+- **`gnn.coalesce`.** Sorts edges by `(sender, receiver)` and drops duplicates, putting an edge list into the canonical form that sparse COO layouts use. It also returns the index of the row kept for each surviving edge, so edge features can be filtered to match.
 - **`gnn.degree`.** Counts how many edges reference each node. It counts a single index array, so `degree(senders, n)` gives out-degree and `degree(receivers, n)` gives in-degree.
 - **`gnn.remove_self_loops`.** Drops every `i -> i` edge, pairing with `add_self_loops` for datasets that ship with self-loops already present. The number of edges removed depends on the data, so it is a data preparation step rather than something to call inside `jax.jit`.
 

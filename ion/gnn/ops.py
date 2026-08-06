@@ -14,6 +14,7 @@ Functions:
     add_self_loops     Append identity edges so every node sends a message to itself.
     remove_self_loops  Drop edges whose sender and receiver are the same node.
     degree             Count how many edges reference each node.
+    coalesce           Sort edges and drop duplicates, returning the rows kept.
 
 `segment_max`, `segment_min` and `segment_prod` are re-exported from `jax.ops`.
 `segment_sum` wraps the JAX operation with float32 accumulation for floating-point data.
@@ -30,6 +31,7 @@ from jaxtyping import Array, Float, Int
 __all__ = [
     "add_self_loops",
     "batch_graphs",
+    "coalesce",
     "degree",
     "max_pool",
     "mean_pool",
@@ -217,3 +219,18 @@ def degree(
     >>> in_degree = degree(receivers, num_nodes)
     """
     return jnp.bincount(indices, length=num_nodes)
+
+
+def coalesce(
+    senders: Int[Array, " e"],
+    receivers: Int[Array, " e"],
+    num_nodes: int,
+) -> tuple[Int[Array, " e2"], Int[Array, " e2"], Int[Array, " e2"]]:
+    """Sort edges by (sender, receiver) and drop duplicates.
+
+    >>> senders, receivers, kept = coalesce(senders, receivers, num_nodes)
+    >>> x_edge = x_edge[kept]
+    """
+    keys = senders * num_nodes + receivers
+    _, kept = jnp.unique(keys, return_index=True)
+    return senders[kept], receivers[kept], kept

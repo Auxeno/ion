@@ -48,6 +48,10 @@ Floating-point segment sum, mean, and softmax operations, including graph sum an
     options:
       heading_level: 3
 
+::: ion.gnn.coalesce
+    options:
+      heading_level: 3
+
 ::: ion.gnn.batch_graphs
     options:
       heading_level: 3
