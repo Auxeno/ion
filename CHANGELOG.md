@@ -3,6 +3,7 @@
 ## 0.14.0
 
 - **Breaking: `dot_product_attention_with_rope` removed.** The helper saved one composition and did not earn a slot in the public API. 
+- **`gnn.line_graph`.** Rebuilds a graph with its edges as nodes, joined where one edge ends and another begins. Line-graph nodes are the rows of the input edge arrays, so `x_edge` becomes the node features unchanged and any existing convolution updates edge representations. `non_backtracking` drops the pairs that walk straight back down the reverse edge, and the returned pivot node is where angle features attach.
 - **`gnn.to_undirected`.** Appends the reverse of every edge and coalesces, so an undirected graph is stored with both directions present. Coalescing makes it idempotent, and the returned indices address the original edges concatenated with the reversed ones, so direction-dependent edge features can be negated rather than copied.
 - **`gnn.coalesce`.** Sorts edges by `(sender, receiver)` and drops duplicates, putting an edge list into the canonical form that sparse COO layouts use. It also returns the index of the row kept for each surviving edge, so edge features can be filtered to match.
 - **`gnn.degree`.** Counts how many edges reference each node. It counts a single index array, so `degree(senders, n)` gives out-degree and `degree(receivers, n)` gives in-degree.

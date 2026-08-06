@@ -230,6 +230,25 @@ senders, receivers = gnn.add_self_loops(senders, receivers, num_nodes)
 
 How many edges it removes depends on the data, so the output shape is not known ahead of time and the call cannot go inside `jax.jit`. Treat it as a data preparation step. Edge features and masks are not filtered for you; apply the same `senders != receivers` mask to them.
 
+## Line graphs
+
+Every layer here updates node features. Some of them read edge features, but none of them change one. To learn edge representations, convert the graph so that its edges are the nodes:
+
+```python
+senders, receivers = gnn.remove_self_loops(senders, receivers)
+senders, receivers, kept = gnn.to_undirected(senders, receivers, num_nodes)
+x_edge = jnp.concatenate([x_edge, x_edge])[kept]
+
+line_senders, line_receivers, shared = gnn.line_graph(senders, receivers, num_nodes)
+x_edge = conv(x_edge, line_senders, line_receivers)
+```
+
+Two edges are joined when one ends where the other begins, so they form a two-hop path through a shared node. A line-graph node is a row of the edge arrays, which is why `x_edge` becomes the node features with no rearranging, and why a convolution that only knows how to update nodes ends up updating edges.
+
+The third return value is the node each pair of edges passes through. It is the natural place for line-graph edge features, either `x[shared]` or the angle between the two edges when nodes carry positions.
+
+An undirected graph stored with both directions gives each direction its own line-graph node, so `(i, j)` and `(j, i)` hold independent state. `non_backtracking` defaults to `True` so an edge never sends a message straight back down its own reverse; pass `False` when the graph is genuinely directed and `i -> v -> i` is a real path. The result has `sum(indeg(v) * outdeg(v))` edges, which grows with the square of the degree, so a graph with high-degree hubs produces a very large line graph.
+
 ## Feature propagation
 
 A GCN applies a shared linear transformation and then combines features using degree-normalized edges. To make the graph operation visible by itself, the plot below fixes the linear transformation to the identity and omits the bias and activation. It repeatedly applies only the normalized aggregation:

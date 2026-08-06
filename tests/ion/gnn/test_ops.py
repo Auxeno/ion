@@ -332,6 +332,84 @@ class TestToUndirected:
         assert kept.shape[0] == 0
 
 
+class TestLineGraph:
+    def test_path_and_fork(self):
+        """An edge connects to every edge leaving the node it lands on."""
+        senders = jnp.array([0, 1, 1])
+        receivers = jnp.array([1, 2, 3])
+        ls, lr, shared = gnn.line_graph(senders, receivers, num_nodes=4)
+        npt.assert_array_equal(ls, jnp.array([0, 0]))
+        npt.assert_array_equal(lr, jnp.array([1, 2]))
+        npt.assert_array_equal(shared, jnp.array([1, 1]))
+
+    def test_matches_join_definition(self):
+        """Pairs are exactly those where one edge ends where the other begins."""
+        senders = jnp.array([0, 1, 2, 1])
+        receivers = jnp.array([1, 2, 0, 0])
+        ls, lr, _ = gnn.line_graph(senders, receivers, 3, non_backtracking=False)
+        pairs = sorted(zip(ls.tolist(), lr.tolist()))
+        expected = sorted(
+            (a, b)
+            for a in range(4)
+            for b in range(4)
+            if receivers[a] == senders[b]
+        )
+        assert pairs == expected
+
+    def test_non_backtracking_drops_reverse_pairs(self):
+        """The i -> v -> i pairs are removed, and only those."""
+        senders = jnp.array([0, 1])
+        receivers = jnp.array([1, 0])
+        ls, lr, _ = gnn.line_graph(senders, receivers, 2, non_backtracking=False)
+        assert sorted(zip(ls.tolist(), lr.tolist())) == [(0, 1), (1, 0)]
+        ls, lr, _ = gnn.line_graph(senders, receivers, 2, non_backtracking=True)
+        assert ls.shape[0] == 0
+
+    def test_shared_is_the_pivot_node(self):
+        """Each pair meets at the returned node."""
+        senders = jnp.array([0, 1, 2, 1])
+        receivers = jnp.array([1, 2, 0, 0])
+        ls, lr, shared = gnn.line_graph(senders, receivers, num_nodes=3)
+        npt.assert_array_equal(receivers[ls], shared)
+        npt.assert_array_equal(senders[lr], shared)
+
+    def test_triangle_splits_by_orientation(self):
+        """A symmetric triangle gives two disjoint 3-cycles, one per orientation."""
+        senders = jnp.array([0, 1, 2])
+        receivers = jnp.array([1, 2, 0])
+        s, r, _ = gnn.to_undirected(senders, receivers, num_nodes=3)
+        ls, lr, _ = gnn.line_graph(s, r, num_nodes=3)
+        assert s.shape[0] == 6
+        assert ls.shape[0] == 6
+
+    def test_size_matches_degree_product(self):
+        """Backtracking pairs number sum(indeg * outdeg) over nodes."""
+        senders = jnp.array([0, 1, 2, 1, 0])
+        receivers = jnp.array([1, 2, 0, 0, 2])
+        ls, _, _ = gnn.line_graph(senders, receivers, 3, non_backtracking=False)
+        in_degree = gnn.degree(receivers, 3)
+        out_degree = gnn.degree(senders, 3)
+        assert ls.shape[0] == int((in_degree * out_degree).sum())
+
+    def test_isolated_and_leaf_edges(self):
+        """Edges landing on a node with no outgoing edges connect to nothing."""
+        senders = jnp.array([0, 2])
+        receivers = jnp.array([1, 3])
+        ls, lr, shared = gnn.line_graph(senders, receivers, num_nodes=4)
+        assert ls.shape[0] == 0
+        assert lr.shape[0] == 0
+        assert shared.shape[0] == 0
+
+    def test_edge_features_become_node_features(self):
+        """Line-graph nodes are edge rows, so x_edge passes through unchanged."""
+        senders = jnp.array([0, 1, 1])
+        receivers = jnp.array([1, 2, 3])
+        x_edge = jnp.array([[1.0], [2.0], [3.0]])
+        ls, lr, _ = gnn.line_graph(senders, receivers, num_nodes=4)
+        out = gnn.segment_sum(x_edge[ls], lr, x_edge.shape[0])
+        npt.assert_allclose(out.ravel(), jnp.array([0.0, 1.0, 1.0]))
+
+
 class TestReexports:
     def test_aliases_jax_ops(self):
         """Unwrapped segment ops are the jax.ops functions themselves."""

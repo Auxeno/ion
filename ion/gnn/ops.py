@@ -16,6 +16,7 @@ Functions:
     degree             Count how many edges reference each node.
     coalesce           Sort edges and drop duplicates, returning the rows kept.
     to_undirected      Add the reverse of every edge so the graph is symmetric.
+    line_graph         Rebuild the graph with edges as nodes, joined where they meet.
 
 `segment_max`, `segment_min` and `segment_prod` are re-exported from `jax.ops`.
 `segment_sum` wraps the JAX operation with float32 accumulation for floating-point data.
@@ -34,6 +35,7 @@ __all__ = [
     "batch_graphs",
     "coalesce",
     "degree",
+    "line_graph",
     "max_pool",
     "mean_pool",
     "remove_self_loops",
@@ -253,3 +255,33 @@ def to_undirected(
         jnp.concatenate([receivers, senders]),
         num_nodes,
     )
+
+
+def line_graph(
+    senders: Int[Array, " e"],
+    receivers: Int[Array, " e"],
+    num_nodes: int,
+    *,
+    non_backtracking: bool = True,
+) -> tuple[Int[Array, " l"], Int[Array, " l"], Int[Array, " l"]]:
+    """Rebuild the graph with edges as nodes, joined head to tail.
+
+    >>> line_senders, line_receivers, shared = line_graph(senders, receivers, num_nodes)
+    """
+    # Edges leaving a node form one contiguous block of the sender-sorted ordering
+    out_degree = degree(senders, num_nodes)
+    order = jnp.argsort(senders, stable=True)
+    blocks = jnp.cumsum(out_degree) - out_degree
+
+    # Every edge i -> v takes the whole block at v, one slot per successor
+    successors = out_degree[receivers]
+    line_senders = jnp.repeat(jnp.arange(senders.shape[0]), successors)
+    offsets = blocks[receivers] - jnp.cumsum(successors) + successors
+    line_receivers = order[offsets[line_senders] + jnp.arange(line_senders.shape[0])]
+
+    # Drop i -> v -> i, which sends each edge straight back down its own reverse
+    if non_backtracking:
+        keep = senders[line_senders] != receivers[line_receivers]
+        line_senders, line_receivers = line_senders[keep], line_receivers[keep]
+
+    return line_senders, line_receivers, receivers[line_senders]
