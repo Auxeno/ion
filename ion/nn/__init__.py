@@ -9,7 +9,6 @@ from .layers.dropout import Dropout
 from .layers.embedding import Embedding
 from .layers.identity import Identity
 from .layers.linear import Linear
-from .layers.lora import LoRALinear
 from .layers.norm import BatchNorm, GroupNorm, LayerNorm, RMSNorm, SpectralNorm
 from .layers.pool import AvgPool, MaxPool
 from .layers.positional import LearnedPositionalEmbedding, RoPE, SinusoidalPositionalEmbedding
@@ -35,7 +34,6 @@ __all__ = [
     "LayerNorm",
     "LearnedPositionalEmbedding",
     "Linear",
-    "LoRALinear",
     "LRU",
     "LRUCell",
     "LSTM",

@@ -117,7 +117,6 @@ Each [`ion.nn`](nn/layers/index.md) layer is a `Module`, constructed with a `key
 | [Positional](nn/layers/positional.md) | `RoPE`, `LearnedPositionalEmbedding`, `SinusoidalPositionalEmbedding` |
 | [Pooling](nn/layers/pool.md) | `MaxPool`, `AvgPool` |
 | [Dropout](nn/layers/dropout.md) | `Dropout` |
-| [LoRA](nn/layers/lora.md) | `LoRALinear` |
 | [Identity](nn/layers/identity.md) | `Identity` |
 | [Composite](nn/layers/mlp.md) | `MLP`, `Sequential` |
 

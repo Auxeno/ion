@@ -112,15 +112,6 @@ model = model.unfreeze()
 optimizer = ion.Optimizer(optax.adam(3e-4), model)
 ```
 
-[`LoRALinear`](nn/layers/lora.md) freezes its base weights automatically:
-
-```python
-lora = nn.LoRALinear(base_linear, rank=8, key=key)
-optimizer = ion.Optimizer(optax.adam(3e-4), lora)
-```
-
-Only the low-rank `A` and `B` parameters receive optimizer state.
-
 `Module.freeze` and `Module.unfreeze` act on a model; `ion.freeze` and `ion.unfreeze` do the same for any pytree. The `is_param` and `is_trainable_param` predicates filter leaves when building custom masks:
 
 ::: ion.freeze

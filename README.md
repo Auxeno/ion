@@ -89,7 +89,7 @@ Ion ships with standard neural network layers. Each is a `Module` with trainable
 
 | Category        | Layers                                                                    |
 |-----------------|---------------------------------------------------------------------------|
-| Linear          | `Linear`, `LoRALinear`                                                    |
+| Linear          | `Linear`                                                                  |
 | Convolution     | `Conv`, `ConvTranspose`                                                   |
 | Attention       | `MultiHeadAttention`                                                      |
 | Normalization   | `BatchNorm`, `LayerNorm`, `RMSNorm`, `GroupNorm`, `SpectralNorm`            |

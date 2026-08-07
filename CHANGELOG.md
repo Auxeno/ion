@@ -2,6 +2,7 @@
 
 ## 0.14.0
 
+- **Breaking: `LoRALinear` removed.** Low-rank adaptation is a fine-tuning protocol rather than a layer, and it wrapped `Linear` alone, so it never reached the attention projections real LoRA targets. Build it from `Param` and `freeze`: a frozen base plus trainable `a` and `b`, returning `base(x) + (x @ a @ b) * (alpha / rank)`.
 - **Breaking: `dot_product_attention_with_rope` removed.** The helper saved one composition and did not earn a slot in the public API. 
 - **`gnn.line_graph`.** Rebuilds a graph with its edges as nodes, joined where one edge ends and another begins. Line-graph nodes are the rows of the input edge arrays, so `x_edge` becomes the node features unchanged and any existing convolution updates edge representations. `non_backtracking` drops the pairs that walk straight back down the reverse edge, and the returned pivot node is where angle features attach.
 - **`gnn.to_undirected`.** Appends the reverse of every edge and coalesces, so an undirected graph is stored with both directions present. Coalescing makes it idempotent, and the returned indices address the original edges concatenated with the reversed ones, so direction-dependent edge features can be negated rather than copied.

@@ -283,14 +283,13 @@ class TestOptimizerPytree:
 
 
 class TestOptimizerAutoPartition:
-    def test_lora_training_no_manual_partition(self):
-        """Frozen base unchanged, loss decreases, no manual partition boilerplate."""
-        keys = jax.random.split(jax.random.key(0), 2)
-        linear = nn.Linear(4, 4, key=keys[0])
-        lora = nn.LoRALinear(linear, rank=2, key=keys[1])
-        frozen_base_w = lora.linear.w._value.copy()
+    def test_partially_frozen_training_no_manual_partition(self):
+        """Frozen layer unchanged, loss decreases, no manual partition boilerplate."""
+        model = nn.MLP([4, 8, 4], key=jax.random.key(0))
+        model = model.at.layers[0].set(model.layers[0].freeze())
+        frozen_w = model.layers[0].w._value.copy()
 
-        optimizer = ion.Optimizer(optax.adam(1e-2), lora)
+        optimizer = ion.Optimizer(optax.adam(1e-2), model)
 
         x = jax.random.normal(jax.random.key(1), (8, 4))
         y = jnp.ones((8, 4))
@@ -298,13 +297,13 @@ class TestOptimizerAutoPartition:
         def loss_fn(model, x, y):
             return jnp.mean((model(x) - y) ** 2)
 
-        initial_loss = loss_fn(lora, x, y)
+        initial_loss = loss_fn(model, x, y)
         for _ in range(10):
-            grads = jax.grad(loss_fn)(lora, x, y)
-            lora, optimizer = optimizer.update(lora, grads)
+            grads = jax.grad(loss_fn)(model, x, y)
+            model, optimizer = optimizer.update(model, grads)
 
-        assert loss_fn(lora, x, y) < initial_loss
-        npt.assert_array_equal(lora.linear.w._value, frozen_base_w)
+        assert loss_fn(model, x, y) < initial_loss
+        npt.assert_array_equal(model.layers[0].w._value, frozen_w)
 
     def test_frozen_params_no_wasted_memory(self):
         """set_to_zero() allocates fewer state leaves than adam."""

@@ -33,7 +33,6 @@ def _build_layers(key):
         (nn.MLP([8, 32, 32, 16], key=next(keys)), jnp.ones((2, 8))),
         (nn.Embedding(16, 8, key=next(keys)), jnp.array([[0, 3, 7, 15], [1, 2, 5, 10]])),
         (nn.Sequential(nn.Linear(8, 16, key=next(keys)), jax.nn.relu), jnp.ones((2, 8))),
-        (nn.LoRALinear(nn.Linear(8, 16, key=next(keys)), rank=4, key=next(keys)), jnp.ones((2, 8))),
         (
             nn.ConvTranspose(3, 8, kernel_shape=(3,), padding=1, key=next(keys)),
             jnp.ones((2, 10, 3)),
@@ -66,7 +65,6 @@ _PARAM_NAMES = [
     "mlp",
     "embedding",
     "sequential",
-    "lora_linear",
     "conv_transpose_1d",
     "conv_transpose_2d",
     "learned_positional_embedding",

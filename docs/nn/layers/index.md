@@ -16,7 +16,6 @@ Every `ion.nn` layer is an immutable JAX [pytree](https://docs.jax.dev/en/latest
 | [Positional](positional.md) | `RoPE`, `LearnedPositionalEmbedding`, `SinusoidalPositionalEmbedding` |
 | [Pooling](pool.md) | `MaxPool`, `AvgPool` |
 | [Dropout](dropout.md) | `Dropout` |
-| [LoRA](lora.md) | `LoRALinear` |
 | [Identity](identity.md) | `Identity` |
 | [MLP](mlp.md) | `MLP` |
 | [Sequential](sequential.md) | `Sequential` |
