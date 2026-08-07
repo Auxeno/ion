@@ -340,7 +340,9 @@ class Module:
             background_color=f"oklch(0.8 0.1 {h % 10_000 / 10_000 * 360:.1f})",
             first_line_annotation=parts.comment_color(parts.text(summary)) if leaves else None,
             expand_state=(
-                parts.ExpandState.WEAKLY_EXPANDED if children else parts.ExpandState.COLLAPSED
+                parts.ExpandState.WEAKLY_EXPANDED
+                if children or path == ""
+                else parts.ExpandState.COLLAPSED
             ),
         )
 
