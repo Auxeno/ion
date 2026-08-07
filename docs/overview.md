@@ -261,6 +261,7 @@ from ion import nn
 model = nn.MLP([4, 16, 3], key=jax.random.key(0))
 
 model.num_params  # total parameter count
+model.disk_usage  # size of the arrays a checkpoint would hold, e.g. '524 B'
 model.params      # Param leaves; array data and buffers become None
 ```
 

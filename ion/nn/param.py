@@ -188,18 +188,17 @@ class Param(_ParamBase[T]):
         return f"Param({self._value!r}{trainable_str})"
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
-        """Hook to make `Param`s colored in grey in Treescope."""
-        import treescope
+        """Hook to render `Param`s on a single line in Treescope."""
+        from treescope import rendering_parts as parts
 
-        attributes = {"value": self._value, "trainable": self.trainable}
+        # An extra abbreviation level hides the array statistics until the Param is expanded
+        array = parts.abbreviation_level(subtree_renderer(self._value, path=None).renderable)
 
-        # Grey for trainable, ice blue for frozen
-        color = "oklch(0.925 0.0 0.0)" if self.trainable else "oklch(0.92 0.06 260.0)"
-
-        return treescope.repr_lib.render_object_constructor(
-            object_type=type(self),
-            attributes=attributes,
+        return parts.build_foldable_tree_node_from_children(
+            prefix="Param(",
+            children=[array, parts.text(f"trainable={self.trainable}")],
+            suffix=")",
+            comma_separated=True,
             path=path,
-            subtree_renderer=subtree_renderer,
-            color=color,
+            expand_state=parts.ExpandState.COLLAPSED,
         )

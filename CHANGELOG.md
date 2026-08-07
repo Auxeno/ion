@@ -9,6 +9,8 @@
 - **`gnn.coalesce`.** Sorts edges by `(sender, receiver)` and drops duplicates, putting an edge list into the canonical form that sparse COO layouts use. It also returns the index of the row kept for each surviving edge, so edge features can be filtered to match.
 - **`gnn.degree`.** Counts how many edges reference each node. It counts a single index array, so `degree(senders, n)` gives out-degree and `degree(receivers, n)` gives in-degree.
 - **`gnn.remove_self_loops`.** Drops every `i -> i` edge, pairing with `add_self_loops` for datasets that ship with self-loops already present. The number of edges removed depends on the data, so it is a data preparation step rather than something to call inside `jax.jit`.
+- **Treescope rendering reworked.** Modules put configuration on one line, then group parameters, buffers, and child modules under headings, and annotate themselves with a parameter count and size. Arrays show dtype and shape until a `Param` is expanded.
+- **`Module.disk_usage`.** Size of the arrays a checkpoint would hold, as a string such as `'75 KB'`.
 
 ## 0.13.0
 

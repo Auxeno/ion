@@ -52,6 +52,7 @@ def test_enable_and_disable_treescope_formatters(monkeypatch):
 
     assert all(rendered_type in html_fmt.type_printers for rendered_type in rendered_types)
     assert isinstance(treescope.active_autovisualizer.get(), treescope.ArrayAutovisualizer)
+    assert treescope.abbreviation_threshold.get() == 2
 
     html_fmt.for_type(object, lambda obj: treescope.render_to_html(obj))
     ion.disable_treescope()
@@ -59,3 +60,4 @@ def test_enable_and_disable_treescope_formatters(monkeypatch):
     assert all(rendered_type not in html_fmt.type_printers for rendered_type in rendered_types)
     assert object not in html_fmt.type_printers
     assert treescope.active_autovisualizer.get() is None
+    assert treescope.abbreviation_threshold.get() is None

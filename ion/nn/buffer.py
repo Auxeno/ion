@@ -78,13 +78,16 @@ class Buffer(Generic[T]):
         return f"Buffer({Param.short_dtype(value.dtype.name)}{list(value.shape)})"
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
-        """Hook to make `Buffer`s colored in grey in Treescope."""
-        import treescope
+        """Hook to render `Buffer`s on a single line in Treescope."""
+        from treescope import rendering_parts as parts
 
-        return treescope.repr_lib.render_object_constructor(
-            object_type=type(self),
-            attributes={"value": self.value},
+        # An extra abbreviation level hides the array statistics until the Buffer is expanded
+        array = parts.abbreviation_level(subtree_renderer(self.value, path=None).renderable)
+
+        return parts.build_foldable_tree_node_from_children(
+            prefix="Buffer(",
+            children=[array],
+            suffix=")",
             path=path,
-            subtree_renderer=subtree_renderer,
-            color="oklch(0.925 0.0 0.0)",
+            expand_state=parts.ExpandState.COLLAPSED,
         )

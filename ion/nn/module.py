@@ -285,25 +285,63 @@ class Module:
         return "\n".join(parts)
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
-        """Hook to add color to Modules with Treescope."""
-        import treescope
+        """Hook to group fields and add color to Modules with Treescope."""
+        from treescope import rendering_parts as parts
 
-        child_attributes = {
-            field.name: getattr(self, field.name)
-            for field in dataclasses.fields(self)  # type: ignore[reportArgumentType]
-            if field.repr
-        }
+        space, newline = parts.text(" "), parts.fold_condition(collapsed=parts.text(" "))
+        entry = lambda label, value, name, separator: parts.siblings_with_annotations(
+            label,
+            subtree_renderer(value, path=None if path is None else f"{path}.{name}"),
+            ",",
+            separator,
+        )
+
+        config, params, buffers, children = [], [], [], []
+        for field in dataclasses.fields(self):  # type: ignore[reportArgumentType]
+            if not field.repr:
+                continue
+            name, value = field.name, getattr(self, field.name)
+            if isinstance(value, (list, tuple)) and any(isinstance(x, Module) for x in value):
+                # Sequences splice in as (0), (1), ... rather than nesting one level deeper
+                children += [
+                    entry(f"({i}): ", item, f"{name}[{i}]", newline) for i, item in enumerate(value)
+                ]
+            elif isinstance(value, Module):
+                children.append(entry(f"{name}=", value, name, newline))
+            elif isinstance(value, (Param, Buffer)):
+                group = params if isinstance(value, Param) else buffers
+                group.append(entry(f"{name}=", value, name, newline))
+            else:
+                config.append(entry(f"{name}=", value, name, space))
+
+        # Config fields share one line, dropping their copy buttons, arrays and children follow
+        lines = [parts.siblings(*[line.renderable for line in config])] if config else []
+        groups = (("Parameters", params), ("Buffers", buffers), ("Modules", children))
+        for header, group in groups:
+            if group:
+                comment = parts.comment_color(parts.text(f"# {header}:"))
+                lines.append(parts.fold_condition(expanded=comment))
+                lines += [parts.build_full_line_with_annotations(line) for line in group]
+
+        # Totals annotate the first line, e.g. Linear(  # 1,088 params, 4.25 KB
+        leaves = [p for p in jax.tree.leaves(self, is_leaf=tree.is_param) if tree.is_param(p)]
+        frozen = sum(p._value.size for p in leaves if not p.trainable)
+        summary = f"  # {self.num_params:,} params, {self.disk_usage}"
+        summary += f", {frozen:,} frozen" if frozen else ""
 
         # Hue derived from a salted hash of the class name; the salt tunes the palette
         h = zlib.crc32(f"j4h9be:{type(self).__qualname__}".encode())
-        color = f"oklch(0.8 0.1 {h % 10_000 / 10_000 * 360:.1f})"
 
-        return treescope.repr_lib.render_object_constructor(
-            object_type=type(self),
-            attributes=child_attributes,
+        return parts.build_foldable_tree_node_from_children(
+            prefix=parts.siblings(parts.maybe_qualified_type_name(type(self)), "("),
+            children=lines,
+            suffix=")",
             path=path,
-            subtree_renderer=subtree_renderer,
-            color=color,
+            background_color=f"oklch(0.8 0.1 {h % 10_000 / 10_000 * 360:.1f})",
+            first_line_annotation=parts.comment_color(parts.text(summary)) if leaves else None,
+            expand_state=(
+                parts.ExpandState.WEAKLY_EXPANDED if children else parts.ExpandState.COLLAPSED
+            ),
         )
 
     @property
@@ -367,3 +405,16 @@ class Module:
         """
         leaves = jax.tree.leaves(self, is_leaf=tree.is_param)
         return sum(p._value.size for p in leaves if tree.is_param(p))
+
+    @property
+    def disk_usage(self) -> str:
+        """Size of the arrays a checkpoint would hold, as a human-readable string.
+
+        >>> model.disk_usage  # e.g. '397 KB'
+        """
+        is_array = lambda leaf: tree.is_param(leaf) or tree.is_buffer(leaf)
+        leaves = jax.tree.leaves(self, is_leaf=is_array)
+        nbytes = sum(leaf.value.nbytes if tree.is_buffer(leaf) else leaf.nbytes for leaf in leaves)
+        units = ("B", "KB", "MB", "GB")
+        exponent = min(len(units) - 1, (nbytes.bit_length() - 1) // 10) if nbytes else 0
+        return f"{nbytes / (1 << 10 * exponent):.3g} {units[exponent]}"

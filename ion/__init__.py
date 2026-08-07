@@ -35,16 +35,16 @@ def enable_treescope(everything: bool = False) -> None:
 
             html_fmt = ip.display_formatter.formatters["text/html"]  # type: ignore[reportAttributeAccessIssue,reportOptionalMemberAccess]
 
-            # Wrap in a slightly smaller font so trees render more compactly in notebooks
-            render = lambda obj: f'<div style="font-size:90%">{treescope.render_to_html(obj)}</div>'
+            render = lambda obj: treescope.render_to_html(obj)
 
-            html_fmt.for_type(nn.Module, lambda obj: render(obj))
-            html_fmt.for_type(nn.Param, lambda obj: render(obj))
-            html_fmt.for_type(nn.Buffer, lambda obj: render(obj))
-            html_fmt.for_type(Optimizer, lambda obj: render(obj))
-            html_fmt.for_type(ArrayImpl, lambda obj: render(obj))
-            html_fmt.for_type(np.ndarray, lambda obj: render(obj))
+            html_fmt.for_type(nn.Module, render)
+            html_fmt.for_type(nn.Param, render)
+            html_fmt.for_type(nn.Buffer, render)
+            html_fmt.for_type(Optimizer, render)
+            html_fmt.for_type(ArrayImpl, render)
+            html_fmt.for_type(np.ndarray, render)
             treescope.active_autovisualizer.set_globally(treescope.ArrayAutovisualizer())
+            treescope.abbreviation_threshold.set_globally(2)
     except ImportError:
         pass
 
@@ -72,6 +72,7 @@ def disable_treescope() -> None:
             html_fmt.type_printers.pop(object, None)
 
         treescope.active_autovisualizer.set_globally(None)
+        treescope.abbreviation_threshold.set_globally(None)
     except ImportError:
         pass
 

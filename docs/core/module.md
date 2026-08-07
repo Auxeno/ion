@@ -12,6 +12,7 @@
         - astype
         - params
         - num_params
+        - disk_usage
 
 ---
 
