@@ -7,6 +7,8 @@ Functions:
     segment_prod       Product reduction within segments. (Re-exported from jax.ops.)
     segment_softmax    Softmax normalized within segments (e.g. per-node neighborhoods).
     segment_mean       Mean reduction within segments.
+    segment_var        Population variance within segments.
+    segment_std        Population standard deviation within segments.
     mean_pool          Average node features within each graph (graph-level readout).
     sum_pool           Sum node features within each graph.
     max_pool           Maximum node features within each graph.
@@ -44,7 +46,9 @@ __all__ = [
     "segment_min",
     "segment_prod",
     "segment_softmax",
+    "segment_std",
     "segment_sum",
+    "segment_var",
     "sum_pool",
     "to_undirected",
 ]
@@ -117,6 +121,36 @@ def segment_mean(
     # Count segment members
     counts = jnp.maximum(jnp.bincount(segment_ids, length=num_segments), 1)
     return (sums / counts.reshape(-1, *(1,) * (data.ndim - 1))).astype(dtype)
+
+
+def segment_var(
+    data: Float[Array, "e ..."],
+    segment_ids: Int[Array, " e"],
+    num_segments: int,
+) -> Float[Array, "s ..."]:
+    """Population variance of data within each segment; empty segments give zeros.
+
+    >>> variances = segment_var(messages, receivers, num_nodes)
+    """
+    dtype = data.dtype
+    data = data.astype(jnp.float32)
+
+    # Two-pass: deviations from the segment mean, rather than E[x^2] - E[x]^2
+    means = segment_mean(data, segment_ids, num_segments)
+    deviations = jnp.square(data - means[segment_ids])
+    return jnp.maximum(segment_mean(deviations, segment_ids, num_segments), 0.0).astype(dtype)
+
+
+def segment_std(
+    data: Float[Array, "e ..."],
+    segment_ids: Int[Array, " e"],
+    num_segments: int,
+) -> Float[Array, "s ..."]:
+    """Population standard deviation within each segment; empty segments give zeros.
+
+    >>> stds = segment_std(messages, receivers, num_nodes)
+    """
+    return jnp.sqrt(segment_var(data, segment_ids, num_segments))
 
 
 def mean_pool(

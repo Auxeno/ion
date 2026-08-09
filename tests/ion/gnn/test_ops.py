@@ -490,6 +490,90 @@ class TestSegmentMean:
         npt.assert_array_equal(result, jnp.array([0.5], dtype=dtype))
 
 
+class TestSegmentVar:
+    def test_matches_jnp_var(self):
+        """Output matches jnp.var applied per segment."""
+        data = jnp.array([1.0, 2.0, 3.0, 4.0, 6.0])
+        segment_ids = jnp.array([0, 0, 0, 1, 1])
+        result = gnn.segment_var(data, segment_ids, num_segments=2)
+        expected = jnp.array([jnp.var(data[:3]), jnp.var(data[3:])])
+        npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
+
+    def test_multidimensional_data(self):
+        """Works with (e, d) shaped data."""
+        data = jax.random.normal(jax.random.key(0), (6, 4))
+        segment_ids = jnp.array([0, 0, 0, 1, 1, 1])
+        result = gnn.segment_var(data, segment_ids, num_segments=2)
+        npt.assert_allclose(result[0], data[:3].var(axis=0), rtol=1e-5, atol=1e-5)
+        npt.assert_allclose(result[1], data[3:].var(axis=0), rtol=1e-5, atol=1e-5)
+
+    def test_empty_and_singleton_segments(self):
+        """Segments with no members or one member give zeros, not NaN."""
+        data = jnp.array([1.0, 2.0, 7.0])
+        segment_ids = jnp.array([0, 0, 2])
+        result = gnn.segment_var(data, segment_ids, num_segments=3)
+        npt.assert_allclose(result, jnp.array([0.25, 0.0, 0.0]), rtol=1e-5, atol=1e-5)
+
+    def test_large_offset_stable(self):
+        """A large constant offset leaves the variance unchanged."""
+        data = jnp.array([1.0, 2.0, 3.0]) + 1e6
+        segment_ids = jnp.zeros(3, dtype=jnp.int32)
+        result = gnn.segment_var(data, segment_ids, num_segments=1)
+        npt.assert_allclose(result, jnp.array([2.0 / 3.0]), rtol=1e-4, atol=1e-4)
+
+    def test_jit_compatible(self):
+        """segment_var works under jax.jit."""
+        data = jnp.array([1.0, 2.0, 3.0])
+        segment_ids = jnp.array([0, 0, 1])
+        eager = gnn.segment_var(data, segment_ids, 2)
+        jitted = jax.jit(gnn.segment_var, static_argnums=2)(data, segment_ids, 2)
+        npt.assert_allclose(eager, jitted, atol=1e-6)
+
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
+    def test_mixed_precision(self, dtype):
+        """Accumulates in float32 while preserving the input dtype."""
+        data = jnp.concatenate((jnp.zeros(2048, dtype=dtype), jnp.ones(2048, dtype=dtype)))
+        segment_ids = jnp.zeros(4096, dtype=jnp.int32)
+        result = gnn.segment_var(data, segment_ids, num_segments=1)
+
+        assert result.dtype == dtype
+        npt.assert_array_equal(result, jnp.array([0.25], dtype=dtype))
+
+
+class TestSegmentStd:
+    def test_matches_jnp_std(self):
+        """Output matches jnp.std applied per segment."""
+        data = jnp.array([1.0, 2.0, 3.0, 4.0, 6.0])
+        segment_ids = jnp.array([0, 0, 0, 1, 1])
+        result = gnn.segment_std(data, segment_ids, num_segments=2)
+        expected = jnp.array([jnp.std(data[:3]), jnp.std(data[3:])])
+        npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
+
+    def test_is_sqrt_of_var(self):
+        """Standard deviation is the square root of the variance."""
+        data = jax.random.normal(jax.random.key(0), (6, 4))
+        segment_ids = jnp.array([0, 0, 0, 1, 1, 1])
+        std = gnn.segment_std(data, segment_ids, num_segments=2)
+        var = gnn.segment_var(data, segment_ids, num_segments=2)
+        npt.assert_allclose(std, jnp.sqrt(var), rtol=1e-5, atol=1e-5)
+
+    def test_identical_values_finite(self):
+        """Segments whose values are all equal give zero, not NaN."""
+        data = jnp.array([3.0, 3.0, 3.0, 5.0])
+        segment_ids = jnp.array([0, 0, 0, 2])
+        result = gnn.segment_std(data, segment_ids, num_segments=3)
+        assert jnp.all(jnp.isfinite(result))
+        npt.assert_allclose(result, jnp.zeros(3), atol=1e-6)
+
+    def test_jit_compatible(self):
+        """segment_std works under jax.jit."""
+        data = jnp.array([1.0, 2.0, 3.0])
+        segment_ids = jnp.array([0, 0, 1])
+        eager = gnn.segment_std(data, segment_ids, 2)
+        jitted = jax.jit(gnn.segment_std, static_argnums=2)(data, segment_ids, 2)
+        npt.assert_allclose(eager, jitted, atol=1e-6)
+
+
 class TestMeanPool:
     def test_output_manual(self):
         """Output matches per-graph mean computed manually."""

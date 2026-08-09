@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.14.1
+
+- **`gnn.segment_var` and `gnn.segment_std`.** Population variance and standard deviation within each segment, dividing by the segment size to match `jnp.var` and `jnp.std` at their default `ddof=0`. Both take the mean squared deviation from the segment mean rather than `E[x^2] - E[x]^2`, so they stay accurate when values are large relative to their spread, and empty or single-element segments return zero rather than `NaN`.
+
 ## 0.14.0
 
 - **Breaking: `LoRALinear` removed.** Low-rank adaptation is a fine-tuning protocol rather than a layer, and it wrapped `Linear` alone, so it never reached the attention projections real LoRA targets. Build it from `Param` and `freeze`: a frozen base plus trainable `a` and `b`, returning `base(x) + (x @ a @ b) * (alpha / rank)`.

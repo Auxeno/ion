@@ -15,7 +15,9 @@ from .ops import (
     segment_min,
     segment_prod,
     segment_softmax,
+    segment_std,
     segment_sum,
+    segment_var,
     sum_pool,
     to_undirected,
 )
@@ -43,7 +45,9 @@ __all__ = [
     "segment_min",
     "segment_prod",
     "segment_softmax",
+    "segment_std",
     "segment_sum",
+    "segment_var",
     "sum_pool",
     "to_undirected",
 ]
