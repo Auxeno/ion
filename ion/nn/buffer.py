@@ -16,8 +16,6 @@ import jax.tree_util as jtu
 from jax.core import Tracer
 from jaxtyping import Array
 
-from .param import Param
-
 T = TypeVar("T", bound=Array)
 
 
@@ -75,19 +73,10 @@ class Buffer(Generic[T]):
 
     def __repr__(self) -> str:
         value = self.value
-        return f"Buffer({Param.short_dtype(value.dtype.name)}{list(value.shape)})"
+        return f"Buffer({value.dtype.name}{value.shape})"
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
-        """Hook to render `Buffer`s on a single line in Treescope."""
-        from treescope import rendering_parts as parts
+        """Hook to render with Treescope."""
+        from .. import _treescope
 
-        # An extra abbreviation level hides the array statistics until the Buffer is expanded
-        array = parts.abbreviation_level(subtree_renderer(self.value, path=None).renderable)
-
-        return parts.build_foldable_tree_node_from_children(
-            prefix="Buffer(",
-            children=[array],
-            suffix=")",
-            path=path,
-            expand_state=parts.ExpandState.COLLAPSED,
-        )
+        return _treescope.buffer(self, path, subtree_renderer)

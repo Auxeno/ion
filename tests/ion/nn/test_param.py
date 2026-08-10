@@ -543,38 +543,25 @@ class TestAttributeForwardingExtended:
 
 class TestRepr:
     def test_param_repr(self):
-        """Repr shows shape, dtype abbreviation, and trainable flag."""
+        """Repr shows dtype and shape, staying silent on the default trainable."""
         p = nn.Param(jnp.zeros((3, 4), dtype=jnp.float32))
-        assert repr(p) == "Param(f32[3, 4], trainable=True)"
+        assert repr(p) == "Param(float32(3, 4))"
 
     def test_frozen_param_repr(self):
-        """Frozen Param repr includes trainable=False."""
+        """Frozen Param repr is marked frozen."""
         p = nn.Param(jnp.zeros(5), trainable=False)
-        assert "trainable=False" in repr(p)
+        assert repr(p) == "Param(float32(5,), frozen)"
 
-    def test_abbreviated_dtypes(self):
-        """Repr uses abbreviated dtype names (f32, bf16, i8, etc.)."""
-        cases = [
-            (jnp.float16, "f16"),
-            (jnp.float32, "f32"),
-            (jnp.bfloat16, "bf16"),
-            (jnp.int8, "i8"),
-            (jnp.int32, "i32"),
-            (jnp.uint8, "u8"),
-        ]
-        for dtype, abbrev in cases:
+    def test_dtype_names(self):
+        """Repr spells dtypes out in full, matching the Treescope rendering."""
+        for dtype in (jnp.float16, jnp.bfloat16, jnp.int8, jnp.uint8, jnp.bool_):
             p = nn.Param(jnp.zeros(2, dtype=dtype))
-            assert abbrev in repr(p), f"Expected {abbrev} in repr for {dtype}"
-
-    def test_bool_dtype_repr(self):
-        """Bool dtype has no abbreviation prefix, falls through to raw name."""
-        p = nn.Param(jnp.array([True, False]))
-        assert "bool" in repr(p)
+            assert repr(p) == f"Param({jnp.zeros(2, dtype=dtype).dtype.name}(2,))"
 
     def test_scalar_param_repr(self):
-        """Scalar Param repr shows empty shape brackets."""
+        """Scalar Param repr shows an empty shape."""
         p = nn.Param(jnp.array(1.0))
-        assert "f32[]" in repr(p)
+        assert repr(p) == "Param(float32())"
 
     def test_module_repr_with_param(self):
         """Module __repr__ displays Param wrapper."""

@@ -132,17 +132,17 @@ optimizer = ion.Optimizer(optax.adam(3e-4), model)
 
 ## Inspecting models
 
-A model prints as a tree, with each `Param` showing its dtype, shape, and trainability:
+A model prints as a tree, with each `Param` showing its dtype and shape. Frozen params are marked `frozen`:
 
 ```text
 MLP(
   layer_1=Linear(
-    w=Param(f32[4, 16], trainable=True),
-    b=Param(f32[16], trainable=True),
+    w=Param(float32(4, 16)),
+    b=Param(float32(16,)),
   ),
   layer_2=Linear(
-    w=Param(f32[16, 3], trainable=True),
-    b=Param(f32[3], trainable=True),
+    w=Param(float32(16, 3)),
+    b=Param(float32(3,)),
   ),
   activation=relu,
 )

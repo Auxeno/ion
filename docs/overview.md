@@ -88,12 +88,12 @@ Modules can contain other modules, so layers compose into one model tree. JAX ar
 ```text
 MLP(
   layer_1=Linear(
-    w=Param(f32[4, 16], trainable=True),
-    b=Param(f32[16], trainable=True),
+    w=Param(float32(4, 16)),
+    b=Param(float32(16,)),
   ),
   layer_2=Linear(
-    w=Param(f32[16, 3], trainable=True),
-    b=Param(f32[3], trainable=True),
+    w=Param(float32(16, 3)),
+    b=Param(float32(3,)),
   ),
   activation=relu,
 )

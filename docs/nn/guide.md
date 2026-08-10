@@ -121,16 +121,16 @@ print(mlp)
 MLP(
   layers=(
     Linear(
-      w=Param(f32[3, 64], trainable=True),
-      b=Param(f32[64], trainable=True),
+      w=Param(float32(3, 64)),
+      b=Param(float32(64,)),
     ),
     Linear(
-      w=Param(f32[64, 64], trainable=True),
-      b=Param(f32[64], trainable=True),
+      w=Param(float32(64, 64)),
+      b=Param(float32(64,)),
     ),
     Linear(
-      w=Param(f32[64, 1], trainable=True),
-      b=Param(f32[1], trainable=True),
+      w=Param(float32(64, 1)),
+      b=Param(float32(1,)),
     ),
   ),
   activation=relu,

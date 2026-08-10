@@ -202,17 +202,7 @@ class Optimizer:
         return f"Optimizer(step={step_val}, state_leaves={num_leaves}{fields_str})"
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
-        """Hook to add color to Optimizers with Treescope."""
-        import treescope
+        """Hook to summarize Optimizers and add color with Treescope."""
+        from . import _treescope
 
-        attributes: dict[str, Any] = {"step": self.step, "state": self.state}
-        if self._fields is not None:
-            attributes["fields"] = self._fields
-
-        return treescope.repr_lib.render_object_constructor(
-            object_type=type(self),
-            attributes=attributes,
-            path=path,
-            subtree_renderer=subtree_renderer,
-            color="oklch(0.88 0.10 95)",
-        )
+        return _treescope.optimizer(self, path, subtree_renderer)

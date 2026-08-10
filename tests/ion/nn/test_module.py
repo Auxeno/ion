@@ -580,7 +580,7 @@ class TestRepr:
         assert "Param(" in r
 
     def test_array_field(self):
-        """repr contains abbreviated dtype and shape for plain array fields."""
+        """repr contains dtype and shape for plain array fields."""
 
         class Model(nn.Module):
             x: jax.Array
@@ -588,9 +588,7 @@ class TestRepr:
             def __init__(self):
                 self.x = jnp.zeros((3, 4), dtype=jnp.float32)
 
-        r = repr(Model())
-        assert "f32" in r
-        assert "[3, 4]" in r
+        assert "x=float32(3, 4)," in repr(Model())
 
     def test_callable_field(self):
         """repr contains the function __name__ for callable fields."""

@@ -166,39 +166,14 @@ class Param(_ParamBase[T]):
     def __iter__(self) -> Iterator[Any]:
         return iter(self._value)
 
-    @staticmethod
-    def short_dtype(name: str) -> str:
-        """Abbreviate dtype names: float32 to f32, bfloat16 to bf16, etc."""
-        for prefix, abbr in (
-            ("bfloat", "bf"),
-            ("float", "f"),
-            ("uint", "u"),
-            ("int", "i"),
-            ("complex", "c"),
-        ):
-            if name.startswith(prefix):
-                return abbr + name[len(prefix) :]
-        return name
-
     def __repr__(self) -> str:
-        trainable_str = f", trainable={self.trainable}"
-        if hasattr(self._value, "shape") and hasattr(self._value, "dtype"):
-            dtype = self.short_dtype(self._value.dtype.name)
-            return f"Param({dtype}{list(self._value.shape)}{trainable_str})"
-        return f"Param({self._value!r}{trainable_str})"
+        frozen = "" if self.trainable else ", frozen"
+        if hasattr(self._value, "dtype"):
+            return f"Param({self._value.dtype.name}{self._value.shape}{frozen})"
+        return f"Param({self._value!r}{frozen})"
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
-        """Hook to render `Param`s on a single line in Treescope."""
-        from treescope import rendering_parts as parts
+        """Hook to render with Treescope."""
+        from .. import _treescope
 
-        # An extra abbreviation level hides the array statistics until the Param is expanded
-        array = parts.abbreviation_level(subtree_renderer(self._value, path=None).renderable)
-
-        return parts.build_foldable_tree_node_from_children(
-            prefix="Param(",
-            children=[array, parts.text(f"trainable={self.trainable}")],
-            suffix=")",
-            comma_separated=True,
-            path=path,
-            expand_state=parts.ExpandState.COLLAPSED,
-        )
+        return _treescope.param(self, path, subtree_renderer)
