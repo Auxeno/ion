@@ -52,7 +52,7 @@ nav:
           - Embedding: nn/layers/embedding.md
           - Positional: nn/layers/positional.md
           - Pooling: nn/layers/pool.md
-          - Dropout: nn/layers/dropout.md
+          - Stochastic: nn/layers/stochastic.md
           - Identity: nn/layers/identity.md
           - MLP: nn/layers/mlp.md
           - Sequential: nn/layers/sequential.md

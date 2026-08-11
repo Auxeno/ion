@@ -26,15 +26,19 @@ model = nn.Linear(4, 3, key=jax.random.key(0))
 x = jnp.ones((32, 4))
 y = jnp.ones((32, 3))
 
+
 def loss_fn(model, x, y):
     return jnp.mean((model(x) - y) ** 2)
 
+
 optimizer = ion.Optimizer(optax.adam(1e-2), model)
+
 
 @jax.jit
 def train_step(model, optimizer, x, y):
     grads = jax.grad(loss_fn)(model, x, y)
     return optimizer.update(model, grads)
+
 
 model, optimizer = train_step(model, optimizer, x, y)
 ```
@@ -66,6 +70,7 @@ import typing
 import jax
 import ion.nn as nn
 
+
 class MLP(nn.Module):
     layer_1: nn.Linear
     layer_2: nn.Linear
@@ -79,6 +84,7 @@ class MLP(nn.Module):
 
     def __call__(self, x):
         return self.layer_2(self.activation(self.layer_1(x)))
+
 
 model = MLP(key=jax.random.key(0))
 ```
@@ -116,7 +122,7 @@ Each [`ion.nn`](nn/layers/index.md) layer is a `Module`, constructed with a `key
 | [Embedding](nn/layers/embedding.md) | `Embedding` |
 | [Positional](nn/layers/positional.md) | `RoPE`, `LearnedPositionalEmbedding`, `SinusoidalPositionalEmbedding` |
 | [Pooling](nn/layers/pool.md) | `MaxPool`, `AvgPool` |
-| [Dropout](nn/layers/dropout.md) | `Dropout` |
+| [Stochastic](nn/layers/stochastic.md) | `Dropout` |
 | [Identity](nn/layers/identity.md) | `Identity` |
 | [Composite](nn/layers/mlp.md) | `MLP`, `Sequential` |
 
@@ -187,8 +193,10 @@ from ion import nn
 
 model = nn.MLP([4, 16, 3], key=jax.random.key(0))
 
+
 def mse_loss(model, x, y):
     return jnp.mean((model(x) - y) ** 2)
+
 
 x, y = jnp.ones((32, 4)), jnp.ones((32, 3))
 
@@ -241,14 +249,14 @@ from ion import nn
 model = nn.MLP([4, 16, 3], key=jax.random.key(0))
 new_w = jnp.zeros_like(model.layers[1].w)
 
-model.astype(jnp.bfloat16)                        # cast params to another dtype
-model.freeze()                                    # freeze every param
-model.unfreeze()                                  # unfreeze every param
+model.astype(jnp.bfloat16)  # cast params to another dtype
+model.freeze()  # freeze every param
+model.unfreeze()  # unfreeze every param
 model.at.layers[0].set(model.layers[0].freeze())  # freeze a single submodule
-model.at.layers[1].w.set(new_w)                   # replace a leaf deep in the tree
+model.at.layers[1].w.set(new_w)  # replace a leaf deep in the tree
 
 dropout_model = nn.Sequential(nn.Dropout(0.1))
-dropout_model.at[nn.Dropout].p.set(0.0)           # set every matching layer
+dropout_model.at[nn.Dropout].p.set(0.0)  # set every matching layer
 ```
 
 Read-only introspection returns plain values:
@@ -262,7 +270,7 @@ model = nn.MLP([4, 16, 3], key=jax.random.key(0))
 
 model.num_params  # total parameter count
 model.disk_usage  # size of the arrays a checkpoint would hold, e.g. '524 B'
-model.params      # Param leaves; array data and buffers become None
+model.params  # Param leaves; array data and buffers become None
 ```
 
 Casting is how Ion does [mixed precision](workflows.md#mixed-precision); see [Freezing](workflows.md#freezing) for working with trainability.

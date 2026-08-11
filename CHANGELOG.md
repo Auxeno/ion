@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.14.2
+
+- **Refactor `__treescope_repr__` code to `_treescope.py`**. Slim down `module.py`, `param.py`, `optimizer.py` and `buffer.py` by porting `__treescope_repr__` logic to a separate file.
+- **Dropout supports broadcast masks.** Pass `broadcast_dims` to express structured dropout and stochastic depth; its source and docs now live under `stochastic`.
+
 ## 0.14.1
 
 - **`gnn.segment_var` and `gnn.segment_std`.** Population variance and standard deviation within each segment, dividing by the segment size to match `jnp.var` and `jnp.std` at their default `ddof=0`. Both take the mean squared deviation from the segment mean rather than `E[x^2] - E[x]^2`, so they stay accurate when values are large relative to their spread, and empty or single-element segments return zero rather than `NaN`.

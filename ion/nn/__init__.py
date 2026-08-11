@@ -5,7 +5,6 @@ from .blocks.sequential import Sequential
 from .buffer import Buffer
 from .layers.attention import MultiHeadAttention
 from .layers.conv import Conv, ConvTranspose
-from .layers.dropout import Dropout
 from .layers.embedding import Embedding
 from .layers.identity import Identity
 from .layers.linear import Linear
@@ -14,6 +13,7 @@ from .layers.pool import AvgPool, MaxPool
 from .layers.positional import LearnedPositionalEmbedding, RoPE, SinusoidalPositionalEmbedding
 from .layers.recurrent import GRU, LSTM, RNN, GRUCell, LSTMCell, RNNCell
 from .layers.ssm import LRU, S4D, S5, LRUCell, S4DCell, S5Cell
+from .layers.stochastic import Dropout
 from .module import Module
 from .param import Param
 

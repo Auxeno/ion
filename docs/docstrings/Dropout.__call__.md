@@ -13,7 +13,7 @@ Returns
 -------
 jax.Array["...", float]
     Masked and rescaled output, or `x` unchanged during evaluation. The shape
-    and dtype match the input.
+    and dtype match the input. Mask values are shared across `broadcast_dims`.
 
 Info
 ----
