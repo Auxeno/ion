@@ -54,18 +54,27 @@ y = attn(x)  # (4, 16, 64) -> (4, 16, 64)
 
 x_batched = jnp.ones((5, batch, seq, dim))  # extra batch dim
 y_batched = jax.vmap(attn)(x_batched)  # (5, 4, 16, 64) -> (5, 4, 16, 64)
+```
 
-# GQA, causal, with a sliding window of length 5
+Grouped-query attention combined with causal masking and a sliding window:
+
+```python
 attn_gqa = nn.MultiHeadAttention(dim, num_heads=8, num_kv_heads=2, causal=True, window=5, key=key)
 y = attn_gqa(x)  # (4, 16, 64) -> (4, 16, 64)
+```
 
-# Cross-attention into a wider context sequence
+Cross-attention into a wider context sequence:
+
+```python
 context_seq, context_dim = 32, 128
 attn_cross = nn.MultiHeadAttention(dim, num_heads=8, kv_dim=context_dim, key=key)
 x_kv = jnp.ones((batch, context_seq, context_dim))
 y = attn_cross(x, x_kv)  # (4, 16, 64), (4, 32, 128) -> (4, 16, 64)
+```
 
-# cuDNN FlashAttention-2 with bfloat16 on supported hardware
+To use cuDNN FlashAttention-2 with `bfloat16` on supported hardware:
+
+```python
 flash_attn = nn.MultiHeadAttention(
     dim,
     num_heads=8,

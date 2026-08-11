@@ -369,6 +369,7 @@ JAX compiles a function for the shapes it receives. If the packed number of node
 | `n` | Number of nodes |
 | `e` | Number of directed edges |
 | `g` | Number of graphs |
+| `l` | Number of directed edges in a line graph |
 | `d` | General node feature dimension |
 | `i`, `o` | Input and output feature dimensions |
 | `h`, `k` | Attention heads and per-head dimension |

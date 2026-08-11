@@ -1,22 +1,22 @@
 Pack graphs into one disconnected graph for batched message passing.
 
-Node features are concatenated and each graph's edge indices are offset by the
-number of preceding nodes. The returned `graph_ids` maps every node back to its
-source graph. Call this function outside `jax.jit` because its Python
+Node features are concatenated, edge indices are offset, and `graph_ids` maps
+each node to its source graph. Call this outside `jax.jit` because its Python
 sequences and output shapes vary with the batch.
 
 Parameters
 ----------
-xs : Sequence[jax.Array["_ d", float]]
-    Node feature matrix for each graph. Feature dimensions must match.
-senders : Sequence[jax.Array["_", int]]
-    Sender indices for each graph.
-receivers : Sequence[jax.Array["_", int]]
-    Receiver indices for each graph.
+xs : Sequence[jax.Array["n d", float]]
+    Node feature matrix for each graph. Node counts may vary; feature
+    dimensions must match.
+senders : Sequence[jax.Array["e", int]]
+    Sender indices for each graph. Edge counts may vary.
+receivers : Sequence[jax.Array["e", int]]
+    Receiver indices for each graph. Edge counts may vary.
 
 Returns
 -------
-tuple[jax.Array, jax.Array, jax.Array, jax.Array]
+tuple[jax.Array["n d", float], jax.Array["e", int], jax.Array["e", int], jax.Array["n", int]]
     Concatenated node features, offset senders, offset receivers, and graph IDs.
 
 Example

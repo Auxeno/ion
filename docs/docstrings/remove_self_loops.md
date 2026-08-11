@@ -1,13 +1,8 @@
 Drop every edge whose sender and receiver are the same node.
 
-All self-loops are removed, including any that were already present in the
-input. The remaining edges keep their original order. The number of edges
-removed depends on the data, so the output shape is not known ahead of time
-and this function cannot be called inside `jax.jit`. Use it when preparing
-edge arrays, not inside a training step.
-
-Edge features and masks are not filtered. Apply the same `senders != receivers`
-mask to them to keep the arrays aligned.
+The remaining edges keep their original order. Edge features are not filtered;
+apply the same `senders != receivers` mask to keep them aligned. Because the
+output size depends on the data, call this outside `jax.jit`.
 
 Parameters
 ----------
@@ -26,15 +21,11 @@ Example
 ```python
 senders = jnp.array([0, 1, 1])
 receivers = jnp.array([1, 1, 2])
-senders, receivers = gnn.remove_self_loops(senders, receivers)
-# senders: [0, 1]
-# receivers: [1, 2]
-```
-
-Filtering edge features alongside the edges:
-
-```python
+x_edge = jnp.array([10, 11, 12])
 keep = senders != receivers
 senders, receivers = gnn.remove_self_loops(senders, receivers)
 x_edge = x_edge[keep]
+# senders: [0, 1]
+# receivers: [1, 2]
+# x_edge: [10, 12]
 ```

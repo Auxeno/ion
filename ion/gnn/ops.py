@@ -193,9 +193,9 @@ def max_pool(
 
 
 def batch_graphs(
-    xs: Sequence[Float[Array, "_ d"]],
-    senders: Sequence[Int[Array, " _"]],
-    receivers: Sequence[Int[Array, " _"]],
+    xs: Sequence[Float[Array, "n d"]],
+    senders: Sequence[Int[Array, " e"]],
+    receivers: Sequence[Int[Array, " e"]],
 ) -> tuple[
     Float[Array, "n d"],
     Int[Array, " e"],

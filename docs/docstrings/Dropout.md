@@ -22,17 +22,15 @@ y = drop(x, training=False)  # (8, 64), pass-through
 ```
 
 Stochastic depth is dropout shared across every non-batch dimension of a
-residual branch. For an MLP input shaped `(batch, features)`:
+residual branch:
 
 ```python
+# MLP input shaped (batch, features)
 drop_path = nn.Dropout(0.1, broadcast_dims=(1,))
 branch = mlp(x)
 x = x + drop_path(branch, training=True, key=key)
-```
 
-For a channels-last CNN stack shaped `(batch, height, width, channels)`:
-
-```python
+# Channels-last CNN input shaped (batch, height, width, channels)
 drop_path = nn.Dropout(0.1, broadcast_dims=(1, 2, 3))
 branch = conv_2(jax.nn.relu(conv_1(x)))
 x = x + drop_path(branch, training=True, key=key)
