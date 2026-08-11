@@ -1,6 +1,15 @@
 """Graph neural network layers and operations."""
 
-from .layers import GATConv, GATv2Conv, GCNConv, GINConv, GraphConv, SAGEConv, TransformerConv
+from .layers import (
+    GATConv,
+    GATv2Conv,
+    GCNConv,
+    GINConv,
+    GlobalAttentionPool,
+    GraphConv,
+    SAGEConv,
+    TransformerConv,
+)
 from .ops import (
     add_self_loops,
     batch_graphs,
@@ -28,6 +37,7 @@ __all__ = [
     "GCNConv",
     "GraphConv",
     "GINConv",
+    "GlobalAttentionPool",
     "SAGEConv",
     "TransformerConv",
     "add_self_loops",

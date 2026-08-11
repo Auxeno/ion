@@ -101,7 +101,7 @@ Ion ships with standard neural network layers. Each is a `Module` with trainable
 | Regularization  | `Dropout`                                                                 |
 | Identity        | `Identity`                                                                |
 | Blocks          | `Sequential`, `MLP`                                                       |
-| GNN             | `GCNConv`, `GraphConv`, `GATConv`, `GATv2Conv`, `TransformerConv`, `GINConv`, `SAGEConv` |
+| GNN             | `GCNConv`, `GraphConv`, `GATConv`, `GATv2Conv`, `TransformerConv`, `GINConv`, `SAGEConv`, `GlobalAttentionPool` |
 
 See the [NN guide](https://auxeno.github.io/ion/nn/guide/) and [GNN guide](https://auxeno.github.io/ion/gnn/guide/) for array formats, spatial layers, and shared conventions.
 

@@ -3,6 +3,7 @@
 from .gat import GATConv, GATv2Conv
 from .gcn import GCNConv, GraphConv
 from .gin import GINConv
+from .readout import GlobalAttentionPool
 from .sage import SAGEConv
 from .transformer import TransformerConv
 
@@ -12,6 +13,7 @@ __all__ = [
     "GCNConv",
     "GraphConv",
     "GINConv",
+    "GlobalAttentionPool",
     "SAGEConv",
     "TransformerConv",
 ]

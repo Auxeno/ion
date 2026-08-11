@@ -1,6 +1,6 @@
 # Graph neural network layers
 
-Every graph layer receives a node feature matrix and parallel COO `senders`/`receivers` arrays. See the [GNN guide](../guide.md) for graph representation, message passing, self-loops, batching, and pooling.
+Message-passing layers receive a node feature matrix and parallel COO `senders`/`receivers` arrays. Graph readout layers instead receive `graph_ids` to pool nodes into graph representations. See the [GNN guide](../guide.md) for graph representation, message passing, self-loops, batching, and pooling.
 
 ## Choose a layer
 
@@ -10,3 +10,4 @@ Every graph layer receives a node feature matrix and parallel COO `senders`/`rec
 | [Graph Attention](gat.md) | `GATConv`, `GATv2Conv`, `TransformerConv` | Learned attention weights |
 | [Graph Isomorphism Network](gin.md) | `GINConv` | Sum plus a separate central-node term |
 | [GraphSAGE](sage.md) | `SAGEConv` | Mean, max, or sum pooling plus a root term |
+| [Graph Readout](readout.md) | `GlobalAttentionPool` | Learned attention-weighted sum across nodes |

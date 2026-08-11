@@ -162,7 +162,8 @@ y = model(x, training=True)
 | [Graph Attention](gnn/layers/gat.md) | `GATConv`, `GATv2Conv`, `TransformerConv` |
 | [Graph Isomorphism Network](gnn/layers/gin.md) | `GINConv` |
 | [GraphSAGE](gnn/layers/sage.md) | `SAGEConv` |
-| [Operations](gnn/operations.md) | segment reductions, graph pooling, graph transforms |
+| [Graph Readout](gnn/layers/readout.md) | `GlobalAttentionPool` |
+| [Operations](gnn/operations.md) | segment reductions, fixed graph readouts, graph transforms |
 
 Graphs are plain arrays in COO format: node features plus `senders`/`receivers` edge indices.
 

@@ -346,7 +346,7 @@ logits.shape   # (2, num_classes)
 
 `graph_ids` serves the role normally played by a batch index, allowing the packed node representations to be reduced back to one row per graph.
 
-Ion provides three graph readouts:
+Ion provides three fixed graph readouts:
 
 | Operation | Reduction |
 |---|---|
@@ -355,6 +355,19 @@ Ion provides three graph readouts:
 | `max_pool` | Maximum node representation |
 
 Sum pooling preserves graph-size information, while mean pooling normalizes it away. The [Operations reference](operations.md) documents the complete pooling APIs.
+
+`GlobalAttentionPool` learns which nodes matter. Its `score` module produces one importance logit per node; softmax normalizes those logits within each graph. Its optional `value` module produces the features included in the weighted sum:
+
+```python
+key_score, key_value = jax.random.split(key)
+attention_pool = gnn.GlobalAttentionPool(
+    score=nn.Linear(hidden_dim, 1, use_bias=False, key=key_score),
+    value=nn.Linear(hidden_dim, hidden_dim, key=key_value),
+)
+graph_h = attention_pool(h, graph_ids, num_graphs=2)
+```
+
+The score and value modules supply all of the readout's parameters. Omit `value` to pool `h` directly. A bias on a single linear score is redundant because softmax is unchanged by a constant shift. See the [Graph Readout reference](layers/readout.md) for the full API.
 
 ## Static shapes
 
