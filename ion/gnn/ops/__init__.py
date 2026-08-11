@@ -2,7 +2,7 @@
 
 from .batching import batch_graphs
 from .graph import add_self_loops, coalesce, degree, line_graph, remove_self_loops, to_undirected
-from .pooling import max_pool, mean_pool, sum_pool
+from .readout import max_pool, mean_pool, sum_pool
 from .segment import (
     segment_max,
     segment_mean,

@@ -4,7 +4,7 @@
 
 - **Refactor `__treescope_repr__` code to `_treescope.py`**. Slim down `module.py`, `param.py`, `optimizer.py` and `buffer.py` by porting `__treescope_repr__` logic to a separate file.
 - **Dropout supports broadcast masks.** Pass `broadcast_dims` to express structured dropout and stochastic depth; its source and docs now live under `stochastic`.
-- **Breaking: GNN source modules reorganized.** Layer implementations now live under `ion.gnn.layers`, matching `ion.nn.layers` and the documentation structure. Operations are grouped under `ion.gnn.ops.segment`, `pooling`, `graph`, and `batching`. The flat `ion.gnn` API is unchanged, but direct imports from the old layer modules such as `ion.gnn.gcn` no longer work.
+- **Breaking: GNN source modules reorganized.** Layer implementations now live under `ion.gnn.layers`, matching `ion.nn.layers` and the documentation structure. Operations are grouped under `ion.gnn.ops.segment`, `readout`, `graph`, and `batching`. The flat `ion.gnn` API is unchanged, but direct imports from the old layer modules such as `ion.gnn.gcn` no longer work.
 
 ## 0.14.1
 
