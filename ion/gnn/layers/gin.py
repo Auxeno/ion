@@ -10,9 +10,9 @@ own. Self-loops are not needed: own features enter via the (1 + eps) term.
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Int
 
-from ..nn.module import Module
-from ..nn.param import Param
-from .ops import segment_sum
+from ...nn.module import Module
+from ...nn.param import Param
+from ..ops import segment_sum
 
 
 class GINConv(Module):

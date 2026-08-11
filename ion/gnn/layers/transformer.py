@@ -17,9 +17,9 @@ import jax.numpy as jnp
 from jax.nn.initializers import Initializer, glorot_uniform, zeros
 from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 
-from ..nn.module import Module
-from ..nn.param import Param
-from .ops import segment_softmax, segment_sum
+from ...nn.module import Module
+from ...nn.param import Param
+from ..ops import segment_softmax, segment_sum
 
 
 class TransformerConv(Module):

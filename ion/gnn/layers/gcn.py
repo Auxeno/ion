@@ -15,9 +15,9 @@ from jax import lax
 from jax.nn.initializers import Initializer, glorot_uniform, zeros
 from jaxtyping import Array, Float, Int, PRNGKeyArray
 
-from ..nn.module import Module
-from ..nn.param import Param
-from .ops import degree, segment_sum
+from ...nn.module import Module
+from ...nn.param import Param
+from ..ops import degree, segment_sum
 
 
 class GCNConv(Module):

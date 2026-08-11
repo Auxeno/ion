@@ -16,9 +16,9 @@ import jax.numpy as jnp
 from jax.nn.initializers import Initializer, glorot_uniform, zeros
 from jaxtyping import Array, Float, Int, PRNGKeyArray
 
-from ..nn.module import Module
-from ..nn.param import Param
-from .ops import segment_max, segment_mean, segment_sum
+from ...nn.module import Module
+from ...nn.param import Param
+from ..ops import segment_max, segment_mean, segment_sum
 
 
 class SAGEConv(Module):
