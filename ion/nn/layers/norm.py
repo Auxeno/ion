@@ -1,9 +1,9 @@
 """Normalization layers.
 
 Modules:
-    BatchNorm     Batch normalization.                   (Ioffe & Szegedy, 2015)
     LayerNorm     Layer normalization.                   (Ba et al., 2016)
     RMSNorm       RMS normalization, no mean centering.  (Zhang & Sennrich, 2019)
+    BatchNorm     Batch normalization.                   (Ioffe & Szegedy, 2015)
     GroupNorm     Normalization over channel groups.     (Wu & He, 2018)
     SpectralNorm  Spectral normalization wrapper.        (Miyato et al., 2018)
 
@@ -18,6 +18,68 @@ from jaxtyping import Array, Float, PRNGKeyArray
 from ..buffer import Buffer
 from ..module import Module
 from ..param import Param
+
+
+class LayerNorm(Module):
+    """Layer normalization over the last dimension.
+
+    >>> norm = LayerNorm(64)
+    >>> norm(x)  # (*, 64) -> (*, 64)
+    """
+
+    scale: Param[Float[Array, " d"]]
+    b: Param[Float[Array, " d"]] | None
+    eps: float
+
+    def __init__(self, dim: int, *, eps: float = 1e-5, use_bias: bool = True) -> None:
+
+        self.scale = Param(jnp.ones(dim))
+        self.b = Param(jnp.zeros(dim)) if use_bias else None
+
+        self.eps = eps
+
+    def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
+        dtype = x.dtype
+        x = x.astype(jnp.float32)
+
+        mean = jnp.mean(x, axis=-1, keepdims=True)
+        var = jnp.mean(jnp.square(x - mean), axis=-1, keepdims=True)
+
+        x = (x - mean) * lax.rsqrt(var + self.eps)
+
+        x = x * self.scale
+
+        if self.b is not None:
+            x = x + self.b
+
+        return x.astype(dtype)
+
+
+class RMSNorm(Module):
+    """Root mean square normalization (no mean centering).
+
+    >>> norm = RMSNorm(64)
+    >>> norm(x)  # (*, 64) -> (*, 64)
+    """
+
+    scale: Param[Float[Array, " d"]]
+    eps: float
+
+    def __init__(self, dim: int, *, eps: float = 1e-5) -> None:
+
+        self.scale = Param(jnp.ones(dim))
+
+        self.eps = eps
+
+    def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
+        dtype = x.dtype
+        x = x.astype(jnp.float32)
+
+        rms = jnp.mean(jnp.square(x), axis=-1, keepdims=True)
+
+        x = x * lax.rsqrt(rms + self.eps)
+
+        return (x * self.scale).astype(dtype)
 
 
 class BatchNorm(Module):
@@ -93,41 +155,6 @@ class BatchNorm(Module):
         return x.astype(dtype)
 
 
-class LayerNorm(Module):
-    """Layer normalization over the last dimension.
-
-    >>> norm = LayerNorm(64)
-    >>> norm(x)  # (*, 64) -> (*, 64)
-    """
-
-    scale: Param[Float[Array, " d"]]
-    b: Param[Float[Array, " d"]] | None
-    eps: float
-
-    def __init__(self, dim: int, *, eps: float = 1e-5, use_bias: bool = True) -> None:
-
-        self.scale = Param(jnp.ones(dim))
-        self.b = Param(jnp.zeros(dim)) if use_bias else None
-
-        self.eps = eps
-
-    def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
-        dtype = x.dtype
-        x = x.astype(jnp.float32)
-
-        mean = jnp.mean(x, axis=-1, keepdims=True)
-        var = jnp.mean(jnp.square(x - mean), axis=-1, keepdims=True)
-
-        x = (x - mean) * lax.rsqrt(var + self.eps)
-
-        x = x * self.scale
-
-        if self.b is not None:
-            x = x + self.b
-
-        return x.astype(dtype)
-
-
 class GroupNorm(Module):
     """Group normalization, splitting channels into groups.
 
@@ -185,33 +212,6 @@ class GroupNorm(Module):
         x = x.reshape(*x.shape[:-2], -1)
 
         return (x * self.scale + self.b).astype(dtype)
-
-
-class RMSNorm(Module):
-    """Root mean square normalization (no mean centering).
-
-    >>> norm = RMSNorm(64)
-    >>> norm(x)  # (*, 64) -> (*, 64)
-    """
-
-    scale: Param[Float[Array, " d"]]
-    eps: float
-
-    def __init__(self, dim: int, *, eps: float = 1e-5) -> None:
-
-        self.scale = Param(jnp.ones(dim))
-
-        self.eps = eps
-
-    def __call__(self, x: Float[Array, "... d"]) -> Float[Array, "... d"]:
-        dtype = x.dtype
-        x = x.astype(jnp.float32)
-
-        rms = jnp.mean(jnp.square(x), axis=-1, keepdims=True)
-
-        x = x * lax.rsqrt(rms + self.eps)
-
-        return (x * self.scale).astype(dtype)
 
 
 class SpectralNorm(Module):

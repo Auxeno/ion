@@ -1,7 +1,8 @@
 # Changelog
 
-## 0.14.2
+## 0.15.0
 
+- **Breaking: `Identity` removed.** Ion accepts ordinary callables wherever a pass-through operation might be used, so a dedicated layer added API surface without adding capability.
 - **`gnn.GlobalAttentionPool`.** Learns a softmax-normalized node score and takes an attention-weighted sum within each graph. The caller supplies the score and optional value modules, which decide how much each node contributes and what features it contributes.
 - **Refactor `__treescope_repr__` code to `_treescope.py`**. Slim down `module.py`, `param.py`, `optimizer.py` and `buffer.py` by porting `__treescope_repr__` logic to a separate file.
 - **Dropout supports broadcast masks.** Pass `broadcast_dims` to express structured dropout and stochastic depth; its source and docs now live under `stochastic`.
@@ -79,7 +80,6 @@
 - **Layer weight inits now default to uniform variance scaling, matched to the following activation.** `Linear`, `Conv`, `ConvTranspose`, `GCNConv`, `SelfAttention`/`CrossAttention`, and the SSM layers (`S4D`, `S5`, `LRU`) default to `glorot_uniform` (gain 1) instead of `he_normal`/`truncated_normal(0.02)`; `MLP` uses `he_uniform`, since it applies ReLU between its layers. He assumes a ReLU that a bare projection or attention does not have, so gain-1 Glorot is the safer default and matches PyTorch and Flax. Pass an explicit `w_init` to restore the old behaviour.
 - **`Embedding` and `LearnedPositionalEmbedding` init scales with dimension.** The default is now `variance_scaling(1.0, "fan_in", "uniform", out_axis=0)`, giving std `1/sqrt(dim)` so each row starts near unit norm regardless of `dim` and independent of vocabulary or sequence length. Replaces the dimension-blind `truncated_normal(0.02)` constant, matching Flax's `Embed`.
 - **`Sequential.__call__` accepts and returns `Any`.** The annotation now reflects that chained callables may pass non-array values.
-- **`Identity` split into its own module and doc page.** Moved out of `linear.py` into `ion/nn/layers/identity.py`.
 
 ## 0.10.2
 

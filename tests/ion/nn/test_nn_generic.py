@@ -108,7 +108,6 @@ def test_params_property(layer_and_input):
     if isinstance(
         layer,
         (
-            nn.Identity,
             nn.MaxPool,
             nn.AvgPool,
             nn.Dropout,

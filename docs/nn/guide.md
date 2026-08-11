@@ -39,7 +39,7 @@ linear(jnp.ones((8, 32, 3))).shape  # (8, 32, 16)
 
 One vector, a batch of vectors, and a batch of sequences of vectors all work, with no reshaping and no `vmap`. The layer reference writes this as `(*, 3) -> (*, 16)`, where `*` stands for any number of leading axes, including none.
 
-Layers that act on a feature axis and nothing else all share this contract: `Linear`, `LayerNorm`, `RMSNorm`, `Embedding`, `Dropout`, `Identity`, and `MLP`. Whatever the leading axes mean is the caller's business.
+Layers that act on a feature axis and nothing else all share this contract: `Linear`, `LayerNorm`, `RMSNorm`, `Embedding`, `Dropout`, and `MLP`. Whatever the leading axes mean is the caller's business.
 
 ## Structured axes
 

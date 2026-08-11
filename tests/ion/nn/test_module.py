@@ -17,7 +17,8 @@ class TestBaseModule:
         """Base Module.__call__ raises NotImplementedError."""
 
         class Empty(nn.Module):
-            pass
+            def __init__(self):
+                pass
 
         m = Empty()  # type: ignore[reportCallIssue]
         with pytest.raises(NotImplementedError, match="Empty"):
@@ -555,7 +556,12 @@ class TestNumParams:
 
     def test_no_params(self):
         """Module with no Param fields has 0 parameters."""
-        model = nn.Identity()
+
+        class Empty(nn.Module):
+            def __init__(self):
+                pass
+
+        model = Empty()
         assert model.num_params == 0
 
     def test_frozen_params_counted(self):
@@ -605,15 +611,19 @@ class TestRepr:
     def test_nested_modules(self):
         """Nested module tuple indents with open/close brackets."""
 
+        class Empty(nn.Module):
+            def __init__(self):
+                pass
+
         class Container(nn.Module):
             layers: tuple
 
             def __init__(self):
-                self.layers = (nn.Identity(), nn.Identity())
+                self.layers = (Empty(), Empty())
 
         r = repr(Container())
         assert "(" in r  # tuple open bracket
-        assert "Identity()" in r
+        assert "Empty()" in r
 
     def test_empty_module(self):
         """Module with no fields shows ClassName()."""
