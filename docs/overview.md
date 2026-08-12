@@ -157,12 +157,12 @@ y = model(x, training=True)
 
 | Family | Layers |
 |--------|--------|
-| [Edge Update](gnn/layers/edge.md) | `EdgeUpdate` |
-| [Gated Graph Convolution](gnn/layers/gated_gcn.md) | `GatedGCNConv` |
 | [Graph Convolution](gnn/layers/gcn.md) | `GCNConv`, `GraphConv` |
+| [GraphSAGE](gnn/layers/sage.md) | `SAGEConv` |
 | [Graph Attention](gnn/layers/gat.md) | `GATConv`, `GATv2Conv`, `TransformerConv` |
 | [Graph Isomorphism Network](gnn/layers/gin.md) | `GINConv`, `GINEConv` |
-| [GraphSAGE](gnn/layers/sage.md) | `SAGEConv` |
+| [Gated Graph Convolution](gnn/layers/gated_gcn.md) | `GatedGCNConv` |
+| [Edge Update](gnn/layers/edge.md) | `EdgeUpdate` |
 | [Graph Readout](gnn/layers/readout.md) | `GlobalAttentionPool` |
 | [Operations](gnn/operations.md) | segment reductions, fixed graph readouts, graph transforms |
 

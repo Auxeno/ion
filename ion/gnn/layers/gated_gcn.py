@@ -69,9 +69,7 @@ class GatedGCNConv(Module):
 
         # Update each edge from its previous features and incident nodes
         edge_out = (
-            x_edge @ self.w_edge
-            + x[senders] @ self.w_sender
-            + x[receivers] @ self.w_receiver
+            x_edge @ self.w_edge + x[senders] @ self.w_sender + x[receivers] @ self.w_receiver
         )
         if self.b_edge is not None:
             edge_out = edge_out + self.b_edge

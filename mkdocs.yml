@@ -59,12 +59,12 @@ nav:
       - Guide: gnn/guide.md
       - Layers:
           - gnn/layers/index.md
-          - Edge Update: gnn/layers/edge.md
-          - Gated Graph Convolution: gnn/layers/gated_gcn.md
           - Graph Convolution: gnn/layers/gcn.md
+          - GraphSAGE: gnn/layers/sage.md
           - Graph Attention: gnn/layers/gat.md
           - Graph Isomorphism Network: gnn/layers/gin.md
-          - GraphSAGE: gnn/layers/sage.md
+          - Gated Graph Convolution: gnn/layers/gated_gcn.md
+          - Edge Update: gnn/layers/edge.md
           - Readout: gnn/layers/readout.md
       - Operations: gnn/operations.md
   - Workflows: workflows.md
