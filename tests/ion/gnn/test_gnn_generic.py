@@ -7,6 +7,15 @@ import numpy.testing as npt
 import ion
 
 
+def _sum_output(output):
+    return sum(leaf.sum() for leaf in jax.tree.leaves(output))
+
+
+def _assert_allclose(actual, expected):
+    for actual_leaf, expected_leaf in zip(jax.tree.leaves(actual), jax.tree.leaves(expected)):
+        npt.assert_allclose(actual_leaf, expected_leaf, rtol=1e-5, atol=1e-5)
+
+
 def test_jit(gnn_layer_and_graph):
     """jax.jit produces the same output as eager execution."""
     layer, x, senders, receivers, x_edge = gnn_layer_and_graph
@@ -14,7 +23,7 @@ def test_jit(gnn_layer_and_graph):
     kwargs = {} if x_edge is None else {"x_edge": x_edge}
     expected = layer(x, *args, **kwargs)
     result = jax.jit(layer)(x, *args, **kwargs)
-    npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
+    _assert_allclose(result, expected)
 
 
 def test_grad(gnn_layer_and_graph):
@@ -22,7 +31,7 @@ def test_grad(gnn_layer_and_graph):
     layer, x, senders, receivers, x_edge = gnn_layer_and_graph
     args = (senders, receivers)
     kwargs = {} if x_edge is None else {"x_edge": x_edge}
-    g = jax.grad(lambda x: layer(x, *args, **kwargs).sum())(x)
+    g = jax.grad(lambda x: _sum_output(layer(x, *args, **kwargs)))(x)
     assert jnp.all(jnp.isfinite(g))
 
 
@@ -31,7 +40,7 @@ def test_param_grad(gnn_layer_and_graph):
     layer, x, senders, receivers, x_edge = gnn_layer_and_graph
     args = (senders, receivers)
     kwargs = {} if x_edge is None else {"x_edge": x_edge}
-    grads = jax.grad(lambda m: m(x, *args, **kwargs).sum())(layer)
+    grads = jax.grad(lambda m: _sum_output(m(x, *args, **kwargs)))(layer)
     for leaf in jax.tree.leaves(grads):
         if hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact):
             assert jnp.all(jnp.isfinite(leaf))
@@ -42,7 +51,7 @@ def test_jit_grad(gnn_layer_and_graph):
     layer, x, senders, receivers, x_edge = gnn_layer_and_graph
     args = (senders, receivers)
     kwargs = {} if x_edge is None else {"x_edge": x_edge}
-    g = jax.jit(jax.grad(lambda x: layer(x, *args, **kwargs).sum()))(x)
+    g = jax.jit(jax.grad(lambda x: _sum_output(layer(x, *args, **kwargs))))(x)
     assert jnp.all(jnp.isfinite(g))
 
 
@@ -52,7 +61,7 @@ def test_frozen_params_get_zero_gradient(gnn_layer_and_graph):
     args = (senders, receivers)
     kwargs = {} if x_edge is None else {"x_edge": x_edge}
     frozen = layer.freeze()
-    grads = jax.grad(lambda m: m(x, *args, **kwargs).sum())(frozen)
+    grads = jax.grad(lambda m: _sum_output(m(x, *args, **kwargs)))(frozen)
     for leaf in jax.tree.leaves(grads):
         if hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact):
             npt.assert_allclose(leaf, jnp.zeros_like(leaf), atol=1e-7)
@@ -65,7 +74,8 @@ def test_determinism(gnn_layer_and_graph):
     kwargs = {} if x_edge is None else {"x_edge": x_edge}
     y1 = layer(x, *args, **kwargs)
     y2 = layer(x, *args, **kwargs)
-    npt.assert_array_equal(y1, y2)
+    for y1_leaf, y2_leaf in zip(jax.tree.leaves(y1), jax.tree.leaves(y2)):
+        npt.assert_array_equal(y1_leaf, y2_leaf)
 
 
 def test_output_dtype(gnn_layer_and_graph):
@@ -74,7 +84,7 @@ def test_output_dtype(gnn_layer_and_graph):
     args = (senders, receivers)
     kwargs = {} if x_edge is None else {"x_edge": x_edge}
     y = layer(x, *args, **kwargs)
-    assert y.dtype == x.dtype
+    assert all(leaf.dtype == x.dtype for leaf in jax.tree.leaves(y))
 
 
 def test_pytree_roundtrip(gnn_layer_and_graph):
@@ -97,7 +107,8 @@ def test_serialization(gnn_layer_and_graph):
         loaded = ion.load(f.name, layer)
     y_orig = layer(x, *args, **kwargs)
     y_loaded = loaded(x, *args, **kwargs)
-    npt.assert_array_equal(y_orig, y_loaded)
+    for original_leaf, loaded_leaf in zip(jax.tree.leaves(y_orig), jax.tree.leaves(y_loaded)):
+        npt.assert_array_equal(original_leaf, loaded_leaf)
 
 
 def test_different_graph_different_output(gnn_layer_and_graph):
@@ -114,7 +125,10 @@ def test_different_graph_different_output(gnn_layer_and_graph):
         kwargs = {"x_edge": jax.random.normal(jax.random.key(2), (2, x_edge.shape[1]))}
     y1 = layer(x, s1, r1, **kwargs)
     y2 = layer(x, s2, r2, **kwargs)
-    assert not jnp.allclose(y1, y2)
+    assert any(
+        not jnp.allclose(y1_leaf, y2_leaf)
+        for y1_leaf, y2_leaf in zip(jax.tree.leaves(y1), jax.tree.leaves(y2))
+    )
 
 
 # bfloat16 tests
@@ -130,7 +144,7 @@ def test_bf16_output_dtype(gnn_layer_and_graph):
     args = (senders, receivers)
     kwargs = {} if x_edge is None else {"x_edge": x_edge}
     y = layer(x, *args, **kwargs)
-    assert y.dtype == jnp.bfloat16
+    assert all(leaf.dtype == jnp.bfloat16 for leaf in jax.tree.leaves(y))
 
 
 def test_bf16_finiteness(gnn_layer_and_graph):
@@ -143,4 +157,4 @@ def test_bf16_finiteness(gnn_layer_and_graph):
     args = (senders, receivers)
     kwargs = {} if x_edge is None else {"x_edge": x_edge}
     y = layer(x, *args, **kwargs)
-    assert jnp.all(jnp.isfinite(y))
+    assert all(jnp.all(jnp.isfinite(leaf)) for leaf in jax.tree.leaves(y))

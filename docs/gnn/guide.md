@@ -149,6 +149,26 @@ h = gat(
 
 For an undirected relationship such as a bond, mask both directed edges to exclude it completely. `GraphConv` does not accept feature vectors or a mask, but it can scale each message with a scalar `edge_weight`.
 
+### Updating edge features
+
+`EdgeUpdate` learns a new representation for each edge from its sender, receiver, and current edge features. Its caller-supplied model receives their concatenation:
+
+```python
+edge_model = nn.MLP([2 * node_dim + edge_dim, hidden_dim, out_dim], key=key)
+update = gnn.EdgeUpdate(edge_model)
+x_edge = update(x, senders, receivers, x_edge=x_edge)
+```
+
+`GatedGCNConv` updates nodes and edges together. The updated edges become feature-wise gates on the node messages, and both outputs share `out_dim`:
+
+```python
+conv = gnn.GatedGCNConv(node_dim, out_dim, edge_dim=edge_dim, key=key)
+x, x_edge = conv(x, senders, receivers, x_edge=x_edge)
+x, x_edge = jax.nn.relu(x), jax.nn.relu(x_edge)
+```
+
+Like Ion's other convolutions, neither layer applies an activation or normalization. Add those explicitly when building a block.
+
 The complete graph representation consists of JAX arrays:
 
 | Array | Shape | Meaning |
@@ -219,6 +239,7 @@ This appends `(0, 0)`, `(1, 1)`, through `(5, 5)`. Self-loops are explicit and a
 | `GATConv`, `GATv2Conv` | Normally yes | Let a node attend to itself |
 | `TransformerConv` | No | The root weight includes the node by default |
 | `GINConv`, `GINEConv` | No | The `(1 + eps)` term already includes the node |
+| `GatedGCNConv` | No | The root weight already includes the node |
 | `SAGEConv` | No | The root weight already includes the node |
 
 `add_self_loops` appends one loop for every node. It does not check whether the input already contains self-loops, so avoid calling it twice on the same edge arrays. When using edge features or a mask, also append one corresponding row or value for every new self-loop.
@@ -234,7 +255,7 @@ How many edges it removes depends on the data, so the output shape is not known 
 
 ## Line graphs
 
-Every layer here updates node features. Some of them read edge features, but none of them change one. To learn edge representations, convert the graph so that its edges are the nodes:
+`EdgeUpdate` and `GatedGCNConv` update an edge from its two incident nodes. To let neighbouring edges communicate directly, instead convert the graph so that its edges are the nodes:
 
 ```python
 senders, receivers = gnn.remove_self_loops(senders, receivers)

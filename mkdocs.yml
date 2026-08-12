@@ -59,6 +59,8 @@ nav:
       - Guide: gnn/guide.md
       - Layers:
           - gnn/layers/index.md
+          - Edge Update: gnn/layers/edge.md
+          - Gated Graph Convolution: gnn/layers/gated_gcn.md
           - Graph Convolution: gnn/layers/gcn.md
           - Graph Attention: gnn/layers/gat.md
           - Graph Isomorphism Network: gnn/layers/gin.md

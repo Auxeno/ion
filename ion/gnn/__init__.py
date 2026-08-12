@@ -1,11 +1,13 @@
 """Graph neural network layers and operations."""
 
 from .layers import (
+    EdgeUpdate,
     GATConv,
     GATv2Conv,
     GCNConv,
     GINConv,
     GINEConv,
+    GatedGCNConv,
     GlobalAttentionPool,
     GraphConv,
     SAGEConv,
@@ -34,12 +36,14 @@ from .ops import (
 )
 
 __all__ = [
+    "EdgeUpdate",
     "GATConv",
     "GATv2Conv",
     "GCNConv",
     "GraphConv",
     "GINConv",
     "GINEConv",
+    "GatedGCNConv",
     "GlobalAttentionPool",
     "SAGEConv",
     "TransformerConv",

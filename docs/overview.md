@@ -157,6 +157,8 @@ y = model(x, training=True)
 
 | Family | Layers |
 |--------|--------|
+| [Edge Update](gnn/layers/edge.md) | `EdgeUpdate` |
+| [Gated Graph Convolution](gnn/layers/gated_gcn.md) | `GatedGCNConv` |
 | [Graph Convolution](gnn/layers/gcn.md) | `GCNConv`, `GraphConv` |
 | [Graph Attention](gnn/layers/gat.md) | `GATConv`, `GATv2Conv`, `TransformerConv` |
 | [Graph Isomorphism Network](gnn/layers/gin.md) | `GINConv`, `GINEConv` |

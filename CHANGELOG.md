@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.15.1
+
+- **`gnn.GatedGCNConv`.** Jointly updates node and edge features, using the new edge representations as normalized feature-wise gates on incoming node messages. Activation, normalization, and residual connections remain explicit compositions outside the layer.
+- **`gnn.EdgeUpdate`.** Learns an edge representation from the concatenated sender, receiver, and current edge features with a caller-supplied module, following the Graph Network edge update.
+- **`gnn.GINEConv`.** `GINConv` with edge features added to each message before the ReLU, following Hu et al., 2020. Edge features are added to sender features rather than projected, so `x_edge` shares the node dimension and the layer keeps `GINConv`'s property of creating no weights of its own.
+- **`gnn.unbatch_graphs`.** Splits a batched graph back into per-graph node features and edge indices, undoing `batch_graphs`. It returns Python lists of variable-length arrays, so it is a data preparation step rather than something to call inside `jax.jit`.
+- **Fix LaTeX in demo notebooks**. LaTeX in demo notebooks was formatted incorrectly.
+
 ## 0.15.0
 
 - **Breaking: `Identity` removed.** Ion accepts ordinary callables wherever a pass-through operation might be used, so a dedicated layer added API surface without adding capability.
