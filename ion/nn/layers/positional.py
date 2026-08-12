@@ -27,7 +27,7 @@ class LearnedPositionalEmbedding(Module):
     >>> pos(x)  # (*, s, 64) -> (*, s, 64)
     """
 
-    w: Param[Float[Array, "s d"]]
+    w: Param[Float[Array, "m d"]]
 
     def __init__(
         self,

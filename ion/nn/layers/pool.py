@@ -66,7 +66,7 @@ class MaxPool(Module):
         self.stride = stride
         self.padding = resolved_padding
 
-    def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
+    def __call__(self, x: Float[Array, "b ... c"]) -> Float[Array, "b ... c"]:
         dtype = x.dtype
         x = x.astype(jnp.float32)
 
@@ -135,7 +135,7 @@ class AvgPool(Module):
         self.padding = resolved_padding
         self.count_include_pad = count_include_pad
 
-    def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
+    def __call__(self, x: Float[Array, "b ... c"]) -> Float[Array, "b ... c"]:
         dtype = x.dtype
         x = x.astype(jnp.float32)
 

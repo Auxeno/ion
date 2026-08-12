@@ -312,12 +312,15 @@ Casting a whole model is covered in [Mixed precision](../workflows.md#mixed-prec
 |---|---|
 | `b` | Batch size |
 | `t`, `s` | Time or sequence length |
+| `m` | Maximum sequence length |
 | `d` | General feature dimension |
 | `i`, `o` | Input and output feature dimensions |
 | `c` | Channels |
-| `h`, `k` | Attention heads and per-head dimension |
+| `h` | Attention heads |
+| `q`, `k` | Folded query and key/value projection dimensions in `MultiHeadAttention` |
 | `v` | Vocabulary size |
-| `*` | Any number of leading axes |
+| `...` | Anonymous axes whose sizes need not be preserved |
+| `*` | Any number of preserved leading axes |
 
 Each layer page defines how these labels apply to its inputs, parameters, and outputs.
 

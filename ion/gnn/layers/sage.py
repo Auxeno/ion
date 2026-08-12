@@ -32,7 +32,7 @@ class SAGEConv(Module):
     w_neigh: Param[Float[Array, "i o"]]
     w_self: Param[Float[Array, "i o"]] | None
     b: Param[Float[Array, " o"]] | None
-    aggregate: Callable[..., Float[Array, "n o"]]
+    aggregate: Callable[..., Float[Array, "n i"]]
     normalize: bool
 
     def __init__(

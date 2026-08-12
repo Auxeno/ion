@@ -28,7 +28,7 @@ class Conv(Module):
     """
 
     w: Param[Float[Array, "..."]]
-    b: Param[Float[Array, " c"]] | None
+    b: Param[Float[Array, " o"]] | None
     kernel_shape: tuple[int, ...]
     stride: tuple[int, ...]
     padding: Literal["SAME", "VALID"] | tuple[tuple[int, int], ...]
@@ -82,7 +82,7 @@ class Conv(Module):
         self.dilation = dilation
         self.groups = groups
 
-    def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
+    def __call__(self, x: Float[Array, "b ... i"]) -> Float[Array, "b ... o"]:
 
         num_spatial = len(self.kernel_shape)
         spatial_dims = tuple(range(1, num_spatial + 1))
@@ -114,7 +114,7 @@ class ConvTranspose(Module):
     """
 
     w: Param[Float[Array, "..."]]
-    b: Param[Float[Array, " c"]] | None
+    b: Param[Float[Array, " o"]] | None
     kernel_shape: tuple[int, ...]
     stride: tuple[int, ...]
     padding: tuple[tuple[int, int], ...]
@@ -193,7 +193,7 @@ class ConvTranspose(Module):
         self.dilation = dilation
         self.groups = groups
 
-    def __call__(self, x: Float[Array, "b *spatial c"]) -> Float[Array, "b *spatial c"]:
+    def __call__(self, x: Float[Array, "b ... i"]) -> Float[Array, "b ... o"]:
 
         num_spatial = len(self.kernel_shape)
         spatial_dims = tuple(range(1, num_spatial + 1))

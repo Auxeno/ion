@@ -30,10 +30,10 @@ class MultiHeadAttention(Module):
     >>> attn(x, mask=mask)  # mask: bool (s, t), (b, s, t) or (b, h, s, t)
     """
 
-    w_q: Param[Float[Array, "d hk"]]
-    w_k: Param[Float[Array, "c jk"]]
-    w_v: Param[Float[Array, "c jk"]]
-    w_out: Param[Float[Array, "hk d"]]
+    w_q: Param[Float[Array, "d q"]]
+    w_k: Param[Float[Array, "c k"]]
+    w_v: Param[Float[Array, "c k"]]
+    w_out: Param[Float[Array, "q d"]]
     b_out: Param[Float[Array, " d"]] | None
     num_heads: int
     num_kv_heads: int
