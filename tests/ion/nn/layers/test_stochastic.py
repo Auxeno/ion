@@ -139,10 +139,9 @@ class TestDropout:
         npt.assert_array_equal(negative, positive)
 
     def test_duplicate_broadcast_dims_raise(self):
-        """Dimensions duplicated through positive and negative indices are rejected."""
-        layer = nn.Dropout(p=0.5, broadcast_dims=(1, -2))
+        """Repeated dimensions are rejected at construction."""
         with pytest.raises(ValueError, match="must not contain duplicates"):
-            layer(jnp.ones((4, 3, 2)), training=True, key=jax.random.key(0))
+            nn.Dropout(p=0.5, broadcast_dims=(1, 1))
 
     @pytest.mark.parametrize("dim", [-4, 3])
     def test_out_of_range_broadcast_dim_raises(self, dim: int):

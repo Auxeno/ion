@@ -28,6 +28,8 @@ class Dropout(Module):
 
         if not 0.0 <= p <= 1.0:
             raise ValueError(f"p ({p}) must be in [0, 1]")
+        if len(set(broadcast_dims)) != len(broadcast_dims):
+            raise ValueError(f"broadcast_dims {tuple(broadcast_dims)} must not contain duplicates")
 
         self.p = p
         self.broadcast_dims = tuple(broadcast_dims)
@@ -49,14 +51,10 @@ class Dropout(Module):
         if self.p == 1.0:
             return jnp.zeros_like(x)
 
-        broadcast_dims = []
-        for dim in self.broadcast_dims:
-            if dim < -x.ndim or dim >= x.ndim:
-                raise ValueError(f"broadcast dimension ({dim}) invalid for input rank ({x.ndim})")
-            broadcast_dims.append(dim % x.ndim)
+        if any(dim < -x.ndim or dim >= x.ndim for dim in self.broadcast_dims):
+            raise ValueError(f"broadcast_dims invalid for input rank ({x.ndim})")
 
-        if len(set(broadcast_dims)) != len(broadcast_dims):
-            raise ValueError(f"broadcast_dims {self.broadcast_dims} must not contain duplicates")
+        broadcast_dims = [dim % x.ndim for dim in self.broadcast_dims]
 
         keep_prob = 1.0 - self.p
         mask_shape = tuple(1 if dim in broadcast_dims else size for dim, size in enumerate(x.shape))
