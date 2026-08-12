@@ -27,6 +27,7 @@ def _build_gnn_layers(key):
     receivers = jnp.array([1, 0, 2, 1, 2, 0, 0, 1, 2])
     x = jax.random.normal(next(keys), (3, 8))
     x_edge = jax.random.normal(next(keys), (9, 4))
+    x_edge_node = jax.random.normal(next(keys), (9, 8))
     return [
         (gnn.GCNConv(8, 16, key=next(keys)), x, senders, receivers, None),
         (gnn.GCNConv(8, 16, use_bias=False, key=next(keys)), x, senders, receivers, None),
@@ -84,6 +85,13 @@ def _build_gnn_layers(key):
             senders,
             receivers,
             None,
+        ),
+        (
+            gnn.GINEConv(nn.MLP([8, 16, 16], key=next(keys))),
+            x,
+            senders,
+            receivers,
+            x_edge_node,
         ),
         (gnn.SAGEConv(8, 16, key=next(keys)), x, senders, receivers, None),
         (gnn.SAGEConv(8, 16, aggregator="max", key=next(keys)), x, senders, receivers, None),

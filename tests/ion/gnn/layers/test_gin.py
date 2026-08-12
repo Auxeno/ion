@@ -70,3 +70,62 @@ class TestGINConv:
         gin = gnn.GINConv(nn.MLP([4, 8], key=jax.random.key(0)), train_eps=True)
         assert isinstance(gin.eps, nn.Param)
         assert gin.eps.dtype == jnp.float32
+
+
+class TestGINEConv:
+    def test_output_manual(self):
+        """Output matches manual MLP((1 + eps) * x + sum of relu(x_j + e_ji))."""
+        mlp = nn.MLP([4, 8, 8], key=jax.random.key(0))
+        gine = gnn.GINEConv(mlp, eps=0.5)
+        x = jax.random.normal(jax.random.key(1), (3, 4))
+        x_edge = jax.random.normal(jax.random.key(2), (3, 4))
+        senders = jnp.array([0, 1, 2])
+        receivers = jnp.array([1, 2, 0])
+        y = gine(x, senders, receivers, x_edge=x_edge)
+        agg = gnn.segment_sum(jax.nn.relu(x[senders] + x_edge), receivers, 3)
+        expected = mlp(1.5 * x + agg)
+        npt.assert_allclose(y, expected, rtol=1e-5, atol=1e-5)
+
+    def test_output_shape(self):
+        """Output shape is (n, out_dim) of the update MLP."""
+        gine = gnn.GINEConv(nn.MLP([4, 8, 8], key=jax.random.key(0)))
+        x = jax.random.normal(jax.random.key(1), (5, 4))
+        senders = jnp.array([0, 1])
+        receivers = jnp.array([1, 0])
+        x_edge = jax.random.normal(jax.random.key(2), (2, 4))
+        assert gine(x, senders, receivers, x_edge=x_edge).shape == (5, 8)
+
+    def test_edge_features_change_output(self):
+        """Edge features alter the messages, so zeros differ from nonzeros."""
+        mlp = nn.MLP([4, 8], key=jax.random.key(0))
+        gine = gnn.GINEConv(mlp)
+        x = jax.random.normal(jax.random.key(1), (3, 4))
+        senders = jnp.array([0, 1, 2])
+        receivers = jnp.array([1, 2, 0])
+        y_zero = gine(x, senders, receivers, x_edge=jnp.zeros((3, 4)))
+        y_ones = gine(x, senders, receivers, x_edge=jnp.ones((3, 4)))
+        assert not jnp.allclose(y_zero, y_ones)
+
+    def test_train_eps(self):
+        """train_eps=True makes eps a scalar Param that receives gradient."""
+        mlp = nn.MLP([4, 8], key=jax.random.key(0))
+        gine = gnn.GINEConv(mlp, train_eps=True)
+        assert isinstance(gine.eps, nn.Param)
+        assert gine.num_params == mlp.num_params + 1
+        x = jax.random.normal(jax.random.key(1), (3, 4))
+        x_edge = jax.random.normal(jax.random.key(2), (3, 4))
+        senders = jnp.array([0, 1, 2])
+        receivers = jnp.array([1, 2, 0])
+        grads = jax.grad(lambda m: m(x, senders, receivers, x_edge=x_edge).sum())(gine)
+        assert jnp.any(grads.eps._value != 0)
+
+    def test_isolated_node(self):
+        """A node with no incoming edges gets MLP((1 + eps) * x) only."""
+        mlp = nn.MLP([4, 8], key=jax.random.key(0))
+        gine = gnn.GINEConv(mlp, eps=0.25)
+        x = jax.random.normal(jax.random.key(1), (3, 4))
+        senders = jnp.array([0, 1])
+        receivers = jnp.array([1, 0])
+        x_edge = jax.random.normal(jax.random.key(2), (2, 4))
+        y = gine(x, senders, receivers, x_edge=x_edge)
+        npt.assert_allclose(y[2], mlp(1.25 * x[2]), rtol=1e-5, atol=1e-5)

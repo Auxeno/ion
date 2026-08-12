@@ -131,6 +131,8 @@ h = gat(
 )
 ```
 
+`GINEConv` also takes edge features, but adds them straight to the sender features instead of projecting them, so `x_edge` must already be at the node dimension and there is no `edge_dim` to set.
+
 The attention layers also accept one boolean mask value per directed edge. `True` keeps an edge and `False` makes the layer ignore it:
 
 ```python
@@ -216,7 +218,7 @@ This appends `(0, 0)`, `(1, 1)`, through `(5, 5)`. Self-loops are explicit and a
 | `GraphConv` | No | The separate root weight already includes the node |
 | `GATConv`, `GATv2Conv` | Normally yes | Let a node attend to itself |
 | `TransformerConv` | No | The root weight includes the node by default |
-| `GINConv` | No | The `(1 + eps)` term already includes the node |
+| `GINConv`, `GINEConv` | No | The `(1 + eps)` term already includes the node |
 | `SAGEConv` | No | The root weight already includes the node |
 
 `add_self_loops` appends one loop for every node. It does not check whether the input already contains self-loops, so avoid calling it twice on the same edge arrays. When using edge features or a mask, also append one corresponding row or value for every new self-loop.
