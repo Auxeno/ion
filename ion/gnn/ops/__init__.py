@@ -1,6 +1,6 @@
 """Graph reductions, pooling, batching, and topology operations."""
 
-from .batching import batch_graphs
+from .batching import batch_graphs, unbatch_graphs
 from .graph import add_self_loops, coalesce, degree, line_graph, remove_self_loops, to_undirected
 from .readout import max_pool, mean_pool, sum_pool
 from .segment import (
@@ -33,4 +33,5 @@ __all__ = [
     "segment_var",
     "sum_pool",
     "to_undirected",
+    "unbatch_graphs",
 ]

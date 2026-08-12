@@ -371,7 +371,7 @@ The score and value modules supply all of the readout's parameters. Omit `value`
 
 ## Static shapes
 
-Call `batch_graphs` outside `jax.jit`. It accepts Python sequences of differently shaped arrays and constructs the packed arrays that enter the compiled model.
+Call `batch_graphs` outside `jax.jit`. It accepts Python sequences of differently shaped arrays and constructs the packed arrays that enter the compiled model. `unbatch_graphs` inverts it, splitting per-node outputs back into one array per graph, and is likewise a host-side call.
 
 JAX compiles a function for the shapes it receives. If the packed number of nodes or edges changes, the compiled function may be retraced for the new shapes. Pad nodes and edges to fixed maximum sizes when a workload requires static shapes.
 

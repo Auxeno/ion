@@ -29,6 +29,7 @@ from .ops import (
     segment_var,
     sum_pool,
     to_undirected,
+    unbatch_graphs,
 )
 
 __all__ = [
@@ -58,4 +59,5 @@ __all__ = [
     "segment_var",
     "sum_pool",
     "to_undirected",
+    "unbatch_graphs",
 ]

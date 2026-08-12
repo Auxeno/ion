@@ -666,3 +666,44 @@ class TestBatchGraphs:
             ]
         )
         npt.assert_allclose(batched, separate, rtol=1e-5, atol=1e-5)
+
+
+class TestUnbatchGraphs:
+    def test_round_trip(self):
+        """Unbatching a batched graph recovers the original graphs."""
+        keys = jax.random.split(jax.random.key(0), 3)
+        xs = [jax.random.normal(key, (n, 3)) for key, n in zip(keys, (4, 1, 2))]
+        senders_list = [jnp.array([0, 2]), jnp.array([], dtype=jnp.int32), jnp.array([1])]
+        receivers_list = [jnp.array([1, 3]), jnp.array([], dtype=jnp.int32), jnp.array([0])]
+        batched = gnn.batch_graphs(xs, senders_list, receivers_list)
+        out_xs, out_senders, out_receivers = gnn.unbatch_graphs(*batched)
+
+        for original, restored in zip(xs, out_xs):
+            npt.assert_array_equal(restored, original)
+        for original, restored in zip(senders_list, out_senders):
+            npt.assert_array_equal(restored, original)
+        for original, restored in zip(receivers_list, out_receivers):
+            npt.assert_array_equal(restored, original)
+
+    def test_edge_offsets_removed(self):
+        """Edge indices are shifted back to be local to each graph."""
+        x = jnp.ones((5, 2))
+        senders = jnp.array([0, 1, 3, 4])
+        receivers = jnp.array([1, 2, 4, 3])
+        graph_ids = jnp.array([0, 0, 0, 1, 1])
+        _, out_senders, out_receivers = gnn.unbatch_graphs(x, senders, receivers, graph_ids)
+        npt.assert_array_equal(out_senders[1], jnp.array([0, 1]))
+        npt.assert_array_equal(out_receivers[1], jnp.array([1, 0]))
+
+    def test_single_graph_identity(self):
+        """Unbatching one graph leaves features and edges unchanged."""
+        x = jax.random.normal(jax.random.key(0), (4, 3))
+        senders = jnp.array([0, 1, 2])
+        receivers = jnp.array([1, 2, 3])
+        out_xs, out_senders, out_receivers = gnn.unbatch_graphs(
+            x, senders, receivers, jnp.zeros(4, dtype=jnp.int32)
+        )
+        assert len(out_xs) == 1
+        npt.assert_array_equal(out_xs[0], x)
+        npt.assert_array_equal(out_senders[0], senders)
+        npt.assert_array_equal(out_receivers[0], receivers)

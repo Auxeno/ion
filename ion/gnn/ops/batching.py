@@ -5,7 +5,7 @@ from collections.abc import Sequence
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Int
 
-__all__ = ["batch_graphs"]
+__all__ = ["batch_graphs", "unbatch_graphs"]
 
 
 def batch_graphs(
@@ -30,4 +30,28 @@ def batch_graphs(
         jnp.concatenate([s + o for s, o in zip(senders, offsets)]),
         jnp.concatenate([r + o for r, o in zip(receivers, offsets)]),
         graph_ids,
+    )
+
+
+def unbatch_graphs(
+    x: Float[Array, "n d"],
+    senders: Int[Array, " e"],
+    receivers: Int[Array, " e"],
+    graph_ids: Int[Array, " n"],
+) -> tuple[
+    list[Float[Array, "n d"]],
+    list[Int[Array, " e"]],
+    list[Int[Array, " e"]],
+]:
+    """Split a batched graph back into its component graphs.
+
+    >>> xs, senders_list, receivers_list = unbatch_graphs(x, senders, receivers, graph_ids)
+    """
+    sizes = jnp.bincount(graph_ids)
+    offsets = jnp.cumsum(sizes) - sizes
+    edge_ids = graph_ids[senders]
+    return (
+        [x[graph_ids == i] for i in range(sizes.shape[0])],
+        [senders[edge_ids == i] - o for i, o in enumerate(offsets)],
+        [receivers[edge_ids == i] - o for i, o in enumerate(offsets)],
     )
