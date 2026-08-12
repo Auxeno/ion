@@ -1,6 +1,7 @@
 """MkDocs build hooks for the Ion docs site."""
 
 import pathlib
+import re
 
 from pygments.lexers.python import PythonLexer
 from pygments.token import Name, Operator, Punctuation
@@ -44,6 +45,27 @@ BREAKPOINTS = {
     "76.234375em": "59.984375em",
     "76.25em": "60em",
 }
+
+
+# nbconvert and Plotly's notebook renderer inject MathJax 2 scripts into
+# exported notebook HTML. The site uses MathJax 3, and loading both versions
+# breaks typesetting on notebook pages.
+MATHJAX_2_SCRIPTS = (
+    re.compile(r'<script src="">\s*</script>'),
+    re.compile(r'<script type="text/x-mathjax-config">.*?</script>', re.DOTALL),
+    re.compile(
+        r'<script src="https://cdnjs\.cloudflare\.com/ajax/libs/mathjax/2\.[^"]*">'
+        r"</script>"
+    ),
+)
+
+
+def on_post_page(output, page, config, **kwargs):
+    """Remove notebook-exported MathJax 2 so the site's MathJax 3 can run."""
+    if page.file.src_path.endswith(".ipynb"):
+        for pattern in MATHJAX_2_SCRIPTS:
+            output = pattern.sub("", output)
+    return output
 
 
 def on_post_build(config, **kwargs):
