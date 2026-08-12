@@ -6,7 +6,7 @@ Every `ion.nn` layer is an immutable JAX [pytree](https://docs.jax.dev/en/latest
 
 | Family | Layers |
 |---|---|
-| [Linear](linear.md) | `Linear` |
+| [Linear](linear.md) | `Linear`, `Identity` |
 | [Convolution](conv.md) | `Conv`, `ConvTranspose` |
 | [Attention](attention.md) | `MultiHeadAttention` |
 | [Normalization](norm.md) | `LayerNorm`, `RMSNorm`, `BatchNorm`, `GroupNorm`, `SpectralNorm` |

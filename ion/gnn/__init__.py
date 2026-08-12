@@ -3,11 +3,11 @@
 from .layers import (
     EdgeUpdate,
     GATConv,
+    GatedGCNConv,
     GATv2Conv,
     GCNConv,
     GINConv,
     GINEConv,
-    GatedGCNConv,
     GlobalAttentionPool,
     GraphConv,
     SAGEConv,

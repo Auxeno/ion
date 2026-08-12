@@ -2,6 +2,7 @@
 
 ## 0.15.1
 
+- **`nn.Identity` restored.** Parameterless pass-through module.
 - **`gnn.GatedGCNConv`.** Jointly updates node and edge features, using the new edge representations as normalized feature-wise gates on incoming node messages. Activation, normalization, and residual connections remain explicit compositions outside the layer.
 - **`gnn.EdgeUpdate`.** Learns an edge representation from the concatenated sender, receiver, and current edge features with a caller-supplied module, following the Graph Network edge update.
 - **`gnn.GINEConv`.** `GINConv` with edge features added to each message before the ReLU, following Hu et al., 2020. Edge features are added to sender features rather than projected, so `x_edge` shares the node dimension and the layer keeps `GINConv`'s property of creating no weights of its own.

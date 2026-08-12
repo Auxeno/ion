@@ -113,7 +113,7 @@ Each [`ion.nn`](nn/layers/index.md) layer is a `Module`, constructed with a `key
 
 | Family | Layers |
 |--------|--------|
-| [Linear](nn/layers/linear.md) | `Linear` |
+| [Linear](nn/layers/linear.md) | `Linear`, `Identity` |
 | [Convolution](nn/layers/conv.md) | `Conv`, `ConvTranspose` |
 | [Attention](nn/layers/attention.md) | `MultiHeadAttention` |
 | [Normalization](nn/layers/norm.md) | `LayerNorm`, `RMSNorm`, `BatchNorm`, `GroupNorm`, `SpectralNorm` |

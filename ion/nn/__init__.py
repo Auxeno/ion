@@ -6,7 +6,7 @@ from .buffer import Buffer
 from .layers.attention import MultiHeadAttention
 from .layers.conv import Conv, ConvTranspose
 from .layers.embedding import Embedding
-from .layers.linear import Linear
+from .layers.linear import Identity, Linear
 from .layers.norm import LayerNorm, RMSNorm, BatchNorm, GroupNorm, SpectralNorm
 from .layers.pool import AvgPool, MaxPool
 from .layers.positional import LearnedPositionalEmbedding, RoPE, SinusoidalPositionalEmbedding
@@ -29,6 +29,7 @@ __all__ = [
     "GroupNorm",
     "GRU",
     "GRUCell",
+    "Identity",
     "LayerNorm",
     "LearnedPositionalEmbedding",
     "Linear",

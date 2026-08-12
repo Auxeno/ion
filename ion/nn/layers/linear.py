@@ -1,10 +1,13 @@
-"""Linear layer.
+"""Linear layers.
 
 Modules:
-    Linear  Fully connected layer.
+    Linear    Fully connected layer.
+    Identity  Pass-through, returns input unchanged.
 
 Glorot uniform weight init, zeros for bias.
 """
+
+from typing import Any
 
 import jax
 from jax.nn.initializers import Initializer, glorot_uniform, zeros
@@ -46,4 +49,14 @@ class Linear(Module):
         if self.b is not None:
             x = x + self.b
 
+        return x
+
+
+class Identity(Module):
+    """Pass-through layer, ignores all arguments."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
+    def __call__(self, x: Any, *args: Any, **kwargs: Any) -> Any:
         return x

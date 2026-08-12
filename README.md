@@ -89,7 +89,7 @@ Ion ships with standard neural network layers. Each is a `Module` with trainable
 
 | Category        | Layers                                                                    |
 |-----------------|---------------------------------------------------------------------------|
-| Linear          | [`Linear`](https://auxeno.github.io/ion/nn/layers/linear/#ion.nn.Linear) |
+| Linear          | [`Linear`](https://auxeno.github.io/ion/nn/layers/linear/#ion.nn.Linear), [`Identity`](https://auxeno.github.io/ion/nn/layers/linear/#ion.nn.Identity) |
 | Convolution     | [`Conv`](https://auxeno.github.io/ion/nn/layers/conv/#ion.nn.Conv), [`ConvTranspose`](https://auxeno.github.io/ion/nn/layers/conv/#ion.nn.ConvTranspose) |
 | Attention       | [`MultiHeadAttention`](https://auxeno.github.io/ion/nn/layers/attention/#ion.nn.MultiHeadAttention) |
 | Normalization   | [`LayerNorm`](https://auxeno.github.io/ion/nn/layers/norm/#ion.nn.LayerNorm), [`RMSNorm`](https://auxeno.github.io/ion/nn/layers/norm/#ion.nn.RMSNorm), [`BatchNorm`](https://auxeno.github.io/ion/nn/layers/norm/#ion.nn.BatchNorm), [`GroupNorm`](https://auxeno.github.io/ion/nn/layers/norm/#ion.nn.GroupNorm), [`SpectralNorm`](https://auxeno.github.io/ion/nn/layers/norm/#ion.nn.SpectralNorm) |
