@@ -9,15 +9,15 @@ window.MathJax = {
       ["$$", "$$"],
     ],
     processEscapes: true,
-  },
-  options: {
-    ignoreHtmlClass: ".*|",
-    processHtmlClass: "arithmatex|jupyter-wrapper",
+    processEnvironments: true,
   },
 };
 
 document$.subscribe(() => {
   if (window.MathJax?.typesetPromise) {
+    MathJax.startup.output.clearCache();
+    MathJax.typesetClear();
+    MathJax.texReset();
     MathJax.typesetPromise();
   }
 });
