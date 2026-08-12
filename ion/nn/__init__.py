@@ -11,7 +11,7 @@ from .layers.norm import LayerNorm, RMSNorm, BatchNorm, GroupNorm, SpectralNorm
 from .layers.pool import AvgPool, MaxPool
 from .layers.positional import LearnedPositionalEmbedding, RoPE, SinusoidalPositionalEmbedding
 from .layers.recurrent import GRU, LSTM, RNN, GRUCell, LSTMCell, RNNCell
-from .layers.ssm import LRU, S4D, S5, LRUCell, S4DCell, S5Cell
+from .layers.ssm import S4D, S5, S4DCell, S5Cell
 from .layers.stochastic import Dropout
 from .module import Module
 from .param import Param
@@ -32,8 +32,6 @@ __all__ = [
     "LayerNorm",
     "LearnedPositionalEmbedding",
     "Linear",
-    "LRU",
-    "LRUCell",
     "LSTM",
     "LSTMCell",
     "MaxPool",

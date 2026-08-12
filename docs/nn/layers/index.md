@@ -11,7 +11,7 @@ Every `ion.nn` layer is an immutable JAX [pytree](https://docs.jax.dev/en/latest
 | [Attention](attention.md) | `MultiHeadAttention` |
 | [Normalization](norm.md) | `LayerNorm`, `RMSNorm`, `BatchNorm`, `GroupNorm`, `SpectralNorm` |
 | [Recurrent](recurrent.md) | `RNN`, `LSTM`, `GRU` and their cells |
-| [State Space](ssm.md) | `S4D`, `S5`, `LRU` and their cells |
+| [State Space](ssm.md) | `S4D`, `S5` and their cells |
 | [Embedding](embedding.md) | `Embedding` |
 | [Positional](positional.md) | `RoPE`, `LearnedPositionalEmbedding`, `SinusoidalPositionalEmbedding` |
 | [Pooling](pool.md) | `MaxPool`, `AvgPool` |

@@ -118,7 +118,7 @@ Each [`ion.nn`](nn/layers/index.md) layer is a `Module`, constructed with a `key
 | [Attention](nn/layers/attention.md) | `MultiHeadAttention` |
 | [Normalization](nn/layers/norm.md) | `LayerNorm`, `RMSNorm`, `BatchNorm`, `GroupNorm`, `SpectralNorm` |
 | [Recurrent](nn/layers/recurrent.md) | `RNN`, `LSTM`, `GRU` |
-| [State Space](nn/layers/ssm.md) | `S4D`, `S5`, `LRU` |
+| [State Space](nn/layers/ssm.md) | `S4D`, `S5` |
 | [Embedding](nn/layers/embedding.md) | `Embedding` |
 | [Positional](nn/layers/positional.md) | `RoPE`, `LearnedPositionalEmbedding`, `SinusoidalPositionalEmbedding` |
 | [Pooling](nn/layers/pool.md) | `MaxPool`, `AvgPool` |

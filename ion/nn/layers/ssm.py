@@ -1,8 +1,6 @@
 """State space model layers and cells.
 
 Modules:
-    LRUCell  Single-step Linear Recurrent Unit with diagonal complex state.   (Orvieto et al., 2023)
-    LRU      Linear Recurrent Unit over a sequence via lax.associative_scan.  (Orvieto et al., 2023)
     S4DCell  Single-step per-feature SISO S4D cell (diagonal, S4D-Lin).       (Gu et al., 2022)
     S4D      Per-feature SISO S4D over a sequence via lax.associative_scan.   (Gu et al., 2022)
     S5Cell   Single-step MIMO S5 cell with shared diagonal state.             (Smith et al., 2023)
@@ -10,8 +8,7 @@ Modules:
 
 Sequence layers use associative scan for O(log T) parallel time complexity.
 All hidden states are complex-valued. S4D and S5 use conjugate pairs
-(state_dim N stores N//2 eigenvalues, readout via 2*Re). LRU stores N
-independent complex eigenvalues directly.
+(state_dim N stores N//2 eigenvalues, readout via 2*Re).
 Glorot uniform for projections, zeros for D and skip connections.
 Input layout is (batch, time, features).
 Initial state defaults to zeros if not provided.
@@ -34,129 +31,6 @@ def _binary_op(a: tuple[Array, Array], b: tuple[Array, Array]) -> tuple[Array, A
     a_lambda, a_hidden = a
     b_lambda, b_hidden = b
     return b_lambda * a_lambda, b_lambda * a_hidden + b_hidden
-
-
-class LRUCell(Module):
-    """Single-step Linear Recurrent Unit cell.
-
-    >>> cell = LRUCell(3, 16, key=key)
-    >>> y, h = cell(x, h)  # (*, 3), (*, 16) -> (*, 3), (*, 16)
-    """
-
-    B: Param[Complex[Array, "i h"]]
-    C: Param[Complex[Array, "h i"]]
-    D: Param[Float[Array, " i"]]
-    nu_log: Param[Float[Array, " h"]]
-    theta_log: Param[Float[Array, " h"]]
-    gamma_log: Param[Float[Array, " h"]]
-
-    def __init__(
-        self,
-        in_dim: int,
-        hidden_dim: int,
-        *,
-        r_min: float = 0.0,
-        r_max: float = 1.0,
-        max_phase: float = 2 * pi,
-        w_init: Initializer = glorot_uniform(),
-        d_init: Initializer = zeros,
-        key: PRNGKeyArray,
-    ) -> None:
-
-        key_b, key_c, key_d, key_nu, key_theta = jax.random.split(key, 5)
-
-        # Complex projections: B maps input to hidden state, C maps hidden state to output
-        self.B = Param(w_init(shape=(in_dim, hidden_dim), dtype=jnp.complex64, key=key_b))
-        self.C = Param(w_init(shape=(hidden_dim, in_dim), dtype=jnp.complex64, key=key_c))
-
-        # Skip connection: maps input directly to output, bypassing the recurrence
-        self.D = Param(d_init(shape=(in_dim,), key=key_d))
-
-        # Eigenvalue magnitudes uniform on annulus [r_min, r_max], phases uniform on [0, max_phase]
-        u1 = jax.random.uniform(key_nu, shape=(hidden_dim,))
-        u2 = jax.random.uniform(key_theta, shape=(hidden_dim,))
-        nu_log = jnp.log(-0.5 * jnp.log(u1 * (r_max**2 - r_min**2) + r_min**2))
-        theta_log = jnp.log(max_phase * u2)
-
-        # Diagonal eigenvalues: nu decay magnitude, theta phase rotation, gamma normalization
-        self.nu_log = Param(nu_log)
-        self.theta_log = Param(theta_log)
-        A = jnp.exp(-jnp.exp(self.nu_log) + 1j * jnp.exp(self.theta_log))
-        self.gamma_log = Param(jnp.log(jnp.sqrt(1 - jnp.abs(A) ** 2)))
-
-    def __call__(
-        self,
-        x: Float[Array, "... i"],
-        h: Complex[Array, "... h"],
-    ) -> tuple[Float[Array, "... i"], Complex[Array, "... h"]]:
-
-        A = jnp.exp(-jnp.exp(self.nu_log) + 1j * jnp.exp(self.theta_log))
-        B_norm = self.B * jnp.exp(self.gamma_log)
-        h = A * h + x.astype(self.B.dtype) @ B_norm
-        x = jnp.real(h @ self.C) + self.D * x
-
-        return x, h
-
-    @property
-    def initial_state(self) -> Complex[Array, " h"]:
-        return jnp.zeros(self.nu_log.shape[0], dtype=self.B.dtype)
-
-
-class LRU(Module):
-    """Linear Recurrent Unit over a full sequence.
-
-    >>> lru = LRU(3, 16, key=key)
-    >>> outputs, h = lru(x)  # (b, t, 3) -> (b, t, 3), (b, 16)
-    """
-
-    cell: LRUCell
-
-    def __init__(
-        self,
-        in_dim: int,
-        hidden_dim: int,
-        *,
-        r_min: float = 0.0,
-        r_max: float = 1.0,
-        max_phase: float = 2 * pi,
-        w_init: Initializer = glorot_uniform(),
-        d_init: Initializer = zeros,
-        key: PRNGKeyArray,
-    ) -> None:
-
-        self.cell = LRUCell(
-            in_dim,
-            hidden_dim,
-            r_min=r_min,
-            r_max=r_max,
-            max_phase=max_phase,
-            w_init=w_init,
-            d_init=d_init,
-            key=key,
-        )
-
-    def __call__(
-        self,
-        x: Float[Array, "b t i"],
-        hx: Complex[Array, "b h"] | None = None,
-    ) -> tuple[Float[Array, "b t i"], Complex[Array, "b h"]]:
-
-        b, t, i = x.shape
-
-        A = jnp.exp(-jnp.exp(self.cell.nu_log) + 1j * jnp.exp(self.cell.theta_log))
-        B_norm = self.cell.B * jnp.exp(self.cell.gamma_log)
-
-        lambdas = jnp.broadcast_to(A, (b, t, self.cell.nu_log.shape[0]))
-        hidden = x.astype(self.cell.B.dtype) @ B_norm
-
-        lambdas, hidden = lax.associative_scan(fn=_binary_op, elems=(lambdas, hidden), axis=1)
-
-        if hx is not None:
-            hidden = lambdas * hx[:, None, :] + hidden
-
-        x = jnp.real(hidden @ self.cell.C) + self.cell.D * x
-
-        return x, hidden[:, -1, :]
 
 
 class S4DCell(Module):

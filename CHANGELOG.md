@@ -3,6 +3,7 @@
 ## 0.15.0
 
 - **Breaking: `Identity` removed.** Ion accepts ordinary callables wherever a pass-through operation might be used, so a dedicated layer added API surface without adding capability.
+- **Breaking: `LRU` and `LRUCell` removed.** Their shared-state MIMO recurrence substantially overlapped `S5`; keeping `S4D` and `S5` leaves a clearer SISO/MIMO pair.
 - **`gnn.GlobalAttentionPool`.** Learns a softmax-normalized node score and takes an attention-weighted sum within each graph. The caller supplies the score and optional value modules, which decide how much each node contributes and what features it contributes.
 - **Refactor `__treescope_repr__` code to `_treescope.py`**. Slim down `module.py`, `param.py`, `optimizer.py` and `buffer.py` by porting `__treescope_repr__` logic to a separate file.
 - **Dropout supports broadcast masks.** Pass `broadcast_dims` to express structured dropout and stochastic depth; its source and docs now live under `stochastic`.

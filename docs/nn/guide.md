@@ -68,7 +68,7 @@ outputs.shape  # (8, 20, 16), one hidden state per timestep
 h.shape        # (8, 16), the final hidden state
 ```
 
-`RNN`, `GRU`, `LSTM`, `S4D`, `S5`, and `LRU` all take `(b, t, d)`. `MultiHeadAttention` takes `(b, s, d)`, where `s` is the sequence length being attended over.
+`RNN`, `GRU`, `LSTM`, `S4D`, and `S5` all take `(b, t, d)`. `MultiHeadAttention` takes `(b, s, d)`, where `s` is the sequence length being attended over.
 
 | Layer | Input | Fixed axes |
 |---|---|---|
@@ -76,7 +76,7 @@ h.shape        # (8, 16), the final hidden state
 | `BatchNorm` | `(b, ..., d)` | One or more leading reduction axes |
 | `Conv`, `ConvTranspose`, `MaxPool`, `AvgPool` | `(b, *spatial, c)` | Batch, spatial, channels |
 | `GroupNorm` | `(*, *spatial, c)` | Spatial axes per `num_spatial_dims` |
-| `RNN`, `LSTM`, `GRU`, `S4D`, `S5`, `LRU` | `(b, t, d)` | Batch, time, features |
+| `RNN`, `LSTM`, `GRU`, `S4D`, `S5` | `(b, t, d)` | Batch, time, features |
 | `MultiHeadAttention` | `(b, s, d)` | Batch, sequence, features |
 
 ## Adding leading axes
@@ -232,7 +232,7 @@ h0 = jax.tree.map(lambda s: jnp.broadcast_to(s, (8, 16)), cell.initial_state)
 state, outputs = lax.scan(step, h0, jnp.moveaxis(x, 1, 0))
 ```
 
-Writing the loop makes room for anything the packaged layer does not do, such as resetting state at episode boundaries or feeding each output back in as the next input. `RNNCell`, `GRUCell`, `S4DCell`, `S5Cell`, and `LRUCell` behave the same way.
+Writing the loop makes room for anything the packaged layer does not do, such as resetting state at episode boundaries or feeding each output back in as the next input. `RNNCell`, `GRUCell`, `S4DCell`, and `S5Cell` behave the same way.
 
 ## Randomness
 

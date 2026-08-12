@@ -143,18 +143,17 @@ def cell_and_input(request, key):
 def _build_ssm_layers(key):
     keys = iter(jax.random.split(key, 10))
     return [
-        (nn.LRU(8, 16, key=next(keys)), jnp.ones((2, 5, 8))),
         (nn.S4D(8, 8, key=next(keys)), jnp.ones((2, 5, 8))),
         (nn.S5(8, 8, key=next(keys)), jnp.ones((2, 5, 8))),
     ]
 
 
-_SSM_NAMES = ["lru", "s4d", "s5"]
+_SSM_NAMES = ["s4d", "s5"]
 
 
 @pytest.fixture(params=_SSM_NAMES)
 def ssm_layer_and_input(request, key):
-    """SSM layers (LRU, S4D, S5) with matching input."""
+    """SSM layers (S4D and S5) with matching input."""
     layers = _build_ssm_layers(key)
     idx = _SSM_NAMES.index(request.param)
     return layers[idx]
@@ -163,13 +162,12 @@ def ssm_layer_and_input(request, key):
 def _build_ssm_cells(key):
     keys = iter(jax.random.split(key, 10))
     return [
-        (nn.LRUCell(8, 16, key=next(keys)), jnp.ones((8,))),
         (nn.S4DCell(8, 8, key=next(keys)), jnp.ones((8,))),
         (nn.S5Cell(8, 8, key=next(keys)), jnp.ones((8,))),
     ]
 
 
-_SSM_CELL_NAMES = ["lru_cell", "s4d_cell", "s5_cell"]
+_SSM_CELL_NAMES = ["s4d_cell", "s5_cell"]
 
 
 @pytest.fixture(params=_SSM_CELL_NAMES)
