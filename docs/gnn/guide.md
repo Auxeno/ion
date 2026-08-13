@@ -481,7 +481,19 @@ attention_pool = gnn.GlobalAttentionPool(
 graph_h = attention_pool(h, graph_ids, num_graphs=2)
 ```
 
-The score and value modules supply all of the readout's parameters. Omit `value` to pool `h` directly. A bias on a single linear score is redundant because softmax is unchanged by a constant shift. See the [Pooling reference](layers/pool.md) for the full API.
+The score and value modules supply all of the readout's parameters. Omit `value` to pool `h` directly. A bias on a single linear score is redundant because softmax is unchanged by a constant shift.
+
+`MultiHeadAttentionPool` owns its parameters instead. It learns `num_seeds` query vectors that attend over the nodes of each graph, giving each seed its own view of the graph:
+
+```python
+seed_pool = gnn.MultiHeadAttentionPool(hidden_dim, hidden_dim, num_seeds=4, num_heads=4, key=key)
+graph_h = seed_pool(h, graph_ids, num_graphs=2)  # (2, 4, hidden_dim)
+graph_h = graph_h.reshape(2, -1)
+```
+
+The seed axis is kept rather than flattened, so a downstream head can either flatten it, reduce over it, or attend over it. With `num_seeds=1` and `num_heads=1` this is a dot-product version of `GlobalAttentionPool`.
+
+Both attention readouts normalize their weights within a graph, which makes them blind to graph size in the way `mean_pool` is. Concatenate a `sum_pool` branch when a task depends on counting nodes. See the [Pooling reference](layers/pool.md) for the full API.
 
 ## Static shapes
 
@@ -500,6 +512,7 @@ JAX compiles a function for the shapes it receives. If the packed number of node
 | `d` | General node feature dimension |
 | `i`, `o` | Input and output feature dimensions |
 | `h`, `k` | Attention heads and per-head dimension |
+| `s` | Number of pooling seeds |
 | `f` | Edge feature dimension |
 
 Each layer page defines how these labels apply to its inputs, parameters, and outputs.

@@ -5,7 +5,7 @@ from .composite import EdgeUpdate, GraphNetwork, NodeUpdate
 from .conv import GCNConv, GraphConv, SAGEConv
 from .gated import GatedGCNConv
 from .isomorphism import GINConv, GINEConv
-from .pool import GlobalAttentionPool
+from .pool import GlobalAttentionPool, MultiHeadAttentionPool
 from .relational import HGTConv, RGCNConv
 
 __all__ = [
@@ -20,6 +20,7 @@ __all__ = [
     "GatedGCNConv",
     "GlobalAttentionPool",
     "HGTConv",
+    "MultiHeadAttentionPool",
     "NodeUpdate",
     "RGCNConv",
     "SAGEConv",

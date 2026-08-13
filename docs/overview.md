@@ -163,7 +163,7 @@ y = model(x, training=True)
 | [Composite](gnn/layers/composite.md) | `GraphNetwork`, `EdgeUpdate`, `NodeUpdate` |
 | [Relational](gnn/layers/relational.md) | `RGCNConv`, `HGTConv` |
 | [Gated](gnn/layers/gated.md) | `GatedGCNConv` |
-| [Pooling](gnn/layers/pool.md) | `GlobalAttentionPool` |
+| [Pooling](gnn/layers/pool.md) | `GlobalAttentionPool`, `MultiHeadAttentionPool` |
 | [Operations](gnn/operations.md) | segment reductions, pooling, topology, batching |
 
 Graphs are plain arrays in COO format: node features plus `senders`/`receivers` edge indices.
