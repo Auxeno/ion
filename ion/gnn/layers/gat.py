@@ -29,6 +29,7 @@ class GATConv(Module):
     """
 
     w: Param[Float[Array, "i o"]]
+    w_receiver: Param[Float[Array, "j o"]] | None
     att_sender: Param[Float[Array, "h k"]]
     att_receiver: Param[Float[Array, "h k"]]
     w_edge: Param[Float[Array, "f o"]] | None
@@ -40,7 +41,7 @@ class GATConv(Module):
 
     def __init__(
         self,
-        in_dim: int,
+        in_dim: int | tuple[int, int],
         out_dim: int,
         *,
         num_heads: int = 1,
@@ -60,7 +61,14 @@ class GATConv(Module):
 
         keys = jax.random.split(key, 6)
         key_w, key_att_sender, key_att_receiver, key_w_edge, key_att_edge, key_b = keys
-        self.w = Param(w_init(shape=(in_dim, out_dim), key=key_w))
+        if isinstance(in_dim, tuple):
+            in_src, in_dst = in_dim
+            key_w_sender, key_w_receiver = jax.random.split(key_w)
+            self.w = Param(w_init(shape=(in_src, out_dim), key=key_w_sender))
+            self.w_receiver = Param(w_init(shape=(in_dst, out_dim), key=key_w_receiver))
+        else:
+            self.w = Param(w_init(shape=(in_dim, out_dim), key=key_w))
+            self.w_receiver = None
         self.att_sender = Param(att_init(shape=(num_heads, head_dim), key=key_att_sender))
         self.att_receiver = Param(att_init(shape=(num_heads, head_dim), key=key_att_receiver))
 
@@ -79,27 +87,30 @@ class GATConv(Module):
 
     def __call__(
         self,
-        x: Float[Array, "n i"],
+        x: Float[Array, "n i"] | tuple[Float[Array, "s i"], Float[Array, "t j"]],
         senders: Int[Array, " e"],
         receivers: Int[Array, " e"],
         *,
         x_edge: Float[Array, "e f"] | None = None,
         edge_mask: Bool[Array, " e"] | None = None,
-    ) -> Float[Array, "n o"]:
+    ) -> Float[Array, "t o"]:
 
         if x_edge is None and self.edge_dim is not None:
             raise ValueError(f"edge_dim={self.edge_dim} set at init but no x_edge passed at call")
         if x_edge is not None and self.edge_dim is None:
             raise ValueError("x_edge passed at call but edge_dim not set at init")
 
-        n = x.shape[0]
+        x_src, x_dst = x if isinstance(x, tuple) else (x, x)
+        n_src, n_dst = x_src.shape[0], x_dst.shape[0]
 
         # Project nodes
-        x = (x @ self.w).reshape(n, self.num_heads, -1)
+        x_src = (x_src @ self.w).reshape(n_src, self.num_heads, -1)
+        receiver_weight = self.w if self.w_receiver is None else self.w_receiver
+        x_dst = (x_dst @ receiver_weight).reshape(n_dst, self.num_heads, -1)
 
         # Compute attention scores at node level, then combine at edges
-        logits_sender = (x * self.att_sender).sum(axis=-1)
-        logits_receiver = (x * self.att_receiver).sum(axis=-1)
+        logits_sender = (x_src * self.att_sender).sum(axis=-1)
+        logits_receiver = (x_dst * self.att_receiver).sum(axis=-1)
         logits = logits_sender[senders] + logits_receiver[receivers]
 
         # Add edge feature contribution
@@ -108,7 +119,7 @@ class GATConv(Module):
             assert self.att_edge is not None
             if edge_mask is not None:
                 x_edge = x_edge * edge_mask[:, None]
-            edge = (x_edge @ self.w_edge).reshape(-1, self.num_heads, x.shape[-1])
+            edge = (x_edge @ self.w_edge).reshape(-1, self.num_heads, x_src.shape[-1])
             logits = logits + (edge * self.att_edge).sum(axis=-1)
 
         logits = jax.nn.leaky_relu(logits, self.negative_slope)
@@ -117,18 +128,18 @@ class GATConv(Module):
             logits = jnp.where(edge_mask[:, None], logits, -jnp.inf)
 
         # Softmax over each receiver's incoming edges
-        attention = segment_softmax(logits, receivers, n)
+        attention = segment_softmax(logits, receivers, n_dst)
 
         # Aggregate sender features weighted by attention
-        messages = x[senders] * attention[..., None]
-        x = segment_sum(messages, receivers, n)
+        messages = x_src[senders] * attention[..., None]
+        x_out = segment_sum(messages, receivers, n_dst)
 
-        x = x.reshape(n, -1)
+        x_out = x_out.reshape(n_dst, -1)
 
         if self.b_out is not None:
-            x = x + self.b_out
+            x_out = x_out + self.b_out
 
-        return x
+        return x_out
 
 
 class GATv2Conv(Module):
@@ -140,7 +151,7 @@ class GATv2Conv(Module):
     """
 
     w_sender: Param[Float[Array, "i o"]]
-    w_receiver: Param[Float[Array, "i o"]]
+    w_receiver: Param[Float[Array, "j o"]]
     att: Param[Float[Array, "h k"]]
     w_edge: Param[Float[Array, "f o"]] | None
     b_out: Param[Float[Array, " o"]] | None
@@ -150,7 +161,7 @@ class GATv2Conv(Module):
 
     def __init__(
         self,
-        in_dim: int,
+        in_dim: int | tuple[int, int],
         out_dim: int,
         *,
         num_heads: int = 1,
@@ -168,9 +179,11 @@ class GATv2Conv(Module):
         if out_dim % num_heads != 0:
             raise ValueError(f"out_dim ({out_dim}) must be divisible by num_heads ({num_heads})")
 
+        in_src, in_dst = in_dim if isinstance(in_dim, tuple) else (in_dim, in_dim)
+
         key_w_sender, key_w_receiver, key_att, key_w_edge, key_b = jax.random.split(key, 5)
-        self.w_sender = Param(w_init(shape=(in_dim, out_dim), key=key_w_sender))
-        self.w_receiver = Param(w_init(shape=(in_dim, out_dim), key=key_w_receiver))
+        self.w_sender = Param(w_init(shape=(in_src, out_dim), key=key_w_sender))
+        self.w_receiver = Param(w_init(shape=(in_dst, out_dim), key=key_w_receiver))
         self.att = Param(att_init(shape=(num_heads, head_dim), key=key_att))
 
         if edge_dim is not None:
@@ -186,24 +199,25 @@ class GATv2Conv(Module):
 
     def __call__(
         self,
-        x: Float[Array, "n i"],
+        x: Float[Array, "n i"] | tuple[Float[Array, "s i"], Float[Array, "t j"]],
         senders: Int[Array, " e"],
         receivers: Int[Array, " e"],
         *,
         x_edge: Float[Array, "e f"] | None = None,
         edge_mask: Bool[Array, " e"] | None = None,
-    ) -> Float[Array, "n o"]:
+    ) -> Float[Array, "t o"]:
 
         if x_edge is None and self.edge_dim is not None:
             raise ValueError(f"edge_dim={self.edge_dim} set at init but no x_edge passed at call")
         if x_edge is not None and self.edge_dim is None:
             raise ValueError("x_edge passed at call but edge_dim not set at init")
 
-        n = x.shape[0]
+        x_src, x_dst = x if isinstance(x, tuple) else (x, x)
+        n_src, n_dst = x_src.shape[0], x_dst.shape[0]
 
         # Project nodes
-        x_s = (x @ self.w_sender).reshape(n, self.num_heads, -1)
-        x_r = (x @ self.w_receiver).reshape(n, self.num_heads, -1)
+        x_s = (x_src @ self.w_sender).reshape(n_src, self.num_heads, -1)
+        x_r = (x_dst @ self.w_receiver).reshape(n_dst, self.num_heads, -1)
 
         # Sum of the two projections is the paper's concatenation, factored
         edge_h = x_s[senders] + x_r[receivers]
@@ -224,15 +238,15 @@ class GATv2Conv(Module):
             logits = jnp.where(edge_mask[:, None], logits, -jnp.inf)
 
         # Softmax over each receiver's incoming edges
-        attention = segment_softmax(logits, receivers, n)
+        attention = segment_softmax(logits, receivers, n_dst)
 
         # Aggregate sender features weighted by attention
         messages = x_s[senders] * attention[..., None]
-        x = segment_sum(messages, receivers, n)
+        x_out = segment_sum(messages, receivers, n_dst)
 
-        x = x.reshape(n, -1)
+        x_out = x_out.reshape(n_dst, -1)
 
         if self.b_out is not None:
-            x = x + self.b_out
+            x_out = x_out + self.b_out
 
-        return x
+        return x_out

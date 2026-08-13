@@ -18,6 +18,21 @@ class TestGINConv:
         expected = mlp(1.5 * x + agg)
         npt.assert_allclose(y, expected, rtol=1e-5, atol=1e-5)
 
+    def test_bipartite_output_manual(self):
+        """Bipartite inputs aggregate sources into the destination node set."""
+        mlp = nn.MLP([3, 6], key=jax.random.key(0))
+        gin = gnn.GINConv(mlp, eps=0.5)
+        x_src = jax.random.normal(jax.random.key(1), (4, 3))
+        x_dst = jax.random.normal(jax.random.key(2), (2, 3))
+        senders = jnp.array([0, 3, 1, 2])
+        receivers = jnp.array([0, 0, 1, 1])
+
+        agg = gnn.segment_sum(x_src[senders], receivers, 2)
+        expected = mlp(1.5 * x_dst + agg)
+        y = gin((x_src, x_dst), senders, receivers)
+
+        npt.assert_allclose(y, expected, rtol=1e-5, atol=1e-5)
+
     def test_output_shape(self):
         """Output shape is (n, out_dim) of the update MLP."""
         gin = gnn.GINConv(nn.MLP([4, 8, 8], key=jax.random.key(0)))
@@ -84,6 +99,23 @@ class TestGINEConv:
         y = gine(x, senders, receivers, x_edge=x_edge)
         agg = gnn.segment_sum(jax.nn.relu(x[senders] + x_edge), receivers, 3)
         expected = mlp(1.5 * x + agg)
+        npt.assert_allclose(y, expected, rtol=1e-5, atol=1e-5)
+
+    def test_bipartite_output_manual(self):
+        """Bipartite inputs use source, destination, and edge features."""
+        mlp = nn.MLP([3, 6], key=jax.random.key(0))
+        gine = gnn.GINEConv(mlp, eps=0.5)
+        x_src = jax.random.normal(jax.random.key(1), (4, 3))
+        x_dst = jax.random.normal(jax.random.key(2), (2, 3))
+        x_edge = jax.random.normal(jax.random.key(3), (4, 3))
+        senders = jnp.array([0, 3, 1, 2])
+        receivers = jnp.array([0, 0, 1, 1])
+
+        messages = jax.nn.relu(x_src[senders] + x_edge)
+        agg = gnn.segment_sum(messages, receivers, 2)
+        expected = mlp(1.5 * x_dst + agg)
+        y = gine((x_src, x_dst), senders, receivers, x_edge=x_edge)
+
         npt.assert_allclose(y, expected, rtol=1e-5, atol=1e-5)
 
     def test_output_shape(self):

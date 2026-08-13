@@ -7,8 +7,9 @@ receiving node's features is added to the aggregated messages by default.
 
 Parameters
 ----------
-in_dim : int
-    Input node feature dimension.
+in_dim : int | tuple[int, int]
+    Input node feature dimension. Pass `(src_dim, dst_dim)` for bipartite
+    source and destination features with different widths.
 out_dim : int
     Output node feature dimension. Must be divisible by `num_heads`.
 num_heads : int, default=1
@@ -34,10 +35,11 @@ key : jax.Array
 Attributes
 ----------
 w_q, w_k, w_v : Param
-    Query, key, and value projections of shape `(in_dim, out_dim)`.
+    Destination-query, source-key, and source-value projections. Their first
+    dimensions are `dst_dim`, `src_dim`, and `src_dim` respectively.
 w_root : Param | None
-    Projection for each receiving node's own features, with shape
-    `(in_dim, out_dim)`. `None` when `use_root_weight=False`.
+    Projection for each destination node's own features, with shape
+    `(dst_dim, out_dim)`. `None` when `use_root_weight=False`.
 w_edge : Param | None
     Edge projection of shape `(edge_dim, out_dim)`. `None` unless `edge_dim`
     is set.
@@ -65,4 +67,9 @@ conv = gnn.TransformerConv(
     key=key,
 )
 y = conv(x, senders, receivers, x_edge=x_edge)
+```
+
+```python
+conv = gnn.TransformerConv((src_dim, dst_dim), out_dim, num_heads=4, key=key)
+y_dst = conv((x_src, x_dst), senders, receivers)
 ```

@@ -82,12 +82,12 @@ class GraphConv(Module):
     """
 
     w_neigh: Param[Float[Array, "i o"]]
-    w_self: Param[Float[Array, "i o"]]
+    w_self: Param[Float[Array, "j o"]]
     b: Param[Float[Array, " o"]] | None
 
     def __init__(
         self,
-        in_dim: int,
+        in_dim: int | tuple[int, int],
         out_dim: int,
         *,
         use_bias: bool = True,
@@ -96,30 +96,33 @@ class GraphConv(Module):
         key: PRNGKeyArray,
     ) -> None:
 
+        in_src, in_dst = in_dim if isinstance(in_dim, tuple) else (in_dim, in_dim)
+
         key_neigh, key_self, key_b = jax.random.split(key, 3)
-        self.w_neigh = Param(w_init(shape=(in_dim, out_dim), key=key_neigh))
-        self.w_self = Param(w_init(shape=(in_dim, out_dim), key=key_self))
+        self.w_neigh = Param(w_init(shape=(in_src, out_dim), key=key_neigh))
+        self.w_self = Param(w_init(shape=(in_dst, out_dim), key=key_self))
         self.b = Param(b_init(shape=(out_dim,), key=key_b)) if use_bias else None
 
     def __call__(
         self,
-        x: Float[Array, "n i"],
+        x: Float[Array, "n i"] | tuple[Float[Array, "s i"], Float[Array, "t j"]],
         senders: Int[Array, " e"],
         receivers: Int[Array, " e"],
         *,
         edge_weight: Float[Array, " e"] | None = None,
-    ) -> Float[Array, "n o"]:
+    ) -> Float[Array, "t o"]:
 
-        n, i = x.shape
+        x_src, x_dst = x if isinstance(x, tuple) else (x, x)
+        n_dst = x_dst.shape[0]
 
         # Optionally weight sender features, then sum them into each receiver
-        messages = x[senders]
+        messages = x_src[senders]
         if edge_weight is not None:
             messages = messages * edge_weight[:, None]
-        neigh = segment_sum(messages, receivers, n)
+        neigh = segment_sum(messages, receivers, n_dst)
 
         # Transform neighborhood and central-node features independently
-        x_out = neigh @ self.w_neigh + x @ self.w_self
+        x_out = neigh @ self.w_neigh + x_dst @ self.w_self
 
         if self.b is not None:
             x_out = x_out + self.b

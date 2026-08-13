@@ -8,11 +8,12 @@ from ion import gnn
 
 def _manual_transformer(conv, x, senders, receivers, x_edge=None, edge_mask=None):
     """Reference implementation using the layer's parameters."""
-    n = x.shape[0]
+    x_src, x_dst = x if isinstance(x, tuple) else (x, x)
+    n_src, n_dst = x_src.shape[0], x_dst.shape[0]
     head_dim = conv.w_q.shape[-1] // conv.num_heads
-    q = (x @ conv.w_q).reshape(n, conv.num_heads, head_dim)
-    k = (x @ conv.w_k).reshape(n, conv.num_heads, head_dim)
-    v = (x @ conv.w_v).reshape(n, conv.num_heads, head_dim)
+    q = (x_dst @ conv.w_q).reshape(n_dst, conv.num_heads, head_dim)
+    k = (x_src @ conv.w_k).reshape(n_src, conv.num_heads, head_dim)
+    v = (x_src @ conv.w_v).reshape(n_src, conv.num_heads, head_dim)
 
     edge_k = k[senders]
     messages = v[senders]
@@ -24,11 +25,11 @@ def _manual_transformer(conv, x, senders, receivers, x_edge=None, edge_mask=None
     logits = jnp.sum(q[receivers] * edge_k, axis=-1) / jnp.sqrt(head_dim)
     if edge_mask is not None:
         logits = jnp.where(edge_mask[:, None], logits, -jnp.inf)
-    attention = gnn.segment_softmax(logits, receivers, n)
-    out = gnn.segment_sum(messages * attention[..., None], receivers, n).reshape(n, -1)
+    attention = gnn.segment_softmax(logits, receivers, n_dst)
+    out = gnn.segment_sum(messages * attention[..., None], receivers, n_dst).reshape(n_dst, -1)
 
     if conv.w_root is not None:
-        root = x @ conv.w_root
+        root = x_dst @ conv.w_root
         if conv.w_beta is not None:
             gate_input = jnp.concatenate([root, out, root - out], axis=-1)
             beta = jax.nn.sigmoid(gate_input @ conv.w_beta)
@@ -64,6 +65,21 @@ class TestTransformerConv:
         senders, receivers = triangle_graph_no_self_loops
         expected = _manual_transformer(conv, x, senders, receivers)
         y = conv(x, senders, receivers)
+        npt.assert_allclose(y, expected, rtol=1e-5, atol=1e-5)
+
+    def test_bipartite_output_manual(self):
+        """Bipartite receivers query source keys and values."""
+        conv = gnn.TransformerConv((3, 5), 8, num_heads=2, key=jax.random.key(0))
+        x_src = jax.random.normal(jax.random.key(1), (4, 3))
+        x_dst = jax.random.normal(jax.random.key(2), (2, 5))
+        senders = jnp.array([0, 3, 1])
+        receivers = jnp.array([0, 0, 1])
+
+        x = (x_src, x_dst)
+        expected = _manual_transformer(conv, x, senders, receivers)
+        y = conv(x, senders, receivers)
+
+        assert y.shape == (2, 8)
         npt.assert_allclose(y, expected, rtol=1e-5, atol=1e-5)
 
     def test_no_bias(self, triangle_graph_no_self_loops):

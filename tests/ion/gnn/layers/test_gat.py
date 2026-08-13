@@ -16,6 +16,21 @@ class TestGATConv:
         y = gat(x, senders, receivers)
         assert y.shape == (5, 16)
 
+    def test_bipartite_output_shape(self):
+        """Bipartite inputs can have distinct node counts and feature widths."""
+        gat = gnn.GATConv((3, 5), 8, num_heads=2, key=jax.random.key(0))
+        x_src = jax.random.normal(jax.random.key(1), (4, 3))
+        x_dst = jax.random.normal(jax.random.key(2), (2, 5))
+        senders = jnp.array([0, 3, 1])
+        receivers = jnp.array([0, 0, 1])
+
+        y = gat((x_src, x_dst), senders, receivers)
+
+        assert y.shape == (2, 8)
+        assert gat.w.shape == (3, 8)
+        assert gat.w_receiver is not None
+        assert gat.w_receiver.shape == (5, 8)
+
     def test_output_shape_multi_head(self, triangle_graph):
         """Various num_heads values all produce correct output shape."""
         senders, receivers = triangle_graph
@@ -327,6 +342,20 @@ class TestGATv2Conv:
         receivers = jnp.array([1, 2, 3, 4])
         y = gat(x, senders, receivers)
         assert y.shape == (5, 16)
+
+    def test_bipartite_output_shape(self):
+        """Bipartite inputs can have distinct node counts and feature widths."""
+        gat = gnn.GATv2Conv((3, 5), 8, num_heads=2, key=jax.random.key(0))
+        x_src = jax.random.normal(jax.random.key(1), (4, 3))
+        x_dst = jax.random.normal(jax.random.key(2), (2, 5))
+        senders = jnp.array([0, 3, 1])
+        receivers = jnp.array([0, 0, 1])
+
+        y = gat((x_src, x_dst), senders, receivers)
+
+        assert y.shape == (2, 8)
+        assert gat.w_sender.shape == (3, 8)
+        assert gat.w_receiver.shape == (5, 8)
 
     def test_output_shape_multi_head(self, triangle_graph):
         """Various num_heads values all produce correct output shape."""

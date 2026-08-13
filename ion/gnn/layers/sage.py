@@ -30,14 +30,14 @@ class SAGEConv(Module):
     """
 
     w_neigh: Param[Float[Array, "i o"]]
-    w_self: Param[Float[Array, "i o"]] | None
+    w_self: Param[Float[Array, "j o"]] | None
     b: Param[Float[Array, " o"]] | None
     aggregate: Callable[..., Float[Array, "n i"]]
     normalize: bool
 
     def __init__(
         self,
-        in_dim: int,
+        in_dim: int | tuple[int, int],
         out_dim: int,
         *,
         aggregator: Literal["mean", "max", "sum"] = "mean",
@@ -50,11 +50,12 @@ class SAGEConv(Module):
     ) -> None:
 
         aggregate = {"mean": segment_mean, "max": segment_max, "sum": segment_sum}[aggregator]
+        in_src, in_dst = in_dim if isinstance(in_dim, tuple) else (in_dim, in_dim)
 
         key_neigh, key_self, key_b = jax.random.split(key, 3)
-        self.w_neigh = Param(w_init(shape=(in_dim, out_dim), key=key_neigh))
+        self.w_neigh = Param(w_init(shape=(in_src, out_dim), key=key_neigh))
         self.w_self = (
-            Param(w_init(shape=(in_dim, out_dim), key=key_self)) if use_root_weight else None
+            Param(w_init(shape=(in_dst, out_dim), key=key_self)) if use_root_weight else None
         )
         self.b = Param(b_init(shape=(out_dim,), key=key_b)) if use_bias else None
 
@@ -63,15 +64,16 @@ class SAGEConv(Module):
 
     def __call__(
         self,
-        x: Float[Array, "n i"],
+        x: Float[Array, "n i"] | tuple[Float[Array, "s i"], Float[Array, "t j"]],
         senders: Int[Array, " e"],
         receivers: Int[Array, " e"],
-    ) -> Float[Array, "n o"]:
+    ) -> Float[Array, "t o"]:
 
-        n, i = x.shape
+        x_src, x_dst = x if isinstance(x, tuple) else (x, x)
+        n_dst = x_dst.shape[0]
 
         # Pool sender features into each receiver's neighborhood, then transform
-        neigh = self.aggregate(x[senders], receivers, n)
+        neigh = self.aggregate(x_src[senders], receivers, n_dst)
 
         # segment_max leaves -inf at nodes with no neighbors
         if self.aggregate is segment_max:
@@ -80,7 +82,7 @@ class SAGEConv(Module):
 
         # Add the central node's own features through the root weight
         if self.w_self is not None:
-            x_out = x_out + x @ self.w_self
+            x_out = x_out + x_dst @ self.w_self
 
         if self.b is not None:
             x_out = x_out + self.b

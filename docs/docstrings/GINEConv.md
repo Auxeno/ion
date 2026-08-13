@@ -35,3 +35,7 @@ receivers = jnp.array([1, 2, 0])
 gine = gnn.GINEConv(nn.MLP([in_dim, hidden_dim, out_dim], key=key))
 y = gine(x, senders, receivers, x_edge=x_edge)  # (3, 16) -> (3, 32)
 ```
+
+The layer also accepts `(x_src, x_dst)` for bipartite message passing and
+returns one row per destination node. Source, destination, and edge feature
+widths must match because they are added before the MLP.

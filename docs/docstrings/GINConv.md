@@ -37,3 +37,7 @@ y = gin(x, senders, receivers)  # (3, 16) -> (3, 32)
 
 gin_trainable = gnn.GINConv(nn.MLP([in_dim, hidden_dim, out_dim], key=key), train_eps=True)
 ```
+
+The layer also accepts `(x_src, x_dst)` for bipartite message passing and
+returns one row per destination node. Source and destination feature widths
+must match because their representations are added before the MLP.

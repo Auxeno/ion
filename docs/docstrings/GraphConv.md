@@ -7,8 +7,9 @@ each scalar edge weight \(e_{ji}\) is one.
 
 Parameters
 ----------
-in_dim : int
-    Input node feature dimension.
+in_dim : int | tuple[int, int]
+    Input node feature dimension. A `(src_dim, dst_dim)` tuple creates separate
+    neighbour and destination-root projections for bipartite inputs.
 out_dim : int
     Output node feature dimension.
 use_bias : bool, default=True
@@ -23,9 +24,9 @@ key : jax.Array
 Attributes
 ----------
 w_neigh : Param
-    Neighbour transform of shape `(in_dim, out_dim)`.
+    Neighbour transform of shape `(src_dim, out_dim)`.
 w_self : Param
-    Root transform of shape `(in_dim, out_dim)`.
+    Destination-root transform of shape `(dst_dim, out_dim)`.
 b : Param | None
     Bias vector of shape `(out_dim,)`. `None` when `use_bias=False`.
 
@@ -41,6 +42,14 @@ edge_weight = jnp.array([0.5, 1.0, 2.0])
 
 conv = gnn.GraphConv(in_dim, out_dim, key=key)
 y = conv(x, senders, receivers, edge_weight=edge_weight)
+```
+
+For bipartite message passing, sender and receiver indices use their respective
+local node spaces and the result has one row per destination node:
+
+```python
+conv = gnn.GraphConv((src_dim, dst_dim), out_dim, key=key)
+y_dst = conv((x_src, x_dst), senders, receivers)
 ```
 
 Note

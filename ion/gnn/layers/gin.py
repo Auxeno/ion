@@ -41,17 +41,18 @@ class GINConv(Module):
 
     def __call__(
         self,
-        x: Float[Array, "n i"],
+        x: Float[Array, "n i"] | tuple[Float[Array, "s i"], Float[Array, "t i"]],
         senders: Int[Array, " e"],
         receivers: Int[Array, " e"],
-    ) -> Float[Array, "n o"]:
+    ) -> Float[Array, "t o"]:
 
-        n, i = x.shape
+        x_src, x_dst = x if isinstance(x, tuple) else (x, x)
+        n_dst = x_dst.shape[0]
 
         # Sum aggregation preserves neighbor multiplicity
-        agg = segment_sum(x[senders], receivers, n)
+        agg = segment_sum(x_src[senders], receivers, n_dst)
 
-        return self.mlp((1 + self.eps) * x + agg)
+        return self.mlp((1 + self.eps) * x_dst + agg)
 
 
 class GINEConv(Module):
@@ -77,16 +78,17 @@ class GINEConv(Module):
 
     def __call__(
         self,
-        x: Float[Array, "n i"],
+        x: Float[Array, "n i"] | tuple[Float[Array, "s i"], Float[Array, "t i"]],
         senders: Int[Array, " e"],
         receivers: Int[Array, " e"],
         *,
         x_edge: Float[Array, "e i"],
-    ) -> Float[Array, "n o"]:
+    ) -> Float[Array, "t o"]:
 
-        n, i = x.shape
+        x_src, x_dst = x if isinstance(x, tuple) else (x, x)
+        n_dst = x_dst.shape[0]
 
         # Each edge adds its features to the sender before the message nonlinearity
-        agg = segment_sum(jax.nn.relu(x[senders] + x_edge), receivers, n)
+        agg = segment_sum(jax.nn.relu(x_src[senders] + x_edge), receivers, n_dst)
 
-        return self.mlp((1 + self.eps) * x + agg)
+        return self.mlp((1 + self.eps) * x_dst + agg)

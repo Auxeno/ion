@@ -8,6 +8,7 @@ This guide represents a graph with JAX arrays, follows messages through it, and 
 - [Message passing](#message-passing)
 - [Aggregating messages](#aggregating-messages)
 - [Self-loops](#self-loops)
+- [Bipartite graphs](#bipartite-graphs)
 - [Feature propagation](#feature-propagation)
 - [Building a GNN](#building-a-gnn)
 - [Batching graphs](#batching-graphs)
@@ -252,6 +253,40 @@ senders, receivers = gnn.add_self_loops(senders, receivers, num_nodes)
 ```
 
 How many edges it removes depends on the data, so the output shape is not known ahead of time and the call cannot go inside `jax.jit`. Treat it as a data preparation step. Edge features and masks are not filtered for you; apply the same `senders != receivers` mask to them.
+
+## Bipartite graphs
+
+Most message-passing layers can also send between two distinct node sets. Pass
+the node features as `(x_src, x_dst)` in this case. `senders` indexes rows of
+`x_src`, `receivers` indexes rows of `x_dst`, and the layer returns one row for
+each destination node:
+
+```python
+x_src = jnp.ones((num_src, src_dim))
+x_dst = jnp.ones((num_dst, dst_dim))
+
+conv = gnn.GraphConv((src_dim, dst_dim), out_dim, key=key)
+y_dst = conv((x_src, x_dst), senders, receivers)
+
+y_dst.shape  # (num_dst, out_dim)
+```
+
+For layers with learned input projections, `in_dim` may be an integer or a
+`(src_dim, dst_dim)` tuple. An integer uses the same feature width for both node
+sets. `GINConv` and `GINEConv` instead receive their update network from the
+caller; because their update equations add source and destination features,
+the two node sets must have the same feature width. `GINEConv` edge features
+must share that width too.
+
+`GraphConv`, `SAGEConv`, `GATConv`, `GATv2Conv`, `TransformerConv`, `GINConv`,
+`GINEConv`, `EdgeUpdate`, and `GatedGCNConv` accept bipartite inputs. `GCNConv`
+does not: its symmetric degree normalization assumes one shared node domain.
+
+Passing a single array retains the usual homogeneous behavior and is equivalent
+to passing `(x, x)`. A bipartite call only updates the destination node set. To
+update both partitions, apply a second layer in the reverse direction with
+reversed edge indices. Self-loops do not apply: the two node sets are distinct,
+so no edge joins a node to itself.
 
 ## Line graphs
 

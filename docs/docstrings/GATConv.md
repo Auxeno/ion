@@ -4,8 +4,9 @@ Learns attention weights over each node's neighborhood using LeakyReLU-gated add
 
 Parameters
 ----------
-in_dim : int
-    Input node feature dimension.
+in_dim : int | tuple[int, int]
+    Input node feature dimension. Pass `(src_dim, dst_dim)` for bipartite
+    source and destination features with different widths.
 out_dim : int
     Output node feature dimension. Must be divisible by `num_heads`; each head
     produces `out_dim // num_heads` features, concatenated to `out_dim`.
@@ -32,7 +33,11 @@ key : jax.Array
 Attributes
 ----------
 w : Param
-    Projection weight of shape `(in_dim, out_dim)`.
+    Shared projection of shape `(in_dim, out_dim)` for an integer `in_dim`, or
+    the source projection of shape `(src_dim, out_dim)` for paired dimensions.
+w_receiver : Param | None
+    Destination projection of shape `(dst_dim, out_dim)` for paired dimensions;
+    otherwise `None` and `w` is shared.
 att_sender, att_receiver : Param
     Per-head attention vectors of shape `(num_heads, out_dim // num_heads)`.
 b_out : Param | None
@@ -55,4 +60,9 @@ y = gat(x, senders, receivers)  # (3, 16) -> (3, 32)
 x_edge = jnp.ones((num_edges, edge_dim))
 gat_edges = gnn.GATConv(in_dim, out_dim, num_heads=4, edge_dim=edge_dim, key=key)
 y = gat_edges(x, senders, receivers, x_edge=x_edge)  # (3, 16) -> (3, 32)
+```
+
+```python
+gat = gnn.GATConv((src_dim, dst_dim), out_dim, num_heads=4, key=key)
+y_dst = gat((x_src, x_dst), senders, receivers)
 ```

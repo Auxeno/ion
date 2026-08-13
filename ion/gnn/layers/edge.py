@@ -28,15 +28,14 @@ class EdgeUpdate(Module):
 
     def __call__(
         self,
-        x: Float[Array, "n i"],
+        x: Float[Array, "n i"] | tuple[Float[Array, "s i"], Float[Array, "t j"]],
         senders: Int[Array, " e"],
         receivers: Int[Array, " e"],
         *,
         x_edge: Float[Array, "e f"],
     ) -> Float[Array, "e o"]:
 
-        n, i = x.shape
-        e, f = x_edge.shape
+        x_src, x_dst = x if isinstance(x, tuple) else (x, x)
 
-        edge_inputs = jnp.concatenate((x[senders], x[receivers], x_edge), axis=-1)
+        edge_inputs = jnp.concatenate((x_src[senders], x_dst[receivers], x_edge), axis=-1)
         return self.edge_model(edge_inputs)

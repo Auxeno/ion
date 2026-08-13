@@ -16,8 +16,9 @@ not apply activation, normalization, or residual connections.
 
 Parameters
 ----------
-in_dim : int
-    Input node feature dimension.
+in_dim : int | tuple[int, int]
+    Input node feature dimension. Pass `(src_dim, dst_dim)` for bipartite
+    source and destination features with different widths.
 out_dim : int
     Output dimension shared by node and edge features.
 edge_dim : int
@@ -36,15 +37,15 @@ key : jax.Array
 Attributes
 ----------
 w_self : Param
-    Central-node transform of shape `(in_dim, out_dim)`.
+    Destination-root transform of shape `(dst_dim, out_dim)`.
 w_neigh : Param
-    Sender-message transform of shape `(in_dim, out_dim)`.
+    Sender-message transform of shape `(src_dim, out_dim)`.
 w_edge : Param
     Edge transform of shape `(edge_dim, out_dim)`.
 w_sender : Param
-    Sender contribution to the edge update, shape `(in_dim, out_dim)`.
+    Sender contribution to the edge update, shape `(src_dim, out_dim)`.
 w_receiver : Param
-    Receiver contribution to the edge update, shape `(in_dim, out_dim)`.
+    Receiver contribution to the edge update, shape `(dst_dim, out_dim)`.
 b_node : Param | None
     Node output bias of shape `(out_dim,)`. `None` when `use_bias=False`.
 b_edge : Param | None
@@ -64,4 +65,9 @@ receivers = jnp.array([1, 2, 0])
 conv = gnn.GatedGCNConv(node_dim, out_dim, edge_dim=edge_dim, key=key)
 x, x_edge = conv(x, senders, receivers, x_edge=x_edge)
 x, x_edge = jax.nn.relu(x), jax.nn.relu(x_edge)
+```
+
+```python
+conv = gnn.GatedGCNConv((src_dim, dst_dim), out_dim, edge_dim=edge_dim, key=key)
+x_dst, x_edge = conv((x_src, x_dst), senders, receivers, x_edge=x_edge)
 ```

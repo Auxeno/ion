@@ -4,8 +4,9 @@ Pools neighbour features with a permutation-invariant aggregator, then combines 
 
 Parameters
 ----------
-in_dim : int
-    Input node feature dimension.
+in_dim : int | tuple[int, int]
+    Input node feature dimension. Pass `(src_dim, dst_dim)` for bipartite
+    source and destination features with different widths.
 out_dim : int
     Output node feature dimension.
 aggregator : str, default='mean'
@@ -26,9 +27,10 @@ key : jax.Array
 Attributes
 ----------
 w_neigh : Param
-    Neighbour transform of shape `(in_dim, out_dim)`.
+    Neighbour transform of shape `(src_dim, out_dim)`.
 w_self : Param | None
-    Root transform of shape `(in_dim, out_dim)`. `None` when `use_root_weight=False`.
+    Destination-root transform of shape `(dst_dim, out_dim)`. `None` when
+    `use_root_weight=False`.
 b : Param | None
     Bias vector of shape `(out_dim,)`. `None` when `use_bias=False`.
 
@@ -43,4 +45,9 @@ receivers = jnp.array([1, 2, 0])
 
 sage = gnn.SAGEConv(in_dim, out_dim, aggregator="max", key=key)
 y = sage(x, senders, receivers)  # (3, 16) -> (3, 32)
+```
+
+```python
+sage = gnn.SAGEConv((src_dim, dst_dim), out_dim, key=key)
+y_dst = sage((x_src, x_dst), senders, receivers)
 ```

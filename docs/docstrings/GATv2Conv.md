@@ -4,8 +4,9 @@ Fixes a limitation of `GATConv` where attention rankings are "static" (identical
 
 Parameters
 ----------
-in_dim : int
-    Input node feature dimension.
+in_dim : int | tuple[int, int]
+    Input node feature dimension. Pass `(src_dim, dst_dim)` for bipartite
+    source and destination features with different widths.
 out_dim : int
     Output node feature dimension. Must be divisible by `num_heads`.
 num_heads : int, default=1
@@ -30,7 +31,8 @@ key : jax.Array
 Attributes
 ----------
 w_sender, w_receiver : Param
-    Separate sender and receiver projections of shape `(in_dim, out_dim)`.
+    Separate sender and receiver projections of shape `(src_dim, out_dim)` and
+    `(dst_dim, out_dim)` respectively.
 att : Param
     Per-head attention vector of shape `(num_heads, out_dim // num_heads)`.
 b_out : Param | None
@@ -53,6 +55,11 @@ y = gat(x, senders, receivers)  # (3, 16) -> (3, 32)
 x_edge = jnp.ones((num_edges, edge_dim))
 gat_edges = gnn.GATv2Conv(in_dim, out_dim, num_heads=4, edge_dim=edge_dim, key=key)
 y = gat_edges(x, senders, receivers, x_edge=x_edge)  # (3, 16) -> (3, 32)
+```
+
+```python
+gat = gnn.GATv2Conv((src_dim, dst_dim), out_dim, num_heads=4, key=key)
+y_dst = gat((x_src, x_dst), senders, receivers)
 ```
 
 Info

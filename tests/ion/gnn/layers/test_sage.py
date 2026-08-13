@@ -45,6 +45,21 @@ class TestSAGEConv:
         y = sage(x, senders, receivers)
         npt.assert_allclose(y, expected, rtol=1e-5, atol=1e-5)
 
+    def test_bipartite_output_manual(self):
+        """Bipartite inputs pool sources into the destination node set."""
+        sage = gnn.SAGEConv((2, 4), 3, key=jax.random.key(0))
+        x_src = jax.random.normal(jax.random.key(1), (3, 2))
+        x_dst = jax.random.normal(jax.random.key(2), (2, 4))
+        senders = jnp.array([0, 2, 1])
+        receivers = jnp.array([0, 0, 1])
+
+        neigh = jnp.stack([(x_src[0] + x_src[2]) / 2, x_src[1]])
+        expected = neigh @ sage.w_neigh + x_dst @ sage.w_self + sage.b  # type: ignore[operator]
+        y = sage((x_src, x_dst), senders, receivers)
+
+        assert y.shape == (2, 3)
+        npt.assert_allclose(y, expected, rtol=1e-5, atol=1e-5)
+
     def test_no_bias(self, triangle_graph):
         """No-bias mode: bias field is None, output still has correct shape."""
         sage = gnn.SAGEConv(8, 16, use_bias=False, key=jax.random.key(0))
