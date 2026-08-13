@@ -47,18 +47,18 @@ Example
 -------
 ```python
 # Three-node cycle whose edges carry two relation types
-num_nodes, in_dim, out_dim = 3, 16, 32
+num_nodes, num_relations, in_dim, out_dim = 3, 2, 16, 32
 x = jnp.ones((num_nodes, in_dim))
 senders = jnp.array([0, 1, 2])
 receivers = jnp.array([1, 2, 0])
 edge_type = jnp.array([0, 1, 0])
 
-conv = gnn.RGCNConv(in_dim, out_dim, 2, key=key)
+conv = gnn.RGCNConv(in_dim, out_dim, num_relations, key=key)
 y = conv(x, senders, receivers, edge_type=edge_type)  # (3, 16) -> (3, 32)
 ```
 
 ```python
-conv = gnn.RGCNConv(in_dim, out_dim, 12, num_bases=2, key=key)
+conv = gnn.RGCNConv(in_dim, out_dim, num_relations, num_bases=2, key=key)
 ```
 
 Note

@@ -2,6 +2,7 @@
 
 ## 0.15.2
 
+- **`gnn.HGTConv`.** Heterogeneous graph transformer. Key, query, value, and output projections follow a per-node `node_type` array while attention matrices, message matrices, and a learned prior follow a per-edge `edge_type` array. Attention is normalized over all of a node's incoming edges at once, so relations compete rather than being combined after separate softmaxes.
 - **`gnn.RGCNConv`.** Gives each edge type its own neighbour transform, selected by a per-edge `edge_type` index array so one edge list carries every relation. `num_bases` builds each relation's transform from shared matrices, holding the parameter count flat as relations grow.
 - **Bipartite message passing.** Every message-passing layer except `GCNConv` accepts `(x_src, x_dst)` node features and returns one row per destination node. Pass `in_dim` as a `(src_dim, dst_dim)` tuple to give each partition its own input projection.
 

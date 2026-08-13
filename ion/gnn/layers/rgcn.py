@@ -46,15 +46,12 @@ class RGCNConv(Module):
         key: PRNGKeyArray,
     ) -> None:
 
+        neigh_shape = (num_bases or num_relations, in_dim, out_dim)
+        coeff_shape = (num_relations, num_bases or 0)
+
         key_neigh, key_coeff, key_self, key_b = jax.random.split(key, 4)
-        self.w_neigh = Param(
-            w_init(shape=(num_bases or num_relations, in_dim, out_dim), key=key_neigh)
-        )
-        self.w_coeff = (
-            Param(w_init(shape=(num_relations, num_bases), key=key_coeff))
-            if num_bases is not None
-            else None
-        )
+        self.w_neigh = Param(w_init(shape=neigh_shape, key=key_neigh))
+        self.w_coeff = Param(w_init(shape=coeff_shape, key=key_coeff)) if num_bases else None
         self.w_self = Param(w_init(shape=(in_dim, out_dim), key=key_self))
         self.b = Param(b_init(shape=(out_dim,), key=key_b)) if use_bias else None
 
