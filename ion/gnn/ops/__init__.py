@@ -11,7 +11,7 @@ from .graph import (
     to_adjacency,
     to_undirected,
 )
-from .pool import max_pool, mean_pool, sum_pool
+from .pool import max_pool, mean_pool, min_pool, sum_pool
 from .segment import (
     segment_max,
     segment_mean,
@@ -32,6 +32,7 @@ __all__ = [
     "line_graph",
     "max_pool",
     "mean_pool",
+    "min_pool",
     "remove_self_loops",
     "segment_max",
     "segment_mean",

@@ -42,6 +42,10 @@ Floating-point segment sum, mean, variance, standard deviation, and softmax oper
     options:
       heading_level: 3
 
+::: ion.gnn.min_pool
+    options:
+      heading_level: 3
+
 ## Topology
 
 ::: ion.gnn.add_self_loops

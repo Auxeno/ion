@@ -460,13 +460,14 @@ logits.shape   # (2, num_classes)
 
 `graph_ids` serves the role normally played by a batch index, allowing the packed node representations to be reduced back to one row per graph.
 
-Ion provides three fixed graph readouts:
+Ion provides four fixed graph readouts:
 
 | Operation | Reduction |
 |---|---|
 | `mean_pool` | Mean node representation |
 | `sum_pool` | Sum node representation |
 | `max_pool` | Maximum node representation |
+| `min_pool` | Minimum node representation |
 
 Sum pooling preserves graph-size information, while mean pooling normalizes it away. The [Operations reference](operations.md) documents the complete pooling APIs.
 
