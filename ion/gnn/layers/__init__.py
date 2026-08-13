@@ -6,6 +6,7 @@ from .gated_gcn import GatedGCNConv
 from .gcn import GCNConv, GraphConv
 from .gin import GINConv, GINEConv
 from .readout import GlobalAttentionPool
+from .rgcn import RGCNConv
 from .sage import SAGEConv
 from .transformer import TransformerConv
 
@@ -19,6 +20,7 @@ __all__ = [
     "GINEConv",
     "GatedGCNConv",
     "GlobalAttentionPool",
+    "RGCNConv",
     "SAGEConv",
     "TransformerConv",
 ]

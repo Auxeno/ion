@@ -17,8 +17,10 @@ an input is optional or required is described on the layer's reference page.
 | [`TransformerConv`](gat.md#ion.gnn.TransformerConv) | ✓&ensp;✓ | ✓&ensp;— | ✓ |
 | [`GINConv`](gin.md#ion.gnn.GINConv) | ✓&ensp;✓ | —&ensp;— | ✓ |
 | [`GINEConv`](gin.md#ion.gnn.GINEConv) | ✓&ensp;✓ | ✓&ensp;— | ✓ |
+| [`RGCNConv`](rgcn.md#ion.gnn.RGCNConv) | ✓&ensp;✓ | —&ensp;— | |
 | [`GatedGCNConv`](gated_gcn.md#ion.gnn.GatedGCNConv) | ✓&ensp;✓ | ✓&ensp;✓ | ✓ |
 | [`EdgeUpdate`](edge.md#ion.gnn.EdgeUpdate) | ✓&ensp;— | ✓&ensp;✓ | ✓ |
 
-`GraphConv` can additionally scale messages with scalar `edge_weight` values;
-these are not edge feature vectors.
+`GraphConv` can additionally scale messages with scalar `edge_weight` values and
+`RGCNConv` selects a transform with integer `edge_type` values; neither is an
+edge feature vector.

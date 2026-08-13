@@ -161,6 +161,7 @@ y = model(x, training=True)
 | [GraphSAGE](gnn/layers/sage.md) | `SAGEConv` |
 | [Graph Attention](gnn/layers/gat.md) | `GATConv`, `GATv2Conv`, `TransformerConv` |
 | [Graph Isomorphism Network](gnn/layers/gin.md) | `GINConv`, `GINEConv` |
+| [Relational Graph Convolution](gnn/layers/rgcn.md) | `RGCNConv` |
 | [Gated Graph Convolution](gnn/layers/gated_gcn.md) | `GatedGCNConv` |
 | [Edge Update](gnn/layers/edge.md) | `EdgeUpdate` |
 | [Graph Readout](gnn/layers/readout.md) | `GlobalAttentionPool` |

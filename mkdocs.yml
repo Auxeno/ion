@@ -63,6 +63,7 @@ nav:
           - GraphSAGE: gnn/layers/sage.md
           - Graph Attention: gnn/layers/gat.md
           - Graph Isomorphism Network: gnn/layers/gin.md
+          - Relational Graph Convolution: gnn/layers/rgcn.md
           - Gated Graph Convolution: gnn/layers/gated_gcn.md
           - Edge Update: gnn/layers/edge.md
           - Readout: gnn/layers/readout.md

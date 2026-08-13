@@ -10,6 +10,7 @@ from .layers import (
     GINEConv,
     GlobalAttentionPool,
     GraphConv,
+    RGCNConv,
     SAGEConv,
     TransformerConv,
 )
@@ -45,6 +46,7 @@ __all__ = [
     "GINEConv",
     "GatedGCNConv",
     "GlobalAttentionPool",
+    "RGCNConv",
     "SAGEConv",
     "TransformerConv",
     "add_self_loops",
