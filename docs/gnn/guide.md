@@ -260,6 +260,21 @@ construct them from the two incident nodes alone, or pass another compatible
 reduction such as `aggregate=gnn.segment_mean`. The supplied models own all
 parameters; `GraphNetwork` applies no activation, normalization, or residual.
 
+The two stages are also available separately. `EdgeUpdate` creates new edge
+features from their incident nodes. `NodeUpdate` accepts already-computed edge
+features, so node-only message passing does not need an edge model:
+
+```python
+x_edge = x[senders]
+node_model = nn.Linear(node_dim + node_dim, out_dim, key=key)
+update = gnn.NodeUpdate(node_model, aggregate=gnn.segment_mean)
+x = update(x, senders, receivers, x_edge=x_edge)
+```
+
+Both index arrays remain in the call signature because each feature row belongs
+to the directed edge `(senders[i], receivers[i])`; only `receivers` is needed
+for the reduction itself.
+
 ## Self-loops
 
 A node is not automatically its own neighbour. `GCNConv`, `GATConv`, and `GATv2Conv` normally need self-loop edges so each node can retain its current features:
@@ -280,6 +295,7 @@ This appends `(0, 0)`, `(1, 1)`, through `(5, 5)`. Self-loops are explicit and a
 | `TransformerConv` | No | The root weight includes the node by default |
 | `GINConv`, `GINEConv` | No | The `(1 + eps)` term already includes the node |
 | `GraphNetwork` | No | The node model receives the current node directly |
+| `NodeUpdate` | No | The node model receives the current node directly |
 | `GatedGCNConv` | No | The root weight already includes the node |
 
 `add_self_loops` appends one loop for every node. It does not check whether the input already contains self-loops, so avoid calling it twice on the same edge arrays. When using edge features or a mask, also append one corresponding row or value for every new self-loop.
@@ -318,9 +334,9 @@ the two node sets must have the same feature width. `GINEConv` edge features
 must share that width too.
 
 `GraphConv`, `SAGEConv`, `GATConv`, `GATv2Conv`, `TransformerConv`, `GINConv`,
-`GINEConv`, `GraphNetwork`, `EdgeUpdate`, and `GatedGCNConv` accept bipartite
-inputs. `GCNConv` does not: its symmetric degree normalization assumes one
-shared node domain.
+`GINEConv`, `GraphNetwork`, `EdgeUpdate`, `NodeUpdate`, and `GatedGCNConv`
+accept bipartite inputs. `GCNConv` does not: its symmetric degree normalization
+assumes one shared node domain.
 
 Passing a single array retains the usual homogeneous behavior and is equivalent
 to passing `(x, x)`. A bipartite call only updates the destination node set. To

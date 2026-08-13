@@ -1,7 +1,9 @@
 # Composite
 
-Compose caller-supplied models into edge and node updates. `GraphNetwork` updates both representations around a configurable edge-to-node reduction; `EdgeUpdate` applies only the first stage.
+Compose caller-supplied models into the edge and node updates of a Graph Network block. `EdgeUpdate` transforms edge state, `NodeUpdate` reduces edge features into nodes, and `GraphNetwork` performs both stages in sequence.
 
 ::: ion.gnn.GraphNetwork
 
 ::: ion.gnn.EdgeUpdate
+
+::: ion.gnn.NodeUpdate

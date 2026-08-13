@@ -1,7 +1,7 @@
 """Graph neural network layer implementations."""
 
 from .attention import GATConv, GATv2Conv, TransformerConv
-from .composite import EdgeUpdate, GraphNetwork
+from .composite import EdgeUpdate, GraphNetwork, NodeUpdate
 from .conv import GCNConv, GraphConv, SAGEConv
 from .gated import GatedGCNConv
 from .isomorphism import GINConv, GINEConv
@@ -20,6 +20,7 @@ __all__ = [
     "GatedGCNConv",
     "GlobalAttentionPool",
     "HGTConv",
+    "NodeUpdate",
     "RGCNConv",
     "SAGEConv",
     "TransformerConv",

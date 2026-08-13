@@ -7,6 +7,9 @@ features, then applies a caller-supplied model:
 e'_{ij} = \phi_e([x_i, x_j, e_{ij}]).
 \]
 
+Omit `x_edge` to build edge representations from the incident nodes alone, as
+the edge stage of [`GraphNetwork`](#ion.gnn.GraphNetwork) does.
+
 Parameters
 ----------
 edge_model : Callable[[jax.Array], jax.Array]

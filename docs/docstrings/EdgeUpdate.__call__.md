@@ -8,8 +8,9 @@ senders : jax.Array["e", int]
     Source node index for each directed edge.
 receivers : jax.Array["e", int]
     Destination node index for each directed edge.
-x_edge : jax.Array["e f", float]
-    Current feature vector for each directed edge. Keyword-only.
+x_edge : jax.Array["e f", float] | None, default=None
+    Current feature vector for each directed edge. Keyword-only. When omitted,
+    the edge model receives only sender and receiver features.
 
 Returns
 -------
