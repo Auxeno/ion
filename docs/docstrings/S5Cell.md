@@ -2,6 +2,23 @@ Single-step S5 cell ([Smith et al., 2023](https://arxiv.org/abs/2208.04933)).
 
 A diagonal state space model with a single state shared across all features (multi-input multi-output), in contrast to `S4D`'s per-feature states. One complex diagonal recurrence mixes every input channel through `B` and reads out through `C`. Use `S5` to scan a whole sequence.
 
+With diagonal \(A\), zero-order-hold discretization and the recurrent update are
+
+\[
+\begin{gathered}
+\bar A = e^{A\Delta}, \qquad
+\bar B = B \odot A^{-1}(\bar A-I), \qquad
+h_t = \bar A \odot h_{t-1} + x_t \bar B,
+\\[4pt]
+y_t = 2\operatorname{Re}(h_t C) + D \odot x_t.
+\end{gathered}
+\]
+
+The factor of two recovers the contribution from the conjugate eigenvalues
+that are not stored explicitly. Unlike S4D, the dense \(B\) and \(C\)
+projections couple every feature to one shared state; `S5` evaluates the same
+update with an associative scan.
+
 Parameters
 ----------
 in_dim : int

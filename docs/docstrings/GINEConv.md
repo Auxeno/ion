@@ -1,9 +1,15 @@
 Graph Isomorphism Network layer with edge features ([Hu et al., 2020](https://arxiv.org/abs/1905.12265)).
 
 Adds edge features to each message before a ReLU, then sum-aggregates and applies
-a caller-supplied MLP: \(h_i' = \operatorname{MLP}((1 + \epsilon)h_i +
-\sum_{j \in \mathcal{N}(i)} \operatorname{ReLU}(h_j + e_{ji}))\). Edge features
-share the node feature dimension, so embed them to that width first.
+a caller-supplied MLP:
+
+\[
+h_i' = \operatorname{MLP}\!\left((1 + \epsilon)h_i +
+\sum_{j \in \mathcal{N}(i)} \operatorname{ReLU}(h_j + e_{ji})\right).
+\]
+
+Edge features share the node feature dimension, so embed them to that width
+first.
 
 Parameters
 ----------

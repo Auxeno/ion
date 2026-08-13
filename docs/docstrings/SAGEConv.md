@@ -1,6 +1,11 @@
 GraphSAGE layer ([Hamilton et al., 2017](https://arxiv.org/abs/1706.02216)).
 
-Pools neighbour features with a permutation-invariant aggregator, then combines them with a separately transformed copy of the central node, \(W_n \, \mathrm{agg}(x_j) + W_s \, x_i\).
+Pools neighbour features with a permutation-invariant aggregator, then combines
+them with a separately transformed copy of the central node:
+
+\[
+x'_i = W_n\,\operatorname{agg}_{j\in\mathcal N(i)}(x_j) + W_s x_i.
+\]
 
 Parameters
 ----------

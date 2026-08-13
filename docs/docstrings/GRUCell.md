@@ -2,6 +2,20 @@ Single-step GRU cell ([Cho et al., 2014](https://arxiv.org/abs/1406.1078)).
 
 Computes one timestep of the reset, update, and candidate gates, returning the new hidden state. Use `GRU` to scan a whole sequence.
 
+Split the input and hidden projections into reset, update, and candidate parts:
+
+\[
+\begin{gathered}
+(r_x,z_x,n_x)=x_tW_i+b_i, \qquad
+(r_h,z_h,n_h)=h_{t-1}W_h+b_h,
+\\[4pt]
+r_t=\sigma(r_x+r_h), \qquad z_t=\sigma(z_x+z_h), \qquad
+n_t=\tanh(n_x+r_t\odot n_h),
+\\[4pt]
+h_t=(1-z_t)\odot n_t+z_t\odot h_{t-1}.
+\end{gathered}
+\]
+
 Parameters
 ----------
 in_dim : int

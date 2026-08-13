@@ -2,6 +2,17 @@ Single-step LSTM cell ([Hochreiter & Schmidhuber, 1997](https://doi.org/10.1162/
 
 Computes one timestep of the input, forget, cell, and output gates, returning the new hidden and cell states `(h, c)`. Use `LSTM` to scan a whole sequence.
 
+\[
+\begin{gathered}
+(i_t,f_t,g_t,o_t)
+= (\sigma,\sigma,\tanh,\sigma)(x_tW_i+h_{t-1}W_h+b),
+\\[4pt]
+c_t=f_t\odot c_{t-1}+i_t\odot g_t,
+\qquad
+h_t=o_t\odot\tanh(c_t).
+\end{gathered}
+\]
+
 Parameters
 ----------
 in_dim : int

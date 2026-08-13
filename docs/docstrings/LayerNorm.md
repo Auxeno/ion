@@ -2,6 +2,13 @@ Layer normalization over the last dimension ([Ba et al., 2016](https://arxiv.org
 
 Normalizes each input vector to zero mean and unit variance across its features, then applies a learnable elementwise scale and bias.
 
+\[
+\operatorname{LayerNorm}(x)
+= \gamma \odot \frac{x-\mu}{\sqrt{\sigma^2+\epsilon}} + \beta,
+\qquad
+\mu=\frac{1}{d}\sum_{k=1}^d x_k.
+\]
+
 Parameters
 ----------
 dim : int

@@ -2,6 +2,11 @@ Root mean square normalization over the last dimension ([Zhang & Sennrich, 2019]
 
 Rescales each input vector by its root mean square without subtracting the mean, then applies a learnable elementwise scale. Cheaper than `LayerNorm` and common in modern transformers.
 
+\[
+\operatorname{RMSNorm}(x)
+= \gamma \odot \frac{x}{\sqrt{\frac{1}{d}\sum_{k=1}^d x_k^2+\epsilon}}.
+\]
+
 Parameters
 ----------
 dim : int

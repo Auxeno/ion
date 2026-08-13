@@ -1,6 +1,21 @@
 Graph Attention Network layer ([Velickovic et al., 2018](https://arxiv.org/abs/1710.10903)).
 
-Learns attention weights over each node's neighborhood using LeakyReLU-gated additive attention: \(e_{ij} = \operatorname{LeakyReLU}(a_l^\top W h_i + a_r^\top W h_j)\). Multi-head attention is supported; heads are concatenated.
+Learns attention weights over each node's neighborhood using LeakyReLU-gated
+additive attention. For each head,
+
+\[
+\begin{gathered}
+e_{ij}=\operatorname{LeakyReLU}(a_s^\top W h_i+a_r^\top W h_j),
+\qquad
+\alpha_{ij}=\operatorname{softmax}_{i\in\mathcal N(j)}(e_{ij}),
+\\[4pt]
+h'_j=\operatorname{Concat}_{k=1}^{H}\!\left(
+\sum_{i\in\mathcal N(j)}\alpha_{ij}^{(k)}W^{(k)}h_i\right).
+\end{gathered}
+\]
+
+Optional edge features add a learned edge term to \(e_{ij}\). Multi-head
+outputs are concatenated.
 
 Parameters
 ----------

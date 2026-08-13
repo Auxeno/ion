@@ -1,9 +1,13 @@
 Graph convolutional layer ([Morris et al., 2019](https://arxiv.org/abs/1810.02244)).
 
 Sum-aggregates neighbour features and combines them with a separately
-transformed copy of the central node,
-\(W_n \sum_{j \in \mathcal{N}(i)} e_{ji} x_j + W_s x_i\). When omitted,
-each scalar edge weight \(e_{ji}\) is one.
+transformed copy of the central node:
+
+\[
+x'_i = W_n \sum_{j \in \mathcal{N}(i)} e_{ji} x_j + W_s x_i.
+\]
+
+When omitted, each scalar edge weight \(e_{ji}\) is one.
 
 Parameters
 ----------

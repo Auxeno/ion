@@ -1,10 +1,14 @@
 Graph Isomorphism Network layer ([Xu et al., 2019](https://arxiv.org/abs/1810.00826)).
 
 Sum-aggregates neighbor features and applies a caller-supplied MLP:
-\(h_i' = \operatorname{MLP}((1 + \epsilon)h_i +
-\sum_{j \in \mathcal{N}(i)} h_j)\). Sum aggregation preserves neighbor
-multiplicity, making GIN as discriminative as the Weisfeiler-Lehman graph
-isomorphism test.
+
+\[
+h_i' = \operatorname{MLP}\!\left((1 + \epsilon)h_i +
+\sum_{j \in \mathcal{N}(i)} h_j\right).
+\]
+
+Sum aggregation preserves neighbor multiplicity, making GIN as discriminative
+as the Weisfeiler-Lehman graph isomorphism test.
 
 Parameters
 ----------

@@ -2,6 +2,19 @@ Multi-head attention ([Vaswani et al., 2017](https://arxiv.org/abs/1706.03762)).
 
 Projects the input to queries, keys, and values, and projects the concatenated heads back to `dim`. Keys and values come from the input itself (self-attention) or from a separate context sequence passed as `x_kv` (cross-attention), so one layer covers both. Supports grouped-query attention ([Ainslie et al., 2023](https://arxiv.org/abs/2305.13245)), multi-query attention ([Shazeer, 2019](https://arxiv.org/abs/1911.02150)), sliding-window attention ([Beltagy et al., 2020](https://arxiv.org/abs/2004.05150)), and causal masking.
 
+With the default `attention_fn`, each head computes scaled dot-product
+attention, then the heads are concatenated and projected:
+
+\[
+\operatorname{Attention}(Q,K,V)
+= \operatorname{softmax}\!\left(\frac{QK^\top}{\sqrt{d_h}}\right)V,
+\qquad
+y = \operatorname{Concat}(\mathrm{head}_1,\ldots,\mathrm{head}_H)W_o.
+\]
+
+Grouped-query and multi-query attention share fewer key/value heads across the
+query heads without changing this operation.
+
 Parameters
 ----------
 dim : int

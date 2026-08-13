@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.15.2
+
+- **Bipartite message passing.** Every message-passing layer except `GCNConv` accepts `(x_src, x_dst)` node features and returns one row per destination node. Pass `in_dim` as a `(src_dim, dst_dim)` tuple to give each partition its own input projection.
+
 ## 0.15.1
 
 - **`nn.Identity` restored.** Parameterless pass-through module.

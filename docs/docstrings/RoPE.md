@@ -2,6 +2,20 @@ Rotary positional embeddings ([Su et al., 2021](https://arxiv.org/abs/2104.09864
 
 Rotates adjacent pairs of features by an angle proportional to their position, applied to query and key before attention. Relative position falls out of the dot product, and there are no learnable parameters.
 
+For position \(p\), each adjacent feature pair is rotated at its own frequency:
+
+\[
+\begin{bmatrix}x'_{2k}\\x'_{2k+1}\end{bmatrix}
+=
+\begin{bmatrix}
+\cos\theta_{p,k} & -\sin\theta_{p,k}\\
+\sin\theta_{p,k} & \cos\theta_{p,k}
+\end{bmatrix}
+\begin{bmatrix}x_{2k}\\x_{2k+1}\end{bmatrix},
+\qquad
+\theta_{p,k}=p\,\theta^{-2k/d}.
+\]
+
 Positions form a 1D sequence by default. Passing `shape` lays them out on an N-dimensional lattice instead, giving each axis its own section of the head dimension ([Heo et al., 2024](https://arxiv.org/abs/2403.13298)).
 
 Parameters

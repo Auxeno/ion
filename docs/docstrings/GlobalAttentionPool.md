@@ -2,7 +2,10 @@ Global attention pooling ([Li et al., 2019](https://proceedings.mlr.press/v97/li
 
 Scores each node, normalizes the scores within its graph, and takes an
 attention-weighted sum of node features:
-\(r_g = \sum_{i \in g} \operatorname{softmax}_g(a_i) f(x_i)\).
+
+\[
+r_g = \sum_{i \in g} \operatorname{softmax}_g(a_i) f(x_i).
+\]
 
 Parameters
 ----------

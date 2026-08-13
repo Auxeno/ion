@@ -5,6 +5,35 @@ Receivers produce queries; senders produce keys and values. Optional edge
 features are added to both keys and values. A learned projection of each
 receiving node's features is added to the aggregated messages by default.
 
+For each head, the edge keys and values and the resulting message are
+
+\[
+\begin{gathered}
+q_j = W_q x_j, \qquad
+k_{ij} = W_k x_i + W_e e_{ij}, \qquad
+v_{ij} = W_v x_i + W_e e_{ij},
+\\[4pt]
+m_j = \sum_{i \in \mathcal N(j)}
+\operatorname{softmax}_i\!\left(\frac{q_j^\top k_{ij}}{\sqrt{d_h}}\right)v_{ij}.
+\end{gathered}
+\]
+
+Without edge features, the \(W_e e_{ij}\) terms are omitted. By default,
+
+\[
+x'_j = m_j + W_r x_j.
+\]
+
+With `use_beta=True`, the layer instead learns a gate between the two paths:
+
+\[
+\begin{gathered}
+\beta_j = \sigma\!\left(W_\beta[W_r x_j, m_j, W_r x_j-m_j]\right),
+\\[4pt]
+x'_j = \beta_j W_r x_j + (1-\beta_j)m_j.
+\end{gathered}
+\]
+
 Parameters
 ----------
 in_dim : int | tuple[int, int]

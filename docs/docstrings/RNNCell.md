@@ -1,6 +1,13 @@
 Single-step vanilla RNN cell.
 
-Computes one timestep, \(h' = \tanh(xW_i + hW_h + b)\). Use `RNN` to scan a whole sequence; use the cell directly for custom loops or when threading state across chunks.
+Computes one recurrent update:
+
+\[
+h_t = \tanh(x_tW_i + h_{t-1}W_h + b).
+\]
+
+Use `RNN` to scan a whole sequence; use the cell directly for custom loops or
+when threading state across chunks.
 
 Parameters
 ----------

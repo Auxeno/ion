@@ -3,6 +3,14 @@ Spectral normalization ([Miyato et al., 2018](https://arxiv.org/abs/1802.05957))
 Divides a module parameter by its largest singular value, estimated with power
 iteration.
 
+\[
+\bar W = \frac{W}{\sigma_{\max}(W)}, \qquad
+\sigma_{\max}(W) \approx u^\top Wv.
+\]
+
+The vectors \(u\) and \(v\) are refined by power iteration during training and
+held fixed during evaluation.
+
 Parameters
 ----------
 module : Module
