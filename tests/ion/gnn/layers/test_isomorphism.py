@@ -1,8 +1,7 @@
+from ion import gnn, nn
 import jax
 import jax.numpy as jnp
 import numpy.testing as npt
-
-from ion import gnn, nn
 
 
 class TestGINConv:

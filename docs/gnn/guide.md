@@ -436,7 +436,7 @@ attention_pool = gnn.GlobalAttentionPool(
 graph_h = attention_pool(h, graph_ids, num_graphs=2)
 ```
 
-The score and value modules supply all of the readout's parameters. Omit `value` to pool `h` directly. A bias on a single linear score is redundant because softmax is unchanged by a constant shift. See the [Graph Readout reference](layers/readout.md) for the full API.
+The score and value modules supply all of the readout's parameters. Omit `value` to pool `h` directly. A bias on a single linear score is redundant because softmax is unchanged by a constant shift. See the [Pooling reference](layers/pool.md) for the full API.
 
 ## Static shapes
 

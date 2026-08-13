@@ -1,4 +1,4 @@
-"""Graph readout layers.
+"""Graph pooling layers.
 
 Modules:
     GlobalAttentionPool  Learned attention-weighted graph readout.

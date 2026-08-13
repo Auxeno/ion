@@ -1,27 +1,41 @@
 # Graph neural network layers
 
-Message-passing layers receive a node feature matrix and parallel COO `senders`/`receivers` arrays. Except for `GCNConv`, they also accept an `(x_src, x_dst)` tuple for bipartite message passing. Graph readout layers instead receive `graph_ids` to pool nodes into graph representations. See the [GNN guide](../guide.md) for graph representation, message passing, self-loops, bipartite inputs, batching, and pooling.
+Message-passing layers receive a node feature matrix and parallel COO `senders`/`receivers` arrays. Except for `GCNConv`, they also accept an `(x_src, x_dst)` tuple for bipartite message passing. Graph pooling layers instead receive `graph_ids` to pool nodes into graph representations. See the [GNN guide](../guide.md) for graph representation, message passing, self-loops, bipartite inputs, batching, and pooling.
 
 ## Choose a layer
+
+| Family | Layers |
+|---|---|
+| [Convolution](conv.md) | `GCNConv`, `GraphConv`, `SAGEConv` |
+| [Attention](attention.md) | `GATConv`, `GATv2Conv`, `TransformerConv` |
+| [Isomorphism](isomorphism.md) | `GINConv`, `GINEConv` |
+| [Relational](relational.md) | `RGCNConv`, `HGTConv` |
+| [Gated](gated.md) | `GatedGCNConv` |
+| [Edge Update](edge.md) | `EdgeUpdate` |
+| [Pooling](pool.md) | `GlobalAttentionPool` |
+
+## Feature support
 
 A check means the layer accepts or produces that kind of feature array. Whether
 an input is optional or required is described on the layer's reference page.
 
 | Layer | Nodes<br><small>in&ensp;out</small> | Edges<br><small>in&ensp;out</small> | Bipartite |
 |---|:---:|:---:|:---:|
-| [`GCNConv`](gcn.md#ion.gnn.GCNConv) | ✓&ensp;✓ | —&ensp;— | |
-| [`GraphConv`](gcn.md#ion.gnn.GraphConv) | ✓&ensp;✓ | —&ensp;— | ✓ |
-| [`SAGEConv`](sage.md#ion.gnn.SAGEConv) | ✓&ensp;✓ | —&ensp;— | ✓ |
-| [`GATConv`](gat.md#ion.gnn.GATConv) | ✓&ensp;✓ | ✓&ensp;— | ✓ |
-| [`GATv2Conv`](gat.md#ion.gnn.GATv2Conv) | ✓&ensp;✓ | ✓&ensp;— | ✓ |
-| [`TransformerConv`](gat.md#ion.gnn.TransformerConv) | ✓&ensp;✓ | ✓&ensp;— | ✓ |
-| [`GINConv`](gin.md#ion.gnn.GINConv) | ✓&ensp;✓ | —&ensp;— | ✓ |
-| [`GINEConv`](gin.md#ion.gnn.GINEConv) | ✓&ensp;✓ | ✓&ensp;— | ✓ |
-| [`RGCNConv`](rgcn.md#ion.gnn.RGCNConv) | ✓&ensp;✓ | —&ensp;— | |
-| [`HGTConv`](hgt.md#ion.gnn.HGTConv) | ✓&ensp;✓ | —&ensp;— | |
-| [`GatedGCNConv`](gated_gcn.md#ion.gnn.GatedGCNConv) | ✓&ensp;✓ | ✓&ensp;✓ | ✓ |
+| [`GCNConv`](conv.md#ion.gnn.GCNConv) | ✓&ensp;✓ | —&ensp;— | |
+| [`GraphConv`](conv.md#ion.gnn.GraphConv) | ✓&ensp;✓ | —&ensp;— | ✓ |
+| [`SAGEConv`](conv.md#ion.gnn.SAGEConv) | ✓&ensp;✓ | —&ensp;— | ✓ |
+| [`GATConv`](attention.md#ion.gnn.GATConv) | ✓&ensp;✓ | ✓&ensp;— | ✓ |
+| [`GATv2Conv`](attention.md#ion.gnn.GATv2Conv) | ✓&ensp;✓ | ✓&ensp;— | ✓ |
+| [`TransformerConv`](attention.md#ion.gnn.TransformerConv) | ✓&ensp;✓ | ✓&ensp;— | ✓ |
+| [`GINConv`](isomorphism.md#ion.gnn.GINConv) | ✓&ensp;✓ | —&ensp;— | ✓ |
+| [`GINEConv`](isomorphism.md#ion.gnn.GINEConv) | ✓&ensp;✓ | ✓&ensp;— | ✓ |
+| [`RGCNConv`](relational.md#ion.gnn.RGCNConv) | ✓&ensp;✓ | —&ensp;— | |
+| [`HGTConv`](relational.md#ion.gnn.HGTConv) | ✓&ensp;✓ | —&ensp;— | |
+| [`GatedGCNConv`](gated.md#ion.gnn.GatedGCNConv) | ✓&ensp;✓ | ✓&ensp;✓ | ✓ |
 | [`EdgeUpdate`](edge.md#ion.gnn.EdgeUpdate) | ✓&ensp;— | ✓&ensp;✓ | ✓ |
 
 `GraphConv` can additionally scale messages with scalar `edge_weight` values and
 `RGCNConv` and `HGTConv` select transforms with integer `node_type` and
 `edge_type` values; none of these are edge feature vectors.
+
+[`GlobalAttentionPool`](pool.md#ion.gnn.GlobalAttentionPool) is not a message-passing layer: it takes `graph_ids` rather than an edge list and returns one row per graph. The [graph operations](../operations.md#pooling) page covers the fixed mean, sum, and max readouts.

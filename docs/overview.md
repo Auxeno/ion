@@ -157,16 +157,14 @@ y = model(x, training=True)
 
 | Family | Layers |
 |--------|--------|
-| [Graph Convolution](gnn/layers/gcn.md) | `GCNConv`, `GraphConv` |
-| [GraphSAGE](gnn/layers/sage.md) | `SAGEConv` |
-| [Graph Attention](gnn/layers/gat.md) | `GATConv`, `GATv2Conv`, `TransformerConv` |
-| [Graph Isomorphism Network](gnn/layers/gin.md) | `GINConv`, `GINEConv` |
-| [Relational Graph Convolution](gnn/layers/rgcn.md) | `RGCNConv` |
-| [Heterogeneous Graph Transformer](gnn/layers/hgt.md) | `HGTConv` |
-| [Gated Graph Convolution](gnn/layers/gated_gcn.md) | `GatedGCNConv` |
+| [Convolution](gnn/layers/conv.md) | `GCNConv`, `GraphConv`, `SAGEConv` |
+| [Attention](gnn/layers/attention.md) | `GATConv`, `GATv2Conv`, `TransformerConv` |
+| [Isomorphism](gnn/layers/isomorphism.md) | `GINConv`, `GINEConv` |
+| [Relational](gnn/layers/relational.md) | `RGCNConv`, `HGTConv` |
+| [Gated](gnn/layers/gated.md) | `GatedGCNConv` |
 | [Edge Update](gnn/layers/edge.md) | `EdgeUpdate` |
-| [Graph Readout](gnn/layers/readout.md) | `GlobalAttentionPool` |
-| [Operations](gnn/operations.md) | segment reductions, fixed graph readouts, graph transforms |
+| [Pooling](gnn/layers/pool.md) | `GlobalAttentionPool` |
+| [Operations](gnn/operations.md) | segment reductions, pooling, topology, batching |
 
 Graphs are plain arrays in COO format: node features plus `senders`/`receivers` edge indices.
 

@@ -1,15 +1,12 @@
 """Graph neural network layer implementations."""
 
+from .attention import GATConv, GATv2Conv, TransformerConv
+from .conv import GCNConv, GraphConv, SAGEConv
 from .edge import EdgeUpdate
-from .gat import GATConv, GATv2Conv
-from .gated_gcn import GatedGCNConv
-from .gcn import GCNConv, GraphConv
-from .gin import GINConv, GINEConv
-from .hgt import HGTConv
-from .readout import GlobalAttentionPool
-from .rgcn import RGCNConv
-from .sage import SAGEConv
-from .transformer import TransformerConv
+from .gated import GatedGCNConv
+from .isomorphism import GINConv, GINEConv
+from .pool import GlobalAttentionPool
+from .relational import HGTConv, RGCNConv
 
 __all__ = [
     "EdgeUpdate",

@@ -355,12 +355,7 @@ class TestLineGraph:
         receivers = jnp.array([1, 2, 0, 0])
         ls, lr, _ = gnn.line_graph(senders, receivers, non_backtracking=False)
         pairs = sorted(zip(ls.tolist(), lr.tolist()))
-        expected = sorted(
-            (a, b)
-            for a in range(4)
-            for b in range(4)
-            if receivers[a] == senders[b]
-        )
+        expected = sorted((a, b) for a in range(4) for b in range(4) if receivers[a] == senders[b])
         assert pairs == expected
 
     def test_non_backtracking_drops_reverse_pairs(self):

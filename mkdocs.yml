@@ -59,15 +59,13 @@ nav:
       - Guide: gnn/guide.md
       - Layers:
           - gnn/layers/index.md
-          - Graph Convolution: gnn/layers/gcn.md
-          - GraphSAGE: gnn/layers/sage.md
-          - Graph Attention: gnn/layers/gat.md
-          - Graph Isomorphism Network: gnn/layers/gin.md
-          - Relational Graph Convolution: gnn/layers/rgcn.md
-          - Heterogeneous Graph Transformer: gnn/layers/hgt.md
-          - Gated Graph Convolution: gnn/layers/gated_gcn.md
+          - Convolution: gnn/layers/conv.md
+          - Attention: gnn/layers/attention.md
+          - Isomorphism: gnn/layers/isomorphism.md
+          - Relational: gnn/layers/relational.md
+          - Gated: gnn/layers/gated.md
           - Edge Update: gnn/layers/edge.md
-          - Readout: gnn/layers/readout.md
+          - Pooling: gnn/layers/pool.md
       - Operations: gnn/operations.md
   - Workflows: workflows.md
   - Sharp Edges: sharp-edges.md

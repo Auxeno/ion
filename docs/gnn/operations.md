@@ -1,6 +1,6 @@
 # Graph operations
 
-Segment reductions, fixed graph readouts, and graph-building helpers. These functions back the GNN layers and can also be composed into custom message-passing layers. The [GNN guide](guide.md) explains the array conventions and `graph_ids`.
+Segment reductions, fixed graph pooling, topology edits, and batching. These functions back the GNN layers and can also be composed into custom message-passing layers. The [GNN guide](guide.md) explains the array conventions and `graph_ids`.
 
 Floating-point segment sum, mean, variance, standard deviation, and softmax operations, including graph sum and mean pooling, compute in `float32` for numerical stability, then cast back to the input dtype.
 
@@ -28,7 +28,7 @@ Floating-point segment sum, mean, variance, standard deviation, and softmax oper
     options:
       heading_level: 3
 
-## Fixed graph readout
+## Pooling
 
 ::: ion.gnn.mean_pool
     options:
@@ -42,7 +42,7 @@ Floating-point segment sum, mean, variance, standard deviation, and softmax oper
     options:
       heading_level: 3
 
-## Graph construction
+## Topology
 
 ::: ion.gnn.add_self_loops
     options:
@@ -75,6 +75,8 @@ Floating-point segment sum, mean, variance, standard deviation, and softmax oper
 ::: ion.gnn.from_adjacency
     options:
       heading_level: 3
+
+## Batching
 
 ::: ion.gnn.batch_graphs
     options:

@@ -11,7 +11,7 @@ from .graph import (
     to_adjacency,
     to_undirected,
 )
-from .readout import max_pool, mean_pool, sum_pool
+from .pool import max_pool, mean_pool, sum_pool
 from .segment import (
     segment_max,
     segment_mean,

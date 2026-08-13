@@ -1,4 +1,4 @@
-"""Graph-level readout operations."""
+"""Fixed graph-level pooling operations."""
 
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Int

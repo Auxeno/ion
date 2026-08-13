@@ -1,10 +1,9 @@
+from ion import gnn, nn
+from jax.nn.initializers import zeros
 import jax
 import jax.numpy as jnp
-from jax.nn.initializers import zeros
 import numpy.testing as npt
 import pytest
-
-from ion import gnn, nn
 
 
 class TestGlobalAttentionPool:
@@ -20,9 +19,7 @@ class TestGlobalAttentionPool:
         logits = score(x)
         weights_0 = jax.nn.softmax(logits[:2], axis=0)
         weights_1 = jax.nn.softmax(logits[2:], axis=0)
-        expected = jnp.stack(
-            [(weights_0 * x[:2]).sum(axis=0), (weights_1 * x[2:]).sum(axis=0)]
-        )
+        expected = jnp.stack([(weights_0 * x[:2]).sum(axis=0), (weights_1 * x[2:]).sum(axis=0)])
         npt.assert_allclose(y, expected, rtol=1e-6, atol=1e-6)
 
     def test_uniform_attention_matches_mean_pool(self):

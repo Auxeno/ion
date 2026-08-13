@@ -1,4 +1,4 @@
-# Graph Isomorphism Network
+# Isomorphism
 
 Sum-aggregating graph convolution with a caller-supplied update MLP.
 
