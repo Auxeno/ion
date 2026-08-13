@@ -417,6 +417,116 @@ class TestLineGraph:
         npt.assert_allclose(out.ravel(), jnp.array([0.0, 1.0, 1.0]))
 
 
+class TestToAdjacency:
+    def test_marks_present_edges(self):
+        """Entry (i, j) is one exactly when the edge i -> j exists."""
+        senders = jnp.array([0, 1, 2])
+        receivers = jnp.array([1, 2, 0])
+        adjacency = gnn.to_adjacency(senders, receivers, 3)
+        expected = jnp.array([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]])
+        npt.assert_allclose(adjacency, expected)
+
+    def test_isolated_nodes_give_empty_rows(self):
+        """A node with no edges contributes an all-zero row and column."""
+        senders = jnp.array([0])
+        receivers = jnp.array([1])
+        adjacency = gnn.to_adjacency(senders, receivers, 3)
+        npt.assert_allclose(adjacency[2], jnp.zeros(3))
+        npt.assert_allclose(adjacency[:, 2], jnp.zeros(3))
+
+    def test_duplicate_edges_collapse(self):
+        """Repeated edges set the same entry, so the matrix stays binary."""
+        senders = jnp.array([0, 0, 0])
+        receivers = jnp.array([1, 1, 1])
+        adjacency = gnn.to_adjacency(senders, receivers, 2)
+        npt.assert_allclose(adjacency, jnp.array([[0.0, 1.0], [0.0, 0.0]]))
+
+    def test_direction_is_sender_to_receiver(self):
+        """A one-way edge fills one triangle only."""
+        adjacency = gnn.to_adjacency(jnp.array([0]), jnp.array([1]), 2)
+        assert adjacency[0, 1] == 1.0
+        assert adjacency[1, 0] == 0.0
+
+    def test_undirected_input_is_symmetric(self):
+        """Adding reverse edges first gives a symmetric matrix."""
+        senders, receivers, _ = gnn.to_undirected(jnp.array([0, 1]), jnp.array([1, 2]))
+        adjacency = gnn.to_adjacency(senders, receivers, 3)
+        npt.assert_allclose(adjacency, adjacency.T)
+
+    def test_degree_matches_row_and_column_sums(self):
+        """Row sums are out-degree and column sums are in-degree."""
+        senders = jnp.array([0, 0, 1])
+        receivers = jnp.array([1, 2, 2])
+        adjacency = gnn.to_adjacency(senders, receivers, 3)
+        npt.assert_allclose(adjacency.sum(1), gnn.degree(senders, 3))
+        npt.assert_allclose(adjacency.sum(0), gnn.degree(receivers, 3))
+
+    def test_jits(self):
+        """Output shape comes from num_nodes, so the op traces."""
+        senders = jnp.array([0, 1])
+        receivers = jnp.array([1, 2])
+        adjacency = jax.jit(gnn.to_adjacency, static_argnums=2)(senders, receivers, 3)
+        assert adjacency.shape == (3, 3)
+
+
+class TestFromAdjacency:
+    def test_recovers_edges(self):
+        """Nonzero entries come back as edges, sorted by (sender, receiver)."""
+        adjacency = jnp.array([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]])
+        senders, receivers = gnn.from_adjacency(adjacency)
+        npt.assert_array_equal(senders, jnp.array([0, 1, 2]))
+        npt.assert_array_equal(receivers, jnp.array([1, 2, 0]))
+
+    def test_round_trips_coalesced_edges(self):
+        """Canonical edge lists survive a trip through the dense form."""
+        senders, receivers, _ = gnn.coalesce(jnp.array([2, 0, 1]), jnp.array([0, 1, 2]))
+        s, r = gnn.from_adjacency(gnn.to_adjacency(senders, receivers, 3))
+        npt.assert_array_equal(s, senders)
+        npt.assert_array_equal(r, receivers)
+
+    def test_empty_graph(self):
+        """A zero matrix yields no edges."""
+        senders, receivers = gnn.from_adjacency(jnp.zeros((3, 3)))
+        assert senders.shape[0] == 0
+        assert receivers.shape[0] == 0
+
+    def test_num_edges_pads_out_of_range(self):
+        """Spare slots hold the index num_nodes, one past the last node."""
+        adjacency = jnp.array([[0.0, 1.0], [0.0, 0.0]])
+        senders, receivers = gnn.from_adjacency(adjacency, 3)
+        npt.assert_array_equal(senders, jnp.array([0, 2, 2]))
+        npt.assert_array_equal(receivers, jnp.array([1, 2, 2]))
+
+    def test_num_edges_truncates(self):
+        """Edges beyond the requested count are dropped."""
+        adjacency = jnp.ones((2, 2))
+        senders, receivers = gnn.from_adjacency(adjacency, 2)
+        npt.assert_array_equal(senders, jnp.array([0, 0]))
+        npt.assert_array_equal(receivers, jnp.array([0, 1]))
+
+    def test_padding_drops_out_of_segment_reductions(self):
+        """Padded edges scatter nowhere, so aggregation ignores them."""
+        adjacency = jnp.array([[0.0, 1.0], [0.0, 0.0]])
+        senders, receivers = gnn.from_adjacency(adjacency, 4)
+        x_node = jnp.array([[1.0], [2.0]])
+        out = gnn.segment_sum(x_node[senders], receivers, 2)
+        npt.assert_allclose(out, jnp.array([[0.0], [1.0]]))
+
+    def test_jits_with_num_edges(self):
+        """A static edge count makes the op traceable."""
+        adjacency = jnp.array([[0.0, 1.0], [1.0, 0.0]])
+        senders, receivers = jax.jit(gnn.from_adjacency, static_argnums=1)(adjacency, 2)
+        npt.assert_array_equal(senders, jnp.array([0, 1]))
+        npt.assert_array_equal(receivers, jnp.array([1, 0]))
+
+    def test_any_nonzero_counts_as_an_edge(self):
+        """Weighted matrices give the same topology as binary ones."""
+        adjacency = jnp.array([[0.0, 0.5], [2.0, 0.0]])
+        senders, receivers = gnn.from_adjacency(adjacency)
+        npt.assert_array_equal(senders, jnp.array([0, 1]))
+        npt.assert_array_equal(receivers, jnp.array([1, 0]))
+
+
 class TestReexports:
     def test_aliases_jax_ops(self):
         """Unwrapped segment ops are the jax.ops functions themselves."""

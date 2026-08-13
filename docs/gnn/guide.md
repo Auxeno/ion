@@ -181,6 +181,17 @@ The complete graph representation consists of JAX arrays:
 | `x_edge` | `(num_edges, edge_dim)` | Optional feature vector for each edge |
 | `edge_mask` | `(num_edges,)` | Optional boolean selecting active edges |
 
+### Dense adjacency
+
+Datasets and spectral methods often use an `(n, n)` adjacency matrix instead. Convert in either direction:
+
+```python
+adjacency = gnn.to_adjacency(senders, receivers, num_nodes)
+senders, receivers = gnn.from_adjacency(adjacency)
+```
+
+`from_adjacency` produces a data-dependent number of edges, so pass `num_edges` to call it under `jax.jit`. Spare slots hold the out-of-range index `num_nodes`, which segment reductions drop.
+
 ## Message passing
 
 A graph layer uses each directed edge to route information:

@@ -68,6 +68,14 @@ Floating-point segment sum, mean, variance, standard deviation, and softmax oper
     options:
       heading_level: 3
 
+::: ion.gnn.to_adjacency
+    options:
+      heading_level: 3
+
+::: ion.gnn.from_adjacency
+    options:
+      heading_level: 3
+
 ::: ion.gnn.batch_graphs
     options:
       heading_level: 3

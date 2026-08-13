@@ -20,6 +20,7 @@ from .ops import (
     batch_graphs,
     coalesce,
     degree,
+    from_adjacency,
     line_graph,
     max_pool,
     mean_pool,
@@ -33,6 +34,7 @@ from .ops import (
     segment_sum,
     segment_var,
     sum_pool,
+    to_adjacency,
     to_undirected,
     unbatch_graphs,
 )
@@ -55,6 +57,7 @@ __all__ = [
     "batch_graphs",
     "coalesce",
     "degree",
+    "from_adjacency",
     "line_graph",
     "max_pool",
     "mean_pool",
@@ -68,6 +71,7 @@ __all__ = [
     "segment_sum",
     "segment_var",
     "sum_pool",
+    "to_adjacency",
     "to_undirected",
     "unbatch_graphs",
 ]

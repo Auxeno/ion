@@ -1,14 +1,16 @@
 """Graph topology operations."""
 
 import jax.numpy as jnp
-from jaxtyping import Array, Int
+from jaxtyping import Array, Float, Int
 
 __all__ = [
     "add_self_loops",
     "coalesce",
     "degree",
+    "from_adjacency",
     "line_graph",
     "remove_self_loops",
+    "to_adjacency",
     "to_undirected",
 ]
 
@@ -79,6 +81,31 @@ def to_undirected(
         jnp.concatenate([senders, receivers]),
         jnp.concatenate([receivers, senders]),
     )
+
+
+def to_adjacency(
+    senders: Int[Array, " e"],
+    receivers: Int[Array, " e"],
+    num_nodes: int,
+) -> Float[Array, " n n"]:
+    """Scatter edges into a dense adjacency matrix.
+
+    >>> adjacency = to_adjacency(senders, receivers, num_nodes)
+    """
+    return jnp.zeros((num_nodes, num_nodes)).at[senders, receivers].set(1.0)
+
+
+def from_adjacency(
+    adjacency: Float[Array, " n n"],
+    num_edges: int | None = None,
+) -> tuple[Int[Array, " e"], Int[Array, " e"]]:
+    """Gather the nonzero entries of a dense adjacency matrix into edges.
+
+    >>> senders, receivers = from_adjacency(adjacency)
+    >>> senders, receivers = from_adjacency(adjacency, num_edges=42)  # jit friendly
+    """
+    senders, receivers = jnp.nonzero(adjacency, size=num_edges, fill_value=adjacency.shape[0])
+    return senders, receivers
 
 
 def line_graph(
