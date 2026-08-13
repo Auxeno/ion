@@ -160,9 +160,9 @@ y = model(x, training=True)
 | [Convolution](gnn/layers/conv.md) | `GCNConv`, `GraphConv`, `SAGEConv` |
 | [Attention](gnn/layers/attention.md) | `GATConv`, `GATv2Conv`, `TransformerConv` |
 | [Isomorphism](gnn/layers/isomorphism.md) | `GINConv`, `GINEConv` |
+| [Composite](gnn/layers/composite.md) | `GraphNetwork`, `EdgeUpdate` |
 | [Relational](gnn/layers/relational.md) | `RGCNConv`, `HGTConv` |
 | [Gated](gnn/layers/gated.md) | `GatedGCNConv` |
-| [Edge Update](gnn/layers/edge.md) | `EdgeUpdate` |
 | [Pooling](gnn/layers/pool.md) | `GlobalAttentionPool` |
 | [Operations](gnn/operations.md) | segment reductions, pooling, topology, batching |
 

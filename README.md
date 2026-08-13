@@ -109,9 +109,9 @@ edge indices.
 | Convolution     | [`GCNConv`](https://auxeno.github.io/ion/gnn/layers/conv/#ion.gnn.GCNConv), [`GraphConv`](https://auxeno.github.io/ion/gnn/layers/conv/#ion.gnn.GraphConv), [`SAGEConv`](https://auxeno.github.io/ion/gnn/layers/conv/#ion.gnn.SAGEConv) |
 | Attention       | [`GATConv`](https://auxeno.github.io/ion/gnn/layers/attention/#ion.gnn.GATConv), [`GATv2Conv`](https://auxeno.github.io/ion/gnn/layers/attention/#ion.gnn.GATv2Conv), [`TransformerConv`](https://auxeno.github.io/ion/gnn/layers/attention/#ion.gnn.TransformerConv) |
 | Isomorphism     | [`GINConv`](https://auxeno.github.io/ion/gnn/layers/isomorphism/#ion.gnn.GINConv), [`GINEConv`](https://auxeno.github.io/ion/gnn/layers/isomorphism/#ion.gnn.GINEConv) |
+| Composite       | [`GraphNetwork`](https://auxeno.github.io/ion/gnn/layers/composite/#ion.gnn.GraphNetwork), [`EdgeUpdate`](https://auxeno.github.io/ion/gnn/layers/composite/#ion.gnn.EdgeUpdate) |
 | Relational      | [`RGCNConv`](https://auxeno.github.io/ion/gnn/layers/relational/#ion.gnn.RGCNConv), [`HGTConv`](https://auxeno.github.io/ion/gnn/layers/relational/#ion.gnn.HGTConv) |
 | Gated           | [`GatedGCNConv`](https://auxeno.github.io/ion/gnn/layers/gated/#ion.gnn.GatedGCNConv) |
-| Edge Update     | [`EdgeUpdate`](https://auxeno.github.io/ion/gnn/layers/edge/#ion.gnn.EdgeUpdate) |
 | Pooling         | [`GlobalAttentionPool`](https://auxeno.github.io/ion/gnn/layers/pool/#ion.gnn.GlobalAttentionPool) |
 
 See the [NN guide](https://auxeno.github.io/ion/nn/guide/) and [GNN guide](https://auxeno.github.io/ion/gnn/guide/) for array formats, spatial layers, and shared conventions.

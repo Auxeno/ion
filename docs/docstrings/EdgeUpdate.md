@@ -9,14 +9,14 @@ e'_{ij} = \phi_e([x_i, x_j, e_{ij}]).
 
 Parameters
 ----------
-edge_model : Module
+edge_model : Callable[[jax.Array], jax.Array]
     Update network applied independently to every concatenated edge input.
     Supplies all of the layer's weights, so `EdgeUpdate` takes no `key` and
     creates none of its own.
 
 Attributes
 ----------
-edge_model : Module
+edge_model : Callable
     The update network passed at construction.
 
 Example

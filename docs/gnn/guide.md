@@ -7,6 +7,7 @@ This guide represents a graph with JAX arrays, follows messages through it, and 
 - [COO format](#coo-format)
 - [Message passing](#message-passing)
 - [Aggregating messages](#aggregating-messages)
+- [Custom message passing](#custom-message-passing)
 - [Self-loops](#self-loops)
 - [Bipartite graphs](#bipartite-graphs)
 - [Feature propagation](#feature-propagation)
@@ -233,6 +234,32 @@ aggregated[4]  # [0.0, 1.0, 1.0, 1.0, 0.0, 1.0] = x[1] + x[2] + x[3] + x[5]
 
 The four messages are grouped into row 4 because their receiver is 4. Node 4's own feature is absent because the graph does not yet contain a `4 -> 4` self-loop. This send-then-group operation is the basis of the GCN, GraphConv, graph attention, GIN, and GraphSAGE layers.
 
+## Custom message passing
+
+`GraphNetwork` composes caller-supplied edge and node models around the same
+reduction. The edge model sees each sender, receiver, and current edge; its
+updated edges are aggregated and passed to the node model with the current node:
+
+```python
+key_edge, key_node = jax.random.split(key)
+edge_model = nn.MLP(
+    [2 * node_dim + edge_dim, hidden_dim, message_dim],
+    key=key_edge,
+)
+node_model = nn.MLP(
+    [node_dim + message_dim, hidden_dim, out_dim],
+    key=key_node,
+)
+
+network = gnn.GraphNetwork(edge_model=edge_model, node_model=node_model)
+x, x_edge = network(x, senders, receivers, x_edge=x_edge)
+```
+
+The updated edges are both returned and used as messages. Omit `x_edge` to
+construct them from the two incident nodes alone, or pass another compatible
+reduction such as `aggregate=gnn.segment_mean`. The supplied models own all
+parameters; `GraphNetwork` applies no activation, normalization, or residual.
+
 ## Self-loops
 
 A node is not automatically its own neighbour. `GCNConv`, `GATConv`, and `GATv2Conv` normally need self-loop edges so each node can retain its current features:
@@ -252,6 +279,7 @@ This appends `(0, 0)`, `(1, 1)`, through `(5, 5)`. Self-loops are explicit and a
 | `GATConv`, `GATv2Conv` | Normally yes | Let a node attend to itself |
 | `TransformerConv` | No | The root weight includes the node by default |
 | `GINConv`, `GINEConv` | No | The `(1 + eps)` term already includes the node |
+| `GraphNetwork` | No | The node model receives the current node directly |
 | `GatedGCNConv` | No | The root weight already includes the node |
 
 `add_self_loops` appends one loop for every node. It does not check whether the input already contains self-loops, so avoid calling it twice on the same edge arrays. When using edge features or a mask, also append one corresponding row or value for every new self-loop.
@@ -290,8 +318,9 @@ the two node sets must have the same feature width. `GINEConv` edge features
 must share that width too.
 
 `GraphConv`, `SAGEConv`, `GATConv`, `GATv2Conv`, `TransformerConv`, `GINConv`,
-`GINEConv`, `EdgeUpdate`, and `GatedGCNConv` accept bipartite inputs. `GCNConv`
-does not: its symmetric degree normalization assumes one shared node domain.
+`GINEConv`, `GraphNetwork`, `EdgeUpdate`, and `GatedGCNConv` accept bipartite
+inputs. `GCNConv` does not: its symmetric degree normalization assumes one
+shared node domain.
 
 Passing a single array retains the usual homogeneous behavior and is equivalent
 to passing `(x, x)`. A bipartite call only updates the destination node set. To

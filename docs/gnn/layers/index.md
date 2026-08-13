@@ -9,9 +9,9 @@ Message-passing layers receive a node feature matrix and parallel COO `senders`/
 | [Convolution](conv.md) | `GCNConv`, `GraphConv`, `SAGEConv` |
 | [Attention](attention.md) | `GATConv`, `GATv2Conv`, `TransformerConv` |
 | [Isomorphism](isomorphism.md) | `GINConv`, `GINEConv` |
+| [Composite](composite.md) | `GraphNetwork`, `EdgeUpdate` |
 | [Relational](relational.md) | `RGCNConv`, `HGTConv` |
 | [Gated](gated.md) | `GatedGCNConv` |
-| [Edge Update](edge.md) | `EdgeUpdate` |
 | [Pooling](pool.md) | `GlobalAttentionPool` |
 
 ## Feature support
@@ -29,10 +29,11 @@ an input is optional or required is described on the layer's reference page.
 | [`TransformerConv`](attention.md#ion.gnn.TransformerConv) | ✓&ensp;✓ | ✓&ensp;— | ✓ |
 | [`GINConv`](isomorphism.md#ion.gnn.GINConv) | ✓&ensp;✓ | —&ensp;— | ✓ |
 | [`GINEConv`](isomorphism.md#ion.gnn.GINEConv) | ✓&ensp;✓ | ✓&ensp;— | ✓ |
+| [`GraphNetwork`](composite.md#ion.gnn.GraphNetwork) | ✓&ensp;✓ | ✓&ensp;✓ | ✓ |
+| [`EdgeUpdate`](composite.md#ion.gnn.EdgeUpdate) | ✓&ensp;— | ✓&ensp;✓ | ✓ |
 | [`RGCNConv`](relational.md#ion.gnn.RGCNConv) | ✓&ensp;✓ | —&ensp;— | |
 | [`HGTConv`](relational.md#ion.gnn.HGTConv) | ✓&ensp;✓ | —&ensp;— | |
 | [`GatedGCNConv`](gated.md#ion.gnn.GatedGCNConv) | ✓&ensp;✓ | ✓&ensp;✓ | ✓ |
-| [`EdgeUpdate`](edge.md#ion.gnn.EdgeUpdate) | ✓&ensp;— | ✓&ensp;✓ | ✓ |
 
 `GraphConv` can additionally scale messages with scalar `edge_weight` values and
 `RGCNConv` and `HGTConv` select transforms with integer `node_type` and

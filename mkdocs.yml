@@ -62,9 +62,9 @@ nav:
           - Convolution: gnn/layers/conv.md
           - Attention: gnn/layers/attention.md
           - Isomorphism: gnn/layers/isomorphism.md
+          - Composite: gnn/layers/composite.md
           - Relational: gnn/layers/relational.md
           - Gated: gnn/layers/gated.md
-          - Edge Update: gnn/layers/edge.md
           - Pooling: gnn/layers/pool.md
       - Operations: gnn/operations.md
   - Workflows: workflows.md

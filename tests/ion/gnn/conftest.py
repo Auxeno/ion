@@ -94,6 +94,16 @@ def _build_gnn_layers(key):
             x_edge_node,
         ),
         (
+            gnn.GraphNetwork(
+                edge_model=nn.MLP([20, 16, 8], key=next(keys)),
+                node_model=nn.MLP([16, 16, 16], key=next(keys)),
+            ),
+            x,
+            senders,
+            receivers,
+            x_edge,
+        ),
+        (
             gnn.EdgeUpdate(nn.MLP([20, 16, 8], key=next(keys))),
             x,
             senders,
@@ -126,6 +136,7 @@ _GNN_PARAM_NAMES = [
     "gin_conv",
     "gin_conv_train_eps",
     "gine_conv",
+    "graph_network",
     "edge_update",
     "gated_gcn_conv",
     "sage_conv",
