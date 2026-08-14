@@ -136,7 +136,9 @@ h = gat(
 
 `GINEConv` also takes edge features, but adds them straight to the sender features instead of projecting them, so `x_edge` must already be at the node dimension and there is no `edge_dim` to set.
 
-The attention layers also accept one boolean mask value per directed edge. `True` keeps an edge and `False` makes the layer ignore it:
+The attention layers, `NodeUpdate`, and `GraphNetwork` accept one boolean mask
+value per directed edge. `True` includes an edge in node aggregation and `False`
+excludes it; `GraphNetwork` still updates and returns every edge representation:
 
 ```python
 edge_mask = jnp.ones(senders_molecule.shape, dtype=bool)

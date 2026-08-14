@@ -11,6 +11,9 @@ receivers : jax.Array["e", int]
 x_edge : jax.Array["e f", float] | None, default=None
     Current feature vector for each directed edge. Keyword-only. When omitted,
     the edge model receives only sender and receiver features.
+edge_mask : jax.Array["e", bool] | None, default=None
+    Boolean edge mask where `True` keeps an updated edge in node aggregation and
+    `False` excludes it. Masked edges are still updated and returned.
 
 Returns
 -------

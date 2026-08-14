@@ -113,6 +113,47 @@ class TestGraphNetwork:
         npt.assert_array_equal(edge_out, jnp.array([[3.0], [4.0]]))
         npt.assert_array_equal(node_out[1], jnp.array([7.0]))
 
+    def test_edge_mask_excludes_messages_but_preserves_edge_updates(self):
+        """Masked edges are updated and returned but do not reach destination nodes."""
+        network = gnn.GraphNetwork(
+            edge_model=lambda inputs: inputs[:, -1:] + 1,
+            node_model=lambda inputs: inputs[:, -1:],
+        )
+        x = jnp.zeros((2, 1))
+        x_edge = jnp.array([[2.0], [3.0]])
+        senders = jnp.array([0, 1])
+        receivers = jnp.array([1, 1])
+        mask = jnp.array([True, False])
+
+        node_out, edge_out = network(
+            x, senders, receivers, x_edge=x_edge, edge_mask=mask
+        )
+
+        npt.assert_array_equal(edge_out, jnp.array([[3.0], [4.0]]))
+        npt.assert_array_equal(node_out[1], jnp.array([3.0]))
+
+    def test_edge_mask_matches_composed_updates(self):
+        """A masked block remains exactly EdgeUpdate followed by NodeUpdate."""
+        edge_model = nn.MLP([10, 6], key=jax.random.key(0))
+        node_model = nn.MLP([10, 5], key=jax.random.key(1))
+        network = gnn.GraphNetwork(edge_model=edge_model, node_model=node_model)
+        x = jax.random.normal(jax.random.key(2), (3, 4))
+        x_edge = jax.random.normal(jax.random.key(3), (4, 2))
+        senders = jnp.array([0, 1, 2, 0])
+        receivers = jnp.array([2, 2, 0, 1])
+        mask = jnp.array([True, False, True, False])
+
+        edge_expected = gnn.EdgeUpdate(edge_model)(x, senders, receivers, x_edge=x_edge)
+        node_expected = gnn.NodeUpdate(node_model)(
+            x, senders, receivers, x_edge=edge_expected, edge_mask=mask
+        )
+        node_result, edge_result = network(
+            x, senders, receivers, x_edge=x_edge, edge_mask=mask
+        )
+
+        npt.assert_allclose(node_result, node_expected, rtol=1e-5, atol=1e-5)
+        npt.assert_allclose(edge_result, edge_expected, rtol=1e-5, atol=1e-5)
+
     def test_edge_features_change_edges_and_nodes(self):
         """Initial edge features affect returned edges and downstream nodes."""
         edge_model = nn.MLP([10, 6], key=jax.random.key(0))
@@ -272,6 +313,35 @@ class TestNodeUpdate:
         result = update(x, senders, receivers, x_edge=x_edge)
 
         npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
+
+    def test_edge_mask_excludes_values_and_mean_count(self):
+        """Masked edges affect neither the mean numerator nor denominator."""
+        update = gnn.NodeUpdate(lambda inputs: inputs[:, -1:], aggregate=gnn.segment_mean)
+        x = jnp.zeros((2, 1))
+        x_edge = jnp.array([[2.0], [10.0], [4.0]])
+        senders = jnp.array([0, 0, 1])
+        receivers = jnp.array([0, 0, 1])
+        mask = jnp.array([True, False, False])
+
+        result = update(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
+
+        npt.assert_array_equal(result, jnp.array([[2.0], [0.0]]))
+
+    def test_edge_mask_jit(self):
+        """Dynamic edge masks work under JIT."""
+        update = gnn.NodeUpdate(lambda inputs: inputs[:, -1:])
+        x = jnp.zeros((2, 1))
+        x_edge = jnp.array([[2.0], [10.0]])
+        senders = jnp.array([0, 0])
+        receivers = jnp.array([1, 1])
+        mask = jnp.array([True, False])
+
+        expected = update(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
+        result = jax.jit(update)(
+            x, senders, receivers, x_edge=x_edge, edge_mask=mask
+        )
+
+        npt.assert_array_equal(result, expected)
 
     def test_isolated_node_receives_zero_sum(self):
         """The default aggregation gives isolated nodes a zero message."""

@@ -9,8 +9,9 @@ e'_{ij} = \phi_e([x_i, x_j, e_{ij}]),
 x'_j = \phi_v([x_j, \rho(\{e'_{ij}\}_{i \in \mathcal N(j)})]).
 \]
 
-The updated edge representations are both returned and used as the messages to
-the node update. Omit `x_edge` to construct them from incident nodes alone.
+The updated edge representations are returned and, unless excluded from node
+aggregation by an optional `edge_mask`, used as messages to the node update.
+Omit `x_edge` to construct them from incident nodes alone.
 
 Each node aggregates only its incoming edges, matching the paper's
 \(E'_i = \{e'_k : r_k = i\}\). Some implementations also aggregate the edges a
@@ -28,7 +29,8 @@ node_model : Callable[[jax.Array], jax.Array]
     aggregated incoming edges.
 aggregate : Callable, default=segment_sum
     Edge-to-node reduction with the signature
-    `aggregate(data, segment_ids, num_segments)`.
+    `aggregate(data, segment_ids, num_segments)`. Custom reductions must ignore
+    segment IDs outside `[0, num_segments)`, as Ion's segment reductions do.
 
 Attributes
 ----------

@@ -12,7 +12,7 @@ normalization, or residual connection.
 from collections.abc import Callable
 
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Int
+from jaxtyping import Array, Bool, Float, Int
 
 from ...nn.module import Module
 from ..ops import segment_sum
@@ -48,6 +48,7 @@ class GraphNetwork(Module):
         receivers: Int[Array, " e"],
         *,
         x_edge: Float[Array, "e f"] | None = None,
+        edge_mask: Bool[Array, " e"] | None = None,
     ) -> tuple[Float[Array, "t o"], Float[Array, "e m"]]:
 
         x_src, x_dst = x if isinstance(x, tuple) else (x, x)
@@ -59,7 +60,10 @@ class GraphNetwork(Module):
             edge_inputs.append(x_edge)
         edge_out = self.edge_model(jnp.concatenate(edge_inputs, axis=-1))
 
-        # Aggregate updated edges at receivers, then update destination nodes
+        # Aggregate updated edges at receivers, excluding masked edges
+        if edge_mask is not None:
+            receivers = jnp.where(edge_mask, receivers, n_dst)
+
         received = self.aggregate(edge_out, receivers, n_dst)
         node_inputs = jnp.concatenate((x_dst, received), axis=-1)
         node_out = self.node_model(node_inputs)
@@ -125,10 +129,15 @@ class NodeUpdate(Module):
         receivers: Int[Array, " e"],
         *,
         x_edge: Float[Array, "e f"],
+        edge_mask: Bool[Array, " e"] | None = None,
     ) -> Float[Array, "t o"]:
 
         x_dst = x[1] if isinstance(x, tuple) else x
         n_dst = x_dst.shape[0]
+
+        # Aggregate edge features at receivers, excluding masked edges
+        if edge_mask is not None:
+            receivers = jnp.where(edge_mask, receivers, n_dst)
 
         received = self.aggregate(x_edge, receivers, n_dst)
         node_inputs = jnp.concatenate((x_dst, received), axis=-1)
