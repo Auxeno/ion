@@ -3,6 +3,7 @@
 ## 0.16.0
 
 - **Breaking: GNN layer modules grouped by family.** `ion.gnn.layers` now names its modules after the mechanism rather than the model, matching `ion.nn.layers`: `conv` (`GCNConv`, `GraphConv`, `SAGEConv`), `attention` (`GATConv`, `GATv2Conv`, `TransformerConv`), `isomorphism`, `composite` (`GraphNetwork`, `EdgeUpdate`, `NodeUpdate`), `relational` (`RGCNConv`, `HGTConv`), `gated`, and `pool`. `ion.gnn.ops.readout` became `ion.gnn.ops.pool`. The flat `ion.gnn` API is unchanged, but direct imports from the old modules such as `ion.gnn.layers.gcn` no longer work, and the documentation pages moved with them.
+- **`gnn.min_pool`.** Elementwise minimum of node features within each graph, completing the fixed readouts alongside `mean_pool`, `sum_pool`, and `max_pool`. Empty graphs give zeros rather than the `+inf` fill `segment_min` leaves behind.
 - **`gnn.GraphNetwork`.** Composes caller-supplied edge and node models around a configurable edge-to-node reduction. Updated edges serve as messages and are returned alongside the updated destination nodes; input edge features are optional.
 - **`gnn.NodeUpdate`.** Aggregates caller-supplied edge features at their receivers, concatenates them with current destination nodes, and applies a caller-supplied node model.
 - **`gnn.EdgeUpdate` edge features are optional.** Omitting `x_edge` builds edge representations from the incident nodes alone, so `GraphNetwork` decomposes into `EdgeUpdate` and `NodeUpdate` for graphs that carry no input edge features as well as for those that do.
