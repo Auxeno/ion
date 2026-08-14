@@ -112,6 +112,7 @@ edge indices.
 | Composite       | [`GraphNetwork`](https://auxeno.github.io/ion/gnn/layers/composite/#ion.gnn.GraphNetwork), [`EdgeUpdate`](https://auxeno.github.io/ion/gnn/layers/composite/#ion.gnn.EdgeUpdate), [`NodeUpdate`](https://auxeno.github.io/ion/gnn/layers/composite/#ion.gnn.NodeUpdate) |
 | Relational      | [`RGCNConv`](https://auxeno.github.io/ion/gnn/layers/relational/#ion.gnn.RGCNConv), [`HGTConv`](https://auxeno.github.io/ion/gnn/layers/relational/#ion.gnn.HGTConv) |
 | Gated           | [`GatedGCNConv`](https://auxeno.github.io/ion/gnn/layers/gated/#ion.gnn.GatedGCNConv) |
+| Normalization   | [`GraphNorm`](https://auxeno.github.io/ion/gnn/layers/norm/#ion.gnn.GraphNorm) |
 | Pooling         | [`GlobalAttentionPool`](https://auxeno.github.io/ion/gnn/layers/pool/#ion.gnn.GlobalAttentionPool), [`MultiHeadAttentionPool`](https://auxeno.github.io/ion/gnn/layers/pool/#ion.gnn.MultiHeadAttentionPool) |
 
 See the [NN guide](https://auxeno.github.io/ion/nn/guide/) and [GNN guide](https://auxeno.github.io/ion/gnn/guide/) for array formats, spatial layers, and shared conventions.

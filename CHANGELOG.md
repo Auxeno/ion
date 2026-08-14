@@ -2,6 +2,7 @@
 
 ## 0.16.1
 
+- **`gnn.GraphNorm`.** Normalizes node features independently within each graph, with a learnable scale on the graph mean.
 - **Composite edge masking.** `gnn.GraphNetwork` and `gnn.NodeUpdate` accept an optional boolean `edge_mask` that excludes masked edges from node aggregation and reduction counts. `GraphNetwork` still updates and returns every edge representation, so masking controls routing without destroying edge state.
 - **Documentation fixes.** Several documentation GNN layer `__call__` docstrings that support bipartite message passing are now annotated that they do so.
 

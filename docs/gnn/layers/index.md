@@ -12,6 +12,7 @@ Message-passing layers receive a node feature matrix and parallel COO `senders`/
 | [Composite](composite.md) | `GraphNetwork`, `EdgeUpdate`, `NodeUpdate` |
 | [Relational](relational.md) | `RGCNConv`, `HGTConv` |
 | [Gated](gated.md) | `GatedGCNConv` |
+| [Normalization](norm.md) | `GraphNorm` |
 | [Pooling](pool.md) | `GlobalAttentionPool`, `MultiHeadAttentionPool` |
 
 ## Feature support
@@ -35,6 +36,7 @@ an input is optional or required is described on the layer's reference page.
 | [`RGCNConv`](relational.md#ion.gnn.RGCNConv) | ✓&ensp;✓ | —&ensp;— | |
 | [`HGTConv`](relational.md#ion.gnn.HGTConv) | ✓&ensp;✓ | —&ensp;— | |
 | [`GatedGCNConv`](gated.md#ion.gnn.GatedGCNConv) | ✓&ensp;✓ | ✓&ensp;✓ | ✓ |
+| [`GraphNorm`](norm.md#ion.gnn.GraphNorm) | ✓&ensp;✓ | —&ensp;— | |
 
 `GraphConv` can additionally scale messages with scalar `edge_weight` values and
 `RGCNConv` and `HGTConv` select transforms with integer `node_type` and
