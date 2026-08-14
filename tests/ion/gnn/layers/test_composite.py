@@ -125,9 +125,7 @@ class TestGraphNetwork:
         receivers = jnp.array([1, 1])
         mask = jnp.array([True, False])
 
-        node_out, edge_out = network(
-            x, senders, receivers, x_edge=x_edge, edge_mask=mask
-        )
+        node_out, edge_out = network(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
 
         npt.assert_array_equal(edge_out, jnp.array([[3.0], [4.0]]))
         npt.assert_array_equal(node_out[1], jnp.array([3.0]))
@@ -147,12 +145,32 @@ class TestGraphNetwork:
         node_expected = gnn.NodeUpdate(node_model)(
             x, senders, receivers, x_edge=edge_expected, edge_mask=mask
         )
-        node_result, edge_result = network(
-            x, senders, receivers, x_edge=x_edge, edge_mask=mask
-        )
+        node_result, edge_result = network(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
 
         npt.assert_allclose(node_result, node_expected, rtol=1e-5, atol=1e-5)
         npt.assert_allclose(edge_result, edge_expected, rtol=1e-5, atol=1e-5)
+
+    def test_edge_mask_separates_node_and_edge_gradients(self):
+        """Masked edges retain edge-output gradients but cannot affect node outputs."""
+        network = gnn.GraphNetwork(
+            edge_model=lambda inputs: jnp.square(inputs[:, -1:]),
+            node_model=lambda inputs: inputs[:, -1:],
+        )
+        x = jnp.zeros((2, 1))
+        x_edge = jnp.array([[2.0], [-3.0], [5.0]])
+        senders = jnp.array([0, 0, 1])
+        receivers = jnp.array([0, 1, 1])
+        mask = jnp.array([True, False, True])
+
+        node_grad = jax.grad(
+            lambda edge: network(x, senders, receivers, x_edge=edge, edge_mask=mask)[0].sum()
+        )(x_edge)
+        edge_grad = jax.grad(
+            lambda edge: network(x, senders, receivers, x_edge=edge, edge_mask=mask)[1].sum()
+        )(x_edge)
+
+        npt.assert_array_equal(node_grad, jnp.array([[4.0], [0.0], [10.0]]))
+        npt.assert_array_equal(edge_grad, jnp.array([[4.0], [-6.0], [10.0]]))
 
     def test_edge_features_change_edges_and_nodes(self):
         """Initial edge features affect returned edges and downstream nodes."""
@@ -327,6 +345,54 @@ class TestNodeUpdate:
 
         npt.assert_array_equal(result, jnp.array([[2.0], [0.0]]))
 
+    @pytest.mark.parametrize(
+        ("mask", "expected"),
+        [
+            ([True, True, True, True], [[12.0, 2.0], [-1.0, 15.0]]),
+            ([True, False, False, True], [[2.0, -1.0], [-5.0, 7.0]]),
+            ([False, False, False, False], [[0.0, 0.0], [0.0, 0.0]]),
+        ],
+    )
+    def test_edge_mask_sum_values(self, mask, expected):
+        """Different mask patterns route only selected values to each receiver."""
+        update = gnn.NodeUpdate(lambda inputs: inputs[:, -2:])
+        x = jnp.zeros((2, 1))
+        x_edge = jnp.array([[2.0, -1.0], [10.0, 3.0], [4.0, 8.0], [-5.0, 7.0]])
+        senders = jnp.array([0, 1, 0, 1])
+        receivers = jnp.array([0, 0, 1, 1])
+
+        result = update(
+            x,
+            senders,
+            receivers,
+            x_edge=x_edge,
+            edge_mask=jnp.array(mask),
+        )
+
+        npt.assert_array_equal(result, jnp.array(expected))
+
+    @pytest.mark.parametrize(
+        ("aggregate", "expected"),
+        [
+            (gnn.segment_sum, [1.0, 1.0, 1.0, 0.0]),
+            (gnn.segment_mean, [0.5, 0.5, 1.0, 0.0]),
+        ],
+    )
+    def test_edge_mask_gradients(self, aggregate, expected):
+        """Masked values have zero gradient and do not enter reduction counts."""
+        update = gnn.NodeUpdate(lambda inputs: inputs[:, -1:], aggregate=aggregate)
+        x = jnp.zeros((2, 1))
+        x_edge = jnp.array([[2.0], [10.0], [4.0], [-5.0]])
+        senders = jnp.array([0, 1, 0, 1])
+        receivers = jnp.array([0, 0, 1, 1])
+        mask = jnp.array([True, True, True, False])
+
+        grad = jax.grad(
+            lambda edge: update(x, senders, receivers, x_edge=edge, edge_mask=mask).sum()
+        )(x_edge)
+
+        npt.assert_array_equal(grad[:, 0], jnp.array(expected))
+
     def test_edge_mask_jit(self):
         """Dynamic edge masks work under JIT."""
         update = gnn.NodeUpdate(lambda inputs: inputs[:, -1:])
@@ -337,9 +403,7 @@ class TestNodeUpdate:
         mask = jnp.array([True, False])
 
         expected = update(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
-        result = jax.jit(update)(
-            x, senders, receivers, x_edge=x_edge, edge_mask=mask
-        )
+        result = jax.jit(update)(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
 
         npt.assert_array_equal(result, expected)
 

@@ -38,6 +38,4 @@ an input is optional or required is described on the layer's reference page.
 
 `GraphConv` can additionally scale messages with scalar `edge_weight` values and
 `RGCNConv` and `HGTConv` select transforms with integer `node_type` and
-`edge_type` values; none of these are edge feature vectors.
-
-[`GlobalAttentionPool`](pool.md#ion.gnn.GlobalAttentionPool) and [`MultiHeadAttentionPool`](pool.md#ion.gnn.MultiHeadAttentionPool) are not message-passing layers: they take `graph_ids` rather than an edge list and return one row per graph, or one row per seed for the latter. The [graph operations](../operations.md#pooling) page covers the fixed mean, sum, and max readouts.
+`edge_type` values.
