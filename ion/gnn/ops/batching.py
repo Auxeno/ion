@@ -77,8 +77,8 @@ def unbatch_graphs(
 
     >>> xs, senders_list, receivers_list = unbatch_graphs(x, senders, receivers, graph_ids)
     """
-    x = np.asarray(graph_ids)  # pyright: ignore[reportAssignmentType]
-    graph_ids = np.asarray(x)  # pyright: ignore[reportAssignmentType]
+    x = np.asarray(x)  # pyright: ignore[reportAssignmentType]
+    graph_ids = np.asarray(graph_ids)  # pyright: ignore[reportAssignmentType]
     senders = np.asarray(senders)  # pyright: ignore[reportAssignmentType]
     receivers = np.asarray(receivers)  # pyright: ignore[reportAssignmentType]
 
