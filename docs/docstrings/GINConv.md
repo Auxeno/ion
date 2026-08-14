@@ -8,7 +8,9 @@ h_i' = \operatorname{MLP}\!\left((1 + \epsilon)h_i +
 \]
 
 Sum aggregation preserves neighbor multiplicity, making GIN as discriminative
-as the Weisfeiler-Lehman graph isomorphism test.
+as the Weisfeiler-Lehman graph isomorphism test. Bipartite source and
+destination features must have the same width because they are added before the
+MLP.
 
 Parameters
 ----------
@@ -41,7 +43,3 @@ y = gin(x, senders, receivers)  # (3, 16) -> (3, 32)
 
 gin_trainable = gnn.GINConv(nn.MLP([in_dim, hidden_dim, out_dim], key=key), train_eps=True)
 ```
-
-The layer also accepts `(x_src, x_dst)` for bipartite message passing and
-returns one row per destination node. Source and destination feature widths
-must match because their representations are added before the MLP.

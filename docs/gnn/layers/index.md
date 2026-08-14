@@ -1,6 +1,6 @@
 # Graph neural network layers
 
-Message-passing layers receive a node feature matrix and parallel COO `senders`/`receivers` arrays. Except for `GCNConv`, they also accept an `(x_src, x_dst)` tuple for bipartite message passing. Graph pooling layers instead receive `graph_ids` to pool nodes into graph representations. See the [GNN guide](../guide.md) for graph representation, message passing, self-loops, bipartite inputs, batching, and pooling.
+Message-passing layers receive a node feature matrix and parallel COO `senders`/`receivers` arrays. Layers marked in the Bipartite column below also accept an `(x_src, x_dst)` tuple. Graph pooling layers instead receive `graph_ids` to pool nodes into graph representations. See the [GNN guide](../guide.md) for graph representation, message passing, self-loops, bipartite inputs, batching, and pooling.
 
 ## Choose a layer
 

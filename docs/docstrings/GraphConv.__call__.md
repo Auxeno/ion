@@ -2,8 +2,8 @@ Apply graph convolution to node features.
 
 Parameters
 ----------
-x : jax.Array["n i", float]
-    Feature matrix for `n` nodes, with `in_dim` features per node.
+x : jax.Array["n i", float] | tuple[jax.Array["s i", float], jax.Array["t j", float]]
+    Node features, or `(x_src, x_dst)` for bipartite message passing.
 senders : jax.Array["e", int]
     Source node index for each directed edge.
 receivers : jax.Array["e", int]
@@ -13,8 +13,8 @@ edge_weight : jax.Array["e", float] | None, default=None
 
 Returns
 -------
-jax.Array["n o", float]
-    Aggregated node features with `out_dim` features per node.
+jax.Array["t o", float]
+    Aggregated destination-node features with `out_dim` features per node.
 
 Note
 ----

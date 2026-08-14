@@ -66,8 +66,3 @@ conv = gnn.GatedGCNConv(node_dim, out_dim, edge_dim=edge_dim, key=key)
 x, x_edge = conv(x, senders, receivers, x_edge=x_edge)
 x, x_edge = jax.nn.relu(x), jax.nn.relu(x_edge)
 ```
-
-```python
-conv = gnn.GatedGCNConv((src_dim, dst_dim), out_dim, edge_dim=edge_dim, key=key)
-x_dst, x_edge = conv((x_src, x_dst), senders, receivers, x_edge=x_edge)
-```

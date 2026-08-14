@@ -2,8 +2,8 @@ Update edge features from their incident nodes.
 
 Parameters
 ----------
-x : jax.Array["n i", float]
-    Feature matrix for `n` nodes.
+x : jax.Array["n i", float] | tuple[jax.Array["s i", float], jax.Array["t j", float]]
+    Node features, or `(x_src, x_dst)` for bipartite message passing.
 senders : jax.Array["e", int]
     Source node index for each directed edge.
 receivers : jax.Array["e", int]

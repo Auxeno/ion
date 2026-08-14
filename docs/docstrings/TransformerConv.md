@@ -97,8 +97,3 @@ conv = gnn.TransformerConv(
 )
 y = conv(x, senders, receivers, x_edge=x_edge)
 ```
-
-```python
-conv = gnn.TransformerConv((src_dim, dst_dim), out_dim, num_heads=4, key=key)
-y_dst = conv((x_src, x_dst), senders, receivers)
-```

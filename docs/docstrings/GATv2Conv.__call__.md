@@ -2,8 +2,8 @@ Apply dynamic graph attention to node features.
 
 Parameters
 ----------
-x : jax.Array["n i", float]
-    Feature matrix for `n` nodes, with `in_dim` features per node.
+x : jax.Array["n i", float] | tuple[jax.Array["s i", float], jax.Array["t j", float]]
+    Node features, or `(x_src, x_dst)` for bipartite message passing.
 senders : jax.Array["e", int]
     Source node index for each directed edge.
 receivers : jax.Array["e", int]
@@ -17,5 +17,5 @@ edge_mask : jax.Array["e", bool] | None, default=None
 
 Returns
 -------
-jax.Array["n o", float]
-    Attended node features with the heads concatenated into `out_dim`.
+jax.Array["t o", float]
+    Attended destination-node features with the heads concatenated into `out_dim`.

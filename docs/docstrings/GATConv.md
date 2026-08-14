@@ -76,8 +76,3 @@ x_edge = jnp.ones((num_edges, edge_dim))
 gat_edges = gnn.GATConv(in_dim, out_dim, num_heads=4, edge_dim=edge_dim, key=key)
 y = gat_edges(x, senders, receivers, x_edge=x_edge)  # (3, 16) -> (3, 32)
 ```
-
-```python
-gat = gnn.GATConv((src_dim, dst_dim), out_dim, num_heads=4, key=key)
-y_dst = gat((x_src, x_dst), senders, receivers)
-```

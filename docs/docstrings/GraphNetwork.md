@@ -51,7 +51,3 @@ node_model = nn.MLP([node_dim + message_dim, 16, out_dim], key=key_node)
 network = gnn.GraphNetwork(edge_model=edge_model, node_model=node_model)
 x, x_edge = network(x, senders, receivers, x_edge=x_edge)
 ```
-
-For bipartite edges, pass `(x_src, x_dst)`. Sender indices select `x_src` rows,
-receiver indices select `x_dst` rows, and only the destination nodes are
-updated.

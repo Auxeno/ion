@@ -2,8 +2,8 @@ Jointly update node and edge features.
 
 Parameters
 ----------
-x : jax.Array["n i", float]
-    Feature matrix for `n` nodes, with `in_dim` features per node.
+x : jax.Array["n i", float] | tuple[jax.Array["s i", float], jax.Array["t j", float]]
+    Node features, or `(x_src, x_dst)` for bipartite message passing.
 senders : jax.Array["e", int]
     Source node index for each directed edge.
 receivers : jax.Array["e", int]
@@ -14,8 +14,8 @@ x_edge : jax.Array["e f", float]
 
 Returns
 -------
-tuple[jax.Array["n o", float], jax.Array["e o", float]]
-    Updated node and edge features, both with `out_dim` features per row.
+tuple[jax.Array["t o", float], jax.Array["e o", float]]
+    Updated destination-node and edge features, both with `out_dim` features per row.
 
 Note
 ----

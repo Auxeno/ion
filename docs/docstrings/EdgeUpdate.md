@@ -15,7 +15,8 @@ Parameters
 edge_model : Callable[[jax.Array], jax.Array]
     Update network applied independently to every concatenated edge input.
     Supplies all of the layer's weights, so `EdgeUpdate` takes no `key` and
-    creates none of its own.
+    creates none of its own. For bipartite inputs, its input width is
+    `src_dim + dst_dim + edge_dim`.
 
 Attributes
 ----------
@@ -35,7 +36,3 @@ edge_model = nn.MLP([2 * node_dim + edge_dim, 16, out_dim], key=key)
 update = gnn.EdgeUpdate(edge_model)
 x_edge = update(x, senders, receivers, x_edge=x_edge)  # (3, 2) -> (3, 8)
 ```
-
-For bipartite edges, pass `(x_src, x_dst)`. Sender indices select `x_src` rows
-and receiver indices select `x_dst` rows, so the edge model input width is
-`src_dim + dst_dim + edge_dim`.

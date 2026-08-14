@@ -32,6 +32,3 @@ node_model = nn.MLP([node_dim + edge_dim, hidden_dim, out_dim], key=key)
 update = gnn.NodeUpdate(node_model, aggregate=gnn.segment_mean)
 x = update(x, senders, receivers, x_edge=x_edge)
 ```
-
-For bipartite edges, pass `(x_src, x_dst)`. Only `x_dst` enters the node model
-and the result has one row per destination node.

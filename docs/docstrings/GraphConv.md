@@ -48,14 +48,6 @@ conv = gnn.GraphConv(in_dim, out_dim, key=key)
 y = conv(x, senders, receivers, edge_weight=edge_weight)
 ```
 
-For bipartite message passing, sender and receiver indices use their respective
-local node spaces and the result has one row per destination node:
-
-```python
-conv = gnn.GraphConv((src_dim, dst_dim), out_dim, key=key)
-y_dst = conv((x_src, x_dst), senders, receivers)
-```
-
 Note
 ----
 Without edge weights, this update matches `SAGEConv` with `aggregator="sum"`,

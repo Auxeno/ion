@@ -51,8 +51,3 @@ receivers = jnp.array([1, 2, 0])
 sage = gnn.SAGEConv(in_dim, out_dim, aggregator="max", key=key)
 y = sage(x, senders, receivers)  # (3, 16) -> (3, 32)
 ```
-
-```python
-sage = gnn.SAGEConv((src_dim, dst_dim), out_dim, key=key)
-y_dst = sage((x_src, x_dst), senders, receivers)
-```

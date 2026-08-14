@@ -2,7 +2,7 @@ Update destination nodes from edge features.
 
 Parameters
 ----------
-x : jax.Array["n i", float] | tuple[jax.Array, jax.Array]
+x : jax.Array["n i", float] | tuple[jax.Array["s i", float], jax.Array["t j", float]]
     Node features, or `(x_src, x_dst)` for bipartite message passing.
 senders : jax.Array["e", int]
     Source node index for each directed edge. Included to keep the graph-layer
@@ -17,6 +17,6 @@ edge_mask : jax.Array["e", bool] | None, default=None
 
 Returns
 -------
-jax.Array["n o", float]
+jax.Array["t o", float]
     Updated destination-node features. The feature dimension comes from
     `node_model`.

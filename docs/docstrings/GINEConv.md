@@ -9,7 +9,8 @@ h_i' = \operatorname{MLP}\!\left((1 + \epsilon)h_i +
 \]
 
 Edge features share the node feature dimension, so embed them to that width
-first.
+first. Bipartite source, destination, and edge features must all have the same
+width because they are added before the MLP.
 
 Parameters
 ----------
@@ -41,7 +42,3 @@ receivers = jnp.array([1, 2, 0])
 gine = gnn.GINEConv(nn.MLP([in_dim, hidden_dim, out_dim], key=key))
 y = gine(x, senders, receivers, x_edge=x_edge)  # (3, 16) -> (3, 32)
 ```
-
-The layer also accepts `(x_src, x_dst)` for bipartite message passing and
-returns one row per destination node. Source, destination, and edge feature
-widths must match because they are added before the MLP.
