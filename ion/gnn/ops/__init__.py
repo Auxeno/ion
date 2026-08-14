@@ -1,6 +1,6 @@
 """Graph reductions, pooling, batching, and topology operations."""
 
-from .batching import batch_graphs, unbatch_graphs
+from .batching import batch_graphs, pad_graphs, unbatch_graphs
 from .graph import (
     add_self_loops,
     coalesce,
@@ -33,6 +33,7 @@ __all__ = [
     "max_pool",
     "mean_pool",
     "min_pool",
+    "pad_graphs",
     "remove_self_loops",
     "segment_max",
     "segment_mean",

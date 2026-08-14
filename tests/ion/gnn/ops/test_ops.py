@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
 import numpy.testing as npt
 import pytest
 
@@ -789,6 +790,97 @@ class TestBatchGraphs:
             ]
         )
         npt.assert_allclose(batched, separate, rtol=1e-5, atol=1e-5)
+
+    def test_numpy_inputs(self):
+        """NumPy graphs batch to the same arrays as JAX ones."""
+        xs = [np.ones((3, 2), np.float32), np.ones((2, 2), np.float32)]
+        senders_list = [np.array([0, 1]), np.array([0, 1])]
+        receivers_list = [np.array([1, 2]), np.array([1, 0])]
+        from_numpy = gnn.batch_graphs(xs, senders_list, receivers_list)  # pyright: ignore[reportArgumentType]
+        from_jax = gnn.batch_graphs(
+            [jnp.asarray(x) for x in xs],
+            [jnp.asarray(s) for s in senders_list],
+            [jnp.asarray(r) for r in receivers_list],
+        )
+        for numpy_array, jax_array in zip(from_numpy, from_jax):
+            assert isinstance(numpy_array, jax.Array)
+            assert numpy_array.dtype == jax_array.dtype
+            npt.assert_array_equal(numpy_array, jax_array)
+
+
+class TestPadGraphs:
+    def test_capacity_and_sentinels(self):
+        """Padding fills to capacity with indices one past the last node and graph."""
+        x = jnp.ones((5, 2))
+        senders, receivers = jnp.array([0, 1]), jnp.array([1, 2])
+        graph_ids = jnp.array([0, 0, 0, 1, 1])
+        x, senders, receivers, graph_ids = gnn.pad_graphs(
+            x, senders, receivers, graph_ids, num_nodes=8, num_edges=4, num_graphs=2
+        )
+        assert (x.shape, senders.shape, graph_ids.shape) == ((8, 2), (4,), (8,))
+        npt.assert_array_equal(x[5:], jnp.zeros((3, 2)))
+        npt.assert_array_equal(senders[2:], jnp.array([8, 8]))
+        npt.assert_array_equal(receivers[2:], jnp.array([8, 8]))
+        npt.assert_array_equal(graph_ids[5:], jnp.array([2, 2, 2]))
+
+    def test_exact_capacity_is_identity(self):
+        """Padding to the current size changes nothing."""
+        x = jax.random.normal(jax.random.key(0), (4, 3))
+        senders, receivers = jnp.array([0, 1, 2]), jnp.array([1, 2, 3])
+        graph_ids = jnp.zeros(4, dtype=jnp.int32)
+        padded = gnn.pad_graphs(x, senders, receivers, graph_ids, 4, 3, 1)
+        for original, result in zip((x, senders, receivers, graph_ids), padded):
+            npt.assert_array_equal(result, original)
+
+    def test_overflowing_capacity_raises(self):
+        """A batch larger than its capacity fails rather than truncating."""
+        with pytest.raises(ValueError):
+            gnn.pad_graphs(
+                jnp.ones((5, 2)), jnp.array([0]), jnp.array([1]), jnp.zeros(5, jnp.int32), 4, 1, 1
+            )
+
+    def test_conv_ignores_padding(self):
+        """Convolutions give the same real node features with and without padding."""
+        conv = gnn.GATv2Conv(4, 8, num_heads=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (5, 4))
+        senders, receivers = jnp.array([0, 1, 2, 3]), jnp.array([1, 2, 3, 4])
+        graph_ids = jnp.array([0, 0, 0, 1, 1])
+        padded = gnn.pad_graphs(x, senders, receivers, graph_ids, 9, 7, 2)
+        npt.assert_allclose(
+            conv(x, senders, receivers),
+            conv(padded[0], padded[1], padded[2])[:5],
+            rtol=1e-5,
+            atol=1e-5,
+        )
+
+    def test_pool_drops_padding(self):
+        """Pooling a padded batch returns one row per real graph."""
+        x = jax.random.normal(jax.random.key(0), (5, 3))
+        senders, receivers = jnp.array([0, 1]), jnp.array([1, 2])
+        graph_ids = jnp.array([0, 0, 0, 1, 1])
+        padded = gnn.pad_graphs(x, senders, receivers, graph_ids, 9, 5, 2)
+        for pool in (gnn.mean_pool, gnn.sum_pool, gnn.max_pool, gnn.min_pool):
+            pooled = pool(padded[0], padded[3], num_graphs=2)
+            assert pooled.shape == (2, 3)
+            npt.assert_allclose(pooled, pool(x, graph_ids, num_graphs=2), rtol=1e-5, atol=1e-5)
+
+    def test_gradients_ignore_padding(self):
+        """Padding contributes no gradient to the model."""
+        conv = gnn.GCNConv(4, 6, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (5, 4))
+        senders, receivers = jnp.array([0, 1, 2, 3]), jnp.array([1, 2, 3, 4])
+        graph_ids = jnp.array([0, 0, 0, 1, 1])
+        padded = gnn.pad_graphs(x, senders, receivers, graph_ids, 9, 7, 2)
+
+        def loss(conv, x, senders, receivers, graph_ids):
+            return gnn.mean_pool(conv(x, senders, receivers), graph_ids, num_graphs=2).sum()
+
+        unpadded_grads = jax.grad(loss)(conv, x, senders, receivers, graph_ids)
+        padded_grads = jax.grad(loss)(conv, *padded)
+        for unpadded_leaf, padded_leaf in zip(
+            jax.tree.leaves(unpadded_grads), jax.tree.leaves(padded_grads)
+        ):
+            npt.assert_allclose(unpadded_leaf, padded_leaf, rtol=1e-5, atol=1e-5)
 
 
 class TestUnbatchGraphs:

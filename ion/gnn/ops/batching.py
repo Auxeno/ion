@@ -3,9 +3,10 @@
 from collections.abc import Sequence
 
 import jax.numpy as jnp
+import numpy as np
 from jaxtyping import Array, Float, Int
 
-__all__ = ["batch_graphs", "unbatch_graphs"]
+__all__ = ["batch_graphs", "pad_graphs", "unbatch_graphs"]
 
 
 def batch_graphs(
@@ -23,13 +24,42 @@ def batch_graphs(
     >>> x, senders, receivers, graph_ids = batch_graphs(xs, senders_list, receivers_list)
     """
     sizes = [x.shape[0] for x in xs]
-    offsets = jnp.cumsum(jnp.array([0] + sizes[:-1]))
-    graph_ids = jnp.repeat(jnp.arange(len(xs)), jnp.array(sizes))
+
+    edge_offsets = np.repeat(np.cumsum([0] + sizes[:-1]), [s.shape[0] for s in senders])
     return (
-        jnp.concatenate(xs),
-        jnp.concatenate([s + o for s, o in zip(senders, offsets)]),
-        jnp.concatenate([r + o for r, o in zip(receivers, offsets)]),
-        graph_ids,
+        jnp.asarray(np.concatenate(xs)),
+        jnp.asarray(np.concatenate(senders) + edge_offsets),
+        jnp.asarray(np.concatenate(receivers) + edge_offsets),
+        jnp.asarray(np.repeat(np.arange(len(xs)), sizes)),
+    )
+
+
+def pad_graphs(
+    x: Float[Array, "n d"],
+    senders: Int[Array, " e"],
+    receivers: Int[Array, " e"],
+    graph_ids: Int[Array, " n"],
+    num_nodes: int,
+    num_edges: int,
+    num_graphs: int,
+) -> tuple[
+    Float[Array, "n2 d"],
+    Int[Array, " e2"],
+    Int[Array, " e2"],
+    Int[Array, " n2"],
+]:
+    """Pad a batched graph to fixed node, edge, and graph capacity.
+
+    >>> x, senders, receivers, graph_ids = pad_graphs(x, s, r, graph_ids, 512, 2048, 32)
+    """
+    pad_nodes = num_nodes - x.shape[0]
+    pad_edges = num_edges - senders.shape[0]
+
+    return (
+        jnp.asarray(np.pad(x, ((0, pad_nodes), (0, 0)))),
+        jnp.asarray(np.pad(senders, (0, pad_edges), constant_values=num_nodes)),
+        jnp.asarray(np.pad(receivers, (0, pad_edges), constant_values=num_nodes)),
+        jnp.asarray(np.pad(graph_ids, (0, pad_nodes), constant_values=num_graphs)),
     )
 
 
@@ -47,11 +77,16 @@ def unbatch_graphs(
 
     >>> xs, senders_list, receivers_list = unbatch_graphs(x, senders, receivers, graph_ids)
     """
-    sizes = jnp.bincount(graph_ids)
-    offsets = jnp.cumsum(sizes) - sizes
+    x = np.asarray(graph_ids)  # pyright: ignore[reportAssignmentType]
+    graph_ids = np.asarray(x)  # pyright: ignore[reportAssignmentType]
+    senders = np.asarray(senders)  # pyright: ignore[reportAssignmentType]
+    receivers = np.asarray(receivers)  # pyright: ignore[reportAssignmentType]
+
+    sizes = np.bincount(graph_ids)
+    offsets = np.cumsum(sizes) - sizes
     edge_ids = graph_ids[senders]
     return (
-        [x[graph_ids == i] for i in range(sizes.shape[0])],
-        [senders[edge_ids == i] - o for i, o in enumerate(offsets)],
-        [receivers[edge_ids == i] - o for i, o in enumerate(offsets)],
+        [jnp.asarray(x[graph_ids == i]) for i in range(sizes.shape[0])],
+        [jnp.asarray(senders[edge_ids == i] - o) for i, o in enumerate(offsets)],
+        [jnp.asarray(receivers[edge_ids == i] - o) for i, o in enumerate(offsets)],
     )

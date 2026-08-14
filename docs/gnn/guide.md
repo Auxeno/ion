@@ -14,7 +14,8 @@ This guide represents a graph with JAX arrays, follows messages through it, and 
 - [Building a GNN](#building-a-gnn)
 - [Batching graphs](#batching-graphs)
 - [Graph pooling](#graph-pooling)
-- [Static shapes](#static-shapes)
+- [Minibatch training](#minibatch-training)
+- [Shape labels](#shape-labels)
 - [Further examples](#further-examples)
 
 ## COO format
@@ -413,39 +414,6 @@ logits.shape  # (6 nodes, 3 classes)
 
 The linear classifier acts on each node independently after the graph layers have mixed information between connected nodes. Ion modules are JAX [pytrees](https://docs.jax.dev/en/latest/pytrees.html), so `jax.jit`, `jax.grad`, and the usual Ion optimizer workflow apply without graph-specific transforms.
 
-## Batching graphs
-
-Ordinary neural network inputs are often stacked along a leading batch dimension:
-
-```python
-x.shape  # (batch, items, features)
-```
-
-Graphs frequently contain different numbers of nodes and edges, so they cannot be stacked this way without padding. Ion instead concatenates them into one disconnected graph:
-
-```python
-x, senders, receivers, graph_ids = gnn.batch_graphs(
-    [x_1, x_2],
-    [senders_1, senders_2],
-    [receivers_1, receivers_2],
-)
-```
-
-The packed arrays have shapes:
-
-```python
-x.shape          # (total_nodes, node_dim)
-senders.shape    # (total_edges,)
-receivers.shape  # (total_edges,)
-graph_ids.shape  # (total_nodes,)
-```
-
-`batch_graphs` offsets the edge indices of each graph and records which graph each node belongs to in `graph_ids`. There are no edges between the packed graphs, so message passing cannot mix information between examples. Applying a graph layer to the disconnected graph is equivalent to applying it to each graph separately:
-
-```python
-h = gcn(x, senders, receivers)
-```
-
 ## Graph pooling
 
 Node-level tasks use one output row per node. Graph-level tasks reduce node representations into one row per graph:
@@ -496,13 +464,86 @@ The seed axis is kept rather than flattened, so a downstream head can either fla
 
 Both attention readouts normalize their weights within a graph, which makes them blind to graph size in the way `mean_pool` is. Concatenate a `sum_pool` branch when a task depends on counting nodes. See the [Pooling reference](layers/pool.md) for the full API.
 
-## Static shapes
+## Batching graphs
 
-Call `batch_graphs` outside `jax.jit`. It accepts Python sequences of differently shaped arrays and constructs the packed arrays that enter the compiled model. `unbatch_graphs` inverts it, splitting per-node outputs back into one array per graph, and is likewise a host-side call.
+Ordinary neural network inputs are often stacked along a leading batch dimension:
 
-JAX compiles a function for the shapes it receives. If the packed number of nodes or edges changes, the compiled function may be retraced for the new shapes. Pad nodes and edges to fixed maximum sizes when a workload requires static shapes.
+```python
+x.shape  # (batch, items, features)
+```
 
-### Shape labels
+Graphs frequently contain different numbers of nodes and edges, so they cannot be stacked this way without padding. Ion instead concatenates them into one disconnected graph:
+
+```python
+x, senders, receivers, graph_ids = gnn.batch_graphs(
+    [x_1, x_2],
+    [senders_1, senders_2],
+    [receivers_1, receivers_2],
+)
+```
+
+The packed arrays have shapes:
+
+```python
+x.shape          # (total_nodes, node_dim)
+senders.shape    # (total_edges,)
+receivers.shape  # (total_edges,)
+graph_ids.shape  # (total_nodes,)
+```
+
+`batch_graphs` offsets the edge indices of each graph and records which graph each node belongs to in `graph_ids`. There are no edges between the packed graphs, so message passing cannot mix information between examples. Applying a graph layer to the disconnected graph is equivalent to applying it to each graph separately:
+
+```python
+h = gcn(x, senders, receivers)
+```
+
+## Minibatch training
+
+JAX compiles a function for the shapes it receives. Every minibatch holds a different number of nodes and edges, so a training loop that feeds packed batches straight to a compiled step retraces on nearly every step. `pad_graphs` fixes the shapes by filling each batch out to the same capacity:
+
+```python
+x, senders, receivers, graph_ids = gnn.batch_graphs(xs, senders_list, receivers_list)
+x, senders, receivers, graph_ids = gnn.pad_graphs(
+    x, senders, receivers, graph_ids, num_nodes, num_edges, batch_size
+)
+```
+
+Spare edges take the sender and receiver index `num_nodes`, and spare nodes take the graph id `batch_size`. Both are one past the last real entry, and segment reductions drop out-of-range indices, which is the same convention `from_adjacency` uses for its unused slots. Padding therefore never reaches a real node, and `mean_pool(h, graph_ids, batch_size)` returns one row per real graph with nothing to mask or slice off. Node features, edge features, and labels are padded with `np.pad`, since they carry no indices to fix.
+
+The layers need no changes and see nothing. A padded batch produces the same real node features, the same pooled graph features, and the same gradients as the unpadded one.
+
+The loop around this is an ordinary Python generator, so a dataset larger than memory only needs a lazy read:
+
+```python
+for i in range(0, len(order) - batch_size + 1, batch_size):
+    graphs = [dataset[j] for j in order[i : i + batch_size]]  # reads from disk here
+    ...
+    model, opt, loss = train_step(model, opt, batch, y)
+```
+
+### Choosing a capacity
+
+Taking a fixed number of graphs per batch keeps the graph count constant, so only nodes and edges need padding. Their totals concentrate: summing dozens of graphs averages away most of the variation in individual graph sizes, and the relative spread shrinks with the square root of the batch size. Sizing capacity for the largest graph in the dataset is the trap, because a batch of the largest graph never occurs. Multiplying the mean batch total by a small headroom factor is far tighter, at the cost of occasionally exceeding capacity:
+
+```python
+num_nodes = int(1.4 * batch_size * mean_nodes_per_graph)
+num_edges = int(1.4 * batch_size * mean_edges_per_graph)
+```
+
+`pad_graphs` raises rather than truncating when a batch does not fit, so a loop either skips those batches or reserves more headroom. Skipping loses nothing systematic when the order is shuffled.
+
+Validation batches are usually a fixed sequence, so their exact capacity can be computed up front and nothing is skipped. A final partial batch is padded like any other; its predictions are the first rows of the pooled output.
+
+### Node-level tasks
+
+Graph-level readouts drop padding on their own. A per-node loss instead needs to ignore the padding rows, which `graph_ids` already identifies:
+
+```python
+mask = graph_ids < batch_size
+loss = (errors * mask).sum() / mask.sum()
+```
+
+## Shape labels
 
 | Label | Meaning |
 |---|---|
