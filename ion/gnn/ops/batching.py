@@ -51,7 +51,9 @@ def pad_graphs(
 ]:
     """Pad a batched graph to fixed node, edge, and graph capacity.
 
-    >>> x, senders, receivers, graph_ids = pad_graphs(x, s, r, graph_ids, 512, 2048, 32)
+    >>> x, senders, receivers, graph_ids = pad_graphs(
+    ...     x, senders, receivers, graph_ids, 512, 2048, 32
+    ... )
     """
     node_padding = node_capacity - x.shape[0]
     edge_padding = edge_capacity - senders.shape[0]

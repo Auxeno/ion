@@ -20,8 +20,8 @@ class TestGraphNetwork:
 
         edge_inputs = jnp.concatenate((x[senders], x[receivers], x_edge), axis=-1)
         edge_expected = edge_model(edge_inputs)
-        received = gnn.segment_sum(edge_expected, receivers, 3)
-        node_expected = node_model(jnp.concatenate((x, received), axis=-1))
+        aggregated = gnn.segment_sum(edge_expected, receivers, 3)
+        node_expected = node_model(jnp.concatenate((x, aggregated), axis=-1))
 
         node_result, edge_result = network(x, senders, receivers, x_edge=x_edge)
 
@@ -42,8 +42,8 @@ class TestGraphNetwork:
 
         edge_inputs = jnp.concatenate((x_src[senders], x_dst[receivers], x_edge), axis=-1)
         edge_expected = edge_model(edge_inputs)
-        received = gnn.segment_sum(edge_expected, receivers, 2)
-        node_expected = node_model(jnp.concatenate((x_dst, received), axis=-1))
+        aggregated = gnn.segment_sum(edge_expected, receivers, 2)
+        node_expected = node_model(jnp.concatenate((x_dst, aggregated), axis=-1))
 
         node_result, edge_result = network((x_src, x_dst), senders, receivers, x_edge=x_edge)
 
@@ -79,8 +79,8 @@ class TestGraphNetwork:
         receivers = jnp.array([2, 2, 0, 1])
 
         x_edge_out = edge_model(jnp.concatenate((x[senders], x[receivers], x_edge), axis=-1))
-        received = gnn.segment_mean(x_edge_out, receivers, 3)
-        expected = node_model(jnp.concatenate((x, received), axis=-1))
+        aggregated = gnn.segment_mean(x_edge_out, receivers, 3)
+        expected = node_model(jnp.concatenate((x, aggregated), axis=-1))
         x_out, _ = network(x, senders, receivers, x_edge=x_edge)
 
         npt.assert_allclose(x_out, expected, rtol=1e-5, atol=1e-5)
@@ -294,8 +294,8 @@ class TestNodeUpdate:
         senders = jnp.array([0, 1, 2, 0])
         receivers = jnp.array([2, 2, 0, 1])
 
-        received = gnn.segment_sum(x_edge, receivers, 3)
-        expected = node_model(jnp.concatenate((x, received), axis=-1))
+        aggregated = gnn.segment_sum(x_edge, receivers, 3)
+        expected = node_model(jnp.concatenate((x, aggregated), axis=-1))
         result = update(x, senders, receivers, x_edge=x_edge)
 
         npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
@@ -310,8 +310,8 @@ class TestNodeUpdate:
         senders = jnp.array([0, 3, 1])
         receivers = jnp.array([0, 0, 1])
 
-        received = gnn.segment_sum(x_edge, receivers, 2)
-        expected = node_model(jnp.concatenate((x_dst, received), axis=-1))
+        aggregated = gnn.segment_sum(x_edge, receivers, 2)
+        expected = node_model(jnp.concatenate((x_dst, aggregated), axis=-1))
         result = update((x_src, x_dst), senders, receivers, x_edge=x_edge)
 
         assert result.shape == (2, 7)
@@ -326,8 +326,8 @@ class TestNodeUpdate:
         senders = jnp.array([0, 1, 2, 0])
         receivers = jnp.array([2, 2, 0, 1])
 
-        received = gnn.segment_mean(x_edge, receivers, 3)
-        expected = node_model(jnp.concatenate((x, received), axis=-1))
+        aggregated = gnn.segment_mean(x_edge, receivers, 3)
+        expected = node_model(jnp.concatenate((x, aggregated), axis=-1))
         result = update(x, senders, receivers, x_edge=x_edge)
 
         npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
