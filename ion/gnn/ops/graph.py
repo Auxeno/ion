@@ -1,6 +1,9 @@
 """Graph topology operations."""
 
+from typing import Literal
+
 import jax.numpy as jnp
+import numpy as np
 from jaxtyping import Array, Float, Int
 
 __all__ = [
@@ -8,6 +11,8 @@ __all__ = [
     "coalesce",
     "degree",
     "from_adjacency",
+    "induced_subgraph",
+    "k_hop_subgraph",
     "line_graph",
     "remove_self_loops",
     "to_adjacency",
@@ -135,3 +140,94 @@ def line_graph(
         line_senders, line_receivers = line_senders[keep], line_receivers[keep]
 
     return line_senders, line_receivers, receivers[line_senders]
+
+
+def induced_subgraph(
+    senders: Int[Array, " e"] | np.ndarray,
+    receivers: Int[Array, " e"] | np.ndarray,
+    node_ids: Int[Array, " k"] | np.ndarray,
+    num_nodes: int,
+) -> tuple[
+    Int[Array, " e2"],
+    Int[Array, " e2"],
+    Int[Array, " k"],
+    Int[Array, " e2"],
+]:
+    """Build the node-induced subgraph over a selected set of nodes.
+
+    >>> senders, receivers, node_ids, edge_ids = induced_subgraph(senders, receivers, selected, n)
+    """
+    senders = np.asarray(senders)
+    receivers = np.asarray(receivers)
+    node_ids = np.asarray(node_ids)
+
+    if np.unique(node_ids).shape[0] != node_ids.shape[0]:
+        raise ValueError("node_ids must not contain duplicates")
+
+    relabel = np.full(num_nodes, -1, dtype=senders.dtype)
+    relabel[node_ids] = np.arange(node_ids.shape[0], dtype=senders.dtype)
+
+    keep = (relabel[senders] >= 0) & (relabel[receivers] >= 0)
+    edge_ids = np.flatnonzero(keep)
+
+    return (
+        jnp.asarray(relabel[senders[edge_ids]]),
+        jnp.asarray(relabel[receivers[edge_ids]]),
+        jnp.asarray(node_ids),
+        jnp.asarray(edge_ids),
+    )
+
+
+def k_hop_subgraph(
+    senders: Int[Array, " e"] | np.ndarray,
+    receivers: Int[Array, " e"] | np.ndarray,
+    node_ids: Int[Array, " s"] | np.ndarray,
+    num_hops: int,
+    num_nodes: int,
+    *,
+    direction: Literal["in", "out", "both"] = "in",
+) -> tuple[
+    Int[Array, " e2"],
+    Int[Array, " e2"],
+    Int[Array, " k"],
+    Int[Array, " e2"],
+]:
+    """Build the node-induced subgraph within a number of hops of selected nodes.
+
+    >>> senders, receivers, node_ids, edge_ids = k_hop_subgraph(senders, receivers, selected, 2, n)
+    """
+    if num_hops < 0:
+        raise ValueError("num_hops must be non-negative")
+    if direction not in ("in", "out", "both"):
+        raise ValueError("direction must be 'in', 'out', or 'both'")
+
+    senders = np.asarray(senders)
+    receivers = np.asarray(receivers)
+    node_ids = np.asarray(node_ids)
+
+    if np.unique(node_ids).shape[0] != node_ids.shape[0]:
+        raise ValueError("node_ids must not contain duplicates")
+
+    seen = np.zeros(num_nodes, dtype=bool)
+    seen[node_ids] = True
+    frontier = seen.copy()
+    nodes_by_hop = [node_ids]
+
+    for _ in range(num_hops):
+        candidates = []
+        if direction in ("in", "both"):
+            candidates.append(senders[frontier[receivers]])
+        if direction in ("out", "both"):
+            candidates.append(receivers[frontier[senders]])
+
+        new_node_ids = np.unique(np.concatenate(candidates))
+        new_node_ids = new_node_ids[~seen[new_node_ids]]
+        if new_node_ids.shape[0] == 0:
+            break
+
+        seen[new_node_ids] = True
+        frontier = np.zeros(num_nodes, dtype=bool)
+        frontier[new_node_ids] = True
+        nodes_by_hop.append(new_node_ids)
+
+    return induced_subgraph(senders, receivers, np.concatenate(nodes_by_hop), num_nodes)

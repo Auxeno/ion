@@ -10,9 +10,9 @@ __all__ = ["batch_graphs", "pad_graphs", "unbatch_graphs"]
 
 
 def batch_graphs(
-    xs: Sequence[Float[Array, "n d"]],
-    senders: Sequence[Int[Array, " e"]],
-    receivers: Sequence[Int[Array, " e"]],
+    xs: Sequence[Float[Array, "n d"] | np.ndarray],
+    senders: Sequence[Int[Array, " e"] | np.ndarray],
+    receivers: Sequence[Int[Array, " e"] | np.ndarray],
 ) -> tuple[
     Float[Array, "n d"],
     Int[Array, " e"],
@@ -35,10 +35,10 @@ def batch_graphs(
 
 
 def pad_graphs(
-    x: Float[Array, "n d"],
-    senders: Int[Array, " e"],
-    receivers: Int[Array, " e"],
-    graph_ids: Int[Array, " n"],
+    x: Float[Array, "n d"] | np.ndarray,
+    senders: Int[Array, " e"] | np.ndarray,
+    receivers: Int[Array, " e"] | np.ndarray,
+    graph_ids: Int[Array, " n"] | np.ndarray,
     num_nodes: int,
     num_edges: int,
     num_graphs: int,
@@ -64,10 +64,10 @@ def pad_graphs(
 
 
 def unbatch_graphs(
-    x: Float[Array, "n d"],
-    senders: Int[Array, " e"],
-    receivers: Int[Array, " e"],
-    graph_ids: Int[Array, " n"],
+    x: Float[Array, "n d"] | np.ndarray,
+    senders: Int[Array, " e"] | np.ndarray,
+    receivers: Int[Array, " e"] | np.ndarray,
+    graph_ids: Int[Array, " n"] | np.ndarray,
 ) -> tuple[
     list[Float[Array, "n d"]],
     list[Int[Array, " e"]],
@@ -77,10 +77,10 @@ def unbatch_graphs(
 
     >>> xs, senders_list, receivers_list = unbatch_graphs(x, senders, receivers, graph_ids)
     """
-    x = np.asarray(x)  # pyright: ignore[reportAssignmentType]
-    graph_ids = np.asarray(graph_ids)  # pyright: ignore[reportAssignmentType]
-    senders = np.asarray(senders)  # pyright: ignore[reportAssignmentType]
-    receivers = np.asarray(receivers)  # pyright: ignore[reportAssignmentType]
+    x = np.asarray(x)
+    senders = np.asarray(senders)
+    receivers = np.asarray(receivers)
+    graph_ids = np.asarray(graph_ids)
 
     sizes = np.bincount(graph_ids)
     offsets = np.cumsum(sizes) - sizes

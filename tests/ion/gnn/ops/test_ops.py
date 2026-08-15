@@ -413,6 +413,166 @@ class TestLineGraph:
         npt.assert_allclose(out.ravel(), jnp.array([0.0, 1.0, 1.0]))
 
 
+class TestInducedSubgraph:
+    def test_induced_edges_and_relabelling(self):
+        """Edges between selected nodes are retained and relabelled by node order."""
+        senders = jnp.array([0, 1, 2, 2, 3, 4, 3])
+        receivers = jnp.array([1, 2, 0, 3, 4, 2, 0])
+
+        s, r, node_ids, edge_ids = gnn.induced_subgraph(
+            senders, receivers, jnp.array([2, 0, 3]), num_nodes=5
+        )
+
+        npt.assert_array_equal(s, jnp.array([0, 0, 2]))
+        npt.assert_array_equal(r, jnp.array([1, 2, 1]))
+        npt.assert_array_equal(node_ids, jnp.array([2, 0, 3]))
+        npt.assert_array_equal(edge_ids, jnp.array([2, 3, 6]))
+
+    def test_indices_align_features(self):
+        """Returned original indices select the matching node and edge features."""
+        senders = jnp.array([0, 1, 2, 2, 3, 4, 3])
+        receivers = jnp.array([1, 2, 0, 3, 4, 2, 0])
+        x = jnp.arange(10).reshape(5, 2)
+        x_edge = 10 * jnp.arange(7)
+
+        _, _, node_ids, edge_ids = gnn.induced_subgraph(
+            senders, receivers, jnp.array([2, 0, 3]), 5
+        )
+
+        npt.assert_array_equal(x[node_ids], x[jnp.array([2, 0, 3])])
+        npt.assert_array_equal(x_edge[edge_ids], jnp.array([20, 30, 60]))
+
+    def test_isolated_node_is_preserved(self):
+        """Selected nodes remain present even when no selected edge touches them."""
+        s, r, node_ids, edge_ids = gnn.induced_subgraph(
+            jnp.array([0, 1]), jnp.array([1, 2]), jnp.array([3]), 4
+        )
+
+        npt.assert_array_equal(node_ids, jnp.array([3]))
+        assert s.shape == r.shape == edge_ids.shape == (0,)
+
+    def test_empty_selection(self):
+        """Selecting no nodes produces an empty subgraph."""
+        empty = jnp.array([], dtype=jnp.int32)
+        s, r, node_ids, edge_ids = gnn.induced_subgraph(
+            jnp.array([0, 1]), jnp.array([1, 2]), empty, 3
+        )
+
+        assert s.shape == r.shape == node_ids.shape == edge_ids.shape == (0,)
+
+    def test_node_ids_must_be_unique(self):
+        """Repeated node IDs would make relabelling ambiguous."""
+        senders = jnp.array([0])
+        receivers = jnp.array([1])
+
+        with pytest.raises(ValueError, match="duplicates"):
+            gnn.induced_subgraph(senders, receivers, jnp.array([0, 0]), 2)
+
+    def test_numpy_inputs_preserve_topology_dtype(self):
+        """Host arrays return JAX arrays without changing the topology dtype."""
+        senders = np.array([0, 1, 2], dtype=np.int32)
+        receivers = np.array([1, 2, 0], dtype=np.int32)
+        node_ids = np.array([2, 0], dtype=np.int32)
+
+        result = gnn.induced_subgraph(senders, receivers, node_ids, 3)
+
+        assert all(isinstance(array, jax.Array) for array in result)
+        assert result[0].dtype == result[1].dtype == jnp.int32
+        npt.assert_array_equal(result[2], jnp.array([2, 0]))
+
+class TestKHopSubgraph:
+    senders = jnp.array([0, 2, 3, 1, 4, 6, 2])
+    receivers = jnp.array([1, 1, 2, 4, 5, 5, 4])
+
+    def test_incoming_hops(self):
+        """Incoming traversal follows sender dependencies one frontier at a time."""
+        s, r, node_ids, edge_ids = gnn.k_hop_subgraph(
+            self.senders, self.receivers, jnp.array([1]), 2, 7
+        )
+
+        npt.assert_array_equal(node_ids, jnp.array([1, 0, 2, 3]))
+        npt.assert_array_equal(s, jnp.array([1, 2, 3]))
+        npt.assert_array_equal(r, jnp.array([0, 0, 2]))
+        npt.assert_array_equal(edge_ids, jnp.array([0, 1, 2]))
+
+    def test_outgoing_hops(self):
+        """Outgoing traversal follows receivers reached from the frontier."""
+        s, r, node_ids, edge_ids = gnn.k_hop_subgraph(
+            self.senders, self.receivers, jnp.array([1]), 2, 7, direction="out"
+        )
+
+        npt.assert_array_equal(node_ids, jnp.array([1, 4, 5]))
+        npt.assert_array_equal(s, jnp.array([0, 1]))
+        npt.assert_array_equal(r, jnp.array([1, 2]))
+        npt.assert_array_equal(edge_ids, jnp.array([3, 4]))
+
+    def test_both_directions_returns_induced_edges(self):
+        """Both-direction traversal includes every edge among discovered nodes."""
+        _, _, node_ids, edge_ids = gnn.k_hop_subgraph(
+            self.senders, self.receivers, jnp.array([1]), 1, 7, direction="both"
+        )
+
+        npt.assert_array_equal(node_ids, jnp.array([1, 0, 2, 4]))
+        npt.assert_array_equal(edge_ids, jnp.array([0, 1, 3, 6]))
+
+    def test_starting_nodes_come_first(self):
+        """Starting node order is retained before nodes from later hops."""
+        _, _, node_ids, _ = gnn.k_hop_subgraph(
+            self.senders, self.receivers, jnp.array([5, 1]), 1, 7
+        )
+
+        npt.assert_array_equal(node_ids, jnp.array([5, 1, 0, 2, 4, 6]))
+
+    def test_zero_hops(self):
+        """Zero hops returns the induced graph over the starting nodes alone."""
+        s, r, node_ids, edge_ids = gnn.k_hop_subgraph(
+            self.senders, self.receivers, jnp.array([1, 4]), 0, 7
+        )
+
+        npt.assert_array_equal(node_ids, jnp.array([1, 4]))
+        npt.assert_array_equal(s, jnp.array([0]))
+        npt.assert_array_equal(r, jnp.array([1]))
+        npt.assert_array_equal(edge_ids, jnp.array([3]))
+
+    def test_empty_nodes(self):
+        """An empty starting set produces an empty subgraph."""
+        empty = jnp.array([], dtype=jnp.int32)
+        s, r, node_ids, edge_ids = gnn.k_hop_subgraph(
+            self.senders, self.receivers, empty, 2, 7
+        )
+
+        assert s.shape == r.shape == node_ids.shape == edge_ids.shape == (0,)
+
+    def test_invalid_configuration(self):
+        """Invalid hop counts, directions, and node sets raise clear errors."""
+        with pytest.raises(ValueError, match="non-negative"):
+            gnn.k_hop_subgraph(self.senders, self.receivers, jnp.array([1]), -1, 7)
+        with pytest.raises(ValueError, match="direction"):
+            gnn.k_hop_subgraph(
+                self.senders,
+                self.receivers,
+                jnp.array([1]),
+                1,
+                7,
+                direction="sideways",  # pyright: ignore[reportArgumentType]
+            )
+        with pytest.raises(ValueError, match="duplicates"):
+            gnn.k_hop_subgraph(self.senders, self.receivers, jnp.array([1, 1]), 1, 7)
+
+    def test_numpy_inputs(self):
+        """Host arrays follow the same traversal and return JAX arrays."""
+        result = gnn.k_hop_subgraph(
+            np.asarray(self.senders),
+            np.asarray(self.receivers),
+            np.array([1], dtype=np.int32),
+            2,
+            7,
+        )
+
+        assert all(isinstance(array, jax.Array) for array in result)
+        npt.assert_array_equal(result[2], jnp.array([1, 0, 2, 3]))
+
+
 class TestToAdjacency:
     def test_marks_present_edges(self):
         """Entry (i, j) is one exactly when the edge i -> j exists."""
@@ -796,7 +956,7 @@ class TestBatchGraphs:
         xs = [np.ones((3, 2), np.float32), np.ones((2, 2), np.float32)]
         senders_list = [np.array([0, 1]), np.array([0, 1])]
         receivers_list = [np.array([1, 2]), np.array([1, 0])]
-        from_numpy = gnn.batch_graphs(xs, senders_list, receivers_list)  # pyright: ignore[reportArgumentType]
+        from_numpy = gnn.batch_graphs(xs, senders_list, receivers_list)
         from_jax = gnn.batch_graphs(
             [jnp.asarray(x) for x in xs],
             [jnp.asarray(s) for s in senders_list],
