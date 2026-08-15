@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.16.1
+## 0.17.0
 
 - **Breaking: consistent GNN vocabulary.** Separate central transforms are named `w_root`; `SAGEConv` takes `aggregate`; relational layers take `num_edge_types`; `GATConv.w` is `w_sender`; and fixed topology sizes use `node_capacity` and `edge_capacity`.
 - **`gnn.remove_self_loops` returns retained indices.** Its third result selects aligned edge features, matching `coalesce`, `to_undirected`, and the subgraph operations.
