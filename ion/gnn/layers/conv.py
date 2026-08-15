@@ -2,13 +2,13 @@
 
 Modules:
     GCNConv    Symmetric degree-normalized convolution.  (Kipf & Welling, 2017)
-    GraphConv  Separate neighbor and root transforms.    (Morris et al., 2019)
+    GraphConv  Separate neighbour and root transforms.   (Morris et al., 2019)
     SAGEConv   Sample-and-aggregate with a root term.    (Hamilton et al., 2017)
 
 Glorot uniform weight init, zeros for bias.
 GCNConv self-loops are the caller's responsibility, see `gnn.add_self_loops`.
 GraphConv and SAGEConv do not need self-loops because they have a separate root term.
-SAGEConv neighbor aggregation is `mean`, `max`, or `sum`.
+SAGEConv neighbour aggregation is `mean`, `max`, or `sum`.
 """
 
 from collections.abc import Callable
@@ -57,7 +57,7 @@ class GCNConv(Module):
         receivers: Int[Array, " e"],
     ) -> Float[Array, "n o"]:
 
-        n, i = x.shape
+        n = x.shape[0]
 
         x = x @ self.w
 
@@ -70,16 +70,17 @@ class GCNConv(Module):
 
         # Route, scale, and accumulate features from senders to receivers
         messages = x[senders] * edge_weight[:, None]
-        x = segment_sum(messages, receivers, n)
+        aggregated = segment_sum(messages, receivers, n)
+        x_out = aggregated
 
         if self.b is not None:
-            x = x + self.b
+            x_out = x_out + self.b
 
-        return x
+        return x_out
 
 
 class GraphConv(Module):
-    """Graph convolutional layer with separate root and neighbor transforms.
+    """Graph convolutional layer with separate root and neighbour transforms.
 
     >>> conv = GraphConv(16, 32, key=key)
     >>> conv(x, senders, receivers)  # (n, 16) -> (n, 32)
@@ -87,7 +88,7 @@ class GraphConv(Module):
     """
 
     w_neigh: Param[Float[Array, "i o"]]
-    w_self: Param[Float[Array, "j o"]]
+    w_root: Param[Float[Array, "j o"]]
     b: Param[Float[Array, " o"]] | None
 
     def __init__(
@@ -103,9 +104,9 @@ class GraphConv(Module):
 
         in_src, in_dst = in_dim if isinstance(in_dim, tuple) else (in_dim, in_dim)
 
-        key_neigh, key_self, key_b = jax.random.split(key, 3)
+        key_neigh, key_root, key_b = jax.random.split(key, 3)
         self.w_neigh = Param(w_init(shape=(in_src, out_dim), key=key_neigh))
-        self.w_self = Param(w_init(shape=(in_dst, out_dim), key=key_self))
+        self.w_root = Param(w_init(shape=(in_dst, out_dim), key=key_root))
         self.b = Param(b_init(shape=(out_dim,), key=key_b)) if use_bias else None
 
     def __call__(
@@ -124,10 +125,10 @@ class GraphConv(Module):
         messages = x_src[senders]
         if edge_weight is not None:
             messages = messages * edge_weight[:, None]
-        neigh = segment_sum(messages, receivers, n_dst)
+        aggregated = segment_sum(messages, receivers, n_dst)
 
-        # Transform neighborhood and central-node features independently
-        x_out = neigh @ self.w_neigh + x_dst @ self.w_self
+        # Transform neighbourhood and root features independently
+        x_out = aggregated @ self.w_neigh + x_dst @ self.w_root
 
         if self.b is not None:
             x_out = x_out + self.b
@@ -140,11 +141,11 @@ class SAGEConv(Module):
 
     >>> sage = SAGEConv(16, 32, key=key)
     >>> sage(x, senders, receivers)  # (n, 16) -> (n, 32)
-    >>> sage = SAGEConv(16, 32, aggregator="max", normalize=True, key=key)
+    >>> sage = SAGEConv(16, 32, aggregate="max", normalize=True, key=key)
     """
 
     w_neigh: Param[Float[Array, "i o"]]
-    w_self: Param[Float[Array, "j o"]] | None
+    w_root: Param[Float[Array, "j o"]] | None
     b: Param[Float[Array, " o"]] | None
     aggregate: Callable[..., Float[Array, "n i"]]
     normalize: bool
@@ -154,7 +155,7 @@ class SAGEConv(Module):
         in_dim: int | tuple[int, int],
         out_dim: int,
         *,
-        aggregator: Literal["mean", "max", "sum"] = "mean",
+        aggregate: Literal["mean", "max", "sum"] = "mean",
         normalize: bool = False,
         use_root_weight: bool = True,
         use_bias: bool = True,
@@ -163,17 +164,16 @@ class SAGEConv(Module):
         key: PRNGKeyArray,
     ) -> None:
 
-        aggregate = {"mean": segment_mean, "max": segment_max, "sum": segment_sum}[aggregator]
         in_src, in_dst = in_dim if isinstance(in_dim, tuple) else (in_dim, in_dim)
+        root_shape = (in_dst, out_dim)
 
-        key_neigh, key_self, key_b = jax.random.split(key, 3)
+        key_neigh, key_root, key_b = jax.random.split(key, 3)
         self.w_neigh = Param(w_init(shape=(in_src, out_dim), key=key_neigh))
-        self.w_self = (
-            Param(w_init(shape=(in_dst, out_dim), key=key_self)) if use_root_weight else None
-        )
+        self.w_root = Param(w_init(shape=root_shape, key=key_root)) if use_root_weight else None
         self.b = Param(b_init(shape=(out_dim,), key=key_b)) if use_bias else None
 
-        self.aggregate = aggregate
+        aggregates = {"mean": segment_mean, "max": segment_max, "sum": segment_sum}
+        self.aggregate = aggregates[aggregate]
         self.normalize = normalize
 
     def __call__(
@@ -186,17 +186,16 @@ class SAGEConv(Module):
         x_src, x_dst = x if isinstance(x, tuple) else (x, x)
         n_dst = x_dst.shape[0]
 
-        # Pool sender features into each receiver's neighborhood, then transform
-        neigh = self.aggregate(x_src[senders], receivers, n_dst)
+        messages = x_src[senders]
+        aggregated = self.aggregate(messages, receivers, n_dst)
 
-        # segment_max leaves -inf at nodes with no neighbors
+        # segment_max leaves -inf at nodes with no neighbours
         if self.aggregate is segment_max:
-            neigh = jnp.where(jnp.isneginf(neigh), 0.0, neigh)
-        x_out = neigh @ self.w_neigh
+            aggregated = jnp.where(jnp.isneginf(aggregated), 0.0, aggregated)
+        x_out = aggregated @ self.w_neigh
 
-        # Add the central node's own features through the root weight
-        if self.w_self is not None:
-            x_out = x_out + x_dst @ self.w_self
+        if self.w_root is not None:
+            x_out = x_out + x_dst @ self.w_root
 
         if self.b is not None:
             x_out = x_out + self.b

@@ -194,7 +194,7 @@ adjacency = gnn.to_adjacency(senders, receivers, num_nodes)
 senders, receivers = gnn.from_adjacency(adjacency)
 ```
 
-`from_adjacency` produces a data-dependent number of edges, so pass `num_edges` to call it under `jax.jit`. Spare slots hold the out-of-range index `num_nodes`, which segment reductions drop.
+`from_adjacency` produces a data-dependent number of edges, so pass `edge_capacity` to call it under `jax.jit`. Spare slots hold the out-of-range index `num_nodes`, which segment reductions drop.
 
 ## Message passing
 
@@ -306,11 +306,12 @@ This appends `(0, 0)`, `(1, 1)`, through `(5, 5)`. Self-loops are explicit and a
 `remove_self_loops` is the inverse and drops every `i -> i` edge, which is useful when a dataset ships with self-loops already present and you want to control them yourself:
 
 ```python
-senders, receivers = gnn.remove_self_loops(senders, receivers)
+senders, receivers, kept = gnn.remove_self_loops(senders, receivers)
+x_edge = x_edge[kept]
 senders, receivers = gnn.add_self_loops(senders, receivers, num_nodes)
 ```
 
-How many edges it removes depends on the data, so the output shape is not known ahead of time and the call cannot go inside `jax.jit`. Treat it as a data preparation step. Edge features and masks are not filtered for you; apply the same `senders != receivers` mask to them.
+How many edges it removes depends on the data, so the output shape is not known ahead of time and the call cannot go inside `jax.jit`. Treat it as a data preparation step. Use `kept` to select the corresponding edge features and masks.
 
 ## Bipartite graphs
 
@@ -352,7 +353,8 @@ so no edge joins a node to itself.
 `EdgeUpdate` and `GatedGCNConv` update an edge from its two incident nodes. To let neighbouring edges communicate directly, instead convert the graph so that its edges are the nodes:
 
 ```python
-senders, receivers = gnn.remove_self_loops(senders, receivers)
+senders, receivers, kept = gnn.remove_self_loops(senders, receivers)
+x_edge = x_edge[kept]
 senders, receivers, kept = gnn.to_undirected(senders, receivers)
 x_edge = jnp.concatenate([x_edge, x_edge])[kept]
 
@@ -506,11 +508,11 @@ JAX compiles a function for the shapes it receives. Every minibatch holds a diff
 ```python
 x, senders, receivers, graph_ids = gnn.batch_graphs(xs, senders_list, receivers_list)
 x, senders, receivers, graph_ids = gnn.pad_graphs(
-    x, senders, receivers, graph_ids, num_nodes, num_edges, batch_size
+    x, senders, receivers, graph_ids, node_capacity, edge_capacity, batch_size
 )
 ```
 
-Spare edges take the sender and receiver index `num_nodes`, and spare nodes take the graph id `batch_size`. Both are one past the last real entry, and segment reductions drop out-of-range indices, which is the same convention `from_adjacency` uses for its unused slots. Padding therefore never reaches a real node, and `mean_pool(h, graph_ids, batch_size)` returns one row per real graph with nothing to mask or slice off. Node features, edge features, and labels are padded with `np.pad`, since they carry no indices to fix.
+Spare edges take the sender and receiver index `node_capacity`, and spare nodes take the graph id `batch_size`. Both are one past the last real entry, and segment reductions drop out-of-range indices, which is the same convention `from_adjacency` uses for its unused slots. Padding therefore never reaches a real node, and `mean_pool(h, graph_ids, batch_size)` returns one row per real graph with nothing to mask or slice off. Node features, edge features, and labels are padded with `np.pad`, since they carry no indices to fix.
 
 The layers need no changes and see nothing. A padded batch produces the same real node features, the same pooled graph features, and the same gradients as the unpadded one.
 
@@ -528,8 +530,8 @@ for i in range(0, len(order) - batch_size + 1, batch_size):
 Taking a fixed number of graphs per batch keeps the graph count constant, so only nodes and edges need padding. Their totals concentrate: summing dozens of graphs averages away most of the variation in individual graph sizes, and the relative spread shrinks with the square root of the batch size. Sizing capacity for the largest graph in the dataset is the trap, because a batch of the largest graph never occurs. Multiplying the mean batch total by a small headroom factor is far tighter, at the cost of occasionally exceeding capacity:
 
 ```python
-num_nodes = int(1.4 * batch_size * mean_nodes_per_graph)
-num_edges = int(1.4 * batch_size * mean_edges_per_graph)
+node_capacity = int(1.4 * batch_size * mean_nodes_per_graph)
+edge_capacity = int(1.4 * batch_size * mean_edges_per_graph)
 ```
 
 `pad_graphs` raises rather than truncating when a batch does not fit, so a loop either skips those batches or reserves more headroom. Skipping loses nothing systematic when the order is shuffled.

@@ -58,17 +58,17 @@ class GraphNetwork(Module):
         edge_inputs = [x_src[senders], x_dst[receivers]]
         if x_edge is not None:
             edge_inputs.append(x_edge)
-        edge_out = self.edge_model(jnp.concatenate(edge_inputs, axis=-1))
+        x_edge_out = self.edge_model(jnp.concatenate(edge_inputs, axis=-1))
 
         # Aggregate updated edges at receivers, excluding masked edges
         if edge_mask is not None:
             receivers = jnp.where(edge_mask, receivers, n_dst)
 
-        received = self.aggregate(edge_out, receivers, n_dst)
-        node_inputs = jnp.concatenate((x_dst, received), axis=-1)
-        node_out = self.node_model(node_inputs)
+        aggregated = self.aggregate(x_edge_out, receivers, n_dst)
+        node_inputs = jnp.concatenate((x_dst, aggregated), axis=-1)
+        x_out = self.node_model(node_inputs)
 
-        return node_out, edge_out
+        return x_out, x_edge_out
 
 
 class EdgeUpdate(Module):
@@ -139,6 +139,6 @@ class NodeUpdate(Module):
         if edge_mask is not None:
             receivers = jnp.where(edge_mask, receivers, n_dst)
 
-        received = self.aggregate(x_edge, receivers, n_dst)
-        node_inputs = jnp.concatenate((x_dst, received), axis=-1)
+        aggregated = self.aggregate(x_edge, receivers, n_dst)
+        node_inputs = jnp.concatenate((x_dst, aggregated), axis=-1)
         return self.node_model(node_inputs)

@@ -1,6 +1,6 @@
 Graph Attention Network layer ([Velickovic et al., 2018](https://arxiv.org/abs/1710.10903)).
 
-Learns attention weights over each node's neighborhood using LeakyReLU-gated
+Learns attention weights over each node's neighbourhood using LeakyReLU-gated
 additive attention. For each head,
 
 \[
@@ -47,12 +47,12 @@ key : jax.Array
 
 Attributes
 ----------
-w : Param
+w_sender : Param
     Shared projection of shape `(in_dim, out_dim)` for an integer `in_dim`, or
     the source projection of shape `(src_dim, out_dim)` for paired dimensions.
 w_receiver : Param | None
     Destination projection of shape `(dst_dim, out_dim)` for paired dimensions;
-    otherwise `None` and `w` is shared.
+    otherwise `None` and `w_sender` is shared.
 att_sender, att_receiver : Param
     Per-head attention vectors of shape `(num_heads, out_dim // num_heads)`.
 b_out : Param | None

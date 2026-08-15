@@ -1,7 +1,7 @@
 """Relational graph convolutional layers.
 
 Modules:
-    RGCNConv  Per-relation neighbor transforms.             (Schlichtkrull et al., 2018)
+    RGCNConv  Per-relation neighbour transforms.            (Schlichtkrull et al., 2018)
     HGTConv   Type-dependent attention over a typed graph.  (Hu et al., 2020)
 
 Glorot uniform weight init, zeros for bias, ones for HGTConv's relation prior and skip gate.
@@ -34,15 +34,15 @@ class RGCNConv(Module):
 
     w_neigh: Param[Float[Array, "b i o"]]
     w_coeff: Param[Float[Array, "r b"]] | None
-    w_self: Param[Float[Array, "i o"]]
+    w_root: Param[Float[Array, "i o"]]
     b: Param[Float[Array, " o"]] | None
-    num_relations: int
+    num_edge_types: int
 
     def __init__(
         self,
         in_dim: int,
         out_dim: int,
-        num_relations: int,
+        num_edge_types: int,
         *,
         num_bases: int | None = None,
         use_bias: bool = True,
@@ -51,16 +51,16 @@ class RGCNConv(Module):
         key: PRNGKeyArray,
     ) -> None:
 
-        neigh_shape = (num_bases or num_relations, in_dim, out_dim)
-        coeff_shape = (num_relations, num_bases or 0)
+        neigh_shape = (num_bases or num_edge_types, in_dim, out_dim)
+        coeff_shape = (num_edge_types, num_bases or 0)
 
-        key_neigh, key_coeff, key_self, key_b = jax.random.split(key, 4)
+        key_neigh, key_coeff, key_root, key_b = jax.random.split(key, 4)
         self.w_neigh = Param(w_init(shape=neigh_shape, key=key_neigh))
         self.w_coeff = Param(w_init(shape=coeff_shape, key=key_coeff)) if num_bases else None
-        self.w_self = Param(w_init(shape=(in_dim, out_dim), key=key_self))
+        self.w_root = Param(w_init(shape=(in_dim, out_dim), key=key_root))
         self.b = Param(b_init(shape=(out_dim,), key=key_b)) if use_bias else None
 
-        self.num_relations = num_relations
+        self.num_edge_types = num_edge_types
 
     def __call__(
         self,
@@ -82,12 +82,12 @@ class RGCNConv(Module):
         messages = jnp.einsum("ni,rio->nro", x, w_neigh)[senders, edge_type]
 
         # Normalize by how many edges of the same relation reach the receiver
-        segments = receivers * self.num_relations + edge_type
-        count = degree(segments, n * self.num_relations).astype(x.dtype)
-        messages = messages / count[segments][:, None]
+        segment_ids = receivers * self.num_edge_types + edge_type
+        counts = degree(segment_ids, n * self.num_edge_types).astype(x.dtype)
+        messages = messages / counts[segment_ids][:, None]
 
-        # Accumulate relation messages, then add the central-node transform
-        x_out = segment_sum(messages, receivers, n) + x @ self.w_self
+        aggregated = segment_sum(messages, receivers, n)
+        x_out = aggregated + x @ self.w_root
 
         if self.b is not None:
             x_out = x_out + self.b
@@ -118,7 +118,7 @@ class HGTConv(Module):
         in_dim: int,
         out_dim: int,
         num_node_types: int,
-        num_relations: int,
+        num_edge_types: int,
         *,
         num_heads: int = 1,
         use_skip: bool = True,
@@ -129,7 +129,7 @@ class HGTConv(Module):
     ) -> None:
 
         head_dim = out_dim // num_heads
-        relation_shape = (num_relations, num_heads, head_dim, head_dim)
+        relation_shape = (num_edge_types, num_heads, head_dim, head_dim)
 
         if out_dim % num_heads != 0:
             raise ValueError(f"out_dim ({out_dim}) must be divisible by num_heads ({num_heads})")
@@ -144,7 +144,7 @@ class HGTConv(Module):
         self.w_att = Param(w_init(shape=relation_shape, key=key_att))
         self.w_msg = Param(w_init(shape=relation_shape, key=key_msg))
         self.w_out = Param(w_init(shape=(num_node_types, out_dim, out_dim), key=key_out))
-        self.mu = Param(jnp.ones((num_relations, num_heads)))
+        self.mu = Param(jnp.ones((num_edge_types, num_heads)))
         self.skip = Param(jnp.ones((num_node_types,))) if use_skip else None
         self.b_out = Param(b_init(shape=(num_node_types, out_dim), key=key_b)) if use_bias else None
 
@@ -179,16 +179,16 @@ class HGTConv(Module):
         # Softmax over each receiver's incoming edges, across every relation at once
         attention = segment_softmax(logits, receivers, n)
 
-        # Aggregate messages, then project under the receiving node's own type
-        agg = segment_sum(edge_v * attention[..., None], receivers, n).reshape(n, -1)
-        out = jnp.einsum("no,tof->ntf", jax.nn.gelu(agg), self.w_out)[nodes]
+        messages = edge_v * attention[..., None]
+        aggregated = segment_sum(messages, receivers, n).reshape(n, -1)
+        x_out = jnp.einsum("no,tof->ntf", jax.nn.gelu(aggregated), self.w_out)[nodes]
 
         if self.b_out is not None:
-            out = out + self.b_out[node_type]
+            x_out = x_out + self.b_out[node_type]
 
         # Learned per-type gate between the new representation and the input
         if self.skip is not None:
             gate = jax.nn.sigmoid(self.skip[node_type])[:, None]
-            out = gate * out + (1 - gate) * x
+            x_out = gate * x_out + (1 - gate) * x
 
-        return out
+        return x_out

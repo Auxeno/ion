@@ -2,6 +2,9 @@
 
 ## 0.16.1
 
+- **Breaking: consistent GNN vocabulary.** Separate central transforms are named `w_root`; `SAGEConv` takes `aggregate`; relational layers take `num_edge_types`; `GATConv.w` is `w_sender`; and fixed topology sizes use `node_capacity` and `edge_capacity`.
+- **`gnn.remove_self_loops` returns retained indices.** Its third result selects aligned edge features, matching `coalesce`, `to_undirected`, and the subgraph operations.
+- **GNN robustness and configuration.** `GraphNorm` gains `use_bias`, GAT masks safely discard non-finite edge features, and caller-supplied GIN, GINE, and global-attention transformations accept any array callable.
 - **Subgraph extraction.** `gnn.induced_subgraph` builds the node-induced graph over selected nodes, while `gnn.k_hop_subgraph` discovers complete neighbourhoods along incoming, outgoing, or both edge directions. Both relabel nodes and return the original node and edge indices for slicing features.
 - **`gnn.GraphNorm`.** Normalizes node features independently within each graph, with a learnable scale on the graph mean.
 - **Composite edge masking.** `gnn.GraphNetwork` and `gnn.NodeUpdate` accept an optional boolean `edge_mask` that excludes masked edges from node aggregation and reduction counts. `GraphNetwork` still updates and returns every edge representation, so masking controls routing without destroying edge state.
@@ -144,7 +147,7 @@
 
 ## 0.8.0
 
-- **`GINConv`.** Graph Isomorphism Network layer (Xu et al., 2019): sum-aggregates neighbor features and applies a caller-supplied MLP to `(1 + eps) * x + aggregated`. `train_eps=True` makes `eps` learnable.
+- **`GINConv`.** Graph Isomorphism Network layer (Xu et al., 2019): sum-aggregates neighbour features and applies a caller-supplied MLP to `(1 + eps) * x + aggregated`. `train_eps=True` makes `eps` learnable.
 - **Graph-level readout pooling.** `ion.gnn` gains `mean_pool`, `sum_pool`, and `max_pool`, pooling node features `(n, d)` into per-graph vectors `(g, d)` via `graph_ids`.
 - **`segment_mean` and a coherent segment namespace.** New `segment_mean`; `segment_sum`/`max`/`min`/`prod` re-exported from `jax.ops` alongside `segment_softmax`.
 - **`batch_graphs`.** Packs a list of graphs into one disconnected graph for batched message passing; returns `graph_ids` for the pooling functions.

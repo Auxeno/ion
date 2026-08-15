@@ -4,7 +4,7 @@ Sum-aggregates neighbour features and combines them with a separately
 transformed copy of the central node:
 
 \[
-x'_i = W_n \sum_{j \in \mathcal{N}(i)} e_{ji} x_j + W_s x_i.
+x'_i = W_n \sum_{j \in \mathcal{N}(i)} e_{ji} x_j + W_r x_i.
 \]
 
 When omitted, each scalar edge weight \(e_{ji}\) is one.
@@ -29,7 +29,7 @@ Attributes
 ----------
 w_neigh : Param
     Neighbour transform of shape `(src_dim, out_dim)`.
-w_self : Param
+w_root : Param
     Destination-root transform of shape `(dst_dim, out_dim)`.
 b : Param | None
     Bias vector of shape `(out_dim,)`. `None` when `use_bias=False`.
@@ -50,6 +50,6 @@ y = conv(x, senders, receivers, edge_weight=edge_weight)
 
 Note
 ----
-Without edge weights, this update matches `SAGEConv` with `aggregator="sum"`,
+Without edge weights, this update matches `SAGEConv` with `aggregate="sum"`,
 `normalize=False`, and `use_root_weight=True`. `GraphConv` provides the narrower
 canonical operator and supports scalar edge weights.

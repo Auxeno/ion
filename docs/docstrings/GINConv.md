@@ -1,31 +1,31 @@
 Graph Isomorphism Network layer ([Xu et al., 2019](https://arxiv.org/abs/1810.00826)).
 
-Sum-aggregates neighbor features and applies a caller-supplied MLP:
+Sum-aggregates neighbour features and applies a caller-supplied MLP:
 
 \[
 h_i' = \operatorname{MLP}\!\left((1 + \epsilon)h_i +
 \sum_{j \in \mathcal{N}(i)} h_j\right).
 \]
 
-Sum aggregation preserves neighbor multiplicity, making GIN as discriminative
+Sum aggregation preserves neighbour multiplicity, making GIN as discriminative
 as the Weisfeiler-Lehman graph isomorphism test. Bipartite source and
 destination features must have the same width because they are added before the
 MLP.
 
 Parameters
 ----------
-mlp : Module
+mlp : Callable[[jax.Array], jax.Array]
     Update network applied after aggregation. Supplies all of the layer's
     weights, so `GINConv` takes no `key` and creates none of its own.
 eps : float, default=0.0
-    Weights a node's own features against its aggregated neighbors. Fixed unless
+    Weights a node's own features against its aggregated neighbours. Fixed unless
     `train_eps=True`.
 train_eps : bool, default=False
     If `True`, `eps` becomes a learnable scalar `Param`.
 
 Attributes
 ----------
-mlp : Module
+mlp : Callable[[jax.Array], jax.Array]
     The update network passed at construction.
 eps : Param | float
     Learnable scalar when `train_eps=True`, otherwise the fixed float.

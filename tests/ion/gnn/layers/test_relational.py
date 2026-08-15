@@ -16,7 +16,7 @@ class TestRGCNConv:
         receivers = jnp.array([1, 2, 0])
         edge_type = jnp.array([0, 1, 0])
 
-        expected = x @ conv.w_self + conv.b  # type: ignore[operator]
+        expected = x @ conv.w_root + conv.b  # type: ignore[operator]
         for relation in range(2):
             mask = edge_type == relation
             neigh = (x @ conv.w_neigh[relation])[senders] * mask[:, None]
@@ -35,7 +35,7 @@ class TestRGCNConv:
         sage = gnn.SAGEConv(4, 6, key=jax.random.key(0))
         conv = gnn.RGCNConv(4, 6, 1, key=jax.random.key(1))
         conv = conv.at.w_neigh.set(nn.Param(sage.w_neigh.value[None]))
-        conv = conv.at.w_self.set(sage.w_self)
+        conv = conv.at.w_root.set(sage.w_root)
         conv = conv.at.b.set(sage.b)
         x = jax.random.normal(jax.random.key(2), (3, 4))
         senders = jnp.array([0, 1, 2])
@@ -98,7 +98,7 @@ class TestRGCNConv:
         receivers = jnp.array([1])
 
         y = conv(x, senders, receivers, edge_type=jnp.array([0]))
-        expected = x[2] @ conv.w_self + conv.b  # type: ignore[operator]
+        expected = x[2] @ conv.w_root + conv.b  # type: ignore[operator]
 
         npt.assert_allclose(y[2], expected, rtol=1e-5, atol=1e-5)
 
@@ -122,7 +122,7 @@ class TestRGCNConv:
         conv = gnn.RGCNConv(4, 6, 2, key=jax.random.key(0))
 
         assert conv.w_neigh.dtype == jnp.float32
-        assert conv.w_self.dtype == jnp.float32
+        assert conv.w_root.dtype == jnp.float32
 
 
 def _graph():

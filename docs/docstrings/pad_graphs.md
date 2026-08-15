@@ -1,6 +1,6 @@
 Pad a batched graph to fixed node, edge, and graph capacity.
 
-Spare edges take the sender and receiver index `num_nodes`, and spare nodes take
+Spare edges take the sender and receiver index `node_capacity`, and spare nodes take
 the graph id `num_graphs`, one past the last real entry in each case. Segment
 reductions drop out-of-range indices, so padding never reaches a real node and
 pooling returns one row per real graph with nothing to mask or slice off.
@@ -20,9 +20,9 @@ receivers : jax.Array["e", int]
     Batched receiver indices.
 graph_ids : jax.Array["n", int]
     Graph index of each node, as returned by `batch_graphs`.
-num_nodes : int
+node_capacity : int
     Node capacity. Fewer nodes than the batch contains raises.
-num_edges : int
+edge_capacity : int
     Edge capacity. Fewer edges than the batch contains raises.
 num_graphs : int
     Graph capacity, and the value to pass to the pooling call.
@@ -37,7 +37,13 @@ Example
 ```python
 x, senders, receivers, graph_ids = gnn.batch_graphs(xs, senders_list, receivers_list)
 x, senders, receivers, graph_ids = gnn.pad_graphs(
-    x, senders, receivers, graph_ids, num_nodes=512, num_edges=2048, num_graphs=32
+    x,
+    senders,
+    receivers,
+    graph_ids,
+    node_capacity=512,
+    edge_capacity=2048,
+    num_graphs=32,
 )
 
 h = conv(x, senders, receivers)

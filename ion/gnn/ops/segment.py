@@ -5,7 +5,7 @@ Functions:
     segment_max        Maximum reduction within segments. (Re-exported from jax.ops.)
     segment_min        Minimum reduction within segments. (Re-exported from jax.ops.)
     segment_prod       Product reduction within segments. (Re-exported from jax.ops.)
-    segment_softmax    Softmax normalized within segments (e.g. per-node neighborhoods).
+    segment_softmax    Softmax normalized within segments (e.g. per-node neighbourhoods).
     segment_mean       Mean reduction within segments.
     segment_var        Population variance within segments.
     segment_std        Population standard deviation within segments.

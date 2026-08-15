@@ -59,10 +59,10 @@ class TestGraphNetwork:
         senders = jnp.array([0, 1, 2])
         receivers = jnp.array([1, 2, 0])
 
-        node_out, edge_out = network(x, senders, receivers)
+        x_out, x_edge_out = network(x, senders, receivers)
 
-        assert node_out.shape == (3, 5)
-        assert edge_out.shape == (3, 6)
+        assert x_out.shape == (3, 5)
+        assert x_edge_out.shape == (3, 6)
 
     def test_segment_mean(self):
         """A compatible non-default aggregation callable controls reduction."""
@@ -78,12 +78,12 @@ class TestGraphNetwork:
         senders = jnp.array([0, 1, 2, 0])
         receivers = jnp.array([2, 2, 0, 1])
 
-        edge_out = edge_model(jnp.concatenate((x[senders], x[receivers], x_edge), axis=-1))
-        received = gnn.segment_mean(edge_out, receivers, 3)
+        x_edge_out = edge_model(jnp.concatenate((x[senders], x[receivers], x_edge), axis=-1))
+        received = gnn.segment_mean(x_edge_out, receivers, 3)
         expected = node_model(jnp.concatenate((x, received), axis=-1))
-        node_out, _ = network(x, senders, receivers, x_edge=x_edge)
+        x_out, _ = network(x, senders, receivers, x_edge=x_edge)
 
-        npt.assert_allclose(node_out, expected, rtol=1e-5, atol=1e-5)
+        npt.assert_allclose(x_out, expected, rtol=1e-5, atol=1e-5)
 
     def test_isolated_node_receives_zero_sum(self):
         """The default aggregation gives isolated nodes a zero message."""
@@ -93,9 +93,9 @@ class TestGraphNetwork:
         )
         x = jax.random.normal(jax.random.key(0), (3, 4))
 
-        node_out, _ = network(x, jnp.array([0]), jnp.array([1]))
+        x_out, _ = network(x, jnp.array([0]), jnp.array([1]))
 
-        npt.assert_array_equal(node_out[2], jnp.zeros(2))
+        npt.assert_array_equal(x_out[2], jnp.zeros(2))
 
     def test_updated_edges_are_aggregated(self):
         """Node updates receive new edge values rather than previous edge values."""
@@ -108,10 +108,10 @@ class TestGraphNetwork:
         senders = jnp.array([0, 1])
         receivers = jnp.array([1, 1])
 
-        node_out, edge_out = network(x, senders, receivers, x_edge=x_edge)
+        x_out, x_edge_out = network(x, senders, receivers, x_edge=x_edge)
 
-        npt.assert_array_equal(edge_out, jnp.array([[3.0], [4.0]]))
-        npt.assert_array_equal(node_out[1], jnp.array([7.0]))
+        npt.assert_array_equal(x_edge_out, jnp.array([[3.0], [4.0]]))
+        npt.assert_array_equal(x_out[1], jnp.array([7.0]))
 
     def test_edge_mask_excludes_messages_but_preserves_edge_updates(self):
         """Masked edges are updated and returned but do not reach destination nodes."""
@@ -125,10 +125,10 @@ class TestGraphNetwork:
         receivers = jnp.array([1, 1])
         mask = jnp.array([True, False])
 
-        node_out, edge_out = network(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
+        x_out, x_edge_out = network(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
 
-        npt.assert_array_equal(edge_out, jnp.array([[3.0], [4.0]]))
-        npt.assert_array_equal(node_out[1], jnp.array([3.0]))
+        npt.assert_array_equal(x_edge_out, jnp.array([[3.0], [4.0]]))
+        npt.assert_array_equal(x_out[1], jnp.array([3.0]))
 
     def test_edge_mask_matches_composed_updates(self):
         """A masked block remains exactly EdgeUpdate followed by NodeUpdate."""

@@ -23,7 +23,7 @@ class GatedGCNConv(Module):
     >>> x, x_edge = conv(x, senders, receivers, x_edge=x_edge)
     """
 
-    w_self: Param[Float[Array, "j o"]]
+    w_root: Param[Float[Array, "j o"]]
     w_neigh: Param[Float[Array, "i o"]]
     w_edge: Param[Float[Array, "f o"]]
     w_sender: Param[Float[Array, "i o"]]
@@ -48,7 +48,7 @@ class GatedGCNConv(Module):
         in_src, in_dst = in_dim if isinstance(in_dim, tuple) else (in_dim, in_dim)
 
         keys = jax.random.split(key, 7)
-        self.w_self = Param(w_init(shape=(in_dst, out_dim), key=keys[0]))
+        self.w_root = Param(w_init(shape=(in_dst, out_dim), key=keys[0]))
         self.w_neigh = Param(w_init(shape=(in_src, out_dim), key=keys[1]))
         self.w_edge = Param(w_init(shape=(edge_dim, out_dim), key=keys[2]))
         self.w_sender = Param(w_init(shape=(in_src, out_dim), key=keys[3]))
@@ -70,24 +70,24 @@ class GatedGCNConv(Module):
         n_dst = x_dst.shape[0]
 
         # Update each edge from its previous features and incident nodes
-        edge_out = (
+        x_edge_out = (
             x_edge @ self.w_edge
             + x_src[senders] @ self.w_sender
             + x_dst[receivers] @ self.w_receiver
         )
         if self.b_edge is not None:
-            edge_out = edge_out + self.b_edge
+            x_edge_out = x_edge_out + self.b_edge
 
         # Normalize feature-wise gates over each receiver's incoming edges
-        gates = jax.nn.sigmoid(edge_out)
+        gates = jax.nn.sigmoid(x_edge_out)
         gate_sum = segment_sum(gates, receivers, n_dst)
 
         # Gate transformed sender features, then add the central-node transform
         messages = gates * (x_src[senders] @ self.w_neigh)
-        neigh = segment_sum(messages, receivers, n_dst) / (gate_sum + self.eps)
-        node_out = x_dst @ self.w_self + neigh
+        aggregated = segment_sum(messages, receivers, n_dst) / (gate_sum + self.eps)
+        x_out = x_dst @ self.w_root + aggregated
 
         if self.b_node is not None:
-            node_out = node_out + self.b_node
+            x_out = x_out + self.b_node
 
-        return node_out, edge_out
+        return x_out, x_edge_out

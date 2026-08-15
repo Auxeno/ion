@@ -24,6 +24,7 @@ class TestGraphNorm:
         norm = norm.at.mean_scale.set(nn.Param(jnp.array([0.5, 1.5])))
         norm = norm.at.scale.set(nn.Param(jnp.array([2.0, 3.0])))
         norm = norm.at.b.set(nn.Param(jnp.array([1.0, -1.0])))
+        assert norm.b is not None
         x = jnp.array([[1.0, 2.0], [3.0, 6.0], [4.0, 8.0], [10.0, 14.0], [16.0, 20.0]])
         graph_ids = jnp.array([0, 0, 1, 1, 1])
 
@@ -52,11 +53,21 @@ class TestGraphNorm:
     def test_parameter_initialization(self):
         """Affine and mean scales use their standard initial values."""
         norm = gnn.GraphNorm(4)
+        assert norm.b is not None
 
         npt.assert_array_equal(norm.scale.value, jnp.ones(4))
         npt.assert_array_equal(norm.b.value, jnp.zeros(4))
         npt.assert_array_equal(norm.mean_scale.value, jnp.ones(4))
         assert norm.num_params == 12
+
+    def test_no_bias(self):
+        """use_bias=False removes the output bias without changing normalization."""
+        norm = gnn.GraphNorm(3, use_bias=False)
+        x = jax.random.normal(jax.random.key(0), (6, 3))
+
+        assert norm.b is None
+        npt.assert_allclose(norm(x), gnn.GraphNorm(3)(x), rtol=1e-6, atol=1e-6)
+        assert norm.num_params == 6
 
     def test_graphs_are_independent(self):
         """Changing one graph does not change another graph's output."""

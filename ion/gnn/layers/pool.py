@@ -4,11 +4,12 @@ Modules:
     GlobalAttentionPool         Learned attention-weighted graph readout.
     MultiHeadAttentionPool      Learned seed queries attending over each graph.  (Lee et al., 2019)
 
-GlobalAttentionPool takes its score and optional value modules from the caller.
+GlobalAttentionPool takes its score and optional value callables from the caller.
 MultiHeadAttentionPool learns its seeds directly as queries, so it needs no query
 projection, and returns one row per seed. Glorot uniform weight init, zeros for bias.
 """
 
+from collections.abc import Callable
 import math
 
 import jax
@@ -28,14 +29,14 @@ class GlobalAttentionPool(Module):
     >>> pool(x, graph_ids, num_graphs=4)  # (n, 16) -> (4, 16)
     """
 
-    score: Module
-    value: Module | None
+    score: Callable[[Array], Array]
+    value: Callable[[Array], Array] | None
 
     def __init__(
         self,
-        score: Module,
+        score: Callable[[Array], Array],
         *,
-        value: Module | None = None,
+        value: Callable[[Array], Array] | None = None,
     ) -> None:
 
         self.score = score

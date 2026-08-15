@@ -23,7 +23,7 @@ class TestGatedGCNConv:
         gate_sum = gnn.segment_sum(gates, receivers, 3)
         messages = gates * (x[senders] @ conv.w_neigh)
         neigh = gnn.segment_sum(messages, receivers, 3) / (gate_sum + conv.eps)
-        node_expected = x @ conv.w_self + neigh + conv.b_node  # type: ignore[operator]
+        node_expected = x @ conv.w_root + neigh + conv.b_node  # type: ignore[operator]
 
         node_result, edge_result = conv(x, senders, receivers, x_edge=x_edge)
 
@@ -49,7 +49,7 @@ class TestGatedGCNConv:
         gate_sum = gnn.segment_sum(gates, receivers, 2)
         messages = gates * (x_src[senders] @ conv.w_neigh)
         neigh = gnn.segment_sum(messages, receivers, 2) / (gate_sum + conv.eps)
-        node_expected = x_dst @ conv.w_self + neigh + conv.b_node  # type: ignore[operator]
+        node_expected = x_dst @ conv.w_root + neigh + conv.b_node  # type: ignore[operator]
 
         node_result, edge_result = conv((x_src, x_dst), senders, receivers, x_edge=x_edge)
 
@@ -106,7 +106,7 @@ class TestGatedGCNConv:
         x_edge = jax.random.normal(jax.random.key(2), (1, 2))
 
         x_out, _ = conv(x, senders, receivers, x_edge=x_edge)
-        expected = x[2] @ conv.w_self + conv.b_node  # type: ignore[operator]
+        expected = x[2] @ conv.w_root + conv.b_node  # type: ignore[operator]
 
         npt.assert_allclose(x_out[2], expected, rtol=1e-5, atol=1e-5)
 
@@ -114,5 +114,5 @@ class TestGatedGCNConv:
         """Weights default to float32."""
         conv = gnn.GatedGCNConv(4, 6, edge_dim=2, key=jax.random.key(0))
 
-        assert conv.w_self.dtype == jnp.float32
+        assert conv.w_root.dtype == jnp.float32
         assert conv.w_edge.dtype == jnp.float32

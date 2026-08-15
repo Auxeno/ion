@@ -39,8 +39,8 @@ def pad_graphs(
     senders: Int[Array, " e"] | np.ndarray,
     receivers: Int[Array, " e"] | np.ndarray,
     graph_ids: Int[Array, " n"] | np.ndarray,
-    num_nodes: int,
-    num_edges: int,
+    node_capacity: int,
+    edge_capacity: int,
     num_graphs: int,
 ) -> tuple[
     Float[Array, "n2 d"],
@@ -52,13 +52,13 @@ def pad_graphs(
 
     >>> x, senders, receivers, graph_ids = pad_graphs(x, s, r, graph_ids, 512, 2048, 32)
     """
-    pad_nodes = num_nodes - x.shape[0]
-    pad_edges = num_edges - senders.shape[0]
+    pad_nodes = node_capacity - x.shape[0]
+    pad_edges = edge_capacity - senders.shape[0]
 
     return (
         jnp.asarray(np.pad(x, ((0, pad_nodes), (0, 0)))),
-        jnp.asarray(np.pad(senders, (0, pad_edges), constant_values=num_nodes)),
-        jnp.asarray(np.pad(receivers, (0, pad_edges), constant_values=num_nodes)),
+        jnp.asarray(np.pad(senders, (0, pad_edges), constant_values=node_capacity)),
+        jnp.asarray(np.pad(receivers, (0, pad_edges), constant_values=node_capacity)),
         jnp.asarray(np.pad(graph_ids, (0, pad_nodes), constant_values=num_graphs)),
     )
 

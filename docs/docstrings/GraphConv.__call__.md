@@ -18,6 +18,6 @@ jax.Array["t o", float]
 
 Note
 ----
-Self-loops are not needed because the central node enters through `w_self`.
+Self-loops are not needed because the central node enters through `w_root`.
 If included, a self-loop contributes through both the neighbour and root
 paths. A node with no incoming edges receives only its root term and bias.

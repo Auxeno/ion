@@ -48,6 +48,16 @@ class TestGlobalAttentionPool:
         assert result.shape == (2, 4)
         npt.assert_allclose(result, expected, rtol=1e-6, atol=1e-6)
 
+    def test_accepts_array_callables(self):
+        """Score and value can be ordinary array callables."""
+        pool = gnn.GlobalAttentionPool(lambda x: x[:, :1], value=lambda x: 2 * x)
+        x = jnp.array([[1.0, 2.0], [3.0, 4.0]])
+        graph_ids = jnp.zeros(2, dtype=jnp.int32)
+
+        attention = jax.nn.softmax(x[:, :1], axis=0)
+        expected = (attention * 2 * x).sum(axis=0, keepdims=True)
+        npt.assert_allclose(pool(x, graph_ids, 1), expected)
+
     def test_empty_graph(self):
         """Graphs with no nodes produce zero rows."""
         pool = gnn.GlobalAttentionPool(nn.Linear(2, 1, key=jax.random.key(0)))

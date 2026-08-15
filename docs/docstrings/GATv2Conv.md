@@ -75,4 +75,7 @@ y = gat_edges(x, senders, receivers, x_edge=x_edge)  # (3, 16) -> (3, 32)
 
 Info
 -----
-Structural difference from `GATConv`: two weight matrices (`w_sender`, `w_receiver`) instead of one, and a single attention vector (`att`) instead of two, so attention is computed per-edge rather than decomposed to node-level scores. The `edge_dim` / `x_edge` / `edge_mask` interface is identical to `GATConv`.
+Unlike `GATConv`, GATv2 keeps separate `w_sender` and `w_receiver`
+projections even for a homogeneous input. Its single attention vector `att`
+scores the combined edge representation rather than decomposed node-level
+scores. The `edge_dim` / `x_edge` / `edge_mask` interface is identical.

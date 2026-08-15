@@ -9,6 +9,8 @@ own. Self-loops are not needed: own features enter via the (1 + eps) term.
 Edge features are added to sender features, so they share the node dimension.
 """
 
+from collections.abc import Callable
+
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Int
@@ -25,12 +27,12 @@ class GINConv(Module):
     >>> gin(x, senders, receivers)  # (n, 16) -> (n, 32)
     """
 
-    mlp: Module
+    mlp: Callable[[Array], Array]
     eps: Param[Float[Array, ""]] | float
 
     def __init__(
         self,
-        mlp: Module,
+        mlp: Callable[[Array], Array],
         *,
         eps: float = 0.0,
         train_eps: bool = False,
@@ -49,10 +51,12 @@ class GINConv(Module):
         x_src, x_dst = x if isinstance(x, tuple) else (x, x)
         n_dst = x_dst.shape[0]
 
-        # Sum aggregation preserves neighbor multiplicity
-        agg = segment_sum(x_src[senders], receivers, n_dst)
+        # Sum aggregation preserves neighbour multiplicity
+        messages = x_src[senders]
+        aggregated = segment_sum(messages, receivers, n_dst)
 
-        return self.mlp((1 + self.eps) * x_dst + agg)
+        x_out = (1 + self.eps) * x_dst + aggregated
+        return self.mlp(x_out)
 
 
 class GINEConv(Module):
@@ -62,12 +66,12 @@ class GINEConv(Module):
     >>> gine(x, senders, receivers, x_edge=x_edge)  # (n, 16) -> (n, 32)
     """
 
-    mlp: Module
+    mlp: Callable[[Array], Array]
     eps: Param[Float[Array, ""]] | float
 
     def __init__(
         self,
-        mlp: Module,
+        mlp: Callable[[Array], Array],
         *,
         eps: float = 0.0,
         train_eps: bool = False,
@@ -89,6 +93,8 @@ class GINEConv(Module):
         n_dst = x_dst.shape[0]
 
         # Each edge adds its features to the sender before the message nonlinearity
-        agg = segment_sum(jax.nn.relu(x_src[senders] + x_edge), receivers, n_dst)
+        messages = jax.nn.relu(x_src[senders] + x_edge)
+        aggregated = segment_sum(messages, receivers, n_dst)
 
-        return self.mlp((1 + self.eps) * x_dst + agg)
+        x_out = (1 + self.eps) * x_dst + aggregated
+        return self.mlp(x_out)

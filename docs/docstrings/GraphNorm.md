@@ -13,13 +13,15 @@ dim : int
     Number of node features.
 eps : float, default=1e-5
     Positive constant added to the variance for numerical stability.
+use_bias : bool, default=True
+    Whether to include a learnable output bias.
 
 Attributes
 ----------
 scale : Param
     Per-feature output scale, initialized to ones.
-b : Param
-    Per-feature output bias, initialized to zeros.
+b : Param | None
+    Per-feature output bias, initialized to zeros. `None` when `use_bias=False`.
 mean_scale : Param
     Per-feature graph mean scale, initialized to ones.
 

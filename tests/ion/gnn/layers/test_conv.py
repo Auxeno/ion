@@ -108,13 +108,13 @@ class TestGraphConv:
         assert y.shape == (5, 16)
 
     def test_output_manual(self, triangle_graph_no_self_loops):
-        """Output matches sum(neighbours) @ w_neigh + x @ w_self + b."""
+        """Output matches sum(neighbours) @ w_neigh + x @ w_root + b."""
         conv = gnn.GraphConv(2, 3, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 2))
         senders, receivers = triangle_graph_no_self_loops
 
         neigh = jnp.stack([x[1] + x[2], x[0] + x[2], x[0] + x[1]])
-        expected = neigh @ conv.w_neigh + x @ conv.w_self + conv.b  # type: ignore[operator]
+        expected = neigh @ conv.w_neigh + x @ conv.w_root + conv.b  # type: ignore[operator]
 
         y = conv(x, senders, receivers)
         npt.assert_allclose(y, expected, rtol=1e-5, atol=1e-5)
@@ -128,7 +128,7 @@ class TestGraphConv:
         receivers = jnp.array([0, 0, 1])
 
         neigh = jnp.stack([x_src[0] + x_src[2], x_src[1]])
-        expected = neigh @ conv.w_neigh + x_dst @ conv.w_self + conv.b  # type: ignore[operator]
+        expected = neigh @ conv.w_neigh + x_dst @ conv.w_root + conv.b  # type: ignore[operator]
         y = conv((x_src, x_dst), senders, receivers)
 
         assert y.shape == (2, 3)
@@ -149,7 +149,7 @@ class TestGraphConv:
                 -x[1],
             ]
         )
-        expected = neigh @ conv.w_neigh + x @ conv.w_self + conv.b  # type: ignore[operator]
+        expected = neigh @ conv.w_neigh + x @ conv.w_root + conv.b  # type: ignore[operator]
 
         y = conv(x, senders, receivers, edge_weight=edge_weight)
         npt.assert_allclose(y, expected, rtol=1e-5, atol=1e-5)
@@ -172,7 +172,7 @@ class TestGraphConv:
         senders, receivers = triangle_graph_no_self_loops
         edge_weight = jnp.zeros(senders.shape)
 
-        expected = x @ conv.w_self + conv.b  # type: ignore[operator]
+        expected = x @ conv.w_root + conv.b  # type: ignore[operator]
         y = conv(x, senders, receivers, edge_weight=edge_weight)
         npt.assert_allclose(y, expected, rtol=1e-5, atol=1e-5)
 
@@ -191,7 +191,7 @@ class TestGraphConv:
         senders = jnp.array([0])
         receivers = jnp.array([1])
 
-        expected = x[2] @ conv.w_self + conv.b  # type: ignore[operator]
+        expected = x[2] @ conv.w_root + conv.b  # type: ignore[operator]
         y = conv(x, senders, receivers)
         npt.assert_allclose(y[2], expected, rtol=1e-5, atol=1e-6)
 
@@ -200,7 +200,7 @@ class TestGraphConv:
         conv = gnn.GraphConv(2048, 2048, key=jax.random.key(42))
         expected_var = 2.0 / (2048 + 2048)
         npt.assert_allclose(jnp.var(conv.w_neigh._value), expected_var, rtol=0.05)
-        npt.assert_allclose(jnp.var(conv.w_self._value), expected_var, rtol=0.05)
+        npt.assert_allclose(jnp.var(conv.w_root._value), expected_var, rtol=0.05)
 
     def test_zero_bias_init(self):
         """Bias is initialized to all zeros."""
@@ -211,7 +211,7 @@ class TestGraphConv:
         """Parameters default to float32."""
         conv = gnn.GraphConv(8, 16, key=jax.random.key(0))
         assert conv.w_neigh.dtype == jnp.float32
-        assert conv.w_self.dtype == jnp.float32
+        assert conv.w_root.dtype == jnp.float32
 
     def test_edge_weight_jit(self, triangle_graph_no_self_loops):
         """JIT compilation preserves weighted aggregation."""
@@ -238,19 +238,19 @@ class TestGraphConv:
         assert jnp.any(grad != 0)
 
 
-def _neighbor_agg(x, senders, receivers, num_nodes, aggregator):
-    """Reference neighborhood pooling by dense scatter over receivers."""
+def _neighbour_aggregate(x, senders, receivers, num_nodes, aggregate):
+    """Reference neighbourhood pooling by dense scatter over receivers."""
     agg = []
     for r in range(num_nodes):
-        neighbors = x[senders[receivers == r]]
-        if neighbors.shape[0] == 0:
+        neighbours = x[senders[receivers == r]]
+        if neighbours.shape[0] == 0:
             agg.append(jnp.zeros(x.shape[1]))
-        elif aggregator == "mean":
-            agg.append(neighbors.mean(axis=0))
-        elif aggregator == "sum":
-            agg.append(neighbors.sum(axis=0))
+        elif aggregate == "mean":
+            agg.append(neighbours.mean(axis=0))
+        elif aggregate == "sum":
+            agg.append(neighbours.sum(axis=0))
         else:
-            agg.append(neighbors.max(axis=0))
+            agg.append(neighbours.max(axis=0))
     return jnp.stack(agg)
 
 
@@ -264,15 +264,15 @@ class TestSAGEConv:
         y = sage(x, senders, receivers)
         assert y.shape == (5, 16)
 
-    @pytest.mark.parametrize("aggregator", ["mean", "max", "sum"])
-    def test_output_manual(self, aggregator, triangle_graph_no_self_loops):
-        """Output matches manual agg(neighbors) @ w_neigh + x @ w_self + b."""
-        sage = gnn.SAGEConv(2, 3, aggregator=aggregator, key=jax.random.key(0))
+    @pytest.mark.parametrize("aggregate", ["mean", "max", "sum"])
+    def test_output_manual(self, aggregate, triangle_graph_no_self_loops):
+        """Output matches manual aggregation plus root transform and bias."""
+        sage = gnn.SAGEConv(2, 3, aggregate=aggregate, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 2))
         senders, receivers = triangle_graph_no_self_loops
 
-        neigh = _neighbor_agg(x, senders, receivers, 3, aggregator)
-        expected = neigh @ sage.w_neigh + x @ sage.w_self + sage.b  # type: ignore[operator]
+        neigh = _neighbour_aggregate(x, senders, receivers, 3, aggregate)
+        expected = neigh @ sage.w_neigh + x @ sage.w_root + sage.b  # type: ignore[operator]
 
         y = sage(x, senders, receivers)
         npt.assert_allclose(y, expected, rtol=1e-5, atol=1e-5)
@@ -286,7 +286,7 @@ class TestSAGEConv:
         receivers = jnp.array([0, 0, 1])
 
         neigh = jnp.stack([(x_src[0] + x_src[2]) / 2, x_src[1]])
-        expected = neigh @ sage.w_neigh + x_dst @ sage.w_self + sage.b  # type: ignore[operator]
+        expected = neigh @ sage.w_neigh + x_dst @ sage.w_root + sage.b  # type: ignore[operator]
         y = sage((x_src, x_dst), senders, receivers)
 
         assert y.shape == (2, 3)
@@ -302,13 +302,13 @@ class TestSAGEConv:
         assert y.shape == (3, 16)
 
     def test_no_root_weight(self, triangle_graph_no_self_loops):
-        """use_root_weight=False drops the self weight; output uses only neighbors."""
+        """use_root_weight=False drops the root weight; output uses only neighbours."""
         sage = gnn.SAGEConv(2, 3, use_root_weight=False, key=jax.random.key(0))
-        assert sage.w_self is None
+        assert sage.w_root is None
         x = jax.random.normal(jax.random.key(1), (3, 2))
         senders, receivers = triangle_graph_no_self_loops
 
-        neigh = _neighbor_agg(x, senders, receivers, 3, "mean")
+        neigh = _neighbour_aggregate(x, senders, receivers, 3, "mean")
         expected = neigh @ sage.w_neigh + sage.b  # type: ignore[operator]
 
         y = sage(x, senders, receivers)
@@ -347,5 +347,5 @@ class TestSAGEConv:
         senders = jnp.array([0])
         receivers = jnp.array([1])
         y = sage(x, senders, receivers)
-        expected = x[2] @ sage.w_self + sage.b  # type: ignore[operator]
+        expected = x[2] @ sage.w_root + sage.b  # type: ignore[operator]
         npt.assert_allclose(y[2], expected, rtol=1e-5, atol=1e-6)

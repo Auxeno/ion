@@ -40,6 +40,14 @@ class TestGINConv:
         receivers = jnp.array([1, 0])
         assert gin(x, senders, receivers).shape == (5, 8)
 
+    def test_accepts_array_callable(self):
+        """The update can be an ordinary array callable."""
+        gin = gnn.GINConv(lambda x: 2 * x)
+        x = jnp.ones((2, 3))
+
+        result = gin(x, jnp.array([0]), jnp.array([1]))
+        npt.assert_array_equal(result, jnp.array([[2] * 3, [4] * 3]))
+
     def test_default_eps_static(self):
         """Default eps is a plain float, not a trainable Param."""
         mlp = nn.MLP([4, 8], key=jax.random.key(0))
@@ -70,7 +78,7 @@ class TestGINConv:
         npt.assert_allclose(y[2], mlp(1.25 * x[2]), rtol=1e-5, atol=1e-5)
 
     def test_sum_aggregation_counts(self):
-        """Duplicate neighbor features accumulate (sum, not mean)."""
+        """Duplicate neighbour features accumulate (sum, not mean)."""
         mlp = nn.MLP([2, 4], key=jax.random.key(0))
         gin = gnn.GINConv(mlp)
         x = jnp.array([[1.0, 1.0], [1.0, 1.0], [0.0, 0.0]])
@@ -125,6 +133,15 @@ class TestGINEConv:
         receivers = jnp.array([1, 0])
         x_edge = jax.random.normal(jax.random.key(2), (2, 4))
         assert gine(x, senders, receivers, x_edge=x_edge).shape == (5, 8)
+
+    def test_accepts_array_callable(self):
+        """The update can be an ordinary array callable."""
+        gine = gnn.GINEConv(lambda x: 2 * x)
+        x = jnp.ones((2, 3))
+        x_edge = jnp.ones((1, 3))
+
+        result = gine(x, jnp.array([0]), jnp.array([1]), x_edge=x_edge)
+        npt.assert_array_equal(result, jnp.array([[2] * 3, [6] * 3]))
 
     def test_edge_features_change_output(self):
         """Edge features alter the messages, so zeros differ from nonzeros."""

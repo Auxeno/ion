@@ -38,13 +38,13 @@ def add_self_loops(
 def remove_self_loops(
     senders: Int[Array, " e"],
     receivers: Int[Array, " e"],
-) -> tuple[Int[Array, " e2"], Int[Array, " e2"]]:
+) -> tuple[Int[Array, " e2"], Int[Array, " e2"], Int[Array, " e2"]]:
     """Remove self-loop edges (i -> i).
 
-    >>> senders, receivers = remove_self_loops(senders, receivers)
+    >>> senders, receivers, kept = remove_self_loops(senders, receivers)
     """
-    keep = senders != receivers
-    return senders[keep], receivers[keep]
+    kept = jnp.flatnonzero(senders != receivers)
+    return senders[kept], receivers[kept], kept
 
 
 def degree(
@@ -102,14 +102,16 @@ def to_adjacency(
 
 def from_adjacency(
     adjacency: Float[Array, " n n"],
-    num_edges: int | None = None,
+    edge_capacity: int | None = None,
 ) -> tuple[Int[Array, " e"], Int[Array, " e"]]:
     """Gather the nonzero entries of a dense adjacency matrix into edges.
 
     >>> senders, receivers = from_adjacency(adjacency)
-    >>> senders, receivers = from_adjacency(adjacency, num_edges=42)  # jit friendly
+    >>> senders, receivers = from_adjacency(adjacency, edge_capacity=42)  # jit friendly
     """
-    senders, receivers = jnp.nonzero(adjacency, size=num_edges, fill_value=adjacency.shape[0])
+    senders, receivers = jnp.nonzero(
+        adjacency, size=edge_capacity, fill_value=adjacency.shape[0]
+    )
     return senders, receivers
 
 

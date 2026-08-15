@@ -6,7 +6,7 @@ paper belongs to. Only 140 labeled nodes are used for training; the rest
 are unlabeled. Each node has a 1,433-dim bag-of-words feature vector.
 
 Trains a GCNConv model (fixed degree-weighted averaging) and a
-GATConv model (learned neighbor weighting) on the same split.
+GATConv model (learned neighbour weighting) on the same split.
 """
 
 import urllib.request

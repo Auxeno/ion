@@ -19,5 +19,5 @@ tuple[jax.Array["t o", float], jax.Array["e o", float]]
 
 Note
 ----
-Self-loops are not needed because each node enters through `w_self`. A node
+Self-loops are not needed because each node enters through `w_root`. A node
 with no incoming edges receives only its root term and node bias.

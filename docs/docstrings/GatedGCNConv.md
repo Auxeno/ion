@@ -36,7 +36,7 @@ key : jax.Array
 
 Attributes
 ----------
-w_self : Param
+w_root : Param
     Destination-root transform of shape `(dst_dim, out_dim)`.
 w_neigh : Param
     Sender-message transform of shape `(src_dim, out_dim)`.

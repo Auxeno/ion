@@ -112,8 +112,8 @@ def _build_gnn_layers(key):
         ),
         (gnn.GatedGCNConv(8, 16, edge_dim=4, key=next(keys)), x, senders, receivers, x_edge),
         (gnn.SAGEConv(8, 16, key=next(keys)), x, senders, receivers, None),
-        (gnn.SAGEConv(8, 16, aggregator="max", key=next(keys)), x, senders, receivers, None),
-        (gnn.SAGEConv(8, 16, aggregator="sum", key=next(keys)), x, senders, receivers, None),
+        (gnn.SAGEConv(8, 16, aggregate="max", key=next(keys)), x, senders, receivers, None),
+        (gnn.SAGEConv(8, 16, aggregate="sum", key=next(keys)), x, senders, receivers, None),
         (gnn.SAGEConv(8, 16, normalize=True, key=next(keys)), x, senders, receivers, None),
         (gnn.SAGEConv(8, 16, use_root_weight=False, key=next(keys)), x, senders, receivers, None),
     ]

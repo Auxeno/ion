@@ -14,18 +14,18 @@ width because they are added before the MLP.
 
 Parameters
 ----------
-mlp : Module
+mlp : Callable[[jax.Array], jax.Array]
     Update network applied after aggregation. Supplies all of the layer's
     weights, so `GINEConv` takes no `key` and creates none of its own.
 eps : float, default=0.0
-    Weights a node's own features against its aggregated neighbors. Fixed unless
+    Weights a node's own features against its aggregated neighbours. Fixed unless
     `train_eps=True`.
 train_eps : bool, default=False
     If `True`, `eps` becomes a learnable scalar `Param`.
 
 Attributes
 ----------
-mlp : Module
+mlp : Callable[[jax.Array], jax.Array]
     The update network passed at construction.
 eps : Param | float
     Learnable scalar when `train_eps=True`, otherwise the fixed float.

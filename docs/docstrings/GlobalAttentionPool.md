@@ -9,20 +9,20 @@ r_g = \sum_{i \in g} \operatorname{softmax}_g(a_i) f(x_i).
 
 Parameters
 ----------
-score : Module
-    Module deciding how much each node contributes. It maps every node feature
+score : Callable[[jax.Array], jax.Array]
+    Callable deciding how much each node contributes. It maps every node feature
     row to one importance logit and must return shape `(num_nodes, 1)`.
-value : Module | None, default=None
-    Optional module deciding what each node contributes. It maps node features
+value : Callable[[jax.Array], jax.Array] | None, default=None
+    Optional callable deciding what each node contributes. It maps node features
     to the values used in the weighted sum. When `None`, the input features are
     pooled directly.
 
 Attributes
 ----------
-score : Module
-    Node scoring module supplied at construction.
-value : Module | None
-    Node value module supplied at construction.
+score : Callable[[jax.Array], jax.Array]
+    Node scoring callable supplied at construction.
+value : Callable[[jax.Array], jax.Array] | None
+    Node value callable supplied at construction.
 
 Example
 -------

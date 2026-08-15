@@ -26,7 +26,7 @@ class TestGATConv:
         y = gat((x_src, x_dst), senders, receivers)
 
         assert y.shape == (2, 8)
-        assert gat.w.shape == (3, 8)
+        assert gat.w_sender.shape == (3, 8)
         assert gat.w_receiver is not None
         assert gat.w_receiver.shape == (5, 8)
 
@@ -52,7 +52,7 @@ class TestGATConv:
         """Glorot fans come from the flat (in_dim, out_dim) projection, including multi-head."""
         for num_heads in [1, 4]:
             gat = gnn.GATConv(256, 128, num_heads=num_heads, key=jax.random.key(42))
-            var = jnp.var(gat.w._value)
+            var = jnp.var(gat.w_sender._value)
             expected_var = 2.0 / (256 + 128)
             npt.assert_allclose(var, expected_var, rtol=0.1)
 
@@ -64,14 +64,14 @@ class TestGATConv:
     def test_default_dtype(self):
         """Weights default to float32."""
         gat = gnn.GATConv(8, 16, key=jax.random.key(0))
-        assert gat.w.dtype == jnp.float32
+        assert gat.w_sender.dtype == jnp.float32
         assert gat.att_sender.dtype == jnp.float32
         assert gat.att_receiver.dtype == jnp.float32
 
     def test_projection_shapes(self):
         """Projection parameters stay flat; only activations gain a head axis."""
         gat = gnn.GATConv(8, 16, num_heads=4, edge_dim=3, key=jax.random.key(0))
-        assert gat.w.shape == (8, 16)
+        assert gat.w_sender.shape == (8, 16)
         assert gat.w_edge is not None
         assert gat.w_edge.shape == (3, 16)
 
@@ -90,7 +90,7 @@ class TestGATConv:
         gat = gnn.GATConv(8, 8, negative_slope=0.1, key=jax.random.key(0))
         assert gat.negative_slope == 0.1
 
-    def test_neighbor_influence_via_jacobian(self):
+    def test_neighbour_influence_via_jacobian(self):
         """Connected nodes influence each other, disconnected nodes do not."""
         gat = gnn.GATConv(4, 4, key=jax.random.key(0))
         x = jax.random.normal(jax.random.key(1), (3, 4))
@@ -263,6 +263,27 @@ class TestGATConvEdgeMask:
         assert y_masked.shape == (3, 16)
         assert jnp.all(jnp.isfinite(y_masked))
 
+    def test_masked_nonfinite_edge_features_do_not_leak(self):
+        """Masked non-finite edge features cannot contaminate the output."""
+        gat = gnn.GATConv(4, 4, edge_dim=2, use_bias=False, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 4))
+        senders = jnp.array([0, 2])
+        receivers = jnp.array([1, 1])
+        x_edge = jnp.array([[1.0, -1.0], [jnp.inf, jnp.nan]])
+        mask = jnp.array([True, False])
+
+        result = gat(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
+        expected = gat(
+            x,
+            senders[:1],
+            receivers[:1],
+            x_edge=x_edge[:1],
+            edge_mask=mask[:1],
+        )
+
+        assert jnp.all(jnp.isfinite(result))
+        npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
+
     def test_edge_mask_grad(self, triangle_graph):
         """Gradients flow through edge_mask without NaN."""
         senders, receivers = triangle_graph
@@ -270,7 +291,7 @@ class TestGATConvEdgeMask:
         x = jax.random.normal(jax.random.key(1), (3, 8))
         mask = jnp.ones(senders.shape[0], dtype=bool).at[0].set(False)
         grads = jax.grad(lambda m: m(x, senders, receivers, edge_mask=mask).sum())(gat)
-        assert jnp.all(jnp.isfinite(grads.w._value))
+        assert jnp.all(jnp.isfinite(grads.w_sender._value))
 
     def test_edge_mask_jit(self, triangle_graph):
         """jax.jit with edge_mask produces same output as eager."""
@@ -566,6 +587,27 @@ class TestGATv2ConvEdgeMask:
         assert y_masked.shape == (3, 16)
         assert jnp.all(jnp.isfinite(y_masked))
 
+    def test_masked_nonfinite_edge_features_do_not_leak(self):
+        """Masked non-finite edge features cannot contaminate the output."""
+        gat = gnn.GATv2Conv(4, 4, edge_dim=2, use_bias=False, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 4))
+        senders = jnp.array([0, 2])
+        receivers = jnp.array([1, 1])
+        x_edge = jnp.array([[1.0, -1.0], [jnp.inf, jnp.nan]])
+        mask = jnp.array([True, False])
+
+        result = gat(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
+        expected = gat(
+            x,
+            senders[:1],
+            receivers[:1],
+            x_edge=x_edge[:1],
+            edge_mask=mask[:1],
+        )
+
+        assert jnp.all(jnp.isfinite(result))
+        npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
+
     def test_edge_mask_grad(self, triangle_graph):
         """Gradients flow through edge_mask without NaN."""
         senders, receivers = triangle_graph
@@ -655,19 +697,19 @@ def _manual_transformer(conv, x, senders, receivers, x_edge=None, edge_mask=None
     if edge_mask is not None:
         logits = jnp.where(edge_mask[:, None], logits, -jnp.inf)
     attention = gnn.segment_softmax(logits, receivers, n_dst)
-    out = gnn.segment_sum(messages * attention[..., None], receivers, n_dst).reshape(n_dst, -1)
+    x_out = gnn.segment_sum(messages * attention[..., None], receivers, n_dst).reshape(n_dst, -1)
 
     if conv.w_root is not None:
         root = x_dst @ conv.w_root
         if conv.w_beta is not None:
-            gate_input = jnp.concatenate([root, out, root - out], axis=-1)
+            gate_input = jnp.concatenate([root, x_out, root - x_out], axis=-1)
             beta = jax.nn.sigmoid(gate_input @ conv.w_beta)
-            out = beta * root + (1 - beta) * out
+            x_out = beta * root + (1 - beta) * x_out
         else:
-            out = out + root
+            x_out = x_out + root
     if conv.b_out is not None:
-        out = out + conv.b_out
-    return out
+        x_out = x_out + conv.b_out
+    return x_out
 
 
 class TestTransformerConv:

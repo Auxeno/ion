@@ -23,14 +23,14 @@ class GraphNorm(Module):
     """
 
     scale: Param[Float[Array, " d"]]
-    b: Param[Float[Array, " d"]]
+    b: Param[Float[Array, " d"]] | None
     mean_scale: Param[Float[Array, " d"]]
     eps: float
 
-    def __init__(self, dim: int, *, eps: float = 1e-5) -> None:
+    def __init__(self, dim: int, *, eps: float = 1e-5, use_bias: bool = True) -> None:
 
         self.scale = Param(jnp.ones(dim))
-        self.b = Param(jnp.zeros(dim))
+        self.b = Param(jnp.zeros(dim)) if use_bias else None
         self.mean_scale = Param(jnp.ones(dim))
 
         self.eps = eps
@@ -63,4 +63,8 @@ class GraphNorm(Module):
             var = segment_mean(jnp.square(x), graph_ids, num_graphs)
             x = x * lax.rsqrt(var[graph_ids] + self.eps)
 
-        return (x * self.scale + self.b).astype(dtype)
+        x = x * self.scale
+        if self.b is not None:
+            x = x + self.b
+
+        return x.astype(dtype)

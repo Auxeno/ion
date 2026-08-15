@@ -1,10 +1,10 @@
 GraphSAGE layer ([Hamilton et al., 2017](https://arxiv.org/abs/1706.02216)).
 
-Pools neighbour features with a permutation-invariant aggregator, then combines
+Pools neighbour features with a permutation-invariant aggregate, then combines
 them with a separately transformed copy of the central node:
 
 \[
-x'_i = W_n\,\operatorname{agg}_{j\in\mathcal N(i)}(x_j) + W_s x_i.
+x'_i = W_n\,\operatorname{agg}_{j\in\mathcal N(i)}(x_j) + W_r x_i.
 \]
 
 Parameters
@@ -14,7 +14,7 @@ in_dim : int | tuple[int, int]
     source and destination features with different widths.
 out_dim : int
     Output node feature dimension.
-aggregator : str, default='mean'
+aggregate : str, default='mean'
     Neighbourhood pooling: `"mean"`, `"max"`, or `"sum"`.
 normalize : bool, default=False
     Whether to L2 normalize each output node embedding.
@@ -33,7 +33,7 @@ Attributes
 ----------
 w_neigh : Param
     Neighbour transform of shape `(src_dim, out_dim)`.
-w_self : Param | None
+w_root : Param | None
     Destination-root transform of shape `(dst_dim, out_dim)`. `None` when
     `use_root_weight=False`.
 b : Param | None
@@ -48,6 +48,6 @@ x = jnp.ones((num_nodes, in_dim))
 senders = jnp.array([0, 1, 2])
 receivers = jnp.array([1, 2, 0])
 
-sage = gnn.SAGEConv(in_dim, out_dim, aggregator="max", key=key)
+sage = gnn.SAGEConv(in_dim, out_dim, aggregate="max", key=key)
 y = sage(x, senders, receivers)  # (3, 16) -> (3, 32)
 ```
