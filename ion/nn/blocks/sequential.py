@@ -43,12 +43,14 @@ class Sequential(Module):
 
         for layer, layer_key in zip(self.layers, keys):
             parameters = inspect.signature(layer).parameters
+            training_parameter = parameters.get("training")
             kwargs = {}
 
-            if "training" in parameters:
-                if training is None:
+            if training_parameter is not None:
+                if training is None and training_parameter.default is inspect.Parameter.empty:
                     raise ValueError(f"{type(layer).__name__} requires training=True or False")
-                kwargs["training"] = training
+                if training is not None:
+                    kwargs["training"] = training
             if "key" in parameters:
                 kwargs["key"] = layer_key
 

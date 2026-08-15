@@ -1,6 +1,9 @@
 """Neural network modules: base classes, layers, and blocks."""
 
+from .blocks.bidirectional import Bidirectional
+from .blocks.ensemble import Ensemble
 from .blocks.mlp import MLP
+from .blocks.residual import Residual
 from .blocks.sequential import Sequential
 from .buffer import Buffer
 from .layers.attention import MultiHeadAttention
@@ -22,10 +25,12 @@ __all__ = [
     "Param",
     "AvgPool",
     "BatchNorm",
+    "Bidirectional",
     "Conv",
     "ConvTranspose",
     "Dropout",
     "Embedding",
+    "Ensemble",
     "GroupNorm",
     "GRU",
     "GRUCell",
@@ -39,6 +44,7 @@ __all__ = [
     "MLP",
     "MultiHeadAttention",
     "RMSNorm",
+    "Residual",
     "RNN",
     "RNNCell",
     "RoPE",

@@ -123,7 +123,7 @@ Each [`ion.nn`](nn/layers/index.md) layer is a `Module`, constructed with a `key
 | [Positional](nn/layers/positional.md) | `RoPE`, `LearnedPositionalEmbedding`, `SinusoidalPositionalEmbedding` |
 | [Pooling](nn/layers/pool.md) | `MaxPool`, `AvgPool` |
 | [Stochastic](nn/layers/stochastic.md) | `Dropout` |
-| [Composite](nn/layers/mlp.md) | `MLP`, `Sequential` |
+| [Blocks](nn/layers/blocks.md) | `MLP`, `Sequential`, `Residual`, `Bidirectional`, `Ensemble` |
 
 ```python
 import jax
@@ -207,9 +207,12 @@ out = jax.jit(model)(x)
 grads = jax.grad(mse_loss)(model, x, y)
 
 # Model ensemble
-keys = jax.random.split(jax.random.key(0), 8)
-ensemble = jax.vmap(lambda key: nn.MLP([4, 16, 3], key=key))(keys)
-preds = jax.vmap(lambda m: m(x))(ensemble)
+ensemble = nn.Ensemble(
+    lambda key: nn.MLP([4, 16, 3], key=key),
+    8,
+    key=jax.random.key(0),
+)
+preds = ensemble(x)
 ```
 
 Stateful calls work directly with `jax.jit`, `jax.grad`, and `jax.lax.scan` too. Writing a shared buffer under a parallelizing transform such as `jax.vmap`, or inside `jax.checkpoint`, has additional constraints; see [Sharp edges](sharp-edges.md#buffer-mutation-and-jax-transforms).

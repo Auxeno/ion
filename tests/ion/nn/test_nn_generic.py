@@ -634,6 +634,20 @@ def _cast_bf16(layer, x):
     return layer, x
 
 
+def _sequence_initial_state(layer, batch_size, dtype):
+    """Build a batched initial state for a sequence layer."""
+
+    def initial_state(sequence):
+        return jax.tree.map(
+            lambda a: jnp.zeros((batch_size, *a.shape), dtype=dtype),
+            sequence.cell.initial_state,
+        )
+
+    if isinstance(layer, nn.Bidirectional):
+        return initial_state(layer.forward), initial_state(layer.backward)
+    return initial_state(layer)
+
+
 def test_bf16_output_dtype(layer_and_input):
     """bfloat16 inputs produce bfloat16 outputs."""
     layer, x = layer_and_input
@@ -657,10 +671,7 @@ def test_seq_bf16_output_dtype(seq_layer_and_input):
     """bfloat16 inputs produce bfloat16 outputs for sequence layers."""
     layer, x = seq_layer_and_input
     layer, x = _cast_bf16(layer, x)
-    h0 = jax.tree.map(
-        lambda a: jnp.zeros((x.shape[0], *a.shape), dtype=jnp.bfloat16),
-        layer.cell.initial_state,
-    )
+    h0 = _sequence_initial_state(layer, x.shape[0], jnp.bfloat16)
     y, _ = layer(x, hx=h0)
     assert y.dtype == jnp.bfloat16
 
@@ -669,10 +680,7 @@ def test_seq_bf16_finiteness(seq_layer_and_input):
     """bfloat16 outputs are finite for sequence layers."""
     layer, x = seq_layer_and_input
     layer, x = _cast_bf16(layer, x)
-    h0 = jax.tree.map(
-        lambda a: jnp.zeros((x.shape[0], *a.shape), dtype=jnp.bfloat16),
-        layer.cell.initial_state,
-    )
+    h0 = _sequence_initial_state(layer, x.shape[0], jnp.bfloat16)
     y, _ = layer(x, hx=h0)
     assert jnp.all(jnp.isfinite(y))
 

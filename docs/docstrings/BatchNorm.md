@@ -41,3 +41,9 @@ Note
 ----
 Running statistics use JAX's default floating dtype. Buffers are not changed
 by `Module.astype` or the optimizer.
+
+Warning
+-------
+Running statistics are buffers, so `BatchNorm` cannot be an `nn.Ensemble`
+member. `Ensemble` builds its members under `jax.vmap`, where a new buffer
+lets a traced reference escape the transform.

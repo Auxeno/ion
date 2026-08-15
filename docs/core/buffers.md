@@ -50,4 +50,4 @@ class Counter(nn.Module):
 
 Buffers have a fixed shape and dtype, contribute no pytree leaves, and are not cast or updated by an optimizer. `set` also applies `stop_gradient`.
 
-Because buffers are mutable, ordinary pytree copies share their state. Use `model.clone()` for an independent copy. See [Sharp edges](../sharp-edges.md#models-with-buffers-are-not-plain-values) for copying and JAX transform constraints.
+Because buffers are mutable, ordinary pytree copies share their state. Use `model.clone()` for an independent copy. A layer owning a buffer also cannot be an [`Ensemble`](../nn/layers/blocks.md) member, since `Ensemble` builds its members under `jax.vmap`. See [Sharp edges](../sharp-edges.md#models-with-buffers-are-not-plain-values) for copying and JAX transform constraints.

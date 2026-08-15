@@ -35,6 +35,8 @@ independent = model.clone()                    # owns running statistics
 
 `jax.vmap` may read a buffer, so stateful models work normally in evaluation. It cannot write one shared buffer from several mapped lanes: those concurrent writes have no defined ordering or final value. Ion buffers are unmapped pytree metadata, so a training call that writes one under `vmap` raises. Pass the whole batch to the layer instead; `BatchNorm` reduces over all leading axes. If an update must combine mapped values, compute them with `vmap`, reduce them, then call `set` once outside it. Use `jax.lax.scan` when updates must be sequential. The same restriction applies to `jax.shard_map` over a shared buffer and to transforms implemented with batching, such as `jax.jacfwd`.
 
+`nn.Ensemble` uses `vmap` for member construction as well as evaluation, so its factory cannot return a model with `Buffer` fields. Creating a buffer inside the mapped factory lets a traced reference escape the transform; `BatchNorm`, `SpectralNorm`, and other stateful layers therefore cannot be ensemble members.
+
 `jax.checkpoint` (also called `remat`) is unsafe around buffer writes for a different reason: it may replay the forward computation during the backward pass, applying the update a second time. Keep stateful operations outside the rematerialized function:
 
 ```python

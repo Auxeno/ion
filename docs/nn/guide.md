@@ -96,12 +96,11 @@ jax.vmap(attn)(jnp.ones((2, 4, 16, 64))).shape  # (2, 4, 16, 64)
 
 Ion modules are pytrees, so `vmap` treats the layer as data and maps over the input alone. Nothing about the layer needs to change. The same mapping handles a single unbatched image, though adding the axis with `x[None]` is usually simpler.
 
-`vmap` is also how one model becomes many. Mapping construction over a batch of keys produces an ensemble that runs in a single call:
+`Ensemble` maps construction and evaluation over independent keys, retaining a leading member axis by default:
 
 ```python
-keys = jax.random.split(key, 8)
-ensemble = jax.vmap(lambda key: nn.MLP([3, 64, 1], key=key))(keys)
-preds = jax.vmap(lambda model: model(jnp.ones((32, 3))))(ensemble)
+ensemble = nn.Ensemble(lambda key: nn.MLP([3, 64, 1], key=key), 8, key=key)
+preds = ensemble(jnp.ones((32, 3)))
 
 preds.shape  # (8, 32, 1)
 ```
@@ -160,6 +159,8 @@ model = nn.Sequential(
 ```
 
 `MLP` is the same idea specialized to alternating linear layers and one activation, so `nn.MLP([3, 64, 1], key=key)` replaces the above.
+
+`Residual` adds a shape-preserving layer's output to its input. `Bidirectional` runs sequence layers in both time directions, while `Ensemble` builds independent copies of one model and evaluates them over a leading member axis. All three route through nested blocks normally.
 
 Anything with branching, multiple inputs, or intermediate values worth naming is written as a `Module` instead. Declare the submodules as class annotations, assign them in `__init__`, and write the forward pass in `__call__`:
 

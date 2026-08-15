@@ -103,6 +103,18 @@ class TestSequential:
         with pytest.raises(ValueError, match="requires training"):
             model(jnp.ones((4,)))
 
+    def test_optional_training_uses_default(self):
+        """An optional training argument does not require an explicit mode."""
+
+        def scale(x, *, training=False):
+            return x * (2 if training else 1)
+
+        model = nn.Sequential(scale)
+        x = jnp.ones((4,))
+
+        npt.assert_array_equal(model(x), x)
+        npt.assert_array_equal(model(x, training=True), 2 * x)
+
     def test_dropout_training_requires_key(self):
         """Training with a contained Dropout requires a random key."""
         model = nn.Sequential(nn.Dropout(0.5))

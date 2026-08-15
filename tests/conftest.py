@@ -32,6 +32,11 @@ def _build_layers(key):
         (nn.MLP([8, 32, 32, 16], key=next(keys)), jnp.ones((2, 8))),
         (nn.Embedding(16, 8, key=next(keys)), jnp.array([[0, 3, 7, 15], [1, 2, 5, 10]])),
         (nn.Sequential(nn.Linear(8, 16, key=next(keys)), jax.nn.relu), jnp.ones((2, 8))),
+        (nn.Residual(nn.Linear(8, 8, key=next(keys))), jnp.ones((2, 8))),
+        (
+            nn.Ensemble(lambda key: nn.Linear(8, 16, key=key), 3, key=next(keys)),
+            jnp.ones((2, 8)),
+        ),
         (
             nn.ConvTranspose(3, 8, kernel_shape=(3,), padding=1, key=next(keys)),
             jnp.ones((2, 10, 3)),
@@ -63,6 +68,8 @@ _PARAM_NAMES = [
     "mlp",
     "embedding",
     "sequential",
+    "residual",
+    "ensemble",
     "conv_transpose_1d",
     "conv_transpose_2d",
     "learned_positional_embedding",
@@ -106,15 +113,22 @@ def _build_seq_layers(key):
         (nn.RNN(8, 16, key=next(keys)), jnp.ones((2, 5, 8))),
         (nn.LSTM(8, 16, key=next(keys)), jnp.ones((2, 5, 8))),
         (nn.GRU(8, 16, key=next(keys)), jnp.ones((2, 5, 8))),
+        (
+            nn.Bidirectional(
+                nn.RNN(8, 16, key=next(keys)),
+                nn.RNN(8, 16, key=next(keys)),
+            ),
+            jnp.ones((2, 5, 8)),
+        ),
     ]
 
 
-_SEQ_NAMES = ["rnn", "lstm", "gru"]
+_SEQ_NAMES = ["rnn", "lstm", "gru", "bidirectional"]
 
 
 @pytest.fixture(params=_SEQ_NAMES)
 def seq_layer_and_input(request, key):
-    """Sequence layers (RNN, LSTM, GRU) with matching input."""
+    """Sequence layers with matching input."""
     layers = _build_seq_layers(key)
     idx = _SEQ_NAMES.index(request.param)
     return layers[idx]

@@ -53,8 +53,7 @@ nav:
           - Positional: nn/layers/positional.md
           - Pooling: nn/layers/pool.md
           - Stochastic: nn/layers/stochastic.md
-          - MLP: nn/layers/mlp.md
-          - Sequential: nn/layers/sequential.md
+          - Blocks: nn/layers/blocks.md
   - GNN:
       - Guide: gnn/guide.md
       - Layers:

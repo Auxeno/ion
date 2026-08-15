@@ -2,6 +2,9 @@
 
 ## 0.17.0
 
+- **Neural network blocks.** `nn.Residual` adds a shape-preserving layer's output to its input, and `nn.Bidirectional` runs independent sequence layers in both time directions, summing their outputs by default.
+- **`nn.Ensemble`.** Builds independently initialized copies of one model and evaluates them with `vmap`, retaining the leading member axis by default with optional mean and sum reductions.
+- **Nested call routing.** `nn.Sequential`, `nn.Residual`, and `nn.Ensemble` consistently forward training mode and random keys through nested blocks.
 - **Breaking: consistent GNN vocabulary.** Separate central transforms are named `w_root`; `SAGEConv` takes `aggregate`; relational layers take `num_edge_types`; `GATConv.w` is `w_sender`; and fixed topology sizes use `node_capacity` and `edge_capacity`.
 - **`gnn.remove_self_loops` returns retained indices.** Its third result selects aligned edge features, matching `coalesce`, `to_undirected`, and the subgraph operations.
 - **GNN robustness and configuration.** `GraphNorm` gains `use_bias`, GAT masks safely discard non-finite edge features, and caller-supplied GIN, GINE, and global-attention transformations accept any array callable.

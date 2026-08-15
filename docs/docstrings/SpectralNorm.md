@@ -52,3 +52,9 @@ The final parameter dimension is the output dimension. Earlier dimensions are
 flattened, supporting linear and convolutional weights. Power-iteration vectors
 use JAX's default floating dtype, so low-precision parameters promote naturally
 during the estimate. The wrapped module's result returns to the input dtype.
+
+Warning
+-------
+The power-iteration vectors are buffers, so `SpectralNorm` cannot be an
+`nn.Ensemble` member. `Ensemble` builds its members under `jax.vmap`, where a
+new buffer lets a traced reference escape the transform.
