@@ -55,6 +55,7 @@ class GatedGCNConv(Module):
         self.w_receiver = Param(w_init(shape=(in_dst, out_dim), key=keys[4]))
         self.b_node = Param(b_init(shape=(out_dim,), key=keys[5])) if use_bias else None
         self.b_edge = Param(b_init(shape=(out_dim,), key=keys[6])) if use_bias else None
+
         self.eps = eps
 
     def __call__(

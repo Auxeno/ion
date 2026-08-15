@@ -56,6 +56,7 @@ class GINConv(Module):
         aggregated = segment_sum(messages, receivers, n_dst)
 
         x_out = (1 + self.eps) * x_dst + aggregated
+
         return self.mlp(x_out)
 
 
@@ -97,4 +98,5 @@ class GINEConv(Module):
         aggregated = segment_sum(messages, receivers, n_dst)
 
         x_out = (1 + self.eps) * x_dst + aggregated
+
         return self.mlp(x_out)

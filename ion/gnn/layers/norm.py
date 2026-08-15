@@ -51,6 +51,7 @@ class GraphNorm(Module):
 
             mean = jnp.mean(x, axis=0)
             x = x - self.mean_scale * mean
+
             var = jnp.mean(jnp.square(x), axis=0)
             x = x * lax.rsqrt(var + self.eps)
         else:

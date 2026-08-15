@@ -192,6 +192,7 @@ class SAGEConv(Module):
         # segment_max leaves -inf at nodes with no neighbours
         if self.aggregate is segment_max:
             aggregated = jnp.where(jnp.isneginf(aggregated), 0.0, aggregated)
+
         x_out = aggregated @ self.w_neigh
 
         if self.w_root is not None:

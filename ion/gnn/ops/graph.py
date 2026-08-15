@@ -88,33 +88,6 @@ def to_undirected(
     )
 
 
-def to_adjacency(
-    senders: Int[Array, " e"],
-    receivers: Int[Array, " e"],
-    num_nodes: int,
-) -> Float[Array, " n n"]:
-    """Scatter edges into a dense adjacency matrix.
-
-    >>> adjacency = to_adjacency(senders, receivers, num_nodes)
-    """
-    return jnp.zeros((num_nodes, num_nodes)).at[senders, receivers].set(1.0)
-
-
-def from_adjacency(
-    adjacency: Float[Array, " n n"],
-    edge_capacity: int | None = None,
-) -> tuple[Int[Array, " e"], Int[Array, " e"]]:
-    """Gather the nonzero entries of a dense adjacency matrix into edges.
-
-    >>> senders, receivers = from_adjacency(adjacency)
-    >>> senders, receivers = from_adjacency(adjacency, edge_capacity=42)  # jit friendly
-    """
-    senders, receivers = jnp.nonzero(
-        adjacency, size=edge_capacity, fill_value=adjacency.shape[0]
-    )
-    return senders, receivers
-
-
 def line_graph(
     senders: Int[Array, " e"],
     receivers: Int[Array, " e"],
@@ -126,15 +99,17 @@ def line_graph(
     >>> line_senders, line_receivers, shared = line_graph(senders, receivers)
     """
     # Edges leaving a node form one contiguous block of the sender-sorted ordering
-    order = jnp.argsort(senders, stable=True)
-    sorted_senders = senders[order]
+    sender_order = jnp.argsort(senders, stable=True)
+    sorted_senders = senders[sender_order]
 
     # Every edge i -> v takes the whole block at v, one slot per successor
-    starts = jnp.searchsorted(sorted_senders, receivers)
-    successors = jnp.searchsorted(sorted_senders, receivers, side="right") - starts
-    line_senders = jnp.repeat(jnp.arange(senders.shape[0]), successors)
-    offsets = starts - jnp.cumsum(successors) + successors
-    line_receivers = order[offsets[line_senders] + jnp.arange(line_senders.shape[0])]
+    successor_starts = jnp.searchsorted(sorted_senders, receivers)
+    successor_ends = jnp.searchsorted(sorted_senders, receivers, side="right")
+    successor_counts = successor_ends - successor_starts
+    line_senders = jnp.repeat(jnp.arange(senders.shape[0]), successor_counts)
+    successor_offsets = successor_starts - jnp.cumsum(successor_counts) + successor_counts
+    successor_positions = successor_offsets[line_senders] + jnp.arange(line_senders.shape[0])
+    line_receivers = sender_order[successor_positions]
 
     # Drop i -> v -> i, which sends each edge straight back down its own reverse
     if non_backtracking:
@@ -233,3 +208,28 @@ def k_hop_subgraph(
         nodes_by_hop.append(new_node_ids)
 
     return induced_subgraph(senders, receivers, np.concatenate(nodes_by_hop), num_nodes)
+
+
+def to_adjacency(
+    senders: Int[Array, " e"],
+    receivers: Int[Array, " e"],
+    num_nodes: int,
+) -> Float[Array, " n n"]:
+    """Scatter edges into a dense adjacency matrix.
+
+    >>> adjacency = to_adjacency(senders, receivers, num_nodes)
+    """
+    return jnp.zeros((num_nodes, num_nodes)).at[senders, receivers].set(1.0)
+
+
+def from_adjacency(
+    adjacency: Float[Array, " n n"],
+    edge_capacity: int | None = None,
+) -> tuple[Int[Array, " e"], Int[Array, " e"]]:
+    """Gather the nonzero entries of a dense adjacency matrix into edges.
+
+    >>> senders, receivers = from_adjacency(adjacency)
+    >>> senders, receivers = from_adjacency(adjacency, edge_capacity=42)  # jit friendly
+    """
+    senders, receivers = jnp.nonzero(adjacency, size=edge_capacity, fill_value=adjacency.shape[0])
+    return senders, receivers

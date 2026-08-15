@@ -141,4 +141,5 @@ class NodeUpdate(Module):
 
         aggregated = self.aggregate(x_edge, receivers, n_dst)
         node_inputs = jnp.concatenate((x_dst, aggregated), axis=-1)
+
         return self.node_model(node_inputs)

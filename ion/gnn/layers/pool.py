@@ -55,6 +55,7 @@ class GlobalAttentionPool(Module):
 
         attention = segment_softmax(logits, graph_ids, num_graphs)
         values = x if self.value is None else self.value(x)
+
         return segment_sum(attention * values, graph_ids, num_graphs)
 
 

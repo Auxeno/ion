@@ -76,14 +76,12 @@ class GATConv(Module):
             self.w_receiver = None
         self.att_sender = Param(att_init(shape=(num_heads, head_dim), key=key_att_sender))
         self.att_receiver = Param(att_init(shape=(num_heads, head_dim), key=key_att_receiver))
-
         if edge_dim is not None:
             self.w_edge = Param(w_init(shape=(edge_dim, out_dim), key=key_w_edge))
             self.att_edge = Param(att_init(shape=(num_heads, head_dim), key=key_att_edge))
         else:
             self.w_edge = None
             self.att_edge = None
-
         self.b_out = Param(b_init(shape=(out_dim,), key=key_b)) if use_bias else None
 
         self.num_heads = num_heads
@@ -188,12 +186,10 @@ class GATv2Conv(Module):
         self.w_sender = Param(w_init(shape=(in_src, out_dim), key=key_w_sender))
         self.w_receiver = Param(w_init(shape=(in_dst, out_dim), key=key_w_receiver))
         self.att = Param(att_init(shape=(num_heads, head_dim), key=key_att))
-
         if edge_dim is not None:
             self.w_edge = Param(w_init(shape=(edge_dim, out_dim), key=key_w_edge))
         else:
             self.w_edge = None
-
         self.b_out = Param(b_init(shape=(out_dim,), key=key_b)) if use_bias else None
 
         self.num_heads = num_heads
