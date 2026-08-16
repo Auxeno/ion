@@ -11,6 +11,9 @@ receivers : jax.Array["e", int]
 x_edge : jax.Array["e f", float]
     Feature matrix with one row per directed edge and `edge_dim` features per
     row. Keyword-only.
+edge_mask : jax.Array["e", bool] | None, default=None
+    Boolean edge mask where `True` keeps an edge in node aggregation and `False`
+    excludes it. Masked edges are still updated and returned. Keyword-only.
 
 Returns
 -------
@@ -20,4 +23,6 @@ tuple[jax.Array["t o", float], jax.Array["e o", float]]
 Note
 ----
 Self-loops are not needed because each node enters through `w_root`. A node
-with no incoming edges receives only its root term and node bias.
+with no incoming edges receives only its root term and node bias. Masking
+excludes an edge from both the gate normalization and the node aggregation,
+leaving its returned edge features unchanged.

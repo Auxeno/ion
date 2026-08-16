@@ -11,6 +11,9 @@ receivers : jax.Array["e", int]
     Destination node index for each directed edge.
 x_edge : jax.Array["e i", float]
     Feature vector for each directed edge, at the node feature dimension.
+edge_mask : jax.Array["e", bool] | None, default=None
+    Boolean edge mask where `True` keeps an edge in node aggregation and `False`
+    excludes it. Keyword-only.
 
 Returns
 -------

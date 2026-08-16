@@ -7,13 +7,14 @@ Modules:
 The update network is passed by the caller; the layers create no weights of their
 own. Self-loops are not needed: own features enter via the (1 + eps) term.
 Edge features are added to sender features, so they share the node dimension.
+GINEConv accepts an optional boolean edge mask: True = keep edge, False = ignore.
 """
 
 from collections.abc import Callable
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Int
+from jaxtyping import Array, Bool, Float, Int
 
 from ...nn.module import Module
 from ...nn.param import Param
@@ -88,10 +89,14 @@ class GINEConv(Module):
         receivers: Int[Array, " e"],
         *,
         x_edge: Float[Array, "e i"],
+        edge_mask: Bool[Array, " e"] | None = None,
     ) -> Float[Array, "t o"]:
 
         x_src, x_dst = x if isinstance(x, tuple) else (x, x)
         n_dst = x_dst.shape[0]
+
+        if edge_mask is not None:
+            receivers = jnp.where(edge_mask, receivers, n_dst)
 
         # Each edge adds its features to the sender before the message nonlinearity
         messages = jax.nn.relu(x_src[senders] + x_edge)

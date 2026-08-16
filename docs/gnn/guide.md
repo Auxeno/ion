@@ -136,9 +136,10 @@ h = gat(
 
 `GINEConv` also takes edge features, but adds them straight to the sender features instead of projecting them, so `x_edge` must already be at the node dimension and there is no `edge_dim` to set.
 
-The attention layers, `NodeUpdate`, and `GraphNetwork` accept one boolean mask
-value per directed edge. `True` includes an edge in node aggregation and `False`
-excludes it; `GraphNetwork` still updates and returns every edge representation:
+Message-passing layers that accept `x_edge`, plus the relational layers, accept
+one boolean mask value per directed edge. `True` includes an edge in node
+aggregation and `False` excludes it. Layers that return edge representations,
+`GraphNetwork` and `GatedGCNConv`, still update and return every edge:
 
 ```python
 edge_mask = jnp.ones(senders_molecule.shape, dtype=bool)
@@ -152,7 +153,7 @@ h = gat(
 )
 ```
 
-For an undirected relationship such as a bond, mask both directed edges to exclude it completely. `GraphConv` does not accept feature vectors or a mask, but it can scale each message with a scalar `edge_weight`.
+For an undirected relationship such as a bond, mask both directed edges to exclude it completely. A masked edge is dropped from normalization as well as aggregation, so `RGCNConv` per-relation counts match the edges that remain. `EdgeUpdate` takes no mask, because it updates edges without aggregating them. `GraphConv` does not accept feature vectors or a mask, but it can scale each message with a scalar `edge_weight`.
 
 ### Updating edge features
 

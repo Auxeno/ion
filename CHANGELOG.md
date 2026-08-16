@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.17,1
+
+- **Edge masking for edge-aware and relational layers.** Message-passing layers that accept `x_edge`, plus `RGCNConv` and `HGTConv`, accept an optional boolean `edge_mask` that excludes masked edges from node aggregation and normalization counts. `RGCNConv` per-relation counts and `GatedGCNConv` gate sums match the retained edges. `GraphNetwork` and `GatedGCNConv` still update and return every edge representation, so masking controls routing without destroying edge state. `EdgeUpdate` takes no mask, because it updates edges without aggregating them.
+- **`gnn.RGCNConv` NaN gradient fix.** Receivers indexing past the last node, which both padded batches and masked edges produce, divided messages by a clamped per-relation count that could be zero. The forward pass discarded the resulting infinities but `w_neigh` gradients came back NaN. The count is now floored at one, which leaves real edges untouched.
+
 ## 0.17.0
 
 - **Neural network blocks.** `nn.Residual` adds a shape-preserving layer's output to its input, and `nn.Bidirectional` runs independent sequence layers in both time directions, summing their outputs by default.
@@ -10,7 +15,6 @@
 - **GNN robustness and configuration.** `GraphNorm` gains `use_bias`, GAT masks safely discard non-finite edge features, and caller-supplied GIN, GINE, and global-attention transformations accept any array callable.
 - **Subgraph extraction.** `gnn.induced_subgraph` builds the node-induced graph over selected nodes, while `gnn.k_hop_subgraph` discovers complete neighbourhoods along incoming, outgoing, or both edge directions. Both relabel nodes and return the original node and edge indices for slicing features.
 - **`gnn.GraphNorm`.** Normalizes node features independently within each graph, with a learnable scale on the graph mean.
-- **Composite edge masking.** `gnn.GraphNetwork` and `gnn.NodeUpdate` accept an optional boolean `edge_mask` that excludes masked edges from node aggregation and reduction counts. `GraphNetwork` still updates and returns every edge representation, so masking controls routing without destroying edge state.
 - **Documentation fixes.** Several documentation GNN layer `__call__` docstrings that support bipartite message passing are now annotated that they do so.
 
 ## 0.16.0

@@ -5,11 +5,14 @@ Modules:
 
 Glorot uniform weight init, zeros for bias. The layer applies no activation,
 normalization, or residual connection.
+Optional boolean edge mask: True = keep edge, False = ignore.
+Masked edges are still updated and returned, only their node aggregation is dropped.
 """
 
 import jax
+import jax.numpy as jnp
 from jax.nn.initializers import Initializer, glorot_uniform, zeros
-from jaxtyping import Array, Float, Int, PRNGKeyArray
+from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 
 from ...nn.module import Module
 from ...nn.param import Param
@@ -65,6 +68,7 @@ class GatedGCNConv(Module):
         receivers: Int[Array, " e"],
         *,
         x_edge: Float[Array, "e f"],
+        edge_mask: Bool[Array, " e"] | None = None,
     ) -> tuple[Float[Array, "t o"], Float[Array, "e o"]]:
 
         x_src, x_dst = x if isinstance(x, tuple) else (x, x)
@@ -78,6 +82,9 @@ class GatedGCNConv(Module):
         )
         if self.b_edge is not None:
             x_edge_out = x_edge_out + self.b_edge
+
+        if edge_mask is not None:
+            receivers = jnp.where(edge_mask, receivers, n_dst)
 
         # Normalize feature-wise gates over each receiver's incoming edges
         gates = jax.nn.sigmoid(x_edge_out)

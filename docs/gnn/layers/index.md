@@ -29,13 +29,13 @@ an input is optional or required is described on the layer's reference page.
 | [`GATv2Conv`](attention.md#ion.gnn.GATv2Conv) | ✓&ensp;✓ | ✓&ensp;— | ✓ | ✓ |
 | [`TransformerConv`](attention.md#ion.gnn.TransformerConv) | ✓&ensp;✓ | ✓&ensp;— | ✓ | ✓ |
 | [`GINConv`](isomorphism.md#ion.gnn.GINConv) | ✓&ensp;✓ | —&ensp;— | | ✓ |
-| [`GINEConv`](isomorphism.md#ion.gnn.GINEConv) | ✓&ensp;✓ | ✓&ensp;— | | ✓ |
+| [`GINEConv`](isomorphism.md#ion.gnn.GINEConv) | ✓&ensp;✓ | ✓&ensp;— | ✓ | ✓ |
 | [`GraphNetwork`](composite.md#ion.gnn.GraphNetwork) | ✓&ensp;✓ | ✓&ensp;✓ | ✓ | ✓ |
 | [`EdgeUpdate`](composite.md#ion.gnn.EdgeUpdate) | ✓&ensp;— | ✓&ensp;✓ | | ✓ |
 | [`NodeUpdate`](composite.md#ion.gnn.NodeUpdate) | ✓&ensp;✓ | ✓&ensp;— | ✓ | ✓ |
-| [`RGCNConv`](relational.md#ion.gnn.RGCNConv) | ✓&ensp;✓ | —&ensp;— | | |
-| [`HGTConv`](relational.md#ion.gnn.HGTConv) | ✓&ensp;✓ | —&ensp;— | | |
-| [`GatedGCNConv`](gated.md#ion.gnn.GatedGCNConv) | ✓&ensp;✓ | ✓&ensp;✓ | | ✓ |
+| [`RGCNConv`](relational.md#ion.gnn.RGCNConv) | ✓&ensp;✓ | —&ensp;— | ✓ | |
+| [`HGTConv`](relational.md#ion.gnn.HGTConv) | ✓&ensp;✓ | —&ensp;— | ✓ | |
+| [`GatedGCNConv`](gated.md#ion.gnn.GatedGCNConv) | ✓&ensp;✓ | ✓&ensp;✓ | ✓ | ✓ |
 | [`GraphNorm`](norm.md#ion.gnn.GraphNorm) | ✓&ensp;✓ | —&ensp;— | | |
 
 `GraphConv` can additionally scale messages with scalar `edge_weight` values and

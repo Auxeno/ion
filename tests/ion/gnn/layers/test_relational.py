@@ -124,6 +124,54 @@ class TestRGCNConv:
         assert conv.w_neigh.dtype == jnp.float32
         assert conv.w_root.dtype == jnp.float32
 
+    def test_edge_mask_matches_retained_edges(self):
+        """Masking an edge matches dropping it, per-relation counts included."""
+        conv = gnn.RGCNConv(4, 6, 2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 4))
+        senders = jnp.array([0, 1, 2, 0])
+        receivers = jnp.array([1, 2, 0, 2])
+        edge_type = jnp.array([0, 1, 0, 1])
+        mask = jnp.array([True, False, True, True])
+
+        result = conv(x, senders, receivers, edge_type=edge_type, edge_mask=mask)
+        keep = jnp.array([0, 2, 3])
+        expected = conv(x, senders[keep], receivers[keep], edge_type=edge_type[keep])
+
+        npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
+
+    def test_out_of_range_receivers_give_finite_grads(self):
+        """Padded or masked receivers must not divide by a clamped zero count."""
+        conv = gnn.RGCNConv(4, 6, 2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 4))
+        senders = jnp.array([0, 1, 2])
+        receivers = jnp.array([1, 3, 3])  # index 3 is one past the last node
+        edge_type = jnp.array([0, 1, 1])
+
+        grads = jax.grad(lambda m: m(x, senders, receivers, edge_type=edge_type).sum())(conv)
+
+        assert all(jnp.all(jnp.isfinite(leaf)) for leaf in jax.tree.leaves(grads))
+
+    def test_all_edges_masked_is_finite_under_jit_and_grad(self):
+        """An empty retained graph stays finite when traced and differentiated."""
+        conv = gnn.RGCNConv(4, 6, 2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 4))
+        senders = jnp.array([0, 1, 2])
+        receivers = jnp.array([1, 2, 0])
+        edge_type = jnp.array([0, 1, 0])
+        mask = jnp.zeros(3, dtype=bool)
+
+        y = jax.jit(conv)(
+            x, senders, receivers, edge_type=edge_type, edge_mask=mask
+        )
+        grads = jax.grad(
+            lambda m: m(
+                x, senders, receivers, edge_type=edge_type, edge_mask=mask
+            ).sum()
+        )(conv)
+
+        assert jnp.all(jnp.isfinite(y))
+        assert all(jnp.all(jnp.isfinite(leaf)) for leaf in jax.tree.leaves(grads))
+
 
 def _graph():
     """Four nodes over two types, five edges over two relations."""
@@ -265,3 +313,51 @@ class TestHGTConv:
 
         assert conv.w_k.dtype == jnp.float32
         assert conv.w_att.dtype == jnp.float32
+
+    def test_edge_mask_matches_retained_edges(self):
+        """Masking an edge matches dropping it from the attention normalization."""
+        conv = gnn.HGTConv(6, 6, 2, 2, num_heads=2, key=jax.random.key(0))
+        x, node_type, senders, receivers, edge_type = _graph()
+        mask = jnp.array([True, False, True, True, True])
+
+        result = conv(
+            x, senders, receivers, node_type=node_type, edge_type=edge_type, edge_mask=mask
+        )
+        keep = jnp.array([0, 2, 3, 4])
+        expected = conv(
+            x,
+            senders[keep],
+            receivers[keep],
+            node_type=node_type,
+            edge_type=edge_type[keep],
+        )
+
+        npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
+
+    def test_all_edges_masked_is_finite_under_jit_and_grad(self):
+        """Empty masked attention stays finite when traced and differentiated."""
+        conv = gnn.HGTConv(6, 6, 2, 2, num_heads=2, key=jax.random.key(0))
+        x, node_type, senders, receivers, edge_type = _graph()
+        mask = jnp.zeros(senders.shape, dtype=bool)
+
+        y = jax.jit(conv)(
+            x,
+            senders,
+            receivers,
+            node_type=node_type,
+            edge_type=edge_type,
+            edge_mask=mask,
+        )
+        grads = jax.grad(
+            lambda m: m(
+                x,
+                senders,
+                receivers,
+                node_type=node_type,
+                edge_type=edge_type,
+                edge_mask=mask,
+            ).sum()
+        )(conv)
+
+        assert jnp.all(jnp.isfinite(y))
+        assert all(jnp.all(jnp.isfinite(leaf)) for leaf in jax.tree.leaves(grads))

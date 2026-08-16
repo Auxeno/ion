@@ -116,3 +116,33 @@ class TestGatedGCNConv:
 
         assert conv.w_root.dtype == jnp.float32
         assert conv.w_edge.dtype == jnp.float32
+
+    def test_edge_mask_preserves_every_edge_output(self):
+        """Masking changes node aggregation but leaves all returned edges untouched."""
+        conv = gnn.GatedGCNConv(4, 6, edge_dim=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 4))
+        senders = jnp.array([0, 1, 2])
+        receivers = jnp.array([1, 2, 0])
+        x_edge = jax.random.normal(jax.random.key(2), (3, 2))
+        mask = jnp.array([True, False, True])
+
+        node_full, edge_full = conv(x, senders, receivers, x_edge=x_edge)
+        node_masked, edge_masked = conv(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
+
+        npt.assert_allclose(edge_masked, edge_full, rtol=1e-5, atol=1e-5)
+        assert not jnp.allclose(node_masked[2], node_full[2])
+
+    def test_edge_mask_matches_retained_edges(self):
+        """Masking an edge matches dropping it, gate normalization included."""
+        conv = gnn.GatedGCNConv(4, 6, edge_dim=2, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (3, 4))
+        senders = jnp.array([0, 1, 2])
+        receivers = jnp.array([1, 2, 0])
+        x_edge = jax.random.normal(jax.random.key(2), (3, 2))
+        mask = jnp.array([True, False, True])
+
+        node_masked, _ = conv(x, senders, receivers, x_edge=x_edge, edge_mask=mask)
+        keep = jnp.array([0, 2])
+        node_kept, _ = conv(x, senders[keep], receivers[keep], x_edge=x_edge[keep])
+
+        npt.assert_allclose(node_masked, node_kept, rtol=1e-5, atol=1e-5)

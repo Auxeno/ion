@@ -13,6 +13,9 @@ node_type : jax.Array["n", int]
 edge_type : jax.Array["e", int]
     Edge-type index selecting each edge's attention and message transforms.
     Keyword-only.
+edge_mask : jax.Array["e", bool] | None, default=None
+    Boolean edge mask where `True` keeps an edge in node aggregation and `False`
+    excludes it. Keyword-only.
 
 Returns
 -------

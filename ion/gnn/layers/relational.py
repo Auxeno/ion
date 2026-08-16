@@ -10,6 +10,7 @@ node feature matrix and one edge list carry the whole heterogeneous graph.
 RGCNConv takes an optional basis decomposition sharing `num_bases` matrices across relations.
 HGTConv attention is normalized over all of a node's incoming edges, whatever their relation.
 Self-loops are not needed: RGCNConv has a separate root term and HGTConv a skip gate.
+Optional boolean edge mask: True = keep edge, False = ignore.
 """
 
 import math
@@ -17,7 +18,7 @@ import math
 import jax
 import jax.numpy as jnp
 from jax.nn.initializers import Initializer, glorot_uniform, zeros
-from jaxtyping import Array, Float, Int, PRNGKeyArray
+from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 
 from ...nn.module import Module
 from ...nn.param import Param
@@ -69,9 +70,13 @@ class RGCNConv(Module):
         receivers: Int[Array, " e"],
         *,
         edge_type: Int[Array, " e"],
+        edge_mask: Bool[Array, " e"] | None = None,
     ) -> Float[Array, "n o"]:
 
         n = x.shape[0]
+
+        if edge_mask is not None:
+            receivers = jnp.where(edge_mask, receivers, n)
 
         # Each relation's transform is a learned mixture of the shared bases
         w_neigh = self.w_neigh
@@ -84,7 +89,9 @@ class RGCNConv(Module):
         # Normalize by how many edges of the same relation reach the receiver
         segment_ids = receivers * self.num_edge_types + edge_type
         counts = degree(segment_ids, n * self.num_edge_types).astype(x.dtype)
-        messages = messages / counts[segment_ids][:, None]
+
+        # Out-of-range receivers index a clamped count that may be zero
+        messages = messages / jnp.maximum(counts[segment_ids], 1.0)[:, None]
 
         aggregated = segment_sum(messages, receivers, n)
         x_out = aggregated + x @ self.w_root
@@ -158,6 +165,7 @@ class HGTConv(Module):
         *,
         node_type: Int[Array, " n"],
         edge_type: Int[Array, " e"],
+        edge_mask: Bool[Array, " e"] | None = None,
     ) -> Float[Array, "n o"]:
 
         n = x.shape[0]
@@ -175,6 +183,9 @@ class HGTConv(Module):
 
         # Scaled dot product, scaled again by a learned prior on the relation
         logits = (q[receivers] * edge_k).sum(axis=-1) * self.mu[edge_type] / math.sqrt(head_dim)
+
+        if edge_mask is not None:
+            receivers = jnp.where(edge_mask, receivers, n)
 
         # Softmax over each receiver's incoming edges, across every relation at once
         attention = segment_softmax(logits, receivers, n)

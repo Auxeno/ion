@@ -3,6 +3,7 @@ import tempfile
 import jax
 import jax.numpy as jnp
 import numpy.testing as npt
+import pytest
 
 import ion
 
@@ -14,6 +15,24 @@ def _sum_output(output):
 def _assert_allclose(actual, expected):
     for actual_leaf, expected_leaf in zip(jax.tree.leaves(actual), jax.tree.leaves(expected)):
         npt.assert_allclose(actual_leaf, expected_leaf, rtol=1e-5, atol=1e-5)
+
+
+_EDGE_MASK_LAYERS = (
+    ion.gnn.GATConv,
+    ion.gnn.GATv2Conv,
+    ion.gnn.TransformerConv,
+    ion.gnn.GINEConv,
+    ion.gnn.GraphNetwork,
+    ion.gnn.NodeUpdate,
+    ion.gnn.RGCNConv,
+    ion.gnn.HGTConv,
+    ion.gnn.GatedGCNConv,
+)
+
+
+def _require_edge_mask(layer):
+    if not isinstance(layer, _EDGE_MASK_LAYERS):
+        pytest.skip(f"{type(layer).__name__} does not take edge_mask")
 
 
 def test_jit(gnn_layer_and_graph):
@@ -129,6 +148,73 @@ def test_different_graph_different_output(gnn_layer_and_graph):
         not jnp.allclose(y1_leaf, y2_leaf)
         for y1_leaf, y2_leaf in zip(jax.tree.leaves(y1), jax.tree.leaves(y2))
     )
+
+
+# edge_mask tests
+
+
+def test_edge_mask_all_true_matches_no_mask(gnn_layer_and_graph):
+    """An all-True mask leaves every output unchanged."""
+    layer, x, senders, receivers, x_edge = gnn_layer_and_graph
+    _require_edge_mask(layer)
+    kwargs = {} if x_edge is None else {"x_edge": x_edge}
+    mask = jnp.ones(senders.shape[0], dtype=bool)
+    expected = layer(x, senders, receivers, **kwargs)
+    result = layer(x, senders, receivers, edge_mask=mask, **kwargs)
+    _assert_allclose(result, expected)
+
+
+def test_edge_mask_matches_retained_edges(gnn_layer_and_graph):
+    """Masking edges matches passing only the edges that survive the mask."""
+    layer, x, senders, receivers, x_edge = gnn_layer_and_graph
+    _require_edge_mask(layer)
+    mask = jnp.ones(senders.shape[0], dtype=bool).at[jnp.array([0, 4])].set(False)
+    keep = jnp.where(mask)[0]
+    kwargs = {} if x_edge is None else {"x_edge": x_edge}
+    kept_kwargs = {} if x_edge is None else {"x_edge": x_edge[keep]}
+
+    result = layer(x, senders, receivers, edge_mask=mask, **kwargs)
+    expected = layer(x, senders[keep], receivers[keep], **kept_kwargs)
+
+    # Layers returning edge features keep one row per input edge, so compare nodes
+    npt.assert_allclose(
+        jax.tree.leaves(result)[0], jax.tree.leaves(expected)[0], rtol=1e-5, atol=1e-5
+    )
+
+
+def test_edge_mask_all_false_is_finite(gnn_layer_and_graph):
+    """Masking every edge leaves no receiver with a degenerate normalization."""
+    layer, x, senders, receivers, x_edge = gnn_layer_and_graph
+    _require_edge_mask(layer)
+    kwargs = {} if x_edge is None else {"x_edge": x_edge}
+    mask = jnp.zeros(senders.shape[0], dtype=bool)
+    y = layer(x, senders, receivers, edge_mask=mask, **kwargs)
+    assert all(jnp.all(jnp.isfinite(leaf)) for leaf in jax.tree.leaves(y))
+
+
+def test_edge_mask_param_grad(gnn_layer_and_graph):
+    """Masked edges leave parameter gradients finite."""
+    layer, x, senders, receivers, x_edge = gnn_layer_and_graph
+    _require_edge_mask(layer)
+    kwargs = {} if x_edge is None else {"x_edge": x_edge}
+    mask = jnp.ones(senders.shape[0], dtype=bool).at[jnp.array([0, 4])].set(False)
+    grads = jax.grad(lambda m: _sum_output(m(x, senders, receivers, edge_mask=mask, **kwargs)))(
+        layer
+    )
+    for leaf in jax.tree.leaves(grads):
+        if hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact):
+            assert jnp.all(jnp.isfinite(leaf))
+
+
+def test_edge_mask_jit(gnn_layer_and_graph):
+    """jax.jit with edge_mask produces the same output as eager execution."""
+    layer, x, senders, receivers, x_edge = gnn_layer_and_graph
+    _require_edge_mask(layer)
+    kwargs = {} if x_edge is None else {"x_edge": x_edge}
+    mask = jnp.ones(senders.shape[0], dtype=bool).at[jnp.array([0, 4])].set(False)
+    expected = layer(x, senders, receivers, edge_mask=mask, **kwargs)
+    result = jax.jit(layer)(x, senders, receivers, edge_mask=mask, **kwargs)
+    _assert_allclose(result, expected)
 
 
 # bfloat16 tests
