@@ -30,6 +30,11 @@ class TestDropout:
         with pytest.raises(TypeError, match="deterministic"):
             nn.Dropout(p=0.5, deterministic=True)  # type: ignore[call-arg]
 
+    def test_no_broadcast_dims_argument(self):
+        """The removed broadcast_dims constructor argument raises TypeError."""
+        with pytest.raises(TypeError, match="broadcast_dims"):
+            nn.Dropout(p=0.5, broadcast_dims=(1, 2))  # type: ignore[call-arg]
+
     def test_p_out_of_range_raises(self):
         """p outside [0, 1] raises ValueError at construction."""
         with pytest.raises(ValueError, match="must be in"):
@@ -41,15 +46,6 @@ class TestDropout:
         """p=0 and p=1 are valid."""
         assert nn.Dropout(p=0.0).p == 0.0
         assert nn.Dropout(p=1.0).p == 1.0
-
-    def test_broadcast_dims_default(self):
-        """Masks are element-wise by default."""
-        assert nn.Dropout(p=0.5).broadcast_dims == ()
-
-    def test_broadcast_dims_stored_as_tuple(self):
-        """Broadcast dimensions are immutable static configuration."""
-        layer = nn.Dropout(p=0.5, broadcast_dims=[1, 2])  # type: ignore[arg-type]
-        assert layer.broadcast_dims == (1, 2)
 
     def test_p_zero_is_identity(self):
         """p=0 returns input unchanged during training without a key."""
@@ -111,45 +107,6 @@ class TestDropout:
         drop_frac = jnp.mean(y == 0.0)
         npt.assert_allclose(drop_frac, 0.3, atol=0.03)
 
-    def test_broadcast_dims_share_mask(self):
-        """Broadcast dimensions share one mask value within each batch item."""
-        layer = nn.Dropout(p=0.5, broadcast_dims=(1, 2))
-        x = jnp.ones((100, 3, 4))
-        y = layer(x, training=True, key=jax.random.key(0))
-
-        npt.assert_array_equal(y, jnp.broadcast_to(y[:, :1, :1], x.shape))
-        assert jnp.any(y == 0.0)
-        assert jnp.any(y != 0.0)
-
-    def test_all_dims_share_one_mask(self):
-        """Broadcasting every dimension makes one decision for the whole input."""
-        layer = nn.Dropout(p=0.5, broadcast_dims=(0, 1, 2))
-        x = jnp.ones((4, 3, 2))
-        y = layer(x, training=True, key=jax.random.key(0))
-
-        npt.assert_array_equal(y, jnp.full_like(x, y[0, 0, 0]))
-
-    def test_negative_broadcast_dims(self):
-        """Negative dimensions match their positive equivalents."""
-        x = jnp.ones((20, 3, 4))
-        key = jax.random.key(0)
-        positive = nn.Dropout(p=0.5, broadcast_dims=(1, 2))(x, training=True, key=key)
-        negative = nn.Dropout(p=0.5, broadcast_dims=(-2, -1))(x, training=True, key=key)
-
-        npt.assert_array_equal(negative, positive)
-
-    def test_duplicate_broadcast_dims_raise(self):
-        """Repeated dimensions are rejected at construction."""
-        with pytest.raises(ValueError, match="must not contain duplicates"):
-            nn.Dropout(p=0.5, broadcast_dims=(1, 1))
-
-    @pytest.mark.parametrize("dim", [-4, 3])
-    def test_out_of_range_broadcast_dim_raises(self, dim: int):
-        """Broadcast dimensions must exist in the input shape."""
-        layer = nn.Dropout(p=0.5, broadcast_dims=(dim,))
-        with pytest.raises(ValueError, match="invalid for input rank"):
-            layer(jnp.ones((4, 3, 2)), training=True, key=jax.random.key(0))
-
     def test_p_one_returns_zeros(self):
         """p=1 drops everything without producing NaN."""
         layer = nn.Dropout(p=1.0)
@@ -169,15 +126,6 @@ class TestDropout:
         train = jax.jit(lambda x, key: layer(x, training=True, key=key))
         assert jnp.any(train(x, jax.random.key(0)) == 0)
 
-    def test_jit_broadcast_dims(self):
-        """Broadcast masks work under jax.jit."""
-        layer = nn.Dropout(p=0.5, broadcast_dims=(1, 2))
-        x = jnp.ones((100, 3, 4))
-        train = jax.jit(lambda x, key: layer(x, training=True, key=key))
-        y = train(x, jax.random.key(0))
-
-        npt.assert_array_equal(y, jnp.broadcast_to(y[:, :1, :1], x.shape))
-
     def test_jit_evaluation(self):
         """Evaluation works under jax.jit."""
         layer = nn.Dropout(p=0.5)
@@ -192,3 +140,113 @@ class TestDropout:
         x = jnp.ones(100)
         assert jnp.any(apply(x, training=True, key=jax.random.key(0)) == 0)
         npt.assert_array_equal(apply(x, training=False), x)
+
+
+class TestDropPath:
+    def test_training_is_required(self):
+        """Omitting the required training mode raises TypeError."""
+        layer = nn.DropPath(p=0.5)
+        with pytest.raises(TypeError, match="training"):
+            layer(jnp.ones((4, 8)))  # type: ignore[call-arg]
+
+    def test_evaluation_is_identity(self):
+        """Evaluation returns input unchanged and needs no key."""
+        layer = nn.DropPath(p=0.5)
+        x = jnp.ones((4, 8))
+        npt.assert_array_equal(layer(x, training=False), x)
+
+    def test_p_out_of_range_raises(self):
+        """p outside [0, 1] raises ValueError at construction."""
+        with pytest.raises(ValueError, match="must be in"):
+            nn.DropPath(p=-0.3)
+        with pytest.raises(ValueError, match="must be in"):
+            nn.DropPath(p=1.5)
+
+    def test_no_broadcast_dims_argument(self):
+        """Drop paths are configured by p alone."""
+        with pytest.raises(TypeError, match="broadcast_dims"):
+            nn.DropPath(p=0.5, broadcast_dims=(1,))  # type: ignore[call-arg]
+
+    def test_p_zero_is_identity(self):
+        """p=0 returns input unchanged during training without a key."""
+        layer = nn.DropPath(p=0.0)
+        x = jnp.ones((4, 8))
+        npt.assert_array_equal(layer(x, training=True), x)
+
+    def test_p_one_returns_zeros(self):
+        """p=1 drops everything without producing NaN."""
+        layer = nn.DropPath(p=1.0)
+        x = jnp.ones((4, 8))
+        y = layer(x, training=True, key=jax.random.key(0))
+        npt.assert_array_equal(y, jnp.zeros_like(x))
+
+    def test_training_requires_key(self):
+        """Training with an active drop path and no key raises ValueError."""
+        with pytest.raises(ValueError, match="key is required when training=True"):
+            nn.DropPath(p=0.5)(jnp.ones((4, 8)), training=True)
+
+    @pytest.mark.parametrize("shape", [(100, 8), (100, 3, 4), (100, 3, 4, 5)])
+    def test_whole_sample_shares_mask(self, shape: tuple[int, ...]):
+        """Every element of a sample takes the same decision, at any rank."""
+        layer = nn.DropPath(p=0.5)
+        x = jnp.ones(shape)
+        y = layer(x, training=True, key=jax.random.key(0))
+
+        sample = y[(slice(None),) + (slice(0, 1),) * (len(shape) - 1)]
+        npt.assert_array_equal(y, jnp.broadcast_to(sample, shape))
+        assert jnp.any(y == 0.0)
+        assert jnp.any(y != 0.0)
+
+    def test_samples_are_independent(self):
+        """Samples are kept and dropped independently of each other."""
+        layer = nn.DropPath(p=0.5)
+        y = layer(jnp.ones((1000, 4)), training=True, key=jax.random.key(0))
+        drop_frac = jnp.mean(y[:, 0] == 0.0)
+
+        npt.assert_allclose(drop_frac, 0.5, atol=0.05)
+
+    def test_inverted_scaling(self):
+        """Kept samples are scaled by 1/(1-p)."""
+        layer = nn.DropPath(p=0.5)
+        y = layer(jnp.ones((1000, 4)), training=True, key=jax.random.key(0))
+        kept = y[y != 0.0]
+
+        npt.assert_allclose(kept, 2.0, rtol=1e-5, atol=1e-5)
+
+    def test_expected_value_preserved(self):
+        """Mean output approximately matches mean input over many samples."""
+        layer = nn.DropPath(p=0.3)
+        y = layer(jnp.ones((10000, 4)), training=True, key=jax.random.key(42))
+
+        npt.assert_allclose(jnp.mean(y), 1.0, atol=0.05)
+
+    def test_output_dtype_preserved(self):
+        """Output dtype matches input dtype."""
+        layer = nn.DropPath(p=0.5)
+        x = jnp.ones((8, 4), dtype=jnp.float32)
+        y = layer(x, training=True, key=jax.random.key(0))
+        assert y.dtype == x.dtype
+
+    def test_vmap_extra_batch_dim(self):
+        """Mapped keys give each outer batch item its own decisions."""
+        layer = nn.DropPath(p=0.5)
+        x = jnp.ones((2, 100, 4))
+        keys = jax.random.split(jax.random.key(0), 2)
+        y = jax.vmap(lambda x, key: layer(x, training=True, key=key))(x, keys)
+
+        npt.assert_array_equal(y, jnp.broadcast_to(y[:, :, :1], x.shape))
+        assert not jnp.allclose(y[0], y[1])
+
+    def test_jit_training(self):
+        """Training works under jax.jit."""
+        layer = nn.DropPath(p=0.5)
+        x = jnp.ones((100, 4))
+        train = jax.jit(lambda x, key: layer(x, training=True, key=key))
+        assert jnp.any(train(x, jax.random.key(0)) == 0)
+
+    def test_jit_evaluation(self):
+        """Evaluation works under jax.jit."""
+        layer = nn.DropPath(p=0.5)
+        x = jnp.ones((100, 4))
+        evaluate = jax.jit(lambda x: layer(x, training=False))
+        npt.assert_array_equal(evaluate(x), x)

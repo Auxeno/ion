@@ -15,7 +15,7 @@ from .layers.pool import AvgPool, MaxPool
 from .layers.positional import LearnedPositionalEmbedding, RoPE, SinusoidalPositionalEmbedding
 from .layers.recurrent import GRU, LSTM, RNN, GRUCell, LSTMCell, RNNCell
 from .layers.ssm import S4D, S5, S4DCell, S5Cell
-from .layers.stochastic import Dropout
+from .layers.stochastic import Dropout, DropPath
 from .module import Module
 from .param import Param
 
@@ -29,6 +29,7 @@ __all__ = [
     "Conv",
     "ConvTranspose",
     "Dropout",
+    "DropPath",
     "Embedding",
     "Ensemble",
     "GroupNorm",

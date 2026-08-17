@@ -15,7 +15,7 @@ Every `ion.nn` layer is an immutable JAX [pytree](https://docs.jax.dev/en/latest
 | [Embedding](embedding.md) | `Embedding` |
 | [Positional](positional.md) | `RoPE`, `LearnedPositionalEmbedding`, `SinusoidalPositionalEmbedding` |
 | [Pooling](pool.md) | `MaxPool`, `AvgPool` |
-| [Stochastic](stochastic.md) | `Dropout` |
+| [Stochastic](stochastic.md) | `Dropout`, `DropPath` |
 | [Blocks](blocks.md) | `MLP`, `Sequential`, `Residual`, `Bidirectional`, `Ensemble` |
 
 Blocks assemble other layers but remain ordinary `Module` pytrees. The [NN guide](../guide.md#array-conventions) documents the shared array, batching, shape, and dtype conventions.

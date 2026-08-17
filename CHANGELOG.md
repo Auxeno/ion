@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.17,1
+## 0.18.0
+
+- **`nn.DropPath`.** Stochastic depth as its own layer. It drops a residual branch for whole samples and scales the survivors by `1 / (1 - p)`, sharing one decision across every dimension after the batch dimension, whatever the input rank.
+- **Breaking: `Dropout.broadcast_dims` removed.** Shared masks existed almost entirely to express stochastic depth, which `DropPath` now does.
+
+## 0.17.1
 
 - **Edge masking for edge-aware and relational layers.** Message-passing layers that accept `x_edge`, plus `RGCNConv` and `HGTConv`, accept an optional boolean `edge_mask` that excludes masked edges from node aggregation and normalization counts. `RGCNConv` per-relation counts and `GatedGCNConv` gate sums match the retained edges. `GraphNetwork` and `GatedGCNConv` still update and return every edge representation, so masking controls routing without destroying edge state. `EdgeUpdate` takes no mask, because it updates edges without aggregating them.
 - **`gnn.RGCNConv` NaN gradient fix.** Receivers indexing past the last node, which both padded batches and masked edges produce, divided messages by a clamped per-relation count that could be zero. The forward pass discarded the resulting infinities but `w_neigh` gradients came back NaN. The count is now floored at one, which leaves real edges untouched.

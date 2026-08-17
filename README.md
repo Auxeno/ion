@@ -98,7 +98,7 @@ Ion ships with standard neural network layers. Each is a `Module` with trainable
 | Pooling         | [`MaxPool`](https://auxeno.github.io/ion/nn/layers/pool/#ion.nn.MaxPool), [`AvgPool`](https://auxeno.github.io/ion/nn/layers/pool/#ion.nn.AvgPool) |
 | Embedding       | [`Embedding`](https://auxeno.github.io/ion/nn/layers/embedding/#ion.nn.Embedding) |
 | Positional      | [`RoPE`](https://auxeno.github.io/ion/nn/layers/positional/#ion.nn.RoPE), [`LearnedPositionalEmbedding`](https://auxeno.github.io/ion/nn/layers/positional/#ion.nn.LearnedPositionalEmbedding), [`SinusoidalPositionalEmbedding`](https://auxeno.github.io/ion/nn/layers/positional/#ion.nn.SinusoidalPositionalEmbedding) |
-| Stochastic      | [`Dropout`](https://auxeno.github.io/ion/nn/layers/stochastic/#ion.nn.Dropout) |
+| Stochastic      | [`Dropout`](https://auxeno.github.io/ion/nn/layers/stochastic/#ion.nn.Dropout), [`DropPath`](https://auxeno.github.io/ion/nn/layers/stochastic/#ion.nn.DropPath) |
 | Blocks          | [`Sequential`](https://auxeno.github.io/ion/nn/layers/blocks/#ion.nn.Sequential), [`MLP`](https://auxeno.github.io/ion/nn/layers/blocks/#ion.nn.MLP), [`Residual`](https://auxeno.github.io/ion/nn/layers/blocks/#ion.nn.Residual), [`Bidirectional`](https://auxeno.github.io/ion/nn/layers/blocks/#ion.nn.Bidirectional), [`Ensemble`](https://auxeno.github.io/ion/nn/layers/blocks/#ion.nn.Ensemble) |
 
 Graph layers live in `ion.gnn` and take node features with COO `senders`/`receivers`

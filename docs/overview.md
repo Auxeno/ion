@@ -122,7 +122,7 @@ Each [`ion.nn`](nn/layers/index.md) layer is a `Module`, constructed with a `key
 | [Embedding](nn/layers/embedding.md) | `Embedding` |
 | [Positional](nn/layers/positional.md) | `RoPE`, `LearnedPositionalEmbedding`, `SinusoidalPositionalEmbedding` |
 | [Pooling](nn/layers/pool.md) | `MaxPool`, `AvgPool` |
-| [Stochastic](nn/layers/stochastic.md) | `Dropout` |
+| [Stochastic](nn/layers/stochastic.md) | `Dropout`, `DropPath` |
 | [Blocks](nn/layers/blocks.md) | `MLP`, `Sequential`, `Residual`, `Bidirectional`, `Ensemble` |
 
 ```python
