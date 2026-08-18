@@ -4,6 +4,7 @@
 
 - **`nn.DropPath`.** Stochastic depth as its own layer. It drops a residual branch for whole samples and scales the survivors by `1 / (1 - p)`, sharing one decision across every dimension after the batch dimension, whatever the input rank.
 - **Breaking: `Dropout.broadcast_dims` removed.** Shared masks existed almost entirely to express stochastic depth, which `DropPath` now does.
+- **Improved Treescope colors**. Color modules by import order.
 
 ## 0.17.1
 

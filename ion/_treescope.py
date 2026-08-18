@@ -12,7 +12,7 @@ import jax
 import numpy as np
 from treescope import rendering_parts as parts
 
-from . import tree
+from . import gnn, nn, tree
 from .nn.buffer import Buffer
 from .nn.module import Module
 from .nn.param import Param
@@ -122,15 +122,18 @@ def module(self: Module, path: str | None, subtree_renderer: Any) -> Any:
     summary = f"  # {total:,} params, {self.disk_usage}"
     summary += f", {frozen:,} frozen" if frozen else ""
 
-    # Hue derived from a salted hash of the class name; the salt tunes the palette
-    h = zlib.crc32(f"j4h9be:{type(self).__qualname__}".encode())
+    # Layers outside the palette, user modules included, fall back to a hash of the name
+    name = type(self).__qualname__
+    exports = [n for m in (nn, gnn.layers) for n, v in vars(m).items() if isinstance(v, type)]
+    hues = {n: (222 + 11 * i) % 360 for i, n in enumerate(exports)}
+    hue = hues.get(name, zlib.crc32(name.encode()) % 3_600 / 10)
 
     node = parts.build_foldable_tree_node_from_children(
         prefix=parts.siblings(parts.maybe_qualified_type_name(type(self)), "("),
         children=lines,
         suffix=")",
         path=path,
-        background_color=f"oklch(0.8 0.1 {h % 10_000 / 10_000 * 360:.1f})",
+        background_color=f"oklch(0.8 0.12 {hue:.1f})",
         first_line_annotation=parts.comment_color(parts.text(summary)) if leaves else None,
         expand_state=(
             parts.ExpandState.WEAKLY_EXPANDED
@@ -164,6 +167,6 @@ def optimizer(self: "Optimizer", path: str | None, subtree_renderer: Any) -> Any
         suffix=")",
         comma_separated=True,
         path=path,
-        background_color="oklch(0.88 0.10 95)",
-        expand_state=parts.ExpandState.COLLAPSED,
+        background_color="oklch(0.88 0.12 95)",
+        expand_state=parts.ExpandState.WEAKLY_EXPANDED,
     )
