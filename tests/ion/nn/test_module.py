@@ -663,6 +663,19 @@ class TestRepr:
 
         assert "\x1b[48;2;" in repr(nn.Linear(4, 16, key=jax.random.key(0)))
 
+    def test_colors_literals(self, monkeypatch):
+        """Numbers, constants, dtypes and frozen markers each take their palette color."""
+        from ion._rendering import CONSTANT, FROZEN, NUMBER
+
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+
+        r = repr(tree.freeze(nn.LayerNorm(64, eps=1e-05, use_bias=False)))
+
+        assert f"{NUMBER}1e-05" in r
+        assert f"{CONSTANT}None" in r
+        assert f"{FROZEN}, frozen" in r
+
     def test_nesting_indents(self, monkeypatch):
         """Fields indent one level per module, and the closing bracket returns to its parent."""
         monkeypatch.delenv("NO_COLOR", raising=False)
@@ -1599,6 +1612,19 @@ class TestStatistics:
         lines = module_repr(model, statistics(model)).split("\n")[2:4]
 
         columns = {line.index("\u03bc=") for line in lines}
+        assert len(columns) == 1
+
+    def test_annotations_align_under_color(self, monkeypatch):
+        """Escape codes take no width, so colored entries share the column too."""
+        from ion._rendering import module_repr, statistics
+
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+
+        model = tree.freeze(nn.Linear(8, 64, key=jax.random.key(0)))
+        lines = module_repr(model, statistics(model)).split("\n")[2:4]
+
+        columns = {len(re.sub(r"\x1b\[[0-9;]*m", "", line).split("\u03bc=")[0]) for line in lines}
         assert len(columns) == 1
 
     def test_repr_stays_free_of_statistics(self):

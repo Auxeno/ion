@@ -167,10 +167,10 @@ class Param(_ParamBase[T]):
         return iter(self._value)
 
     def __repr__(self) -> str:
-        frozen = "" if self.trainable else ", frozen"
-        if hasattr(self._value, "dtype"):
-            return f"Param({self._value.dtype.name}{self._value.shape}{frozen})"
-        return f"Param({self._value!r}{frozen})"
+        """Hook to render for the terminal."""
+        from .. import _rendering
+
+        return _rendering.param_repr(self)
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
         """Hook to render with Treescope."""

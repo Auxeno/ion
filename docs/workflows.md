@@ -132,7 +132,7 @@ optimizer = ion.Optimizer(optax.adam(3e-4), model)
 
 ## Inspecting models
 
-A model prints as a tree, grouped into config, parameters, buffers and child modules, with parameter counts and sizes on each line. Frozen params are marked `frozen`. In a color terminal each layer type is highlighted with the same hue Treescope gives it, carried on both of its brackets. Output captured to a pipe or file drops the color, leaving plain text:
+A model prints as a tree, grouped into config, parameters, buffers and child modules, with parameter counts and sizes on each line. Frozen params are marked `frozen`. In a color terminal each layer type is highlighted with the same hue Treescope gives it, carried on both of its brackets, and numbers, strings, constants and dtypes take the colors the documentation gives them in code blocks. Output captured to a pipe or file drops the color, leaving plain text:
 
 ```text
 MLP(  # 131 params, 524 B, 80 frozen
@@ -150,21 +150,6 @@ MLP(  # 131 params, 524 B, 80 frozen
   ),
 )
 ```
-
-Echoing a model at an interactive prompt adds a distribution histogram and moments to each
-parameter, aligned in a column so layers can be compared by eye:
-
-```text
-Linear(  # 4,608 params, 18 KB
-  # Parameters:
-  w=Param(float32(8, 512)),  █▇▇▇▇▇▇▇▇▆▇▇█  μ=-0.00036 σ=0.062
-  b=Param(float32(512,)),    ▁▁▁▁▁▁█▁▁▁▁▁▁  μ=0 σ=0
-)
-```
-
-Only the echo path pays for this. `repr` does no reductions, so logging, debuggers and
-exception messages stay cheap on models of any size. The histogram bins between the 1st and
-99th percentile of a subsample, while the moments are exact over the whole array.
 
 Echoing a model at an interactive prompt adds a distribution histogram and moments to each
 parameter, aligned in a column so layers can be compared by eye:

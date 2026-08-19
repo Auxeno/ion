@@ -7,13 +7,15 @@ Functions:
     statistics  Describe every parameter's distribution in one device sync.
 
 Both layouts share `hue`, `fields` and `summary`, so the two cannot drift apart. Called
-lazily by each type's `__treescope_repr__` and `__repr__` hooks.
+lazily by each type's `__treescope_repr__` and `__repr__` hooks. Only the terminal colors
+literals, following the docs palette rather than Treescope's own value styling.
 """
 
 import dataclasses
 import inspect
 import math
 import os
+import re
 import sys
 import zlib
 from typing import TYPE_CHECKING, Any
@@ -33,7 +35,15 @@ if TYPE_CHECKING:
 
 BINS = 11
 BLOCKS = "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588"
-COMMENT = "\x1b[38;2;204;204;204m"
+COMMENT = "\x1b[38;2;166;178;197m"
+NUMBER = "\x1b[38;2;34;211;238m"
+STRING = "\x1b[38;2;31;206;156m"
+CONSTANT = "\x1b[38;2;142;81;255m"
+SYMBOL = "\x1b[38;2;71;138;245m"
+FROZEN = "\x1b[38;2;71;138;245m"
+WARNING = "\x1b[38;2;239;83;80m"
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+LITERALS = re.compile(r"'[^']*'|\b(?:None|True|False)\b|(?<![\w.])-?\d+\.?\d*(?:[eE][-+]?\d+)?")
 
 
 def hue(name: str) -> float:
@@ -217,6 +227,18 @@ def color(text: str, code: str) -> str:
     return f"{code}{text}\x1b[0m"
 
 
+def highlight(text: str) -> str:
+    """Color the numbers, strings and constants inside a value's repr."""
+
+    def paint(match: re.Match) -> str:
+        token = match.group()
+        if token.startswith("'"):
+            return color(token, STRING)
+        return color(token, CONSTANT if token[0].isalpha() else NUMBER)
+
+    return LITERALS.sub(paint, text)
+
+
 def oklch(tone: float, lightness: float = 0.8) -> str:
     """Convert an `oklch(l 0.12 h)` palette color into 24-bit ANSI `r;g;b` channels."""
     a, b = 0.12 * math.cos(math.radians(tone)), 0.12 * math.sin(math.radians(tone))
@@ -268,12 +290,30 @@ def statistics(self: Module) -> dict[int, str]:
     described = {}
     for leaf, (mean, std, counts) in zip(leaves, jax.device_get(reductions)):
         if not math.isfinite(mean):
-            described[id(leaf)] = f"{' ' * BINS}  not finite"
+            described[id(leaf)] = f"{' ' * BINS}  " + color("not finite", WARNING)
         else:
             bars = "".join(BLOCKS[round(count / counts.max() * 7)] for count in counts)
-            described[id(leaf)] = f"{bars}  \u03bc={mean:.2g} \u03c3={std:.2g}"
+            average, deviation = color(f"{mean:.2g}", NUMBER), color(f"{std:.2g}", NUMBER)
+            described[id(leaf)] = f"{bars}  \u03bc={average} \u03c3={deviation}"
 
     return described
+
+
+def param_repr(self: Param) -> str:
+    """Render a `Param` as `Param(float32(64, 10))`, marking it frozen if it is."""
+    value = self._value
+    frozen = "" if self.trainable else color(", frozen", FROZEN)
+    if not hasattr(value, "dtype"):
+        return f"Param({highlight(repr(value))}{frozen})"
+
+    return f"Param({color(value.dtype.name, SYMBOL)}{highlight(str(value.shape))}{frozen})"
+
+
+def buffer_repr(self: Buffer) -> str:
+    """Render a `Buffer` as `Buffer(float32(64,))`."""
+    value = self.value
+
+    return f"Buffer({color(value.dtype.name, SYMBOL)}{highlight(str(value.shape))})"
 
 
 def module_repr(self: Module, stats: dict[int, str] | None = None) -> str:
@@ -286,11 +326,12 @@ def module_repr(self: Module, stats: dict[int, str] | None = None) -> str:
         shown = []
         for label, value, *_ in config:
             if isinstance(value, (jax.Array, np.ndarray)):
-                shown.append(f"{label}{value.dtype.name}{value.shape}")
+                dtype = color(value.dtype.name, SYMBOL)
+                shown.append(f"{label}{dtype}{highlight(str(value.shape))}")
             elif callable(value) and hasattr(value, "__name__"):
-                shown.append(f"{label}{value.__name__}")
+                shown.append(f"{label}{color(value.__name__, SYMBOL)}")
             else:
-                shown.append(f"{label}{value!r}")
+                shown.append(f"{label}{highlight(repr(value))}")
         lines.append(", ".join(shown) + ",")
 
     for header, group in (("Parameters", params), ("Buffers", buffers), ("Modules", children)):
@@ -303,12 +344,13 @@ def module_repr(self: Module, stats: dict[int, str] | None = None) -> str:
             rendered = module_repr(value, stats) if isinstance(value, Module) else repr(value)
             entries.append((f"{label}{rendered},", value))
 
-        # Descriptions share one column, so distributions line up down the group
-        width = max(len(entry) for entry, _ in entries) if stats and group is params else 0
-        for entry, value in entries:
+        # Descriptions share one column, measured on visible text since escapes take no width
+        widths = [len(ANSI.sub("", entry)) for entry, _ in entries]
+        width = max(widths) if stats and group is params else 0
+        for (entry, value), visible in zip(entries, widths):
             described = stats.get(id(value)) if stats else None
             if described:
-                entry += " " * (width - len(entry) + 2) + described
+                entry += " " * (width - visible + 2) + described
             lines += entry.split("\n")
 
     # Both brackets share one highlight, marking where the module's fields begin and end

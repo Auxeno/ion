@@ -72,8 +72,10 @@ class Buffer(Generic[T]):
         return buffer
 
     def __repr__(self) -> str:
-        value = self.value
-        return f"Buffer({value.dtype.name}{value.shape})"
+        """Hook to render for the terminal."""
+        from .. import _rendering
+
+        return _rendering.buffer_repr(self)
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
         """Hook to render with Treescope."""
