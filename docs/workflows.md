@@ -179,10 +179,10 @@ Modules, params, buffers and optimizers then render as folding trees, collapsed 
 
 ## Measuring cost
 
-`ion.cost` traces and compiles a call without executing it, then explains its static work and memory layer by layer:
+`Module.cost` traces and compiles a call without executing it, then explains its static work and memory layer by layer:
 
 ```python
-report = ion.cost(model, jnp.ones((8, 128), jnp.int32))
+report = model.cost(jnp.ones((8, 128), jnp.int32))
 print(report)
 ```
 
@@ -207,12 +207,12 @@ The tree and colours match the model repr. FLOPs are inclusive: a parent's value
 
 The output column records the logical shape and dtype produced by each module during the trace. Fusion may prevent that value from becoming a physical device buffer.
 
-Any callable taking a model works, so a loss, gradient evaluation or whole step is analysed the same way:
+`Module.cost` analyses a model's own call; `ion.cost` does the same for any callable taking a model, so a loss, gradient evaluation or whole step is analysed the same way:
 
 ```python
 ion.cost(loss, model, x, y)
 ion.cost(jax.grad(loss), model, x, y)
-ion.cost(model, jax.ShapeDtypeStruct((8192, 256), jnp.float32))
+model.cost(jax.ShapeDtypeStruct((8192, 256), jnp.float32))
 ```
 
 Concrete array pytrees are abstractified automatically, while a `jax.ShapeDtypeStruct` avoids allocating the input in the first place. Results are accessible directly by tree path:

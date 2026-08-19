@@ -172,6 +172,14 @@ class TestTargets:
         model = nn.MLP([64, 32, 10], key=jax.random.key(0))
         assert ion.cost(model, jnp.ones((8, 64))).flops > 0
 
+    def test_module_method(self):
+        """`model.cost(x)` matches the function called on the same model."""
+        model = nn.MLP([64, 32, 10], key=jax.random.key(0))
+        x = jnp.ones((8, 64))
+        method, function = model.cost(x), ion.cost(model, x)
+        assert method.flops == function.flops
+        assert method.layers.keys() == function.layers.keys()
+
     def test_loss_function(self):
         """A function may receive the model among its arguments."""
         model = nn.MLP([64, 32, 10], key=jax.random.key(0))

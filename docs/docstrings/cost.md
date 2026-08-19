@@ -1,13 +1,8 @@
-Describe the static work and memory implied by one call, layer by layer.
+Analyse one call's arithmetic and memory, layer by layer, for any function taking a model.
 
-The call is traced and compiled without being executed. Concrete array inputs are replaced
-by shape/dtype placeholders, so an array and the equivalent `jax.ShapeDtypeStruct` produce
-the same analysis. Module scopes attribute traced operations and outputs to the layer that
-created them.
-
-The target may be a model, in which case the remaining arguments are passed to it, or any
-function taking a model among its arguments. That covers a loss, a gradient, or a whole
-training step, including both the forward and reverse work in a gradient evaluation.
+[`Module.cost`](core/module.md#ion.nn.Module.cost) covers a model's own forward pass. This
+function also accepts a callable, so a loss, a gradient, or a whole training step is
+analysed the same way, including the reverse work in a gradient evaluation.
 
 Parameters
 ----------
@@ -26,9 +21,6 @@ Cost
 Example
 -------
 ```python
-model = nn.MLP([256, 512, 10], key=key)
-print(ion.cost(model, jnp.ones((32, 256))))
-
 report = ion.cost(jax.grad(loss), model, x, y)
-report.layers["layers[0]"].share  # its fraction of the call's FLOPs
+print(report)
 ```

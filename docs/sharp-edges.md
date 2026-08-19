@@ -101,12 +101,6 @@ model = model.astype(jnp.bfloat16)
 y = model(x.astype(jnp.bfloat16))
 ```
 
-## XLA's `cost_analysis` counts a scan body once, not once per step
-
-`jax.jit(...).lower(...).compile().cost_analysis()` reports a `lax.scan` body a single time, whatever the sequence length. `RNN`, `LSTM` and `GRU` all scan, so their reported FLOPs are flat in the sequence length and understate the real figure by a factor of `T`: a `GRU(64, 128)` on a batch of 8 reports 1.2 MFLOP at every length, against 302 MFLOP at `T=256`. `S4D` and `S5` are unaffected, because `lax.associative_scan` unrolls into the jaxpr and is counted correctly.
-
-`ion.cost` reads the scan's static `length` and scales its body, so it reports the full figure and marks the layer `loop x256`.
-
 ## Numerically sensitive reductions use `float32`
 
 Normalization layers, pooling layers, and floating-point segment reductions compute in `float32`, even when JAX's 64-bit mode is enabled, and cast results back to the input dtype. Write a custom operation if a reduction itself must use `float64`.

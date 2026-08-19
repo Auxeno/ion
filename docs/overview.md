@@ -283,7 +283,7 @@ model.params  # Param leaves; array data and buffers become None
 
 Casting is how Ion does [mixed precision](workflows.md#mixed-precision); see [Freezing](workflows.md#freezing) for working with trainability.
 
-`ion.cost` goes further and analyses a call rather than the model, reporting FLOPs, compiler memory, graph operations and logical outputs against the same tree the repr prints:
+`model.cost` analyses a call rather than the model, reporting FLOPs, compiler memory, graph operations and logical outputs against the same tree the repr prints. `ion.cost` does the same for any callable taking a model, so a loss or gradient evaluation is measured the same way:
 
 ```python
 import jax
@@ -300,7 +300,7 @@ def loss(model, x, y):
     return ((model(x) - y) ** 2).mean()
 
 
-ion.cost(model, x)  # a forward pass
+model.cost(x)                          # a forward pass
 ion.cost(jax.grad(loss), model, x, y)  # forward and reverse work
 ```
 

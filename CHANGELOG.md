@@ -2,6 +2,7 @@
 
 ## 0.19.0
 
+- **`model.cost`.** Traces and compiles a call without executing it, then reports its FLOPs, compiler memory, graph operations, and per-layer outputs in a table that mirrors the model repr. `ion.cost` does the same for any callable taking a model, so a loss, a gradient evaluation, or a whole training step is analysed the same way. Scan bodies are scaled by their static length, so recurrent layers report the full figure rather than the flat count XLA's own `cost_analysis` gives.
 - **Breaking: Treescope is optional and no longer activated on import.** `ion.enable_treescope` and `ion.disable_treescope` are gone. Install it with `pip install treescope` and activate it with `treescope.basic_interactive_setup()`. The rendering hooks no longer depend on Treescope's abbreviation threshold, so collapsed parameters and buffers describe their shape with no configuration at all.
 
 ## 0.18.0

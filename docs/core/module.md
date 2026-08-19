@@ -10,6 +10,7 @@
         - freeze
         - unfreeze
         - astype
+        - cost
         - params
         - num_params
         - disk_usage

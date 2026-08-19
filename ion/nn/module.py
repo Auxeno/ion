@@ -11,7 +11,7 @@ import dataclasses
 import functools
 from contextvars import ContextVar
 from collections.abc import Iterable, Iterator
-from typing import Any, Generic, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Self, TypeVar
 
 import jax
 import jax.tree_util as jtu
@@ -21,6 +21,9 @@ from jaxtyping import PyTree
 from .. import tree
 from .buffer import Buffer
 from .param import Param
+
+if TYPE_CHECKING:
+    from ..cost import Cost
 
 M = TypeVar("M")
 
@@ -329,6 +332,15 @@ class Module:
         >>> bf16_model = model.astype(jnp.bfloat16)
         """
         return tree.astype(self, dtype, params_only=params_only)
+
+    def cost(self, *args: Any, **kwargs: Any) -> "Cost":
+        """Analyse one call's arithmetic and memory, layer by layer. Wraps `ion.cost`.
+
+        >>> model.cost(x)
+        """
+        from ..cost import cost
+
+        return cost(self, *args, **kwargs)
 
     @property
     def params(self) -> PyTree:
