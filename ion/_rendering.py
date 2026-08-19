@@ -470,25 +470,51 @@ def scaled(value: float, base: float, units: tuple[str, ...]) -> str:
 
 def cost_repr(self: "Cost") -> str:
     """Render a `Cost` as a per-layer table, following the tree the module repr prints."""
-    head = (
-        f"{scaled(self.flops, 1e3, FLOPS)}FLOP"
-        f" \u00b7 {scaled(self.transferred, 1024, BYTES)} transferred"
-        f" \u00b7 {scaled(self.peak_memory, 1024, BYTES)} peak memory\n"
-        f"{self.params:,} params \u00b7 {self.ops:,} ops \u2192 {self.kernels:,} kernels"
-        f" \u00b7 balance {self.balance:.0f} FLOP/byte"
+
+    def shape(value: Any) -> str:
+        if hasattr(value, "shape") and hasattr(value, "dtype"):
+            dtype = getattr(value.dtype, "name", str(value.dtype))
+            return f"{color(dtype, SYMBOL)}{highlight(str(value.shape))}"
+        if isinstance(value, tuple):
+            items = ", ".join(shape(item) for item in value)
+            return f"({items}{',' if len(value) == 1 else ''})"
+        if isinstance(value, list):
+            return f"[{', '.join(shape(item) for item in value)}]"
+        if isinstance(value, dict):
+            return "{" + ", ".join(f"{key}: {shape(item)}" for key, item in value.items()) + "}"
+        return "---" if value is None else repr(value)
+
+    inputs = " + ".join(scaled(value, 1024, BYTES) for value in self.input_components)
+    inputs = f"({inputs}) input" if len(self.input_components) > 1 else f"{inputs} input"
+    memory = (
+        f"{scaled(self.total_memory, 1024, BYTES)} total memory = {inputs}"
+        f" + {scaled(self.intermediate_bytes, 1024, BYTES)} intermediate"
+        f" + {scaled(self.output_bytes, 1024, BYTES)} output"
+    )
+    if self.reused_bytes:
+        memory += f" - {scaled(self.reused_bytes, 1024, BYTES)} reused"
+
+    title = f"{self.name} \u00b7 input {shape(self.inputs)} \u00b7 {self.backend}"
+    totals = (
+        f"{scaled(self.flops, 1e3, FLOPS)}FLOP \u00b7 {self.params:,} params"
+        f" ({scaled(self.param_bytes, 1024, BYTES)})"
+        f" \u00b7 {self.ops:,} ops \u2192 {self.fused:,} fused"
     )
     # A scan runs its body once in the jaxpr, so the count it was scaled by is spelled out
     rows = [
-        ("  " * layer.depth + (f"{layer.label} " if layer.label else ""), layer,
-         f" loop x{layer.loop}" if layer.loop > 1 else "")
+        (
+            "  " * layer.depth + (f"{layer.label} " if layer.label else ""),
+            layer,
+            f" loop x{layer.loop}" if layer.loop > 1 else "",
+        )
         for layer in self.layers.values()
     ]
 
     # The name column is sized to its longest entry, so a shallow tree leaves no gutter
     width = max(len("layer"), *(len(a) + len(x.name) + len(z) for a, x, z in rows)) + 2
+    op_width = max(len("ops"), len(f"{self.ops:,}"))
     columns = (
-        f"{'layer':<{width}}{'FLOPs':>7}  {'':<{WIDTH}}{'share':>7}{'ceiling':>9}"
-        f"{'memory':>10}{'transfer':>11}  dtype"
+        f"{'layer':<{width}}{'FLOPs':>7}  {'':<{WIDTH}}{'share':>7}  {'ops':>{op_width}}  output"
     )
 
     # Siblings tile their parent's bar, so each one starts where the previous ended
@@ -500,7 +526,14 @@ def cost_repr(self: "Cost") -> str:
         bars[path] = (filled.get(parent, 0.0) if path else 0.0, within)
         if path:
             filled[parent] = bars[path][0] + within
-    lines = [color(head, COMMENT), "", color(columns, COMMENT)]
+    lines = [
+        color(title, COMMENT),
+        "",
+        color(totals, COMMENT),
+        color(memory, COMMENT),
+        "",
+        color(columns, COMMENT),
+    ]
 
     for (name, layer, suffix), (start, within) in zip(rows, bars.values()):
         # The tree is drawn exactly as the module repr indents it, class names and all
@@ -509,7 +542,8 @@ def cost_repr(self: "Cost") -> str:
         title = f"{name}{color(layer.name, chip)}{color(suffix, COMMENT)}{pad}"
 
         # Bars fade with depth, so a nested level never reads as louder than the one above it
-        offset = round(start * WIDTH)
+        # A partial block occupies its whole terminal cell, so the next sibling starts after it
+        offset = math.ceil(start * WIDTH) if start else 0
         cells = min(max((start + within) * WIDTH - offset, 0.0), WIDTH - offset)
         bar = " " * offset + "\u2588" * int(cells)
         if cells % 1:
@@ -517,13 +551,10 @@ def cost_repr(self: "Cost") -> str:
         grey = f"\x1b[38;2;{ansi(max(0.92 - 0.13 * layer.depth, 0.40), 0.0, 0.0)}m"
 
         flops = scaled(layer.flops, 1e3, FLOPS)
-        reachable = f"{layer.ceiling * 100:.0f}%" if layer.transferred else "-"
         lines.append(
             f"{title}{flops:>7}"
-            f"  {color(bar.ljust(WIDTH), grey)}{layer.share * 100:6.1f}%{reachable:>9}"
-            f"{scaled(layer.memory, 1024, BYTES):>10}"
-            f"{scaled(layer.transferred, 1024, BYTES):>11}  "
-            f"{color(layer.dtype or '---', SYMBOL)}"
+            f"  {color(bar.ljust(WIDTH), grey)}{layer.share * 100:6.1f}%"
+            f"  {color(f'{layer.ops:>{op_width},}', NUMBER)}  {shape(layer.output)}"
         )
 
     return "\n".join(lines)

@@ -9,6 +9,7 @@ and immutability after `__init__`.
 
 import dataclasses
 import functools
+from contextvars import ContextVar
 from collections.abc import Iterable, Iterator
 from typing import Any, Generic, Self, TypeVar
 
@@ -23,7 +24,7 @@ from .param import Param
 
 M = TypeVar("M")
 
-_scopes: dict[int, str] = {}  # layer labels installed by ion.cost, empty in normal use
+_cost_context: ContextVar[Any | None] = ContextVar("ion_cost_context", default=None)
 
 
 @jtu.register_pytree_node_class
@@ -240,11 +241,21 @@ class Module:
             @functools.wraps(original_call)
             def _call_with_scope(self: Any, *args: Any, **kwargs: Any) -> Any:
                 """Run the forward pass, naming its operations while a cost analysis traces."""
-                label = _scopes.get(id(self))
-                if label is None:
+                context = _cost_context.get()
+                if context is None:
                     return original_call(self, *args, **kwargs)
-                with jax.named_scope(label):
+                scope = context.scopes.get(id(self))
+                if scope is None:
                     return original_call(self, *args, **kwargs)
+
+                label, path = scope
+                if label:
+                    with jax.named_scope(label):
+                        output = original_call(self, *args, **kwargs)
+                else:
+                    output = original_call(self, *args, **kwargs)
+                context.record(path, output)
+                return output
 
             cls.__call__ = _call_with_scope
 

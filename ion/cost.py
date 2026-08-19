@@ -1,15 +1,11 @@
-"""Per-layer compute analysis of a model or training step.
+"""Static compute and memory analysis of a model call.
 
 Functions:
-    cost   Measure one call's arithmetic, traffic and memory, layer by layer.
+    cost   Describe one call's arithmetic, memory and outputs, layer by layer.
 
 Classes:
-    Cost        Whole-model totals and the per-layer breakdown of a single call.
-    LayerCost   One layer's measured share of that call.
-
-Both passes key on the scopes `Module.__call__` installs while tracing, so arithmetic comes
-from the jaxpr and traffic from post-fusion HLO without either guessing which operation
-belongs to which layer. Scan bodies are scaled by their length, which `cost_analysis` omits.
+    Cost        Whole-call totals and its per-layer breakdown.
+    LayerCost   One layer's share of the call.
 """
 
 import dataclasses
@@ -19,49 +15,50 @@ from typing import Any
 import jax
 import numpy as np
 
-from .nn.module import Module, _scopes
+from . import tree
+from .nn.module import Module, _cost_context
 
-BALANCE = 250.0  # peak flops per peak byte, the ridge dividing compute from bandwidth limits
 SKIP = ("parameter", "constant", "bitcast", "tuple", "get-tuple-element")
-SHAPE = re.compile(r"\b(pred|f8[a-z0-9]+|[a-z]+\d+)\[([0-9,]*)\]")
-OP_NAME = re.compile(r'op_name="([^"]+)"')
 INSTRUCTION = re.compile(r"=\s*\S+\s+([a-z-]+)\(")
 
 
 @dataclasses.dataclass(frozen=True)
 class LayerCost:
-    """One layer's measured share of a call."""
+    """One layer's share of a call."""
 
     name: str
     label: str
     depth: int
     flops: int
-    transferred: int
-    memory: int
     share: float
-    ceiling: float
-    dtype: str
+    ops: int
+    output: Any
     loop: int
-
-    @property
-    def intensity(self) -> float:
-        """Arithmetic performed per byte moved."""
-        return self.flops / self.transferred if self.transferred else 0.0
 
 
 @dataclasses.dataclass(frozen=True)
 class Cost:
-    """Whole-model totals and the per-layer breakdown of one call."""
+    """Static compute and memory analysis of one call."""
 
+    name: str
+    inputs: Any
+    backend: str
     flops: int
-    transferred: int
-    memory: int
-    peak_memory: int
     params: int
+    param_bytes: int
     ops: int
-    kernels: int
-    balance: float
+    fused: int
+    input_bytes: int
+    input_components: tuple[int, ...]
+    intermediate_bytes: int
+    output_bytes: int
+    reused_bytes: int
     layers: dict[str, LayerCost]
+
+    @property
+    def total_memory(self) -> int:
+        """Total bytes in the compiler's memory plan for the call."""
+        return self.input_bytes + self.intermediate_bytes + self.output_bytes - self.reused_bytes
 
     def __repr__(self) -> str:
         from . import _rendering
@@ -69,48 +66,89 @@ class Cost:
         return _rendering.cost_repr(self)
 
 
+@dataclasses.dataclass
+class _Context:
+    """Names modules and records their abstract outputs during one trace."""
+
+    scopes: dict[int, tuple[str, str]]
+    outputs: dict[str, Any] = dataclasses.field(default_factory=dict)
+
+    def record(self, path: str, value: Any) -> None:
+        self.outputs[path] = _abstract(value)
+
+
+def _abstract(value: Any) -> Any:
+    """Replace array leaves with shape/dtype placeholders without allocating data."""
+
+    def leaf(x: Any) -> Any:
+        if isinstance(x, jax.ShapeDtypeStruct):
+            return x
+        if hasattr(x, "shape") and hasattr(x, "dtype"):
+            return jax.ShapeDtypeStruct(x.shape, x.dtype)
+        return x
+
+    return jax.tree.map(leaf, value)
+
+
+def _has_array(value: Any) -> bool:
+    """Whether a pytree contains a traceable array or shape placeholder."""
+    return any(
+        isinstance(leaf, jax.ShapeDtypeStruct)
+        or (hasattr(leaf, "shape") and hasattr(leaf, "dtype"))
+        for leaf in jax.tree.leaves(value)
+    )
+
+
 def _structure(
     module: Module, path: str = "", depth: int = 0, label: str = "", out: Any = None
 ) -> list:
-    """List every module as (path, label, class, depth) in the order the repr prints them."""
+    """List every module as (path, label, class, depth) in repr order."""
     from ._rendering import fields
 
     out = [] if out is None else out
     out.append((path, label, type(module).__name__, depth))
     for shown, child, name, _ in fields(module)[3]:
-        # The label is the one the repr prints, so `(0)` rather than the path segment
         _structure(child, f"{path}.{name}" if path else name, depth + 1, shown.rstrip("=: "), out)
-
     return out
 
 
-def _labels(module: Module, out: Any = None, name: str | None = None) -> dict[int, str]:
-    """Map each child module's id to its field label, so nested scopes rebuild the full path."""
+def _scopes(
+    module: Module,
+    path: str = "",
+    label: str = "",
+    out: dict[int, tuple[str, str]] | None = None,
+) -> dict[int, tuple[str, str]]:
+    """Map module identities to their local scope label and full tree path."""
     from ._rendering import fields
 
     out = {} if out is None else out
-    if name is not None:
-        out[id(module)] = name
-    for _, child, field, _ in fields(module)[3]:
-        _labels(child, out, field)
-
+    out[id(module)] = (label, path)
+    for _, child, name, _ in fields(module)[3]:
+        child_path = f"{path}.{name}" if path else name
+        _scopes(child, child_path, name, out)
     return out
 
 
-def _measure(jaxpr: Any, scale: int, totals: dict) -> int:
-    """Accumulate FLOPs and op counts per scope, and return the peak bytes held live."""
-    nbytes = lambda var: int(np.prod(var.aval.shape)) * var.aval.dtype.itemsize
-
-    # A value dies once the last equation reading it has run, freeing its buffer for reuse
-    last = {}
-    for index, eqn in enumerate(jaxpr.eqns):
-        for var in eqn.invars:
-            if type(var).__name__ != "Literal":
-                last[var] = index
-
-    live, peak = {}, 0
-    for index, eqn in enumerate(jaxpr.eqns):
+def _measure(jaxpr: Any, scale: int, totals: dict) -> None:
+    """Accumulate execution-weighted FLOPs and static graph operations per scope."""
+    for eqn in jaxpr.eqns:
         name = eqn.primitive.name
+        if name in ("cond", "while"):
+            raise NotImplementedError(f"ion.cost does not support dynamic {name} control flow")
+
+        inner = scale * (eqn.params.get("length", 1) if name == "scan" else 1)
+        for value in eqn.params.values():
+            for item in value if isinstance(value, (tuple, list)) else (value,):
+                closed = item if type(item).__name__ == "Jaxpr" else None
+                body = getattr(item, "jaxpr", None) or closed
+                if body is not None:
+                    _measure(body, inner, totals)
+
+        path = str(eqn.source_info.name_stack).replace("/", ".")
+        entry = totals.setdefault(path, {"flops": 0, "ops": 0, "loop": 1})
+        entry["ops"] += 1
+        entry["loop"] = max(entry["loop"], scale)
+
         shaped = [var for var in eqn.outvars if hasattr(var, "aval") and hasattr(var.aval, "shape")]
         if not shaped:
             continue
@@ -125,82 +163,39 @@ def _measure(jaxpr: Any, scale: int, totals: dict) -> int:
             flops = 2 * int(np.prod(out.shape)) * int(np.prod(rhs.shape[:-1]))
         else:
             flops = sum(int(np.prod(var.aval.shape)) for var in shaped)
-
-        # A scan body appears once but runs `length` times, so its arithmetic scales with it
-        inner = scale * (eqn.params.get("length", 1) if name == "scan" else 1)
-        nested = 0
-        for value in eqn.params.values():
-            for item in value if isinstance(value, (tuple, list)) else (value,):
-                closed = item if type(item).__name__ == "Jaxpr" else None
-                body = getattr(item, "jaxpr", None) or closed
-                if body is not None:
-                    nested = max(nested, _measure(body, inner, totals))
-
-        path = str(eqn.source_info.name_stack).replace("/", ".")
-        entry = totals.setdefault(
-            path, {"flops": 0, "memory": 0, "ops": 0, "dtype": ("", 0), "loop": 1}
-        )
-        entry["loop"] = max(entry["loop"], scale)
         entry["flops"] += scale * flops
-        entry["ops"] += 1
-
-        # Memory is a high-water mark, so buffers already dead do not count towards it
-        live.update({var: nbytes(var) for var in shaped})
-
-        # A loop or branch holds its own frame; other sub-jaxprs are the equation itself inlined
-        frame = name in ("scan", "while", "cond")
-        held = max(sum(live.values()) + (nested if frame else 0), nested)
-        entry["memory"] = max(entry["memory"], held)
-        peak = max(peak, held)
-        for var in [var for var, when in ((v, last.get(v, -1)) for v in live) if when <= index]:
-            del live[var]
-
-        # The dtype shown is whichever one the layer's heaviest operation ran in
-        if scale * flops > entry["dtype"][1]:
-            entry["dtype"] = (out.dtype.name, scale * flops)
-
-    return peak
 
 
-def _traffic(text: str, paths: set[str]) -> tuple[dict[str, int], int]:
-    """Sum post-fusion bytes per layer, skipping instructions that reinterpret rather than move."""
-    moved, kernels, sizes = {}, 0, {}
+def _fused(text: str) -> int:
+    """Count executable operations remaining in the optimized entry computation."""
+    if "ENTRY " not in text:
+        raise RuntimeError("The current backend did not expose an optimized XLA entry computation")
+
+    count = 0
     for line in text.split("ENTRY ", 1)[1].splitlines():
-        named = re.match(r"\s*(?:ROOT\s+)?%(\S+) = ", line)
-        if named is None:
-            continue
-
-        # Operands appear as bare references, so every instruction's own shape is recorded first
-        shape = SHAPE.search(line[named.end() :])
-        if shape is None:
-            continue
-        token, dims = shape.groups()
-        narrow = token.startswith("f8") or token == "pred"
-        width = 1 if narrow else int(re.sub(r"\D", "", token)) // 8
-        sizes[named.group(1)] = int(np.prod([int(d) for d in dims.split(",") if d])) * width
-
         instruction = INSTRUCTION.search(line)
-        if instruction is None or instruction.group(1) in SKIP:
-            continue
-
-        # An instruction reads its operands and writes its output, so both count as traffic
-        operands = re.findall(r"%([\w.\-]+)", line[instruction.end() :].split(")", 1)[0])
-        nbytes = sizes[named.group(1)] + sum(sizes.get(operand, 0) for operand in operands)
-
-        op_name = OP_NAME.search(line)
-        path, best = "", ""
-        for segment in op_name.group(1).split("/")[1:] if op_name else []:
-            path = f"{path}.{segment}" if path else segment
-            best = path if path in paths else best
-
-        moved[best] = moved.get(best, 0) + nbytes
-        kernels += 1
-
-    return moved, kernels
+        if instruction is not None and instruction.group(1) not in SKIP:
+            count += 1
+    return count
 
 
-def cost(target: Any, *args: Any, balance: float = BALANCE, **kwargs: Any) -> Cost:
-    """Measure a call's arithmetic, memory traffic and footprint, broken down by layer.
+def _param_bytes(module: Module) -> int:
+    """Stored bytes belonging to model parameters, excluding buffers."""
+    leaves = jax.tree.leaves(module, is_leaf=tree.is_param)
+    return sum(getattr(leaf._value, "nbytes", 0) for leaf in leaves if tree.is_param(leaf))
+
+
+def _shown_inputs(args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
+    """Return the abstract non-module array arguments shown in the report heading."""
+    values = [value for value in (*args, *kwargs.values()) if not isinstance(value, Module)]
+    values = [value for value in values if _has_array(value)]
+    if not values:
+        return ()
+    return values[0] if len(values) == 1 else tuple(values)
+
+
+def cost(target: Any, *args: Any, **kwargs: Any) -> Cost:
+    """Describe a call's arithmetic, memory and outputs, broken down by layer.
 
     >>> ion.cost(model, x)  # doctest: +SKIP
     """
@@ -208,76 +203,85 @@ def cost(target: Any, *args: Any, balance: float = BALANCE, **kwargs: Any) -> Co
     forward = (lambda model, *rest, **options: model(*rest, **options)) if wrapped else target
     values = (target, *args) if wrapped else args
 
-    root = next((value for value in values if isinstance(value, Module)), None)
+    root = next((value for value in (*values, *kwargs.values()) if isinstance(value, Module)), None)
     if root is None:
         raise TypeError("cost needs a Module, either as its target or among its arguments")
 
-    def traced(*positional, **options):
-        for value in positional:
-            if isinstance(value, Module):
-                _scopes.update(_labels(value))
+    abstract_values = tuple(_abstract(value) for value in values)
+    abstract_kwargs = {name: _abstract(value) for name, value in kwargs.items()}
+    shown_inputs = _abstract(_shown_inputs(args, kwargs))
+    context = _Context({})
+
+    def traced(*positional: Any, **options: Any) -> Any:
+        modules = [value for value in (*positional, *options.values()) if isinstance(value, Module)]
+        context.scopes = {}
+        for module in modules:
+            _scopes(module, out=context.scopes)
+        token = _cost_context.set(context)
         try:
             return forward(*positional, **options)
         finally:
-            _scopes.clear()
+            _cost_context.reset(token)
 
-    # Non-array keywords cannot be traced, so they compile in as static configuration
-    static = tuple(name for name, value in kwargs.items() if not hasattr(value, "shape"))
-    lowered = jax.jit(traced, static_argnames=static).trace(*values, **kwargs)
+    static_argnums = tuple(i for i, value in enumerate(abstract_values) if not _has_array(value))
+    static_argnames = tuple(
+        name for name, value in abstract_kwargs.items() if not _has_array(value)
+    )
+    lowered = jax.jit(traced, static_argnums=static_argnums, static_argnames=static_argnames).trace(
+        *abstract_values, **abstract_kwargs
+    )
     compiled = lowered.lower().compile()
 
     structure = _structure(root)
     paths = {path for path, *_ in structure}
     totals: dict[str, dict] = {}
     _measure(lowered.jaxpr.jaxpr, 1, totals)
-    moved, kernels = _traffic(compiled.as_text(), paths)  # pyright: ignore[reportArgumentType]
+    within = lambda path: (
+        key for key in paths | set(totals) if not path or key == path or key.startswith(path + ".")
+    )
 
     flops = sum(entry["flops"] for entry in totals.values())
-    transferred = sum(moved.values())
-    within = lambda path: (key for key in paths | set(totals) | set(moved)
-                           if not path or key == path or key.startswith(path + "."))
-
-    rolled = {
-        path: (
-            sum(totals.get(key, {}).get("flops", 0) for key in within(path)),
-            sum(moved.get(key, 0) for key in within(path)),
-        )
-        for path, *_ in structure
-    }
-
-    # Kernels run one after another, so each is weighed alone and the tree sums those weights
-    weighed = {
-        scope: max(totals.get(scope, {}).get("flops", 0), moved.get(scope, 0) * balance)
-        for scope in set(totals) | set(moved)
-    }
-    weights = {path: sum(weighed.get(key, 0.0) for key in within(path)) for path, *_ in structure}
-
+    ops = sum(entry["ops"] for entry in totals.values())
     layers = {}
     for path, label, name, depth in structure:
         entries = [totals.get(key, {}) for key in within(path)]
-        layer_flops, layer_bytes = rolled[path]
-        heaviest = max((entry.get("dtype", ("", 0)) for entry in entries), key=lambda pair: pair[1])
+        layer_flops = sum(entry.get("flops", 0) for entry in entries)
         layers[path] = LayerCost(
             name=name,
             label=label,
             depth=depth,
             flops=layer_flops,
-            transferred=layer_bytes,
-            memory=max((entry.get("memory", 0) for entry in entries), default=0),
-            share=min(1.0, weights[path] / weights[""]) if weights[""] else 1.0,
-            ceiling=min(1.0, (layer_flops / layer_bytes if layer_bytes else 0.0) / balance),
-            dtype=heaviest[0],
+            share=layer_flops / flops if flops else 1.0,
+            ops=sum(entry.get("ops", 0) for entry in entries),
+            output=context.outputs.get(path),
             loop=max((entry.get("loop", 1) for entry in entries), default=1),
         )
 
+    memory = compiled.memory_analysis()
+    if memory is None:
+        raise RuntimeError("The current backend did not provide a compiler memory analysis")
+
+    param_bytes = _param_bytes(root)
+    input_bytes = memory.argument_size_in_bytes
+    if param_bytes <= input_bytes:
+        other_inputs = input_bytes - param_bytes
+        components = tuple(value for value in (other_inputs, param_bytes) if value)
+    else:
+        components = (input_bytes,)
+
     return Cost(
+        name=type(root).__name__,
+        inputs=shown_inputs,
+        backend=f"{jax.default_backend().upper()}/XLA",
         flops=flops,
-        transferred=transferred,
-        memory=max((entry["memory"] for entry in totals.values()), default=0),
-        peak_memory=compiled.memory_analysis().temp_size_in_bytes,  # pyright: ignore[reportOptionalMemberAccess]
         params=root.num_params,
-        ops=sum(entry["ops"] for entry in totals.values()),
-        kernels=kernels,
-        balance=balance,
+        param_bytes=param_bytes,
+        ops=ops,
+        fused=_fused(compiled.as_text()),  # pyright: ignore[reportArgumentType]
+        input_bytes=input_bytes,
+        input_components=components,
+        intermediate_bytes=memory.temp_size_in_bytes,
+        output_bytes=memory.output_size_in_bytes,
+        reused_bytes=memory.alias_size_in_bytes,
         layers=layers,
     )
