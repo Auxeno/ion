@@ -282,15 +282,15 @@ class Module:
 
     def __repr__(self) -> str:
         """Render the model and its parameter statistics for the terminal."""
-        from .. import _rendering
+        from .. import display
 
-        return _rendering.module_repr(self, _rendering.statistics(self))
+        return display.module_repr(self, display.statistics(self))
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
         """Hook to group fields and render with Treescope."""
-        from .. import _rendering
+        from .. import display
 
-        return _rendering.module_treescope(self, path, subtree_renderer)
+        return display.module_treescope(self, path, subtree_renderer)
 
     @property
     def at(self) -> _At[Self]:

@@ -196,12 +196,12 @@ class Optimizer:
 
     def __repr__(self) -> str:
         """Hook to summarize the state and render for the terminal."""
-        from . import _rendering
+        from . import display
 
-        return _rendering.optimizer_repr(self)
+        return display.optimizer_repr(self)
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
         """Hook to summarize Optimizers and add color with Treescope."""
-        from . import _rendering
+        from . import display
 
-        return _rendering.optimizer_treescope(self, path, subtree_renderer)
+        return display.optimizer_treescope(self, path, subtree_renderer)

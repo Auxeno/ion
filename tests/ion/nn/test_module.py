@@ -12,7 +12,7 @@ import numpy.testing as npt
 import pytest
 
 import ion
-from ion import nn, tree
+from ion import display, nn, tree
 
 
 class TestBaseModule:
@@ -666,27 +666,25 @@ class TestRepr:
 
     def test_colors_literals(self, monkeypatch):
         """Numbers, constants, dtypes and frozen markers each take their palette color."""
-        from ion._rendering import _CONSTANT, _NUMBER, _SYMBOL
 
         monkeypatch.delenv("NO_COLOR", raising=False)
         monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
 
         r = repr(tree.freeze(nn.LayerNorm(64, eps=1e-05, use_bias=False)))
 
-        assert f"{_NUMBER}1e-05" in r
-        assert f"{_CONSTANT}None" in r
-        assert f"{_SYMBOL}, frozen" in r
+        assert f"{display._NUMBER}1e-05" in r
+        assert f"{display._CONSTANT}None" in r
+        assert f"{display._SYMBOL}, frozen" in r
 
     def test_nested_color_survives_highlighting(self, monkeypatch):
         """A child's escape sequences pass through, so its digits are not recolored as literals."""
-        from ion._rendering import _NUMBER, highlight
 
         monkeypatch.delenv("NO_COLOR", raising=False)
         monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
 
-        nested = f"Param({_NUMBER}64\x1b[0m)"
+        nested = f"Param({display._NUMBER}64\x1b[0m)"
 
-        assert highlight(f"child={nested}") == f"child={nested}"
+        assert display.highlight(f"child={nested}") == f"child={nested}"
 
     def test_nesting_indents(self, monkeypatch):
         """Fields indent one level per module, and the closing bracket returns to its parent."""
@@ -1588,44 +1586,38 @@ class TestModuleWrappingEdgeCases:
 class TestStatistics:
     def test_describes_distribution(self):
         """Each parameter gets a histogram and its moments."""
-        from ion._rendering import format_statistics, statistics
 
         model = nn.Linear(64, 64, key=jax.random.key(0))
-        described = statistics(model)
-        text = format_statistics(described[id(model.w)])
+        described = display.statistics(model)[id(model.w)]
 
-        assert any(block in text for block in "\u2581\u2588")
-        assert "\u03bc=" in text and "\u03c3=" in text
+        assert any(block in described for block in "\u2581\u2588")
+        assert "\u03bc=" in described and "\u03c3=" in described
 
     def test_constant_parameter(self):
         """A parameter with no width places its mass in the middle bucket, not the first."""
-        from ion._rendering import format_statistics, statistics
 
         model = nn.Linear(64, 64, key=jax.random.key(0))
 
-        described = format_statistics(statistics(model)[id(model.b)])
+        described = display.statistics(model)[id(model.b)]
         edge = "\u2581" * (len(described.split("  ")[0]) // 2)
         assert described == f"{edge}\u2588{edge}  \u03bc=0 \u03c3=0"
 
     def test_low_precision_parameter(self):
         """Reductions run in float32, which bfloat16 and float8 scalars cannot format."""
-        from ion._rendering import format_statistics, statistics
 
         for dtype in (jnp.bfloat16, jnp.float16, jnp.float8_e4m3fn):
             model = nn.Linear(8, 64, key=jax.random.key(0)).astype(dtype)
 
-            assert "\u03bc=" in format_statistics(statistics(model)[id(model.w)])
+            assert "\u03bc=" in display.statistics(model)[id(model.w)]
 
     def test_large_parameters_are_sampled(self):
         """A parameter past the sample is summarized from it, and says so with an approximation."""
-        from ion._rendering import format_statistics, statistics
 
         model = nn.Linear(256, 256, key=jax.random.key(0))
-        described = statistics(model)
+        described = display.statistics(model)
 
-        assert not described[id(model.w)].exact
-        assert described[id(model.b)].exact
-        assert "\u03bc\u2248" in format_statistics(described[id(model.w)])
+        assert "\u03bc\u2248" in described[id(model.w)]
+        assert "\u03bc=" in described[id(model.b)]
 
     def test_tracers_have_no_statistics(self):
         """Inside a transformation parameters are tracers, so the structure renders alone."""
@@ -1642,23 +1634,21 @@ class TestStatistics:
 
     def test_annotations_share_a_column(self):
         """Descriptions align down a group so distributions can be compared by eye."""
-        from ion._rendering import module_repr, statistics
 
         model = nn.Linear(8, 64, key=jax.random.key(0))
-        lines = module_repr(model, statistics(model)).split("\n")[2:4]
+        lines = display.module_repr(model, display.statistics(model)).split("\n")[2:4]
 
         columns = {line.index("\u03bc=") for line in lines}
         assert len(columns) == 1
 
     def test_annotations_align_under_color(self, monkeypatch):
         """Escape codes take no width, so colored entries share the column too."""
-        from ion._rendering import module_repr, statistics
 
         monkeypatch.delenv("NO_COLOR", raising=False)
         monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
 
         model = tree.freeze(nn.Linear(8, 64, key=jax.random.key(0)))
-        lines = module_repr(model, statistics(model)).split("\n")[2:4]
+        lines = display.module_repr(model, display.statistics(model)).split("\n")[2:4]
 
         columns = {len(re.sub(r"\x1b\[[0-9;]*m", "", line).split("\u03bc=")[0]) for line in lines}
         assert len(columns) == 1
@@ -1683,10 +1673,9 @@ class TestStatistics:
 class TestPalette:
     def test_mechanism_shares_a_band(self):
         """Layers sharing a mechanism sit beside each other, so graph and dense convs look alike."""
-        from ion._rendering import palette
 
-        conv, graph_conv = palette("Conv")[2], palette("GCNConv")[2]
-        attention = palette("MultiHeadAttention")[2]
+        conv, graph_conv = display.palette("Conv")[2], display.palette("GCNConv")[2]
+        attention = display.palette("MultiHeadAttention")[2]
 
         assert abs(conv - graph_conv) <= 16
         assert abs(conv - attention) > 16
@@ -1694,29 +1683,27 @@ class TestPalette:
     def test_every_layer_has_a_hue(self):
         """Every layer is listed, so none falls back to the hash kept for classes outside Ion."""
         from ion import gnn
-        from ion._rendering import _HUES
 
         exported = ((name, value) for m in (nn, gnn.layers) for name, value in vars(m).items())
         classes = {name for name, value in exported if isinstance(value, type)}
 
-        assert classes - {"Module", "Param", "Buffer"} <= set(_HUES)
+        assert classes - {"Module", "Param", "Buffer"} <= set(display._HUES)
 
     def test_every_color_stays_in_gamut(self):
         """One lightness and chroma serves every hue, so no color is clipped on its way out."""
-        from ion._rendering import oklch, palette
 
-        lightness, chroma, _ = palette("Linear")
-        colors = [oklch(lightness, chroma, hue) for hue in range(360)]
+        lightness, chroma, _ = display.palette("Linear")
+        encoded = (display.ansi(lightness, chroma, hue) for hue in range(360))
+        channels = [int(channel) for color in encoded for channel in color.split(";")]
 
-        assert [rgb for rgb in colors if any(c < 0 or c > 1 for c in rgb)] == []
+        assert min(channels) > 0 and max(channels) < 255
 
     def test_unknown_class_is_stable(self):
         """A class from outside Ion hashes onto the same circle, so its color never shifts."""
-        from ion._rendering import palette
 
-        lightness, chroma, tone = palette("SomeUserBlock")
+        lightness, chroma, tone = display.palette("SomeUserBlock")
 
-        assert palette("SomeUserBlock") == (lightness, chroma, tone)
+        assert display.palette("SomeUserBlock") == (lightness, chroma, tone)
         assert 0 <= tone < 360
 
 

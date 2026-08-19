@@ -73,12 +73,12 @@ class Buffer(Generic[T]):
 
     def __repr__(self) -> str:
         """Hook to render for the terminal."""
-        from .. import _rendering
+        from .. import display
 
-        return _rendering.buffer_repr(self)
+        return display.buffer_repr(self)
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
         """Hook to render with Treescope."""
-        from .. import _rendering
+        from .. import display
 
-        return _rendering.buffer_treescope(self, path, subtree_renderer)
+        return display.buffer_treescope(self, path, subtree_renderer)

@@ -1,17 +1,15 @@
-"""Private renderers for Ion's core types, one set for Treescope and one for the terminal.
+"""Renderers for Ion's core types, one set for terminal and one for Treescope.
 
 Functions:
     palette     Map a class name to its lightness, chroma and hue.
-    fields      Split a module's fields into config, params, buffers and children.
-    summary     Describe a module's parameter count and size.
-    oklch       Convert an oklch color into linear sRGB.
     ansi        Encode an oklch color as 24-bit ANSI channels.
     chip        Return the codes that print a class name on its own background.
     color       Wrap text in an ANSI code where escape sequences will render.
     highlight   Color the literals inside a value's repr.
     scaled      Format a quantity against a unit ladder.
+    fields      Split a module's fields into config, params, buffers and children.
+    summary     Describe a module's parameter count and size.
     statistics  Describe every parameter's distribution in one device sync.
-    format_statistics  Format one parameter's histogram and moments for the terminal.
 
 Every `__repr__` and `__treescope_repr__` hook delegates here, to the matching `*_repr` or
 `*_treescope` function. Both layouts share `palette`, `fields` and `summary`, so the two
@@ -52,23 +50,17 @@ _BYTES = (" B", " KB", " MB", " GB", " TB")
 _FLOPS = ("", "K", "M", "G", "T")
 _SAMPLE = 16_384
 _BINS = 11
+_BLOCKS = "▁▂▃▄▅▆▇█"
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 _LITERALS = re.compile(
     rf"{_ANSI.pattern}|'[^']*'|\b(?:None|True|False)\b|(?<![\w.])-?\d+\.?\d*(?:[eE][-+]?\d+)?"
 )
-
-
-@dataclasses.dataclass(frozen=True)
-class ParameterStatistics:
-    """One parameter's distribution, exact when the parameter fits the sample."""
-
-    mean: float
-    std: float
-    counts: np.ndarray
-    exact: bool
-
-
-# Each class takes a hue in degrees, neighbouring ones so a mechanism reads as a band of color
+_OKLAB = ((0.3963377774, 0.2158037573), (-0.1055613458, -0.0638541728), (-0.0894841775, -1.2914855))
+_SRGB = (
+    (4.0767416621, -3.3077115913, 0.2309699292),
+    (-1.2684380046, 2.6097574011, -0.3413193965),
+    (-0.0041960863, -0.7034186147, 1.7076147010),
+)
 _HUES = {
     "AvgPool": 142,
     "MaxPool": 147,
@@ -130,64 +122,14 @@ def palette(name: str) -> tuple[float, float, float]:
     return 0.78, 0.11, _HUES.get(name, zlib.crc32(name.encode()) % 360)
 
 
-def fields(self: Module) -> tuple[list, list, list, list]:
-    """Split a module's fields into config, parameters, buffers and child modules."""
-    signature = inspect.signature(type(self).__init__).parameters
-    defaults = {name: parameter.default for name, parameter in signature.items()}
-
-    # Entries are (label, value, name, default), the flag marking an uninformative default
-    config, params, buffers, children = [], [], [], []
-    for field in dataclasses.fields(self):  # type: ignore[reportArgumentType]
-        if not field.repr:
-            continue
-        name, value = field.name, getattr(self, field.name)
-        if isinstance(value, (list, tuple)) and any(isinstance(x, Module) for x in value):
-            # Sequences splice in as (0), (1), ... rather than nesting one level deeper
-            children += [(f"({i}): ", item, f"{name}[{i}]", False) for i, item in enumerate(value)]
-        elif isinstance(value, Module):
-            children.append((f"{name}=", value, name, False))
-        elif isinstance(value, (Param, Buffer)):
-            group = params if isinstance(value, Param) else buffers
-            group.append((f"{name}=", value, name, False))
-        else:
-            config.append((f"{name}=", value, name, repr(value) == repr(defaults.get(name))))
-
-    return config, params, buffers, children
-
-
-def summary(self: Module) -> str:
-    """Describe a module's size as `1,088 params, 4.25 KB`, or nothing if it holds none."""
-    leaves = [x for x in jax.tree.leaves(self, is_leaf=tree.is_param) if tree.is_param(x)]
-    if not leaves:
-        return ""
-
-    frozen = sum(getattr(leaf._value, "size", 0) for leaf in leaves if not leaf.trainable)
-    text = f"{self.num_params:,} params, {self.disk_usage}"
-    return text + (f", {frozen:,} frozen" if frozen else "")
-
-
-def oklch(lightness: float, chroma: float, tone: float) -> list[float]:
-    """Convert an oklch color into linear sRGB, leaving the unit range where it exits the gamut."""
-    a, b = chroma * math.cos(math.radians(tone)), chroma * math.sin(math.radians(tone))
-    oklab = (
-        (0.3963377774, 0.2158037573),
-        (-0.1055613458, -0.0638541728),
-        (-0.0894841775, -1.2914855),
-    )
-    srgb = (
-        (4.0767416621, -3.3077115913, 0.2309699292),
-        (-1.2684380046, 2.6097574011, -0.3413193965),
-        (-0.0041960863, -0.7034186147, 1.7076147010),
-    )
-
-    lms = [(lightness + ca * a + cb * b) ** 3 for ca, cb in oklab]
-    return [sum(weight * cone for weight, cone in zip(row, lms)) for row in srgb]
-
-
 def ansi(lightness: float, chroma: float, tone: float) -> str:
     """Encode an oklch color as 24-bit ANSI `r;g;b` channels."""
+    a, b = chroma * math.cos(math.radians(tone)), chroma * math.sin(math.radians(tone))
+    lms = [(lightness + ca * a + cb * b) ** 3 for ca, cb in _OKLAB]
+
+    # Gamma encoding lands each channel on the sRGB curve, clipping where the color leaves it
     channels = []
-    for linear in oklch(lightness, chroma, tone):
+    for linear in (sum(weight * cone for weight, cone in zip(row, lms)) for row in _SRGB):
         gamma = 1.055 * max(linear, 0.0) ** (1 / 2.4) - 0.055
         encoded = gamma if linear > 0.0031308 else linear * 12.92
         channels.append(min(255, max(0, round(encoded * 255))))
@@ -235,8 +177,44 @@ def scaled(value: float, base: float = 1024, units: tuple[str, ...] = _BYTES) ->
     return f"{value:.3g}{units[exponent]}"
 
 
-def statistics(self: Module) -> dict[int, ParameterStatistics]:
-    """Describe every parameter's distribution in one device synchronization."""
+def fields(self: Module) -> tuple[list, list, list, list]:
+    """Split a module's fields into config, parameters, buffers and child modules."""
+    signature = inspect.signature(type(self).__init__).parameters
+    defaults = {name: parameter.default for name, parameter in signature.items()}
+
+    # Entries are (label, value, name, hidden), the flag marking config left at its default
+    config, params, buffers, children = [], [], [], []
+    for field in dataclasses.fields(self):  # type: ignore[reportArgumentType]
+        if not field.repr:
+            continue
+        name, value = field.name, getattr(self, field.name)
+        if isinstance(value, (list, tuple)) and any(isinstance(x, Module) for x in value):
+            # Sequences splice in as (0), (1), ... rather than nesting one level deeper
+            children += [(f"({i}): ", item, f"{name}[{i}]", False) for i, item in enumerate(value)]
+        elif isinstance(value, Module):
+            children.append((f"{name}=", value, name, False))
+        elif isinstance(value, (Param, Buffer)):
+            group = params if isinstance(value, Param) else buffers
+            group.append((f"{name}=", value, name, False))
+        else:
+            config.append((f"{name}=", value, name, repr(value) == repr(defaults.get(name))))
+
+    return config, params, buffers, children
+
+
+def summary(self: Module) -> str:
+    """Describe a module's size as `1,088 params, 4.25 KB`, or nothing if it holds none."""
+    leaves = [x for x in jax.tree.leaves(self, is_leaf=tree.is_param) if tree.is_param(x)]
+    if not leaves:
+        return ""
+
+    frozen = sum(getattr(leaf._value, "size", 0) for leaf in leaves if not leaf.trainable)
+    text = f"{self.num_params:,} params, {self.disk_usage}"
+    return text + (f", {frozen:,} frozen" if frozen else "")
+
+
+def statistics(self: Module) -> dict[int, str]:
+    """Describe every parameter as `▁▂▃█  μ=0.01 σ=0.1`, in one device synchronization."""
     import ion
 
     leaves = [x for x in jax.tree.leaves(self, is_leaf=tree.is_param) if tree.is_param(x)]
@@ -258,7 +236,7 @@ def statistics(self: Module) -> dict[int, ParameterStatistics]:
     for leaf, (sample, exact) in zip(leaves, jax.device_get(samples)):
         sample = np.asarray(sample, dtype=np.float32)
         if sample.size == 0 or not np.all(np.isfinite(sample)):
-            described[id(leaf)] = ParameterStatistics(math.nan, math.nan, np.zeros(_BINS), exact)
+            described[id(leaf)] = f"{' ' * _BINS}  " + color("not finite", _WARNING)
             continue
 
         # The window comes from the percentiles, so a few outliers cannot flatten the bars
@@ -267,37 +245,25 @@ def statistics(self: Module) -> dict[int, ParameterStatistics]:
         # A constant parameter has no width, so its mass falls in the middle bucket
         origin, spread = (low, high - low) if high > low else (low - 0.5, 1.0)
         index = np.clip((sample - origin) / spread * _BINS, 0, _BINS - 0.001).astype(np.int32)
-
         counts = np.bincount(index, minlength=_BINS)
-        mean, std = float(np.mean(sample)), float(np.std(sample))
-        described[id(leaf)] = ParameterStatistics(mean, std, counts, exact)
+        bars = "".join(_BLOCKS[round(count / counts.max() * 7)] for count in counts)
+
+        # A sampled parameter marks both moments approximate, so no figure reads as measured
+        sign = "=" if exact else "≈"
+        mean = color(f"{np.mean(sample):.2g}", _NUMBER)
+        std = color(f"{np.std(sample):.2g}", _NUMBER)
+        described[id(leaf)] = f"{bars}  μ{sign}{mean} σ{sign}{std}"
 
     return described
-
-
-def format_statistics(stats: ParameterStatistics) -> str:
-    """Format one parameter's histogram and moments for the terminal."""
-    if not math.isfinite(stats.mean):
-        return f"{' ' * len(stats.counts)}  " + color("not finite", _WARNING)
-
-    blocks = "▁▂▃▄▅▆▇█"
-    peak = stats.counts.max()
-    bars = "".join(blocks[round(count / peak * 7)] for count in stats.counts)
-
-    # Sampled parameters mark both moments approximate, so no figure reads as measured
-    sign = "=" if stats.exact else "≈"
-    mean, std = color(f"{stats.mean:.2g}", _NUMBER), color(f"{stats.std:.2g}", _NUMBER)
-    return f"{bars}  μ{sign}{mean} σ{sign}{std}"
 
 
 def param_treescope(self: Param, path: str | None, subtree_renderer: Any) -> Any:
     """Render a `Param` as `Param(float32(64, 10))`, marking it frozen if it is."""
     from treescope import rendering_parts as parts
 
+    # Collapsed the array is described by shape, expanded it renders in full
     value = self._value
     described = f"{value.dtype.name}{value.shape}" if hasattr(value, "dtype") else repr(value)
-
-    # Collapsed the array is described by shape, expanded it renders in full
     array = parts.fold_condition(
         collapsed=parts.text(described),
         expanded=subtree_renderer(value, path=None).renderable,
@@ -317,12 +283,10 @@ def buffer_treescope(self: Buffer, path: str | None, subtree_renderer: Any) -> A
     """Render a `Buffer` as `Buffer(float32(64,))`."""
     from treescope import rendering_parts as parts
 
-    value = self.value
-    described = f"{value.dtype.name}{value.shape}"
-
     # Collapsed the array is described by shape, expanded it renders in full
+    value = self.value
     array = parts.fold_condition(
-        collapsed=parts.text(described),
+        collapsed=parts.text(f"{value.dtype.name}{value.shape}"),
         expanded=subtree_renderer(value, path=None).renderable,
     )
     return parts.build_foldable_tree_node_from_children(
@@ -338,13 +302,13 @@ def module_treescope(self: Module, path: str | None, subtree_renderer: Any) -> A
     """Render a `Module`, grouping its fields and coloring it by class."""
     from treescope import rendering_parts as parts
 
-    # Fields are collected before rendering so the last visible entry can drop its separator
+    # Fields are rendered together so the last visible entry can drop its separator
     config, params, buffers, children = fields(self)
-
     ordered = config + params + buffers + children
-    last = max((i for i, item in enumerate(ordered) if not item[3]), default=-1)
+    last = max((i for i, (*_, hidden) in enumerate(ordered) if not hidden), default=-1)
 
-    def entry(index: int, label: str, value: Any, name: str) -> Any:
+    entries = []
+    for index, (label, value, name, _) in enumerate(ordered):
         # Plain arrays are described by shape rather than dumped in full
         rendered = (
             parts.text(f"{value.dtype.name}{value.shape}")
@@ -355,17 +319,17 @@ def module_treescope(self: Module, path: str | None, subtree_renderer: Any) -> A
             expanded=parts.text(", " if index < len(config) - 1 else ","),
             collapsed=parts.text("" if index == last else ", "),
         )
-        return parts.siblings_with_annotations(label, rendered, separator)
+        entries.append(parts.siblings_with_annotations(label, rendered, separator))
 
-    rendered = [entry(i, *item[:3]) for i, item in enumerate(ordered)]
-    grouped = iter(rendered[len(config) :])
-
-    # Config fields share one line, dropping their copy buttons, arrays and children follow
+    # Config fields share one line, dropping the copy buttons of anything left at its default
     shown = [
-        parts.fold_condition(expanded=line.renderable) if hidden else line.renderable
-        for line, (*_, hidden) in zip(rendered, config)
+        parts.fold_condition(expanded=entry.renderable) if hidden else entry.renderable
+        for entry, (*_, hidden) in zip(entries, config)
     ]
     lines = [parts.siblings(*shown)] if config else []
+
+    # Parameters, buffers and children follow under their own headings, one to a line
+    grouped = iter(entries[len(config) :])
     for header, group in (("Parameters", params), ("Buffers", buffers), ("Modules", children)):
         if group:
             comment = parts.comment_color(parts.text(f"# {header}:"))
@@ -434,11 +398,11 @@ def buffer_repr(self: Buffer) -> str:
     return f"Buffer({color(value.dtype.name, _SYMBOL)}{highlight(str(value.shape))})"
 
 
-def module_repr(self: Module, stats: dict[int, ParameterStatistics] | None = None) -> str:
+def module_repr(self: Module, stats: dict[int, str] | None = None) -> str:
     """Render a `Module` as fully expanded text, mirroring the Treescope layout."""
     config, params, buffers, children = fields(self)
 
-    # Config fields share one line, arrays and children follow under their own headings
+    # Config fields share one line, arrays described by their shape and callables by name
     lines = []
     if config:
         shown = []
@@ -452,6 +416,7 @@ def module_repr(self: Module, stats: dict[int, ParameterStatistics] | None = Non
                 shown.append(f"{label}{highlight(repr(value))}")
         lines.append(", ".join(shown) + ",")
 
+    # Parameters, buffers and children follow under their own headings, one to a line
     for header, group in (("Parameters", params), ("Buffers", buffers), ("Modules", children)):
         if not group:
             continue
@@ -464,12 +429,10 @@ def module_repr(self: Module, stats: dict[int, ParameterStatistics] | None = Non
 
         # Descriptions share one column, measured on visible text since escapes take no width
         widths = [len(_ANSI.sub("", entry)) for entry, _ in entries]
-        width = max(widths) if stats and group is params else 0
         for (entry, value), visible in zip(entries, widths):
-            statistic = stats.get(id(value)) if stats else None
-            if statistic:
-                described = format_statistics(statistic)
-                entry += " " * (width - visible + 2) + described
+            described = stats.get(id(value)) if stats else None
+            if described is not None:
+                entry += " " * (max(widths) - visible + 2) + described
             lines += entry.split("\n")
 
     # Both brackets share one highlight, marking where the module's fields begin and end
@@ -504,12 +467,12 @@ def cost_repr(self: "Cost") -> str:
     bar_width = 10  # cells in a share bar, so one cell is ten percent of the step
 
     def shape(value: Any) -> str:
+        """Describe a pytree by the dtype and shape of every array it holds."""
         if hasattr(value, "shape") and hasattr(value, "dtype"):
-            dtype = getattr(value.dtype, "name", str(value.dtype))
-            return f"{color(dtype, _SYMBOL)}{value.shape}"
+            return f"{color(value.dtype.name, _SYMBOL)}{value.shape}"
         if isinstance(value, tuple):
             items = ", ".join(shape(item) for item in value)
-            return f"({items}{',' if len(value) == 1 else ''})"
+            return f"({items},)" if len(value) == 1 else f"({items})"
         if isinstance(value, list):
             return f"[{', '.join(shape(item) for item in value)}]"
         if isinstance(value, dict):
@@ -517,53 +480,41 @@ def cost_repr(self: "Cost") -> str:
         return "---" if value is None else repr(value)
 
     # Parameters share the argument buffer with the call's data, so the two are spelled out
-    data_bytes = self.input_bytes - self.param_bytes
     inputs = (
-        f"({scaled(data_bytes)} + {scaled(self.param_bytes)}) input"
+        f"({scaled(self.input_bytes - self.param_bytes)} + {scaled(self.param_bytes)}) input"
         if 0 < self.param_bytes < self.input_bytes
         else f"{scaled(self.input_bytes)} input"
     )
-    memory = (
-        f"{scaled(self.total_memory)} total memory = {inputs}"
-        f" + {scaled(self.intermediate_bytes)} intermediate"
-        f" + {scaled(self.output_bytes)} output"
-    )
-    if self.reused_bytes:
-        memory += f" - {scaled(self.reused_bytes)} reused"
+    reused = f" - {scaled(self.reused_bytes)} reused" if self.reused_bytes else ""
+
+    # The tree is drawn exactly as the module repr indents it, class names and all
+    labels = {}
+    for path, layer in self.layers.items():
+        # A scan runs its body once in the jaxpr, so the count it was scaled by is spelled out
+        loop = f" loop x{layer.loop}" if layer.loop > 1 else ""
+        indent = "  " * layer.depth + (f"{layer.label} " if layer.label else "")
+        label = indent + color(layer.name, chip(layer.name)) + color(loop, _COMMENT)
+        labels[path] = (label, len(indent) + len(layer.name) + len(loop))
+
+    # The name column is sized to its longest entry, so a shallow tree leaves no gutter
+    width = max(len("layer"), *(visible for _, visible in labels.values())) + 2
+    op_width = max(len("ops"), len(f"{self.ops:,}"))
 
     title = f"{self.name} · input {shape(self.inputs)} · {self.backend}"
     totals = (
         f"{scaled(self.flops, 1e3, _FLOPS)}FLOP · {self.params:,} params"
-        f" ({scaled(self.param_bytes)})"
-        f" · {self.ops:,} ops → {self.fused:,} fused"
+        f" ({scaled(self.param_bytes)}) · {self.ops:,} ops → {self.fused:,} fused"
     )
-    # A scan runs its body once in the jaxpr, so the count it was scaled by is spelled out
-    rows = [
-        (
-            "  " * layer.depth + (f"{layer.label} " if layer.label else ""),
-            layer,
-            f" loop x{layer.loop}" if layer.loop > 1 else "",
-        )
-        for layer in self.layers.values()
-    ]
-
-    # The name column is sized to its longest entry, so a shallow tree leaves no gutter
-    width = max(len("layer"), *(len(a) + len(x.name) + len(z) for a, x, z in rows)) + 2
-    op_width = max(len("ops"), len(f"{self.ops:,}"))
+    memory = (
+        f"{scaled(self.total_memory)} total memory = {inputs}"
+        f" + {scaled(self.intermediate_bytes)} intermediate"
+        f" + {scaled(self.output_bytes)} output{reused}"
+    )
     columns = (
-        f"{'layer':<{width}}{'FLOPs':>7}  {'':<{bar_width}}{'share':>7}  {'ops':>{op_width}}"
-        "  output"
+        f"{'layer':<{width}}{'FLOPs':>7}  {'':<{bar_width}}"
+        f"{'share':>7}  {'ops':>{op_width}}  output"
     )
 
-    # Siblings tile their parent's bar, so each one starts where the previous ended
-    bars, filled = {}, {}
-    for path, layer in self.layers.items():
-        parent = path.rsplit(".", 1)[0] if "." in path else ""
-        whole = self.layers[parent].share if path else 1.0
-        within = layer.share / whole if whole else 0.0
-        bars[path] = (filled.get(parent, 0.0) if path else 0.0, within)
-        if path:
-            filled[parent] = bars[path][0] + within
     lines = [
         color(title, _COMMENT),
         "",
@@ -573,24 +524,30 @@ def cost_repr(self: "Cost") -> str:
         color(columns, _COMMENT),
     ]
 
-    for (indent, layer, suffix), (start, within) in zip(rows, bars.values()):
-        # The tree is drawn exactly as the module repr indents it, class names and all
-        pad = " " * (width - len(indent) - len(layer.name) - len(suffix))
-        label = f"{indent}{color(layer.name, chip(layer.name))}{color(suffix, _COMMENT)}{pad}"
+    # Siblings tile their parent's bar, so each one starts where the previous ended
+    filled = {}
+    for path, layer in self.layers.items():
+        parent = path.rsplit(".", 1)[0] if "." in path else ""
+        whole = self.layers[parent].share if path else 1.0
+        within = layer.share / whole if whole else 0.0
+        start = filled.get(parent, 0.0) if path else 0.0
+        if path:
+            filled[parent] = start + within
 
-        # Bars fade with depth, so a nested level never reads as louder than the one above it
         # A partial block occupies its whole terminal cell, so the next sibling starts after it
-        offset = math.ceil(start * bar_width) if start else 0
+        offset = math.ceil(start * bar_width)
         cells = min(max((start + within) * bar_width - offset, 0.0), bar_width - offset)
         bar = " " * offset + "█" * int(cells)
         if cells % 1:
             bar += eighths[min(7, int(cells % 1 * 8))]
+
+        # Bars fade with depth, so a nested level never reads as louder than the one above it
         grey = f"\x1b[38;2;{ansi(max(0.92 - 0.13 * layer.depth, 0.40), 0.03, 260)}m"
 
         # Only the dtypes carry color, so a row of figures reads as one measurement
-        flops = scaled(layer.flops, 1e3, _FLOPS)
+        label, visible = labels[path]
         lines.append(
-            f"{label}{flops:>7}"
+            f"{label}{' ' * (width - visible)}{scaled(layer.flops, 1e3, _FLOPS):>7}"
             f"  {color(bar.ljust(bar_width), grey)}{layer.share * 100:6.1f}%"
             f"  {layer.ops:>{op_width},}  {shape(layer.output)}"
         )

@@ -7,8 +7,9 @@ import numpy.testing as npt
 import pytest
 
 import ion
-from ion import nn
+from ion import display, nn
 from ion.cost import Cost, LayerCost
+from ion.nn.module import _cost_context
 
 
 def analysis(model, *args, **kwargs):
@@ -54,9 +55,7 @@ class TestTotals:
 class TestMemory:
     def test_total_is_the_compiler_memory_equation(self):
         """Inputs, intermediate and outputs reconcile with reused buffers removed."""
-        measured = ion.cost(
-            nn.MLP([64, 128, 10], key=jax.random.key(0)), jnp.ones((8, 64))
-        )
+        measured = ion.cost(nn.MLP([64, 128, 10], key=jax.random.key(0)), jnp.ones((8, 64)))
         assert measured.total_memory == (
             measured.input_bytes
             + measured.intermediate_bytes
@@ -66,13 +65,13 @@ class TestMemory:
 
     def test_input_splits_data_and_parameters(self):
         """The common model call shows data followed by parameter storage."""
-        from ion._rendering import scaled
 
         model = nn.Linear(8, 4, key=jax.random.key(0))
         x = jnp.ones((2, 8))
         measured = ion.cost(model, x)
         assert measured.input_bytes == x.nbytes + measured.param_bytes
-        assert f"({scaled(x.nbytes)} + {scaled(measured.param_bytes)}) input" in repr(measured)
+        described = f"({display.scaled(x.nbytes)} + {display.scaled(measured.param_bytes)}) input"
+        assert described in repr(measured)
 
     def test_memory_grows_with_the_batch(self):
         """The compiler memory plan reflects larger call inputs and outputs."""
@@ -146,9 +145,7 @@ class TestStructure:
 class TestShareAndOps:
     def test_share_is_a_fraction_of_total_flops(self):
         """Share now has the direct and device-independent FLOP meaning."""
-        measured = ion.cost(
-            nn.MLP([256, 512, 512, 10], key=jax.random.key(0)), jnp.ones((64, 256))
-        )
+        measured = ion.cost(nn.MLP([256, 512, 512, 10], key=jax.random.key(0)), jnp.ones((64, 256)))
         for layer in measured.layers.values():
             npt.assert_allclose(layer.share, layer.flops / measured.flops)
 
@@ -221,8 +218,7 @@ class TestTargets:
 
         concrete = {"x": jnp.ones((2, 8)), "y": jnp.ones((2, 8))}
         shaped = {
-            key: jax.ShapeDtypeStruct(value.shape, value.dtype)
-            for key, value in concrete.items()
+            key: jax.ShapeDtypeStruct(value.shape, value.dtype) for key, value in concrete.items()
         }
         assert ion.cost(Add(), concrete).flops == ion.cost(Add(), shaped).flops
 
@@ -265,20 +261,19 @@ class TestReport:
 
     def test_repr_colors_dtypes_alone(self, monkeypatch):
         """Only dtypes are blue, so a row of figures reads as one measurement."""
-        from ion._rendering import _FLOPS, _NUMBER, _SYMBOL, scaled
 
         monkeypatch.delenv("NO_COLOR", raising=False)
         monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
         measured = ion.cost(nn.Linear(8, 16, key=jax.random.key(0)), jnp.ones((4, 8)))
         text = repr(measured)
-        shape = f"{_SYMBOL}float32\x1b[0m(4, 16)"
+        shape = f"{display._SYMBOL}float32\x1b[0m(4, 16)"
         op_width = max(len("ops"), len(f"{measured.ops:,}"))
 
         assert shape in text
         assert f"{measured.ops:>{op_width},}  {shape}" in text
-        assert f"{scaled(measured.flops, 1e3, _FLOPS):>7}" in text
+        assert f"{display.scaled(measured.flops, 1e3, display._FLOPS):>7}" in text
         assert " 100.0%" in text
-        assert _NUMBER not in text
+        assert display._NUMBER not in text
 
     def test_sibling_bars_do_not_share_a_character_cell(self, monkeypatch):
         """A sibling starts after the cell occupied by its predecessor's partial block."""
@@ -297,7 +292,6 @@ class TestReport:
 
     def test_context_does_not_leak(self):
         """The tracing context is reset after analysis."""
-        from ion.nn.module import _cost_context
 
         ion.cost(nn.Linear(8, 4, key=jax.random.key(0)), jnp.ones((2, 8)))
         assert _cost_context.get() is None
