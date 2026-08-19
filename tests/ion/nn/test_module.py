@@ -11,6 +11,7 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
+import ion
 from ion import nn, tree
 
 
@@ -697,7 +698,7 @@ class TestRepr:
             for line in repr(nn.MLP([4, 16, 3], key=jax.random.key(0))).split("\n")
         ]
         assert plain[1] == "  activation=relu, final_activation=None,"
-        assert plain[5] == "    w=Param(float32(4, 16)),"
+        assert plain[5].startswith("    w=Param(float32(4, 16)),  ")
         assert plain[7] == "  ),"
         assert plain[-1] == ")"
 
@@ -1587,32 +1588,57 @@ class TestModuleWrappingEdgeCases:
 class TestStatistics:
     def test_describes_distribution(self):
         """Each parameter gets a histogram and its moments."""
-        from ion._rendering import statistics
+        from ion._rendering import format_statistics, statistics
 
         model = nn.Linear(64, 64, key=jax.random.key(0))
         described = statistics(model)
+        text = format_statistics(described[id(model.w)])
 
-        assert any(block in described[id(model.w)] for block in "\u2581\u2588")
-        assert "\u03bc=" in described[id(model.w)] and "\u03c3=" in described[id(model.w)]
+        assert any(block in text for block in "\u2581\u2588")
+        assert "\u03bc=" in text and "\u03c3=" in text
 
     def test_constant_parameter(self):
         """A parameter with no width places its mass in the middle bucket, not the first."""
-        from ion._rendering import statistics
+        from ion._rendering import format_statistics, statistics
 
         model = nn.Linear(64, 64, key=jax.random.key(0))
 
-        described = statistics(model)[id(model.b)]
+        described = format_statistics(statistics(model)[id(model.b)])
         edge = "\u2581" * (len(described.split("  ")[0]) // 2)
         assert described == f"{edge}\u2588{edge}  \u03bc=0 \u03c3=0"
 
     def test_low_precision_parameter(self):
         """Reductions run in float32, which bfloat16 and float8 scalars cannot format."""
-        from ion._rendering import statistics
+        from ion._rendering import format_statistics, statistics
 
         for dtype in (jnp.bfloat16, jnp.float16, jnp.float8_e4m3fn):
             model = nn.Linear(8, 64, key=jax.random.key(0)).astype(dtype)
 
-            assert "\u03bc=" in statistics(model)[id(model.w)]
+            assert "\u03bc=" in format_statistics(statistics(model)[id(model.w)])
+
+    def test_large_parameters_are_sampled(self):
+        """A parameter past the sample is summarized from it, and says so with an approximation."""
+        from ion._rendering import format_statistics, statistics
+
+        model = nn.Linear(256, 256, key=jax.random.key(0))
+        described = statistics(model)
+
+        assert not described[id(model.w)].exact
+        assert described[id(model.b)].exact
+        assert "\u03bc\u2248" in format_statistics(described[id(model.w)])
+
+    def test_tracers_have_no_statistics(self):
+        """Inside a transformation parameters are tracers, so the structure renders alone."""
+        rendered = []
+
+        def render(model):
+            rendered.append(repr(model))
+            return model.w.value
+
+        jax.jit(render)(nn.Linear(8, 64, key=jax.random.key(0)))
+
+        assert "\u03bc" not in rendered[0]
+        assert "Param(float32(8, 64))" in rendered[0]
 
     def test_annotations_share_a_column(self):
         """Descriptions align down a group so distributions can be compared by eye."""
@@ -1637,8 +1663,17 @@ class TestStatistics:
         columns = {len(re.sub(r"\x1b\[[0-9;]*m", "", line).split("\u03bc=")[0]) for line in lines}
         assert len(columns) == 1
 
-    def test_repr_stays_free_of_statistics(self):
-        """Plain repr does no reductions, keeping logging and debuggers cheap."""
+    def test_repr_includes_statistics(self):
+        """Bare model evaluation gets the fully described terminal representation."""
+        r = repr(nn.Linear(64, 64, key=jax.random.key(0)))
+
+        assert "\u03bc=" in r and "\u03c3=" in r
+        assert any(block in r for block in "\u2588\u2587\u2586")
+
+    def test_statistics_can_be_disabled(self, monkeypatch):
+        """Clearing the flag keeps repr cheap for logging-heavy applications."""
+        monkeypatch.setattr(ion, "statistics", False)
+
         r = repr(nn.Linear(64, 64, key=jax.random.key(0)))
 
         assert "\u03bc=" not in r

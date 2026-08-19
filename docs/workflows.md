@@ -151,17 +151,25 @@ MLP(  # 131 params, 524 B, 80 frozen
 )
 ```
 
-Echoing a model at an interactive prompt adds a distribution histogram and moments to each parameter, aligned in a column so layers can be compared by eye:
+Printing or evaluating a model adds a distribution histogram and moments to each parameter, aligned in a column so layers can be compared by eye:
 
 ```text
 Linear(  # 4,608 params, 18 KB
   # Parameters:
-  w=Param(float32(8, 512)),  █▇▇▇▇▇▇▇▇▆▇▇█  μ=-0.00036 σ=0.062
-  b=Param(float32(512,)),    ▁▁▁▁▁▁█▁▁▁▁▁▁  μ=0 σ=0
+  w=Param(float32(8, 512)),  █▇▇▇▇▇▇▇▇▇█  μ=-0.00036 σ=0.062
+  b=Param(float32(512,)),    ▁▁▁▁▁█▁▁▁▁▁  μ=0 σ=0
 )
 ```
 
-Only the echo path pays for this. `repr` does no reductions, so logging, debuggers and exception messages stay cheap on models of any size. The histogram bins between the 1st and 99th percentile of a subsample, while the moments are exact over the whole array. A constant parameter has no width, so its mass sits in the middle bucket with a zero deviation.
+Every summary comes from at most 16,384 evenly spaced values. A parameter no larger than that sample is described exactly; a larger one is described from the sample and marks both moments `≈` so no approximation reads as measured. The histogram bins between the 1st and 99th percentile of the sample, so a few outliers cannot flatten the bars. A constant parameter has no width, so its mass sits in the middle bucket with a zero deviation.
+
+The whole tree costs one device synchronization, and a large parameter costs no more than a small one. Where a model is printed often enough for that to matter, in logs or an exception handler, turn the descriptions off and `repr` renders structure alone:
+
+```python
+ion.statistics = False
+```
+
+Inside `jax.jit` and friends parameters are tracers rather than concrete arrays, so a model printed there renders its structure with no descriptions either way.
 
 In IPython and Jupyter, [Treescope](https://github.com/google-deepmind/treescope) renders the same tree interactively, with collapsible nodes and array visualizations. Ion ships the rendering hooks but does not install or activate it, so pull it in and turn it on the usual way:
 

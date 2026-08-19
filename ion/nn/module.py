@@ -281,10 +281,10 @@ class Module:
         return (getattr(self, f.name) for f in dataclasses.fields(self))  # type: ignore[arg-type]
 
     def __repr__(self) -> str:
-        """Hook to group fields and render for the terminal."""
+        """Render the model and its parameter statistics for the terminal."""
         from .. import _rendering
 
-        return _rendering.module_repr(self)
+        return _rendering.module_repr(self, _rendering.statistics(self))
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
         """Hook to group fields and render with Treescope."""

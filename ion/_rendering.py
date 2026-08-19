@@ -11,6 +11,7 @@ Functions:
     highlight   Color the literals inside a value's repr.
     scaled      Format a quantity against a unit ladder.
     statistics  Describe every parameter's distribution in one device sync.
+    format_statistics  Format one parameter's histogram and moments for the terminal.
 
 Every `__repr__` and `__treescope_repr__` hook delegates here, to the matching `*_repr` or
 `*_treescope` function. Both layouts share `palette`, `fields` and `summary`, so the two
@@ -30,6 +31,7 @@ from typing import TYPE_CHECKING, Any
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax.core import Tracer
 
 from . import tree
 from .nn.buffer import Buffer
@@ -48,10 +50,23 @@ _SYMBOL = "\x1b[38;2;71;138;245m"
 _WARNING = "\x1b[38;2;239;83;80m"
 _BYTES = (" B", " KB", " MB", " GB", " TB")
 _FLOPS = ("", "K", "M", "G", "T")
+_SAMPLE = 16_384
+_BINS = 11
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 _LITERALS = re.compile(
     rf"{_ANSI.pattern}|'[^']*'|\b(?:None|True|False)\b|(?<![\w.])-?\d+\.?\d*(?:[eE][-+]?\d+)?"
 )
+
+
+@dataclasses.dataclass(frozen=True)
+class ParameterStatistics:
+    """One parameter's distribution, exact when the parameter fits the sample."""
+
+    mean: float
+    std: float
+    counts: np.ndarray
+    exact: bool
+
 
 # Each class takes a hue in degrees, neighbouring ones so a mechanism reads as a band of color
 _HUES = {
@@ -220,41 +235,59 @@ def scaled(value: float, base: float = 1024, units: tuple[str, ...] = _BYTES) ->
     return f"{value:.3g}{units[exponent]}"
 
 
-def statistics(self: Module) -> dict[int, str]:
-    """Describe every parameter's distribution as a histogram and moments, keyed by `id`."""
-    blocks = "▁▂▃▄▅▆▇█"
-    bins = 11
-    leaves = [x for x in jax.tree.leaves(self, is_leaf=tree.is_param) if tree.is_param(x)]
+def statistics(self: Module) -> dict[int, ParameterStatistics]:
+    """Describe every parameter's distribution in one device synchronization."""
+    import ion
 
-    reductions = []
+    leaves = [x for x in jax.tree.leaves(self, is_leaf=tree.is_param) if tree.is_param(x)]
+    if not ion.statistics or any(isinstance(leaf._value, Tracer) for leaf in leaves):
+        return {}
+
+    samples = []
     for leaf in leaves:
-        # Low precision accumulates poorly and cannot be formatted, so reductions use float32
+        # Low precision accumulates poorly and cannot be formatted, so summaries use float32
         values = jnp.asarray(leaf._value).ravel()
         values = jnp.abs(values) if jnp.iscomplexobj(values) else values.astype(jnp.float32)
 
-        # Moments stay exact, but the window comes from a subsample to bound the sort
-        sample = values[:: max(1, values.size // 8192)]
-        low, high = jnp.percentile(sample, jnp.array([1.0, 99.0]))
+        # Summaries come from a bounded sample, so a large parameter costs no more than a small one
+        stride = max(1, math.ceil(values.size / _SAMPLE))
+        samples.append((values[::stride], values.size <= _SAMPLE))
+
+    # Every sample is issued before the first read, so the whole tree costs one sync
+    described = {}
+    for leaf, (sample, exact) in zip(leaves, jax.device_get(samples)):
+        sample = np.asarray(sample, dtype=np.float32)
+        if sample.size == 0 or not np.all(np.isfinite(sample)):
+            described[id(leaf)] = ParameterStatistics(math.nan, math.nan, np.zeros(_BINS), exact)
+            continue
+
+        # The window comes from the percentiles, so a few outliers cannot flatten the bars
+        low, high = np.percentile(sample, [1.0, 99.0])
 
         # A constant parameter has no width, so its mass falls in the middle bucket
-        constant = high <= low
-        spread = jnp.where(constant, 1.0, high - low)
-        origin = jnp.where(constant, low - 0.5, low)
-        index = jnp.clip((sample - origin) / spread * bins, 0, bins - 0.001).astype(jnp.int32)
+        origin, spread = (low, high - low) if high > low else (low - 0.5, 1.0)
+        index = np.clip((sample - origin) / spread * _BINS, 0, _BINS - 0.001).astype(np.int32)
 
-        reductions.append((jnp.mean(values), jnp.std(values), jnp.bincount(index, length=bins)))
-
-    # Every reduction is issued before the first read, so the whole tree costs one sync
-    described = {}
-    for leaf, (mean, std, counts) in zip(leaves, jax.device_get(reductions)):
-        if not math.isfinite(mean):
-            described[id(leaf)] = f"{' ' * bins}  " + color("not finite", _WARNING)
-        else:
-            bars = "".join(blocks[round(count / counts.max() * 7)] for count in counts)
-            average, deviation = color(f"{mean:.2g}", _NUMBER), color(f"{std:.2g}", _NUMBER)
-            described[id(leaf)] = f"{bars}  μ={average} σ={deviation}"
+        counts = np.bincount(index, minlength=_BINS)
+        mean, std = float(np.mean(sample)), float(np.std(sample))
+        described[id(leaf)] = ParameterStatistics(mean, std, counts, exact)
 
     return described
+
+
+def format_statistics(stats: ParameterStatistics) -> str:
+    """Format one parameter's histogram and moments for the terminal."""
+    if not math.isfinite(stats.mean):
+        return f"{' ' * len(stats.counts)}  " + color("not finite", _WARNING)
+
+    blocks = "▁▂▃▄▅▆▇█"
+    peak = stats.counts.max()
+    bars = "".join(blocks[round(count / peak * 7)] for count in stats.counts)
+
+    # Sampled parameters mark both moments approximate, so no figure reads as measured
+    sign = "=" if stats.exact else "≈"
+    mean, std = color(f"{stats.mean:.2g}", _NUMBER), color(f"{stats.std:.2g}", _NUMBER)
+    return f"{bars}  μ{sign}{mean} σ{sign}{std}"
 
 
 def param_treescope(self: Param, path: str | None, subtree_renderer: Any) -> Any:
@@ -401,7 +434,7 @@ def buffer_repr(self: Buffer) -> str:
     return f"Buffer({color(value.dtype.name, _SYMBOL)}{highlight(str(value.shape))})"
 
 
-def module_repr(self: Module, stats: dict[int, str] | None = None) -> str:
+def module_repr(self: Module, stats: dict[int, ParameterStatistics] | None = None) -> str:
     """Render a `Module` as fully expanded text, mirroring the Treescope layout."""
     config, params, buffers, children = fields(self)
 
@@ -433,8 +466,9 @@ def module_repr(self: Module, stats: dict[int, str] | None = None) -> str:
         widths = [len(_ANSI.sub("", entry)) for entry, _ in entries]
         width = max(widths) if stats and group is params else 0
         for (entry, value), visible in zip(entries, widths):
-            described = stats.get(id(value)) if stats else None
-            if described:
+            statistic = stats.get(id(value)) if stats else None
+            if statistic:
+                described = format_statistics(statistic)
                 entry += " " * (width - visible + 2) + described
             lines += entry.split("\n")
 
@@ -472,7 +506,7 @@ def cost_repr(self: "Cost") -> str:
     def shape(value: Any) -> str:
         if hasattr(value, "shape") and hasattr(value, "dtype"):
             dtype = getattr(value.dtype, "name", str(value.dtype))
-            return f"{color(dtype, _SYMBOL)}{highlight(str(value.shape))}"
+            return f"{color(dtype, _SYMBOL)}{value.shape}"
         if isinstance(value, tuple):
             items = ", ".join(shape(item) for item in value)
             return f"({items}{',' if len(value) == 1 else ''})"
@@ -551,13 +585,14 @@ def cost_repr(self: "Cost") -> str:
         bar = " " * offset + "█" * int(cells)
         if cells % 1:
             bar += eighths[min(7, int(cells % 1 * 8))]
-        grey = f"\x1b[38;2;{ansi(max(0.92 - 0.13 * layer.depth, 0.40), 0.0, 0.0)}m"
+        grey = f"\x1b[38;2;{ansi(max(0.92 - 0.13 * layer.depth, 0.40), 0.03, 260)}m"
 
+        # Only the dtypes carry color, so a row of figures reads as one measurement
         flops = scaled(layer.flops, 1e3, _FLOPS)
         lines.append(
             f"{label}{flops:>7}"
             f"  {color(bar.ljust(bar_width), grey)}{layer.share * 100:6.1f}%"
-            f"  {color(f'{layer.ops:>{op_width},}', _NUMBER)}  {shape(layer.output)}"
+            f"  {layer.ops:>{op_width},}  {shape(layer.output)}"
         )
 
     return "\n".join(lines)

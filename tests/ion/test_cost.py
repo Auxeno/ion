@@ -263,22 +263,22 @@ class TestReport:
         assert "float32(4, 16)" in text
         assert "ceiling" not in text and "transfer" not in text
 
-    def test_repr_colors_shapes_and_ops_like_modules(self, monkeypatch):
-        """Dtypes are blue, dimensions and op counts cyan, and delimiters stay plain."""
-        from ion._rendering import _NUMBER, _SYMBOL
+    def test_repr_colors_dtypes_alone(self, monkeypatch):
+        """Only dtypes are blue, so a row of figures reads as one measurement."""
+        from ion._rendering import _FLOPS, _NUMBER, _SYMBOL, scaled
 
         monkeypatch.delenv("NO_COLOR", raising=False)
         monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
         measured = ion.cost(nn.Linear(8, 16, key=jax.random.key(0)), jnp.ones((4, 8)))
         text = repr(measured)
-        shape = (
-            f"{_SYMBOL}float32\x1b[0m("
-            f"{_NUMBER}4\x1b[0m, {_NUMBER}16\x1b[0m)"
-        )
+        shape = f"{_SYMBOL}float32\x1b[0m(4, 16)"
         op_width = max(len("ops"), len(f"{measured.ops:,}"))
 
         assert shape in text
-        assert f"{_NUMBER}{measured.ops:>{op_width},}\x1b[0m  {shape}" in text
+        assert f"{measured.ops:>{op_width},}  {shape}" in text
+        assert f"{scaled(measured.flops, 1e3, _FLOPS):>7}" in text
+        assert " 100.0%" in text
+        assert _NUMBER not in text
 
     def test_sibling_bars_do_not_share_a_character_cell(self, monkeypatch):
         """A sibling starts after the cell occupied by its predecessor's partial block."""

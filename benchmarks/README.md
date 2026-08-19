@@ -79,6 +79,12 @@ uv run --group benchmarks python -m benchmarks.runner \
   ion mlp tiny full_step --warmup 2 --steps 10
 ```
 
+Measure the cold and warm model representation separately:
+
+```bash
+uv run python -m benchmarks.repr --models mlp resnet gpt --sizes tiny small medium
+```
+
 Run the complete matrix:
 
 ```bash

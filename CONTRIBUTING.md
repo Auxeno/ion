@@ -1,6 +1,6 @@
 # Contributing
 
-Ion aims to stay minimal. Contributions that simplify, fix bugs, improve docs, or add examples are welcome.
+Suggestions and contributions to Ion are welcome. To contribute, please follow the workflow below:
 
 ## Workflow
 
