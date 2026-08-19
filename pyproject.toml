@@ -19,7 +19,6 @@ dependencies = [
     "jaxtyping>=0.3.0",
     "numpy",
     "optax",
-    "treescope",
 ]
 
 [project.urls]
@@ -45,6 +44,7 @@ dev = [
     "ruff",
     "ipykernel",
     "pip",
+    "treescope",
 ]
 examples = [
     "gymnax",

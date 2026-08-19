@@ -108,7 +108,7 @@ MLP(  # 131 params, 524 B
 )
 ```
 
-In a terminal, the same tree prints as text, colored per layer type. In IPython/Jupyter environments, models render interactively with [Treescope](https://github.com/google-deepmind/treescope).
+In a terminal, the same tree prints as text, colored per layer type. In IPython/Jupyter environments, models render interactively if [Treescope](https://github.com/google-deepmind/treescope) is installed and set up, covered in [Workflows](workflows.md).
 
 ## Neural network layers
 
@@ -283,8 +283,7 @@ model.params  # Param leaves; array data and buffers become None
 
 Casting is how Ion does [mixed precision](workflows.md#mixed-precision); see [Freezing](workflows.md#freezing) for working with trainability.
 
-`ion.cost` goes further and analyses a call rather than the model, reporting FLOPs, compiler
-memory, graph operations and logical outputs against the same tree the repr prints:
+`ion.cost` goes further and analyses a call rather than the model, reporting FLOPs, compiler memory, graph operations and logical outputs against the same tree the repr prints:
 
 ```python
 import jax

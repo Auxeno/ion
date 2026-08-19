@@ -25,7 +25,6 @@ from typing import TYPE_CHECKING, Any
 import jax
 import jax.numpy as jnp
 import numpy as np
-from treescope import rendering_parts as parts
 
 from . import gnn, nn, tree
 from .nn.buffer import Buffer
@@ -166,14 +165,18 @@ def summary(self: Module) -> str:
 
 def param_treescope(self: Param, path: str | None, subtree_renderer: Any) -> Any:
     """Render a `Param` as `Param(float32(64, 10))`, marking it frozen if it is."""
+    from treescope import rendering_parts as parts
+
     value = self._value
     described = f"{value.dtype.name}{value.shape}" if hasattr(value, "dtype") else repr(value)
 
-    # Nesting hides the array statistics, leaving float32(64, 10)
-    full = subtree_renderer(value, path=None).renderable
-    array = parts.abbreviatable(full, parts.text(described))
+    # Collapsed the array is described by shape, expanded it renders in full
+    array = parts.fold_condition(
+        collapsed=parts.text(described),
+        expanded=subtree_renderer(value, path=None).renderable,
+    )
     children = [array] if self.trainable else [array, parts.text("frozen")]
-    node = parts.build_foldable_tree_node_from_children(
+    return parts.build_foldable_tree_node_from_children(
         prefix="Param(",
         children=children,
         suffix=")",
@@ -182,20 +185,20 @@ def param_treescope(self: Param, path: str | None, subtree_renderer: Any) -> Any
         expand_state=parts.ExpandState.COLLAPSED,
     )
 
-    # Deeper still the wrapper drops away too
-    described += "" if self.trainable else ", frozen"
-    return parts.abbreviatable_with_annotations(node, parts.text(described))
-
 
 def buffer_treescope(self: Buffer, path: str | None, subtree_renderer: Any) -> Any:
     """Render a `Buffer` as `Buffer(float32(64,))`."""
+    from treescope import rendering_parts as parts
+
     value = self.value
     described = f"{value.dtype.name}{value.shape}"
 
-    # Nesting hides the array statistics, leaving float32(64,)
-    full = subtree_renderer(value, path=None).renderable
-    array = parts.abbreviatable(full, parts.text(described))
-    node = parts.build_foldable_tree_node_from_children(
+    # Collapsed the array is described by shape, expanded it renders in full
+    array = parts.fold_condition(
+        collapsed=parts.text(described),
+        expanded=subtree_renderer(value, path=None).renderable,
+    )
+    return parts.build_foldable_tree_node_from_children(
         prefix="Buffer(",
         children=[array],
         suffix=")",
@@ -203,12 +206,11 @@ def buffer_treescope(self: Buffer, path: str | None, subtree_renderer: Any) -> A
         expand_state=parts.ExpandState.COLLAPSED,
     )
 
-    # Buffers keep their wrapper when abbreviated, marking them out from parameters
-    return parts.abbreviatable_with_annotations(node, parts.text(f"Buffer({described})"))
-
 
 def module_treescope(self: Module, path: str | None, subtree_renderer: Any) -> Any:
     """Render a `Module`, grouping its fields and coloring it by class."""
+    from treescope import rendering_parts as parts
+
     # Fields are collected before rendering so the last visible entry can drop its separator
     config, params, buffers, children = fields(self)
 
@@ -243,7 +245,7 @@ def module_treescope(self: Module, path: str | None, subtree_renderer: Any) -> A
     # Totals annotate the first line, e.g. Linear(  # 1,088 params, 4.25 KB
     total = summary(self)
 
-    node = parts.build_foldable_tree_node_from_children(
+    return parts.build_foldable_tree_node_from_children(
         prefix=parts.siblings(parts.maybe_qualified_type_name(type(self)), "("),
         children=lines,
         suffix=")",
@@ -257,15 +259,11 @@ def module_treescope(self: Module, path: str | None, subtree_renderer: Any) -> A
         ),
     )
 
-    # Deeper in the tree the fields drop away, leaving Linear(<16,640 params>)
-    short = parts.abbreviation_color(
-        parts.text(f"{type(self).__name__}(<{self.num_params:,} params>)")
-    )
-    return parts.abbreviatable_with_annotations(node, short)
-
 
 def optimizer_treescope(self: "Optimizer", path: str | None, subtree_renderer: Any) -> Any:
     """Render an `Optimizer`, folding its state away behind a size summary."""
+    from treescope import rendering_parts as parts
+
     # State mirrors the model once per moment, so collapsed it shows only its size
     leaves = jax.tree.leaves(self.state)
     nbytes = sum(getattr(leaf, "nbytes", 0) for leaf in leaves)

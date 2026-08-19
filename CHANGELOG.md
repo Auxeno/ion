@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.19.0
+
+- **Breaking: Treescope is optional and no longer activated on import.** `ion.enable_treescope` and `ion.disable_treescope` are gone. Install it with `pip install treescope` and activate it with `treescope.basic_interactive_setup()`. The rendering hooks no longer depend on Treescope's abbreviation threshold, so collapsed parameters and buffers describe their shape with no configuration at all.
+
 ## 0.18.0
 
 - **`nn.DropPath`.** Stochastic depth as its own layer. It drops a residual branch for whole samples and scales the survivors by `1 / (1 - p)`, sharing one decision across every dimension after the batch dimension, whatever the input rank.

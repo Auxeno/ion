@@ -151,8 +151,7 @@ MLP(  # 131 params, 524 B, 80 frozen
 )
 ```
 
-Echoing a model at an interactive prompt adds a distribution histogram and moments to each
-parameter, aligned in a column so layers can be compared by eye:
+Echoing a model at an interactive prompt adds a distribution histogram and moments to each parameter, aligned in a column so layers can be compared by eye:
 
 ```text
 Linear(  # 4,608 params, 18 KB
@@ -162,31 +161,25 @@ Linear(  # 4,608 params, 18 KB
 )
 ```
 
-Only the echo path pays for this. `repr` does no reductions, so logging, debuggers and
-exception messages stay cheap on models of any size. The histogram bins between the 1st and
-99th percentile of a subsample, while the moments are exact over the whole array. A constant
-parameter has no width, so its mass sits in the middle bucket with a zero deviation.
+Only the echo path pays for this. `repr` does no reductions, so logging, debuggers and exception messages stay cheap on models of any size. The histogram bins between the 1st and 99th percentile of a subsample, while the moments are exact over the whole array. A constant parameter has no width, so its mass sits in the middle bucket with a zero deviation.
 
-In IPython and Jupyter, [Treescope](https://github.com/google-deepmind/treescope) renders the same tree interactively, with collapsible nodes and array visualizations. It is enabled on import and covers Ion modules, params, buffers, and JAX arrays:
+In IPython and Jupyter, [Treescope](https://github.com/google-deepmind/treescope) renders the same tree interactively, with collapsible nodes and array visualizations. Ion ships the rendering hooks but does not install or activate it, so pull it in and turn it on the usual way:
 
-```python
-ion.enable_treescope()                 # Ion types and arrays (default)
-ion.enable_treescope(everything=True)  # every type treescope supports
-ion.disable_treescope()                # fall back to plain text
+```bash
+pip install treescope
 ```
 
-::: ion.enable_treescope
-    options:
-      heading_level: 3
+```python
+import treescope
 
-::: ion.disable_treescope
-    options:
-      heading_level: 3
+treescope.basic_interactive_setup()
+```
+
+Modules, params, buffers and optimizers then render as folding trees, collapsed down to shapes and expanding to array visualizations on click.
 
 ## Measuring cost
 
-`ion.cost` traces and compiles a call without executing it, then explains its static work and
-memory layer by layer:
+`ion.cost` traces and compiles a call without executing it, then explains its static work and memory layer by layer:
 
 ```python
 report = ion.cost(model, jnp.ones((8, 128), jnp.int32))
@@ -208,20 +201,13 @@ TransformerBlock                  3.86G  ██████████ 100.0%  
   mlp_out Linear                  1.21G         ███  31.3%    1  float32(8, 128, 384)
 ```
 
-The tree and colours match the model repr. FLOPs are inclusive: a parent's value contains
-its descendants. `share` is simply that value divided by the whole call's FLOPs. Sibling bars
-tile their parent, leaving any work done directly by the parent as an unfilled segment.
+The tree and colours match the model repr. FLOPs are inclusive: a parent's value contains its descendants. `share` is simply that value divided by the whole call's FLOPs. Sibling bars tile their parent, leaving any work done directly by the parent as an unfilled segment.
 
-`ops` counts traced JAX operations once in the static graph. A scan body therefore keeps the
-same op count at every sequence length and carries a `loop xT` suffix, while its FLOPs scale
-by `T`. `fused` counts executable operations left in the optimized top-level graph after
-fusion and other compiler simplification. It is not a count of device kernel launches.
+`ops` counts traced JAX operations once in the static graph. A scan body therefore keeps the same op count at every sequence length and carries a `loop xT` suffix, while its FLOPs scale by `T`. `fused` counts executable operations left in the optimized top-level graph after fusion and other compiler simplification. It is not a count of device kernel launches.
 
-The output column records the logical shape and dtype produced by each module during the
-trace. Fusion may prevent that value from becoming a physical device buffer.
+The output column records the logical shape and dtype produced by each module during the trace. Fusion may prevent that value from becoming a physical device buffer.
 
-Any callable taking a model works, so a loss, gradient evaluation or whole step is analysed
-the same way:
+Any callable taking a model works, so a loss, gradient evaluation or whole step is analysed the same way:
 
 ```python
 ion.cost(loss, model, x, y)
@@ -229,8 +215,7 @@ ion.cost(jax.grad(loss), model, x, y)
 ion.cost(model, jax.ShapeDtypeStruct((8192, 256), jnp.float32))
 ```
 
-Concrete array pytrees are abstractified automatically, while a `jax.ShapeDtypeStruct` avoids
-allocating the input in the first place. Results are accessible directly by tree path:
+Concrete array pytrees are abstractified automatically, while a `jax.ShapeDtypeStruct` avoids allocating the input in the first place. Results are accessible directly by tree path:
 
 ```python
 report.layers["layers[3]"].flops
@@ -238,16 +223,9 @@ report.layers["layers[3]"].output
 report.total_memory
 ```
 
-The memory line is the compiler's buffer plan. Input is all array arguments, including model
-parameters; the parentheses separate non-parameter inputs from parameter storage.
-Intermediate is temporary storage allocated for the call, and output is the returned
-buffers. Reused or donated storage is subtracted when the compiler reports aliases. This is
-not observed process or allocator memory.
+The memory line is the compiler's buffer plan. Input is all array arguments, including model parameters; the parentheses separate non-parameter inputs from parameter storage. Intermediate is temporary storage allocated for the call, and output is the returned buffers. Reused or donated storage is subtracted when the compiler reports aliases. This is not observed process or allocator memory.
 
-FLOPs use the conventional two operations for a multiply-add. Matmul and convolution counts
-are precise under that convention; elementwise counts are indicative. Dynamic `cond` and
-unknown-trip `while` control flow are rejected because they have no single factual static
-cost.
+FLOPs use the conventional two operations for a multiply-add. Matmul and convolution counts are precise under that convention; elementwise counts are indicative. Dynamic `cond` and unknown-trip `while` control flow are rejected because they have no single factual static cost.
 
 ::: ion.cost
     options:
