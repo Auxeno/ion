@@ -31,7 +31,7 @@ The [documentation](https://auxeno.github.io/ion/) covers the core, layers, and 
 A model built from Ion's standard layers, trained with native JAX transforms:
 
 ```python
-import jax, optax, typing
+import jax, jax.numpy as jnp, optax, typing
 
 import ion
 import ion.nn as nn
@@ -64,13 +64,22 @@ def train_step(model, optimizer, x, y):
     return model, optimizer
 
 
-model = MLP(key=jax.random.key(0))
+keys = jax.random.split(jax.random.key(0), 3)
+
+model = MLP(key=keys[0])
 
 optimizer = ion.Optimizer(optax.adam(3e-4), model)
 
-for x, y in data:
+x = jax.random.normal(keys[1], (512, 784))
+y = jnp.argmax(x @ jax.random.normal(keys[2], (784, 10)), axis=-1)
+
+for _ in range(500):
     model, optimizer = train_step(model, optimizer, x, y)
+
+model
 ```
+
+![](https://raw.githubusercontent.com/auxeno/ion/main/assets/repr.svg)
 
 ## Documentation
 
