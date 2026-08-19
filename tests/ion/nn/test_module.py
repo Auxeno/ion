@@ -676,6 +676,17 @@ class TestRepr:
         assert f"{CONSTANT}None" in r
         assert f"{FROZEN}, frozen" in r
 
+    def test_nested_color_survives_highlighting(self, monkeypatch):
+        """A child's escape sequences pass through, so its digits are not recolored as literals."""
+        from ion._rendering import NUMBER, highlight
+
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+
+        nested = f"Param({NUMBER}64\x1b[0m)"
+
+        assert highlight(f"child={nested}") == f"child={nested}"
+
     def test_nesting_indents(self, monkeypatch):
         """Fields indent one level per module, and the closing bracket returns to its parent."""
         monkeypatch.delenv("NO_COLOR", raising=False)
@@ -1633,6 +1644,35 @@ class TestStatistics:
 
         assert "\u03bc=" not in r
         assert not any(block in r for block in "\u2588\u2587\u2586")
+
+
+class TestPalette:
+    def test_mechanism_shares_a_hue(self):
+        """Layers sharing a mechanism sit in one family, so graph and dense convs look alike."""
+        from ion._rendering import SPREAD, palette
+
+        conv, graph_conv = palette("Conv")[2], palette("GCNConv")[2]
+        attention = palette("MultiHeadAttention")[2]
+
+        assert abs(conv - graph_conv) <= SPREAD[0]
+        assert abs(conv - attention) > SPREAD[0]
+
+    def test_every_layer_stays_in_gamut(self):
+        """Chroma follows the gamut, so no layer color is clipped on its way to the terminal."""
+        from ion._rendering import FAMILIES, oklch, palette
+
+        clipped = [name for name in FAMILIES if any(c < 0 or c > 1 for c in oklch(*palette(name)))]
+
+        assert clipped == []
+
+    def test_unknown_class_is_stable(self):
+        """A class from outside Ion hashes onto the same arc, so its color never shifts."""
+        from ion._rendering import ARC, palette
+
+        lightness, chroma, tone = palette("SomeUserBlock")
+
+        assert palette("SomeUserBlock") == (lightness, chroma, tone)
+        assert ARC[0] <= tone <= ARC[0] + ARC[1]
 
 
 class TestReprInsideTransformations:

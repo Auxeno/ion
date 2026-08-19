@@ -132,7 +132,7 @@ optimizer = ion.Optimizer(optax.adam(3e-4), model)
 
 ## Inspecting models
 
-A model prints as a tree, grouped into config, parameters, buffers and child modules, with parameter counts and sizes on each line. Frozen params are marked `frozen`. In a color terminal each layer type is highlighted with the same hue Treescope gives it, carried on both of its brackets, and numbers, strings, constants and dtypes take the colors the documentation gives them in code blocks. Output captured to a pipe or file drops the color, leaving plain text:
+A model prints as a tree, grouped into config, parameters, buffers and child modules, with parameter counts and sizes on each line. Frozen params are marked `frozen`. In a color terminal each layer is highlighted with the same color Treescope gives it, carried on both of its brackets. Layers sharing a mechanism share a hue, so every convolution is one color and every normalization another, and numbers, strings, constants and dtypes take the colors the documentation gives them in code blocks. Output captured to a pipe or file drops the color, leaving plain text:
 
 ```text
 MLP(  # 131 params, 524 B, 80 frozen

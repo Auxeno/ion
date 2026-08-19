@@ -1,12 +1,12 @@
 """Private renderers for Ion's core types, one set for Treescope and one for the terminal.
 
 Functions:
-    hue         Map a class name to its palette hue.
+    palette     Map a class name to its lightness, chroma and hue.
     fields      Split a module's fields into config, params, buffers and children.
     summary     Describe a module's parameter count and size.
     statistics  Describe every parameter's distribution in one device sync.
 
-Both layouts share `hue`, `fields` and `summary`, so the two cannot drift apart. Called
+Both layouts share `palette`, `fields` and `summary`, so the two cannot drift apart. Called
 lazily by each type's `__treescope_repr__` and `__repr__` hooks. Only the terminal colors
 literals, following the docs palette rather than Treescope's own value styling.
 """
@@ -43,16 +43,82 @@ SYMBOL = "\x1b[38;2;71;138;245m"
 FROZEN = "\x1b[38;2;71;138;245m"
 WARNING = "\x1b[38;2;239;83;80m"
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
-LITERALS = re.compile(r"'[^']*'|\b(?:None|True|False)\b|(?<![\w.])-?\d+\.?\d*(?:[eE][-+]?\d+)?")
+LITERALS = re.compile(
+    rf"{ANSI.pattern}|'[^']*'|\b(?:None|True|False)\b|(?<![\w.])-?\d+\.?\d*(?:[eE][-+]?\d+)?"
+)
+ARC = (150, 265)  # first hue and span of the layer arc, in degrees
+LAYER = (0.80, 0.80)  # lightness and saturation for an ordinary family
+ACCENT = (0.82, 0.75)  # lightness and saturation for the families worth spotting first
+USER = (0.78, 0.95)  # band for classes defined outside Ion
+SPREAD = (16.0, 0.09, 0.20)  # hue, lightness and saturation a family fans out over
+
+# Families take slots along the arc in this order, and the three most reached for are accented
+ORDER = [
+    "pool",
+    "blocks",
+    "norm",
+    "linear",
+    "ssm",
+    "embedding",
+    "conv",
+    "composite",
+    "recurrent",
+    "attention",
+]
+ACCENTED = {"linear", "conv", "attention"}
+
+# Mechanisms fold into their nearest neighbour, so no family is left with one or two members
+MERGE = {
+    "isomorphism": "conv",
+    "gated": "conv",
+    "relational": "attention",
+    "positional": "embedding",
+    "stochastic": "blocks",
+}
+LEAD = ("Sequential",)  # classes that take the leading position within their family
+
+FAMILIES, MEMBERS = {}, {}
+for _module in (nn, gnn.layers):
+    for _name, _class in vars(_module).items():
+        if isinstance(_class, type) and _name not in ("Module", "Param", "Buffer"):
+            _path = _class.__module__
+            _mechanism = "blocks" if ".blocks." in _path else _path.split(".")[-1]
+            FAMILIES[_name] = MERGE.get(_mechanism, _mechanism)
+
+# Members fan out symmetrically about their family, so a family reads as one band of color
+for _family in ORDER:
+    _names = sorted((n for n, k in FAMILIES.items() if k == _family), key=lambda n: n not in LEAD)
+    for _index, _name in enumerate(_names):
+        MEMBERS[_name] = _index / (len(_names) - 1) - 0.5 if len(_names) > 1 else 0.0
 
 
-def hue(name: str) -> float:
-    """Map a class name to its palette hue, hashing names from outside the palette."""
+def palette(name: str) -> tuple[float, float, float]:
+    """Map a class name to its lightness, chroma and hue, hashing names from outside Ion."""
+    family = FAMILIES.get(name)
+    if family is None:
+        slot, (lightness, saturation) = zlib.crc32(name.encode()) % len(ORDER), USER
+    else:
+        slot = ORDER.index(family)
+        lightness, saturation = ACCENT if family in ACCENTED else LAYER
 
-    # Hues follow export order, so layers of the same family are colored alike
-    exports = [n for m in (nn, gnn.layers) for n, v in vars(m).items() if isinstance(v, type)]
-    hues = {name: (222 + 11 * index) % 360 for index, name in enumerate(exports)}
-    return hues.get(name, zlib.crc32(name.encode()) % 3_600 / 10)
+    offset = MEMBERS.get(name, 0.0)
+    tone = ARC[0] + ARC[1] * slot / len(ORDER) + SPREAD[0] * offset
+    lightness = lightness + SPREAD[1] * offset
+    saturation = min(max(saturation - SPREAD[2] * offset, 0.0), 1.0)
+
+    # Saturation is a fraction of the gamut, so no hue is dragged down by the narrowest one
+    return lightness, saturation * limit(lightness, tone), tone
+
+
+def limit(lightness: float, tone: float) -> float:
+    """Return the most chroma that stays inside sRGB at this lightness and hue."""
+    low, high = 0.0, 0.4
+    for _ in range(24):
+        middle = (low + high) / 2
+        inside = all(0.0 <= channel <= 1.0 for channel in oklch(lightness, middle, tone))
+        low, high = (middle, high) if inside else (low, middle)
+
+    return low
 
 
 def fields(self: Module) -> tuple[list, list, list, list]:
@@ -175,7 +241,7 @@ def module_treescope(self: Module, path: str | None, subtree_renderer: Any) -> A
         children=lines,
         suffix=")",
         path=path,
-        background_color=f"oklch(0.8 0.12 {hue(type(self).__qualname__):.1f})",
+        background_color="oklch({:.3f} {:.3f} {:.1f})".format(*palette(type(self).__qualname__)),
         first_line_annotation=parts.comment_color(parts.text(f"  # {total}")) if total else None,
         expand_state=(
             parts.ExpandState.WEAKLY_EXPANDED
@@ -231,7 +297,10 @@ def highlight(text: str) -> str:
     """Color the numbers, strings and constants inside a value's repr."""
 
     def paint(match: re.Match) -> str:
+        # A nested repr arrives already colored, so its escape sequences pass through untouched
         token = match.group()
+        if token.startswith("\x1b"):
+            return token
         if token.startswith("'"):
             return color(token, STRING)
         return color(token, CONSTANT if token[0].isalpha() else NUMBER)
@@ -239,9 +308,9 @@ def highlight(text: str) -> str:
     return LITERALS.sub(paint, text)
 
 
-def oklch(tone: float, lightness: float = 0.8) -> str:
-    """Convert an `oklch(l 0.12 h)` palette color into 24-bit ANSI `r;g;b` channels."""
-    a, b = 0.12 * math.cos(math.radians(tone)), 0.12 * math.sin(math.radians(tone))
+def oklch(lightness: float, chroma: float, tone: float) -> list[float]:
+    """Convert an oklch color into linear sRGB, leaving the unit range where it exits the gamut."""
+    a, b = chroma * math.cos(math.radians(tone)), chroma * math.sin(math.radians(tone))
     oklab = (
         (0.3963377774, 0.2158037573),
         (-0.1055613458, -0.0638541728),
@@ -254,9 +323,13 @@ def oklch(tone: float, lightness: float = 0.8) -> str:
     )
 
     lms = [(lightness + ca * a + cb * b) ** 3 for ca, cb in oklab]
+    return [sum(weight * cone for weight, cone in zip(row, lms)) for row in srgb]
+
+
+def ansi(lightness: float, chroma: float, tone: float) -> str:
+    """Encode an oklch color as 24-bit ANSI `r;g;b` channels."""
     channels = []
-    for row in srgb:
-        linear = sum(weight * cone for weight, cone in zip(row, lms))
+    for linear in oklch(lightness, chroma, tone):
         gamma = 1.055 * max(linear, 0.0) ** (1 / 2.4) - 0.055
         encoded = gamma if linear > 0.0031308 else linear * 12.92
         channels.append(min(255, max(0, round(encoded * 255))))
@@ -354,7 +427,7 @@ def module_repr(self: Module, stats: dict[int, str] | None = None) -> str:
             lines += entry.split("\n")
 
     # Both brackets share one highlight, marking where the module's fields begin and end
-    chip = f"\x1b[48;2;{oklch(hue(type(self).__qualname__))}m\x1b[38;2;30;30;30m"
+    chip = f"\x1b[48;2;{ansi(*palette(type(self).__qualname__))}m\x1b[38;2;30;30;30m"
     head, close = color(f"{type(self).__name__}(", chip), color(")", chip)
     if not lines:
         return f"{head}{close}"
@@ -374,6 +447,6 @@ def optimizer_repr(self: "Optimizer") -> str:
 
     step = self.step.item() if hasattr(self.step, "item") else self.step
     selected = f", fields={list(self._fields)}" if self._fields is not None else ""
-    head = color("Optimizer", f"\x1b[48;2;{oklch(95, 0.88)}m\x1b[38;2;30;30;30m")
+    head = color("Optimizer", f"\x1b[48;2;{ansi(0.88, 0.12, 95)}m\x1b[38;2;30;30;30m")
 
     return f"{head}(step={step}, state={state}{selected})"
