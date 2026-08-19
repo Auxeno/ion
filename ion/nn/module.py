@@ -23,6 +23,8 @@ from .param import Param
 
 M = TypeVar("M")
 
+_scopes: dict[int, str] = {}  # layer labels installed by ion.cost, empty in normal use
+
 
 @jtu.register_pytree_node_class
 class _Static:
@@ -230,6 +232,21 @@ class Module:
             object.__setattr__(self, "_frozen", True)
 
         cls.__init__ = _constructor_with_freeze
+
+        # Only a class defining its own forward pass is wrapped, so scopes never nest twice
+        if "__call__" in cls.__dict__:
+            original_call = cls.__call__
+
+            @functools.wraps(original_call)
+            def _call_with_scope(self: Any, *args: Any, **kwargs: Any) -> Any:
+                """Run the forward pass, naming its operations while a cost analysis traces."""
+                label = _scopes.get(id(self))
+                if label is None:
+                    return original_call(self, *args, **kwargs)
+                with jax.named_scope(label):
+                    return original_call(self, *args, **kwargs)
+
+            cls.__call__ = _call_with_scope
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Allow attribute assignment only during initialization."""

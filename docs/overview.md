@@ -283,6 +283,29 @@ model.params  # Param leaves; array data and buffers become None
 
 Casting is how Ion does [mixed precision](workflows.md#mixed-precision); see [Freezing](workflows.md#freezing) for working with trainability.
 
+`ion.cost` goes further and measures a call rather than the model, reporting FLOPs, memory traffic and a roofline ceiling for every layer against the same tree the repr prints:
+
+```python
+import jax
+import jax.numpy as jnp
+
+import ion
+from ion import nn
+
+model = nn.MLP([4, 16, 3], key=jax.random.key(0))
+x, y = jnp.ones((8, 4)), jnp.ones((8, 3))
+
+
+def loss(model, x, y):
+    return ((model(x) - y) ** 2).mean()
+
+
+ion.cost(model, x)  # a forward pass
+ion.cost(jax.grad(loss), model, x, y)  # the backward pass too
+```
+
+See [Measuring cost](workflows.md#measuring-cost) for how to read the table.
+
 ## Benchmarks
 
 Ion has been benchmarked against Equinox, Flax NNX, and PyTorch across MLP, ResNet, and GPT workloads on an NVIDIA H100.

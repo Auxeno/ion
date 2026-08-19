@@ -77,7 +77,7 @@ for x, y in data:
 - [Overview](https://auxeno.github.io/ion/overview/) - the core abstractions and design
 - [Core](https://auxeno.github.io/ion/core/module/) - `Module`, `Param`, `Buffer`, and `Optimizer`
 - [NN guide](https://auxeno.github.io/ion/nn/guide/) and [GNN guide](https://auxeno.github.io/ion/gnn/guide/) - array formats and shared conventions
-- [Workflows](https://auxeno.github.io/ion/workflows/) - freezing, mixed precision, serialization, inspecting models
+- [Workflows](https://auxeno.github.io/ion/workflows/) - freezing, mixed precision, serialization, inspecting models, measuring cost
 - [Sharp edges](https://auxeno.github.io/ion/sharp-edges/) - known limitations and gotchas
 - [Examples](https://auxeno.github.io/ion/examples/) - end-to-end training scripts and notebooks
 - [Benchmarks](https://auxeno.github.io/ion/benchmarks/) - comparisons with Equinox, Flax NNX, and PyTorch

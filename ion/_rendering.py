@@ -5,6 +5,8 @@ Functions:
     fields      Split a module's fields into config, params, buffers and children.
     summary     Describe a module's parameter count and size.
     statistics  Describe every parameter's distribution in one device sync.
+    scaled      Format a quantity against a unit ladder.
+    cost_repr   Lay out a cost analysis as a per-layer table.
 
 Both layouts share `palette`, `fields` and `summary`, so the two cannot drift apart. Called
 lazily by each type's `__treescope_repr__` and `__repr__` hooks. Only the terminal colors
@@ -31,10 +33,15 @@ from .nn.module import Module
 from .nn.param import Param
 
 if TYPE_CHECKING:
+    from .cost import Cost
     from .optimizer import Optimizer
 
 BINS = 11
+WIDTH = 10  # cells in a share bar, so one cell is ten percent of the step
+BYTES = (" B", " KB", " MB", " GB", " TB")
+FLOPS = ("", "K", "M", "G", "T")
 BLOCKS = "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588"
+BARS = "\u258f\u258e\u258d\u258c\u258b\u258a\u2589\u2588"  # left eighths, continuing a bar
 COMMENT = "\x1b[38;2;166;178;197m"
 NUMBER = "\x1b[38;2;34;211;238m"
 STRING = "\x1b[38;2;31;206;156m"
@@ -450,3 +457,73 @@ def optimizer_repr(self: "Optimizer") -> str:
     head = color("Optimizer", f"\x1b[48;2;{ansi(0.88, 0.12, 95)}m\x1b[38;2;30;30;30m")
 
     return f"{head}(step={step}, state={state}{selected})"
+
+
+def scaled(value: float, base: float, units: tuple[str, ...]) -> str:
+    """Format a quantity against its unit ladder, as `4.25 KB` or `82.4G`."""
+    exponent = 0
+    while value >= base and exponent < len(units) - 1:
+        value, exponent = value / base, exponent + 1
+
+    return f"{value:.3g}{units[exponent]}"
+
+
+def cost_repr(self: "Cost") -> str:
+    """Render a `Cost` as a per-layer table, following the tree the module repr prints."""
+    head = (
+        f"{scaled(self.flops, 1e3, FLOPS)}FLOP"
+        f" \u00b7 {scaled(self.transferred, 1024, BYTES)} transferred"
+        f" \u00b7 {scaled(self.peak_memory, 1024, BYTES)} peak memory\n"
+        f"{self.params:,} params \u00b7 {self.ops:,} ops \u2192 {self.kernels:,} kernels"
+        f" \u00b7 balance {self.balance:.0f} FLOP/byte"
+    )
+    # A scan runs its body once in the jaxpr, so the count it was scaled by is spelled out
+    rows = [
+        ("  " * layer.depth + (f"{layer.label} " if layer.label else ""), layer,
+         f" loop x{layer.loop}" if layer.loop > 1 else "")
+        for layer in self.layers.values()
+    ]
+
+    # The name column is sized to its longest entry, so a shallow tree leaves no gutter
+    width = max(len("layer"), *(len(a) + len(x.name) + len(z) for a, x, z in rows)) + 2
+    columns = (
+        f"{'layer':<{width}}{'FLOPs':>7}  {'':<{WIDTH}}{'share':>7}{'ceiling':>9}"
+        f"{'memory':>10}{'transfer':>11}  dtype"
+    )
+
+    # Siblings tile their parent's bar, so each one starts where the previous ended
+    bars, filled = {}, {}
+    for path, layer in self.layers.items():
+        parent = path.rsplit(".", 1)[0] if "." in path else ""
+        whole = self.layers[parent].share if path else 1.0
+        within = layer.share / whole if whole else 0.0
+        bars[path] = (filled.get(parent, 0.0) if path else 0.0, within)
+        if path:
+            filled[parent] = bars[path][0] + within
+    lines = [color(head, COMMENT), "", color(columns, COMMENT)]
+
+    for (name, layer, suffix), (start, within) in zip(rows, bars.values()):
+        # The tree is drawn exactly as the module repr indents it, class names and all
+        chip = f"\x1b[48;2;{ansi(*palette(layer.name))}m\x1b[38;2;30;30;30m"
+        pad = " " * (width - len(name) - len(layer.name) - len(suffix))
+        title = f"{name}{color(layer.name, chip)}{color(suffix, COMMENT)}{pad}"
+
+        # Bars fade with depth, so a nested level never reads as louder than the one above it
+        offset = round(start * WIDTH)
+        cells = min(max((start + within) * WIDTH - offset, 0.0), WIDTH - offset)
+        bar = " " * offset + "\u2588" * int(cells)
+        if cells % 1:
+            bar += BARS[min(7, int(cells % 1 * 8))]
+        grey = f"\x1b[38;2;{ansi(max(0.92 - 0.13 * layer.depth, 0.40), 0.0, 0.0)}m"
+
+        flops = scaled(layer.flops, 1e3, FLOPS)
+        reachable = f"{layer.ceiling * 100:.0f}%" if layer.transferred else "-"
+        lines.append(
+            f"{title}{flops:>7}"
+            f"  {color(bar.ljust(WIDTH), grey)}{layer.share * 100:6.1f}%{reachable:>9}"
+            f"{scaled(layer.memory, 1024, BYTES):>10}"
+            f"{scaled(layer.transferred, 1024, BYTES):>11}  "
+            f"{color(layer.dtype or '---', SYMBOL)}"
+        )
+
+    return "\n".join(lines)

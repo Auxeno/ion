@@ -7,6 +7,7 @@ from . import gnn as gnn
 from . import nn as nn
 from . import tree as tree
 from .checkpoint import load, save
+from .cost import cost
 from .optimizer import Optimizer
 from .tree import astype, clone, freeze, is_buffer, is_param, is_trainable_param, unfreeze
 
@@ -115,6 +116,7 @@ __all__ = [
     "Optimizer",
     "astype",
     "clone",
+    "cost",
     "disable_treescope",
     "enable_treescope",
     "freeze",
