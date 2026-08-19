@@ -1,5 +1,7 @@
 import copy
 import dataclasses
+import re
+import sys
 from collections.abc import Callable
 from typing import NamedTuple
 
@@ -633,6 +635,54 @@ class TestRepr:
                 pass
 
         assert repr(Empty()) == "Empty()"
+
+    def test_groups_and_summary(self):
+        """repr groups fields under headings and annotates each module with its size."""
+        r = repr(nn.MLP([4, 16, 3], key=jax.random.key(0)))
+
+        assert "MLP(  # 131 params, 524 B" in r
+        assert "activation=relu, final_activation=None," in r
+        assert "# Modules:" in r
+        assert "# Parameters:" in r
+
+    def test_frozen_summary(self):
+        """Frozen params are counted in the summary and marked on the parameter."""
+        r = repr(nn.Linear(4, 16, key=jax.random.key(0)).freeze())
+
+        assert "80 frozen" in r
+        assert "w=Param(float32(4, 16), frozen)," in r
+
+    def test_plain_off_terminal(self):
+        """Output captured to a pipe or file carries no escape sequences."""
+        assert "\x1b" not in repr(nn.Linear(4, 16, key=jax.random.key(0)))
+
+    def test_color_on_terminal(self, monkeypatch):
+        """A color terminal highlights each class name with its Treescope hue."""
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+
+        assert "\x1b[48;2;" in repr(nn.Linear(4, 16, key=jax.random.key(0)))
+
+    def test_nesting_indents(self, monkeypatch):
+        """Fields indent one level per module, and the closing bracket returns to its parent."""
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+
+        plain = [
+            re.sub(r"\x1b\[[0-9;]*m", "", line)
+            for line in repr(nn.MLP([4, 16, 3], key=jax.random.key(0))).split("\n")
+        ]
+        assert plain[1] == "  activation=relu, final_activation=None,"
+        assert plain[5] == "    w=Param(float32(4, 16)),"
+        assert plain[7] == "  ),"
+        assert plain[-1] == ")"
+
+    def test_no_color_env_var(self, monkeypatch):
+        """NO_COLOR suppresses highlighting even on a terminal."""
+        monkeypatch.setenv("NO_COLOR", "1")
+        monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+
+        assert "\x1b" not in repr(nn.Linear(4, 16, key=jax.random.key(0)))
 
 
 class TestFreezeUnfreeze:
@@ -1508,6 +1558,55 @@ class TestModuleWrappingEdgeCases:
 
         reconstructed = jax.tree.unflatten(*reversed(jax.tree.flatten(m)))
         assert reconstructed.config["lr"] == 0.001
+
+
+class TestStatistics:
+    def test_describes_distribution(self):
+        """Each parameter gets a histogram and its moments."""
+        from ion._rendering import statistics
+
+        model = nn.Linear(64, 64, key=jax.random.key(0))
+        described = statistics(model)
+
+        assert any(block in described[id(model.w)] for block in "\u2581\u2588")
+        assert "\u03bc=" in described[id(model.w)] and "\u03c3=" in described[id(model.w)]
+
+    def test_constant_parameter(self):
+        """A parameter with no width places its mass in the middle bucket, not the first."""
+        from ion import _rendering
+        from ion._rendering import statistics
+
+        model = nn.Linear(64, 64, key=jax.random.key(0))
+
+        edge = "\u2581" * (_rendering.BINS // 2)
+        spike = f"{edge}\u2588{edge}"
+        assert statistics(model)[id(model.b)] == f"{spike}  \u03bc=0 \u03c3=0"
+
+    def test_low_precision_parameter(self):
+        """Reductions run in float32, which bfloat16 and float8 scalars cannot format."""
+        from ion._rendering import statistics
+
+        for dtype in (jnp.bfloat16, jnp.float16, jnp.float8_e4m3fn):
+            model = nn.Linear(8, 64, key=jax.random.key(0)).astype(dtype)
+
+            assert "\u03bc=" in statistics(model)[id(model.w)]
+
+    def test_annotations_share_a_column(self):
+        """Descriptions align down a group so distributions can be compared by eye."""
+        from ion._rendering import module_repr, statistics
+
+        model = nn.Linear(8, 64, key=jax.random.key(0))
+        lines = module_repr(model, statistics(model)).split("\n")[2:4]
+
+        columns = {line.index("\u03bc=") for line in lines}
+        assert len(columns) == 1
+
+    def test_repr_stays_free_of_statistics(self):
+        """Plain repr does no reductions, keeping logging and debuggers cheap."""
+        r = repr(nn.Linear(64, 64, key=jax.random.key(0)))
+
+        assert "\u03bc=" not in r
+        assert not any(block in r for block in "\u2588\u2587\u2586")
 
 
 class TestReprInsideTransformations:

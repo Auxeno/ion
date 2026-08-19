@@ -92,20 +92,23 @@ model = MLP(key=jax.random.key(0))
 Modules can contain other modules, so layers compose into one model tree. JAX arrays and parameters are dynamic leaves; Python values are compile-time constants, so changing one produces a new JIT specialization.
 
 ```text
-MLP(
-  layer_1=Linear(
+MLP(  # 131 params, 524 B
+  activation=relu, final_activation=None,
+  # Modules:
+  (0): Linear(  # 80 params, 320 B
+    # Parameters:
     w=Param(float32(4, 16)),
     b=Param(float32(16,)),
   ),
-  layer_2=Linear(
+  (1): Linear(  # 51 params, 204 B
+    # Parameters:
     w=Param(float32(16, 3)),
     b=Param(float32(3,)),
   ),
-  activation=relu,
 )
 ```
 
-In a terminal, a pretty printer gives the tree as text. In IPython/Jupyter environments, models render with [Treescope](https://github.com/google-deepmind/treescope).
+In a terminal, the same tree prints as text, colored per layer type. In IPython/Jupyter environments, models render interactively with [Treescope](https://github.com/google-deepmind/treescope).
 
 ## Neural network layers
 

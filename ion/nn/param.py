@@ -174,6 +174,6 @@ class Param(_ParamBase[T]):
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
         """Hook to render with Treescope."""
-        from .. import _treescope
+        from .. import _rendering
 
-        return _treescope.param(self, path, subtree_renderer)
+        return _rendering.param_treescope(self, path, subtree_renderer)

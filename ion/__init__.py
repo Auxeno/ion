@@ -49,6 +49,30 @@ def enable_treescope(everything: bool = False) -> None:
         pass
 
 
+def enable_statistics() -> None:
+    """Describe parameter distributions when a model is echoed at an interactive prompt.
+
+    >>> ion.enable_statistics()
+    """
+    try:
+        import IPython  # type: ignore[reportMissingImports]
+
+        ip = IPython.get_ipython()  # type: ignore[reportPrivateImportUsage]
+        if ip is None:
+            return
+
+        # Only the echo path pays for the reductions, leaving repr cheap for logging
+        def describe(model, printer, cycle):
+            from . import _rendering
+
+            printer.text(_rendering.module_repr(model, _rendering.statistics(model)))
+
+        text_fmt = ip.display_formatter.formatters["text/plain"]  # type: ignore[reportAttributeAccessIssue,reportOptionalMemberAccess]
+        text_fmt.for_type(nn.Module, describe)
+    except ImportError:
+        pass
+
+
 def disable_treescope() -> None:
     """Deactivate all Treescope rendering.
 
@@ -79,6 +103,7 @@ def disable_treescope() -> None:
 
 # Enable Treescope by default
 enable_treescope()
+enable_statistics()
 
 __version__ = version("ion-nn")
 

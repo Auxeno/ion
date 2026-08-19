@@ -195,14 +195,13 @@ class Optimizer:
         return obj
 
     def __repr__(self) -> str:
-        """Minimal textual pretty printing."""
-        step_val = self.step.item() if hasattr(self.step, "item") else self.step
-        num_leaves = len(jax.tree.leaves(self.state))
-        fields_str = f", fields={list(self._fields)}" if self._fields is not None else ""
-        return f"Optimizer(step={step_val}, state_leaves={num_leaves}{fields_str})"
+        """Hook to summarize the state and render for the terminal."""
+        from . import _rendering
+
+        return _rendering.optimizer_repr(self)
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
         """Hook to summarize Optimizers and add color with Treescope."""
-        from . import _treescope
+        from . import _rendering
 
-        return _treescope.optimizer(self, path, subtree_renderer)
+        return _rendering.optimizer_treescope(self, path, subtree_renderer)

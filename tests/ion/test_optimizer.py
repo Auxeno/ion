@@ -755,7 +755,7 @@ class TestOptimizerRepr:
         optimizer = ion.Optimizer(optax.adam(1e-3), model)
         r = repr(optimizer)
         assert "step=0" in r
-        assert "state_leaves=" in r
+        assert "leaves," in r
 
 
 class TestMixedPrecision:

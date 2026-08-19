@@ -250,43 +250,16 @@ class Module:
         return (getattr(self, f.name) for f in dataclasses.fields(self))  # type: ignore[arg-type]
 
     def __repr__(self) -> str:
-        """Minimal textual pretty printing for pytrees."""
+        """Hook to group fields and render for the terminal."""
+        from .. import _rendering
 
-        fields = tuple(
-            field
-            for field in dataclasses.fields(self)  # type: ignore[reportArgumentType]
-            if field.repr
-        )
-        if not fields:
-            return f"{type(self).__name__}()"
-
-        parts = [f"{type(self).__name__}("]
-        for field in fields:
-            value = getattr(self, field.name)
-            if isinstance(value, Param):
-                parts.append(f"  {field.name}={value!r},")
-            elif hasattr(value, "shape") and hasattr(value, "dtype"):
-                parts.append(f"  {field.name}={value.dtype.name}{value.shape},")
-            elif isinstance(value, (tuple, list)) and any(isinstance(x, Module) for x in value):
-                open_b, close_b = ("(", ")") if isinstance(value, tuple) else ("[", "]")
-                parts.append(f"  {field.name}={open_b}")
-                for item in value:
-                    item_repr = repr(item).replace("\n", "\n    ")
-                    parts.append(f"    {item_repr},")
-                parts.append(f"  {close_b},")
-            elif callable(value) and hasattr(value, "__name__"):
-                parts.append(f"  {field.name}={value.__name__},")
-            else:
-                val_str = repr(value).replace("\n", "\n  ")
-                parts.append(f"  {field.name}={val_str},")
-        parts.append(")")
-        return "\n".join(parts)
+        return _rendering.module_repr(self)
 
     def __treescope_repr__(self, path: str | None, subtree_renderer: Any) -> Any:
         """Hook to group fields and render with Treescope."""
-        from .. import _treescope
+        from .. import _rendering
 
-        return _treescope.module(self, path, subtree_renderer)
+        return _rendering.module_treescope(self, path, subtree_renderer)
 
     @property
     def at(self) -> _At[Self]:
