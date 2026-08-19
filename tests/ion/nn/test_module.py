@@ -665,25 +665,25 @@ class TestRepr:
 
     def test_colors_literals(self, monkeypatch):
         """Numbers, constants, dtypes and frozen markers each take their palette color."""
-        from ion._rendering import CONSTANT, FROZEN, NUMBER
+        from ion._rendering import _CONSTANT, _NUMBER, _SYMBOL
 
         monkeypatch.delenv("NO_COLOR", raising=False)
         monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
 
         r = repr(tree.freeze(nn.LayerNorm(64, eps=1e-05, use_bias=False)))
 
-        assert f"{NUMBER}1e-05" in r
-        assert f"{CONSTANT}None" in r
-        assert f"{FROZEN}, frozen" in r
+        assert f"{_NUMBER}1e-05" in r
+        assert f"{_CONSTANT}None" in r
+        assert f"{_SYMBOL}, frozen" in r
 
     def test_nested_color_survives_highlighting(self, monkeypatch):
         """A child's escape sequences pass through, so its digits are not recolored as literals."""
-        from ion._rendering import NUMBER, highlight
+        from ion._rendering import _NUMBER, highlight
 
         monkeypatch.delenv("NO_COLOR", raising=False)
         monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
 
-        nested = f"Param({NUMBER}64\x1b[0m)"
+        nested = f"Param({_NUMBER}64\x1b[0m)"
 
         assert highlight(f"child={nested}") == f"child={nested}"
 
@@ -1597,14 +1597,13 @@ class TestStatistics:
 
     def test_constant_parameter(self):
         """A parameter with no width places its mass in the middle bucket, not the first."""
-        from ion import _rendering
         from ion._rendering import statistics
 
         model = nn.Linear(64, 64, key=jax.random.key(0))
 
-        edge = "\u2581" * (_rendering.BINS // 2)
-        spike = f"{edge}\u2588{edge}"
-        assert statistics(model)[id(model.b)] == f"{spike}  \u03bc=0 \u03c3=0"
+        described = statistics(model)[id(model.b)]
+        edge = "\u2581" * (len(described.split("  ")[0]) // 2)
+        assert described == f"{edge}\u2588{edge}  \u03bc=0 \u03c3=0"
 
     def test_low_precision_parameter(self):
         """Reductions run in float32, which bfloat16 and float8 scalars cannot format."""
@@ -1647,32 +1646,43 @@ class TestStatistics:
 
 
 class TestPalette:
-    def test_mechanism_shares_a_hue(self):
-        """Layers sharing a mechanism sit in one family, so graph and dense convs look alike."""
-        from ion._rendering import SPREAD, palette
+    def test_mechanism_shares_a_band(self):
+        """Layers sharing a mechanism sit beside each other, so graph and dense convs look alike."""
+        from ion._rendering import palette
 
         conv, graph_conv = palette("Conv")[2], palette("GCNConv")[2]
         attention = palette("MultiHeadAttention")[2]
 
-        assert abs(conv - graph_conv) <= SPREAD[0]
-        assert abs(conv - attention) > SPREAD[0]
+        assert abs(conv - graph_conv) <= 16
+        assert abs(conv - attention) > 16
 
-    def test_every_layer_stays_in_gamut(self):
-        """Chroma follows the gamut, so no layer color is clipped on its way to the terminal."""
-        from ion._rendering import FAMILIES, oklch, palette
+    def test_every_layer_has_a_hue(self):
+        """Every layer is listed, so none falls back to the hash kept for classes outside Ion."""
+        from ion import gnn
+        from ion._rendering import _HUES
 
-        clipped = [name for name in FAMILIES if any(c < 0 or c > 1 for c in oklch(*palette(name)))]
+        exported = ((name, value) for m in (nn, gnn.layers) for name, value in vars(m).items())
+        classes = {name for name, value in exported if isinstance(value, type)}
 
-        assert clipped == []
+        assert classes - {"Module", "Param", "Buffer"} <= set(_HUES)
+
+    def test_every_color_stays_in_gamut(self):
+        """One lightness and chroma serves every hue, so no color is clipped on its way out."""
+        from ion._rendering import oklch, palette
+
+        lightness, chroma, _ = palette("Linear")
+        colors = [oklch(lightness, chroma, hue) for hue in range(360)]
+
+        assert [rgb for rgb in colors if any(c < 0 or c > 1 for c in rgb)] == []
 
     def test_unknown_class_is_stable(self):
-        """A class from outside Ion hashes onto the same arc, so its color never shifts."""
-        from ion._rendering import ARC, palette
+        """A class from outside Ion hashes onto the same circle, so its color never shifts."""
+        from ion._rendering import palette
 
         lightness, chroma, tone = palette("SomeUserBlock")
 
         assert palette("SomeUserBlock") == (lightness, chroma, tone)
-        assert ARC[0] <= tone <= ARC[0] + ARC[1]
+        assert 0 <= tone < 360
 
 
 class TestReprInsideTransformations:

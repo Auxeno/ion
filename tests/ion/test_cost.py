@@ -66,11 +66,13 @@ class TestMemory:
 
     def test_input_splits_data_and_parameters(self):
         """The common model call shows data followed by parameter storage."""
+        from ion._rendering import scaled
+
         model = nn.Linear(8, 4, key=jax.random.key(0))
         x = jnp.ones((2, 8))
         measured = ion.cost(model, x)
-        assert measured.input_components == (x.nbytes, measured.param_bytes)
-        assert sum(measured.input_components) == measured.input_bytes
+        assert measured.input_bytes == x.nbytes + measured.param_bytes
+        assert f"({scaled(x.nbytes)} + {scaled(measured.param_bytes)}) input" in repr(measured)
 
     def test_memory_grows_with_the_batch(self):
         """The compiler memory plan reflects larger call inputs and outputs."""
@@ -263,20 +265,20 @@ class TestReport:
 
     def test_repr_colors_shapes_and_ops_like_modules(self, monkeypatch):
         """Dtypes are blue, dimensions and op counts cyan, and delimiters stay plain."""
-        from ion._rendering import NUMBER, SYMBOL
+        from ion._rendering import _NUMBER, _SYMBOL
 
         monkeypatch.delenv("NO_COLOR", raising=False)
         monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
         measured = ion.cost(nn.Linear(8, 16, key=jax.random.key(0)), jnp.ones((4, 8)))
         text = repr(measured)
         shape = (
-            f"{SYMBOL}float32\x1b[0m("
-            f"{NUMBER}4\x1b[0m, {NUMBER}16\x1b[0m)"
+            f"{_SYMBOL}float32\x1b[0m("
+            f"{_NUMBER}4\x1b[0m, {_NUMBER}16\x1b[0m)"
         )
         op_width = max(len("ops"), len(f"{measured.ops:,}"))
 
         assert shape in text
-        assert f"{NUMBER}{measured.ops:>{op_width},}\x1b[0m  {shape}" in text
+        assert f"{_NUMBER}{measured.ops:>{op_width},}\x1b[0m  {shape}" in text
 
     def test_sibling_bars_do_not_share_a_character_cell(self, monkeypatch):
         """A sibling starts after the cell occupied by its predecessor's partial block."""
