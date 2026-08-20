@@ -14,8 +14,8 @@ import math
 
 import jax.numpy as jnp
 from jax.nn.initializers import Initializer, variance_scaling
-from jaxtyping import Array, Float, PRNGKeyArray
 
+from ...typing import Array, Float, PRNGKey
 from ..module import Module
 from ..param import Param
 
@@ -35,7 +35,7 @@ class LearnedPositionalEmbedding(Module):
         dim: int,
         *,
         w_init: Initializer = variance_scaling(1.0, "fan_in", "uniform", out_axis=0),
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         self.w = Param(w_init(shape=(max_len, dim), key=key))

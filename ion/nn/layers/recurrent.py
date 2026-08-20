@@ -19,8 +19,8 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 from jax.nn.initializers import Initializer, glorot_uniform, orthogonal, zeros
-from jaxtyping import Array, Float, PRNGKeyArray
 
+from ...typing import Array, Float, PRNGKey
 from ..module import Module
 from ..param import Param
 
@@ -45,7 +45,7 @@ class RNNCell(Module):
         w_i_init: Initializer = glorot_uniform(),
         w_h_init: Initializer = orthogonal(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         key_wi, key_wh, key_b = jax.random.split(key, 3)
@@ -88,7 +88,7 @@ class RNN(Module):
         w_i_init: Initializer = glorot_uniform(),
         w_h_init: Initializer = orthogonal(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         self.cell = RNNCell(
@@ -146,7 +146,7 @@ class LSTMCell(Module):
         w_i_init: Initializer = glorot_uniform(),
         w_h_init: Initializer = orthogonal(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         gate_dim = 4 * hidden_dim
@@ -210,7 +210,7 @@ class LSTM(Module):
         w_i_init: Initializer = glorot_uniform(),
         w_h_init: Initializer = orthogonal(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         self.cell = LSTMCell(
@@ -270,7 +270,7 @@ class GRUCell(Module):
         w_i_init: Initializer = glorot_uniform(),
         w_h_init: Initializer = orthogonal(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         gate_dim = 3 * hidden_dim
@@ -329,7 +329,7 @@ class GRU(Module):
         w_i_init: Initializer = glorot_uniform(),
         w_h_init: Initializer = orthogonal(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         self.cell = GRUCell(

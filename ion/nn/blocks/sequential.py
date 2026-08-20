@@ -13,8 +13,8 @@ from collections.abc import Callable, Iterator
 from typing import Any
 
 import jax
-from jaxtyping import PRNGKeyArray
 
+from ...typing import PRNGKey
 from ..module import Module
 
 
@@ -36,7 +36,7 @@ class Sequential(Module):
         x: Any,
         *,
         training: bool | None = None,
-        key: PRNGKeyArray | None = None,
+        key: PRNGKey | None = None,
     ) -> Any:
 
         keys = [None] * len(self.layers) if key is None else jax.random.split(key, len(self.layers))

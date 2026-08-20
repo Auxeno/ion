@@ -9,8 +9,8 @@ Uses inverse dropout: outputs are scaled by 1/(1-p) during training.
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, PRNGKeyArray
 
+from ...typing import Array, Float, PRNGKey
 from ..module import Module
 
 
@@ -36,7 +36,7 @@ class Dropout(Module):
         x: Float[Array, "..."],
         *,
         training: bool,
-        key: PRNGKeyArray | None = None,
+        key: PRNGKey | None = None,
     ) -> Float[Array, "..."]:
 
         if not training or self.p == 0.0:
@@ -78,7 +78,7 @@ class DropPath(Module):
         x: Float[Array, "b ..."],
         *,
         training: bool,
-        key: PRNGKeyArray | None = None,
+        key: PRNGKey | None = None,
     ) -> Float[Array, "b ..."]:
 
         if not training or self.p == 0.0:

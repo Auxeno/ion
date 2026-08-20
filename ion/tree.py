@@ -18,10 +18,10 @@ from typing import Any
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import PyTree
 
 from .nn.buffer import Buffer
 from .nn.param import Param
+from .typing import PyTree
 
 
 def is_param(x: Any) -> bool:

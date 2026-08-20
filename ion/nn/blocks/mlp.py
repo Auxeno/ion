@@ -11,8 +11,8 @@ from collections.abc import Callable, Sequence
 
 import jax
 from jax.nn.initializers import Initializer, he_uniform, zeros
-from jaxtyping import Array, Float, PRNGKeyArray
 
+from ...typing import Array, Float, PRNGKey
 from ..layers.linear import Linear
 from ..module import Module
 
@@ -37,7 +37,7 @@ class MLP(Module):
         use_bias: bool = True,
         w_init: Initializer = he_uniform(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         if len(dims) < 2:

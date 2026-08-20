@@ -11,8 +11,8 @@ import inspect
 from collections.abc import Callable
 from typing import Any
 
-from jaxtyping import Array, Float, PRNGKeyArray
 
+from ...typing import Array, Float, PRNGKey
 from ..module import Module
 
 
@@ -34,7 +34,7 @@ class Residual(Module):
         x: Float[Array, "..."],
         *args: Any,
         training: bool | None = None,
-        key: PRNGKeyArray | None = None,
+        key: PRNGKey | None = None,
         **kwargs: Any,
     ) -> Float[Array, "..."]:
 

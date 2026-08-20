@@ -1,8 +1,8 @@
 """Fixed graph-level pooling operations."""
 
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Int
 
+from ...typing import Array, Float, Int
 from .segment import segment_max, segment_mean, segment_min, segment_sum
 
 __all__ = ["max_pool", "mean_pool", "min_pool", "sum_pool"]

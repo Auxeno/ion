@@ -12,9 +12,9 @@ normalization, or residual connection.
 from collections.abc import Callable
 
 import jax.numpy as jnp
-from jaxtyping import Array, Bool, Float, Int
 
 from ...nn.module import Module
+from ...typing import Array, Bool, Float, Int
 from ..ops import segment_sum
 
 

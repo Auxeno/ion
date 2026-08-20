@@ -18,10 +18,10 @@ import math
 import jax
 import jax.numpy as jnp
 from jax.nn.initializers import Initializer, glorot_uniform, zeros
-from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 
 from ...nn.module import Module
 from ...nn.param import Param
+from ...typing import Array, Bool, Float, Int, PRNGKey
 from ..ops import degree, segment_softmax, segment_sum
 
 
@@ -49,7 +49,7 @@ class RGCNConv(Module):
         use_bias: bool = True,
         w_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         neigh_shape = (num_bases or num_edge_types, in_dim, out_dim)
@@ -132,7 +132,7 @@ class HGTConv(Module):
         use_bias: bool = True,
         w_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         head_dim = out_dim // num_heads

@@ -4,6 +4,7 @@
 
 - **`nn.DropPath`.** Stochastic depth as its own layer. It drops a residual branch for whole samples and scales the survivors by `1 / (1 - p)`, sharing one decision across every dimension after the batch dimension, whatever the input rank.
 - **Breaking: `Dropout.broadcast_dims` removed.** Shared masks existed almost entirely to express stochastic depth, which `DropPath` now does.
+- **Native typing module.** Array, dtype, `PRNGKey`, and `PyTree` annotations now come from `ion.typing`, removing the `jaxtyping` dependency.
 - **Improved Treescope colors**. Color modules by import order.
 - **Parameter statistics in every model repr.** Printing or evaluating a model now describes each parameter's distribution and moments in any Python terminal, with no IPython formatter integration. Set `ion.statistics = False` to render structure alone.
 - **`model.cost`.** Traces and compiles a call without executing it, then reports its FLOPs, compiler memory, graph operations, and per-layer outputs in a table that mirrors the model repr. `ion.cost` does the same for any callable taking a model, so a loss, a gradient evaluation, or a whole training step is analysed the same way. Scan bodies are scaled by their static length, so recurrent layers report the full figure rather than the flat count XLA's own `cost_analysis` gives.

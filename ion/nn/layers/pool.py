@@ -13,8 +13,8 @@ from typing import Literal
 
 import jax.numpy as jnp
 from jax import lax
-from jaxtyping import Array, Float
 
+from ...typing import Array, Float
 from ..module import Module
 
 

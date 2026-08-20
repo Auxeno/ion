@@ -8,10 +8,10 @@ Statistics are computed independently over the nodes of each graph.
 
 import jax.numpy as jnp
 from jax import lax
-from jaxtyping import Array, Float, Int
 
 from ...nn.module import Module
 from ...nn.param import Param
+from ...typing import Array, Float, Int
 from ..ops import segment_mean
 
 

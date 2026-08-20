@@ -13,8 +13,8 @@ Affine scales initialize to ones and biases to zeros. Feature dimensions are alw
 import jax
 import jax.numpy as jnp
 from jax import lax
-from jaxtyping import Array, Float, PRNGKeyArray
 
+from ...typing import Array, Float, PRNGKey
 from ..buffer import Buffer
 from ..module import Module
 from ..param import Param
@@ -235,7 +235,7 @@ class SpectralNorm(Module):
         parameter: str = "w",
         power_iterations: int = 1,
         eps: float = 1e-12,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         param = getattr(module, parameter)

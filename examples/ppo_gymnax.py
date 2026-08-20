@@ -8,11 +8,11 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 from tqdm import tqdm
 
 import ion
 from ion import nn
+from ion.typing import Array, Bool, Float, Int, PRNGKey
 
 
 class ActorCritic(nn.Module):
@@ -21,7 +21,7 @@ class ActorCritic(nn.Module):
     actor: nn.MLP
     critic: nn.MLP
 
-    def __init__(self, obs_dim: int, action_dim: int, *, key: PRNGKeyArray) -> None:
+    def __init__(self, obs_dim: int, action_dim: int, *, key: PRNGKey) -> None:
         key_a, key_c = jax.random.split(key)
         self.actor = nn.MLP([obs_dim, 64, 64, action_dim], activation=jax.nn.tanh, key=key_a)
         self.critic = nn.MLP([obs_dim, 64, 64, 1], activation=jax.nn.tanh, key=key_c)
@@ -30,7 +30,7 @@ class ActorCritic(nn.Module):
         self,
         observations: Float[Array, "... d"],
         *,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> Int[Array, "..."]:
         """Sample actions from the policy."""
         logits = self.actor(observations)
@@ -44,7 +44,7 @@ class ActorCritic(nn.Module):
         self,
         observations: Float[Array, "... d"],
         *,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> tuple[Int[Array, "..."], Float[Array, "..."], Float[Array, "..."]]:
         """Sample action, compute its log-prob and value estimate."""
         logits = self.actor(observations)
@@ -79,7 +79,7 @@ class Transition(NamedTuple):
     values: Float[Array, "..."]
 
 
-RolloutCarry = tuple[PRNGKeyArray, gymnax.EnvState, Float[Array, "n d"]]
+RolloutCarry = tuple[PRNGKey, gymnax.EnvState, Float[Array, "n d"]]
 
 
 @jax.jit
@@ -179,7 +179,7 @@ def learn(
     optimizer: ion.Optimizer,
     batch: Transition,
     *,
-    key: PRNGKeyArray,
+    key: PRNGKey,
 ) -> tuple[ActorCritic, ion.Optimizer]:
     """Compute GAE advantages then scan over minibatch PPO updates."""
 

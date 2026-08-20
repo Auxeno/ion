@@ -17,7 +17,8 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
-from jaxtyping import Array
+
+from ..typing import Array
 
 T = TypeVar("T", bound=Array)
 

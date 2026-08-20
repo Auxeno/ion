@@ -2,12 +2,12 @@ Apply the wrapped module with its normalized parameter.
 
 Parameters
 ----------
-x : Float[Array, "..."]
+x : jax.Array["...", float]
     Input to the wrapped module.
 training : bool
     Whether to update the power-iteration vectors.
 
 Returns
 -------
-Float[Array, "..."]
+jax.Array["...", float]
     Wrapped module output.

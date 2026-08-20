@@ -7,11 +7,11 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-from jaxtyping import Array, Float, Int, UInt8
 from tqdm import tqdm
 
 import ion
 from ion import nn
+from ion.typing import Array, Float, Int, UInt8
 
 
 def load_mnist() -> tuple[

@@ -15,10 +15,10 @@ import math
 import jax
 import jax.numpy as jnp
 from jax.nn.initializers import Initializer, glorot_uniform, zeros
-from jaxtyping import Array, Float, Int, PRNGKeyArray
 
 from ...nn.module import Module
 from ...nn.param import Param
+from ...typing import Array, Float, Int, PRNGKey
 from ..ops import segment_softmax, segment_sum
 
 
@@ -85,7 +85,7 @@ class MultiHeadAttentionPool(Module):
         w_init: Initializer = glorot_uniform(),
         seed_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         if out_dim % num_heads != 0:

@@ -20,8 +20,8 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 from jax.nn.initializers import Initializer, glorot_uniform, zeros
-from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
+from ...typing import Array, Complex, Float, PRNGKey
 from ..module import Module
 from ..param import Param
 
@@ -55,7 +55,7 @@ class S4DCell(Module):
         dt_max: float = 0.1,
         w_init: Initializer = glorot_uniform(),
         d_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         if state_dim < 2 or state_dim % 2 != 0:
@@ -125,7 +125,7 @@ class S4D(Module):
         dt_max: float = 0.1,
         w_init: Initializer = glorot_uniform(),
         d_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         self.cell = S4DCell(
@@ -181,7 +181,7 @@ class S5Cell(Module):
         dt_max: float = 0.1,
         w_init: Initializer = glorot_uniform(),
         d_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         if state_dim < 2 or state_dim % 2 != 0:
@@ -252,7 +252,7 @@ class S5(Module):
         dt_max: float = 0.1,
         w_init: Initializer = glorot_uniform(),
         d_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         self.cell = S5Cell(

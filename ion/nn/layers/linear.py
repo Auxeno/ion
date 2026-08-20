@@ -11,8 +11,8 @@ from typing import Any
 
 import jax
 from jax.nn.initializers import Initializer, glorot_uniform, zeros
-from jaxtyping import Array, Float, PRNGKeyArray
 
+from ...typing import Array, Float, PRNGKey
 from ..module import Module
 from ..param import Param
 
@@ -35,7 +35,7 @@ class Linear(Module):
         use_bias: bool = True,
         w_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         key_w, key_b = jax.random.split(key)

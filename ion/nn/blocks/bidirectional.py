@@ -11,8 +11,8 @@ default mode and preserves the directional output dimension.
 from typing import Literal
 
 import jax.numpy as jnp
-from jaxtyping import Array, Float, PyTree
 
+from ...typing import Array, Float, PyTree
 from ..module import Module
 
 

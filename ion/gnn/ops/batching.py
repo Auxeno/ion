@@ -4,7 +4,8 @@ from collections.abc import Sequence
 
 import jax.numpy as jnp
 import numpy as np
-from jaxtyping import Array, Float, Int
+
+from ...typing import Array, Float, Int
 
 __all__ = ["batch_graphs", "pad_graphs", "unbatch_graphs"]
 

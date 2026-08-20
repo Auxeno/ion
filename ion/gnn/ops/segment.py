@@ -18,7 +18,8 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 from jax.ops import segment_max, segment_min, segment_prod
-from jaxtyping import Array, Float, Int
+
+from ...typing import Array, Float, Int
 
 __all__ = [
     "segment_max",

@@ -4,7 +4,8 @@ from typing import Literal
 
 import jax.numpy as jnp
 import numpy as np
-from jaxtyping import Array, Float, Int
+
+from ...typing import Array, Float, Int
 
 __all__ = [
     "add_self_loops",

@@ -14,10 +14,10 @@ from collections.abc import Callable
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Bool, Float, Int
 
 from ...nn.module import Module
 from ...nn.param import Param
+from ...typing import Array, Bool, Float, Int
 from ..ops import segment_sum
 
 

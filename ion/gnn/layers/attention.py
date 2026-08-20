@@ -18,10 +18,10 @@ import math
 import jax
 import jax.numpy as jnp
 from jax.nn.initializers import Initializer, glorot_uniform, zeros
-from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 
 from ...nn.module import Module
 from ...nn.param import Param
+from ...typing import Array, Bool, Float, Int, PRNGKey
 from ..ops import segment_softmax, segment_sum
 
 
@@ -56,7 +56,7 @@ class GATConv(Module):
         w_init: Initializer = glorot_uniform(),
         att_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         in_src, in_dst = in_dim if isinstance(in_dim, tuple) else (in_dim, in_dim)
@@ -173,7 +173,7 @@ class GATv2Conv(Module):
         w_init: Initializer = glorot_uniform(),
         att_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         in_src, in_dst = in_dim if isinstance(in_dim, tuple) else (in_dim, in_dim)
@@ -280,7 +280,7 @@ class TransformerConv(Module):
         use_bias: bool = True,
         w_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         in_src, in_dst = in_dim if isinstance(in_dim, tuple) else (in_dim, in_dim)

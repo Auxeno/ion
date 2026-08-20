@@ -6,6 +6,7 @@ from . import checkpoint as checkpoint
 from . import gnn as gnn
 from . import nn as nn
 from . import tree as tree
+from . import typing as typing
 from .checkpoint import load, save
 from .cost import cost
 from .optimizer import Optimizer
@@ -21,6 +22,7 @@ __all__ = [
     "gnn",
     "nn",
     "tree",
+    "typing",
     "Optimizer",
     "astype",
     "clone",

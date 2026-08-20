@@ -2,9 +2,9 @@
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, PRNGKeyArray
 
 import ion.nn as nn
+from ion.typing import Array, Float, PRNGKey
 
 from ...configs import ModelConfig
 
@@ -55,7 +55,7 @@ class ResNet(nn.Module):
     blocks: tuple[ResBlock, ...]
     head: nn.Linear
 
-    def __init__(self, config: ModelConfig, *, key: PRNGKeyArray) -> None:
+    def __init__(self, config: ModelConfig, *, key: PRNGKey) -> None:
         num_blocks = sum(config.block_depths)
         keys = iter(jax.random.split(key, num_blocks + 2))
         width = config.resnet_width
@@ -81,6 +81,6 @@ class ResNet(nn.Module):
         return self.head(jnp.mean(x, axis=(1, 2)))
 
 
-def create_model(config: ModelConfig, *, key: PRNGKeyArray) -> ResNet:
+def create_model(config: ModelConfig, *, key: PRNGKey) -> ResNet:
     """Create the benchmark model."""
     return ResNet(config, key=key)

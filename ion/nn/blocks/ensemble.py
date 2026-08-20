@@ -13,8 +13,8 @@ from typing import Any, Literal
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import PRNGKeyArray
 
+from ...typing import PRNGKey
 from ..module import Module
 
 
@@ -31,11 +31,11 @@ class Ensemble(Module):
 
     def __init__(
         self,
-        factory: Callable[[PRNGKeyArray], Module],
+        factory: Callable[[PRNGKey], Module],
         size: int,
         *,
         reduction: Literal["mean", "sum"] | None = None,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         if size < 1:
@@ -56,7 +56,7 @@ class Ensemble(Module):
         x: Any,
         *args: Any,
         training: bool | None = None,
-        key: PRNGKeyArray | None = None,
+        key: PRNGKey | None = None,
         **kwargs: Any,
     ) -> Any:
 

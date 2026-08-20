@@ -16,11 +16,11 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-from jaxtyping import Array, Bool, Float, Int
 from tqdm import tqdm
 
 import ion
 from ion import gnn, nn
+from ion.typing import Array, Bool, Float, Int
 
 
 def load_cora() -> tuple[

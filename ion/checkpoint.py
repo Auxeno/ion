@@ -23,11 +23,11 @@ import jax
 import jax.numpy as jnp
 import ml_dtypes
 import numpy as np
-from jaxtyping import PyTree
 
 from .nn.buffer import Buffer
 from .nn.param import Param
 from .tree import _is_param_or_buffer
+from .typing import PyTree
 
 _FORMAT_VERSION = 2
 _MAX_HEADER_BYTES = 100_000_000

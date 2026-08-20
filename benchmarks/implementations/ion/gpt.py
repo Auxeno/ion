@@ -3,9 +3,9 @@
 from functools import partial
 
 import jax
-from jaxtyping import Array, Float, Int, PRNGKeyArray
 
 import ion.nn as nn
+from ion.typing import Array, Float, Int, PRNGKey
 
 from ...configs import ModelConfig
 
@@ -19,7 +19,7 @@ class TransformerBlock(nn.Module):
     mlp_in: nn.Linear
     mlp_out: nn.Linear
 
-    def __init__(self, dim: int, num_heads: int, implementation: str, *, key: PRNGKeyArray) -> None:
+    def __init__(self, dim: int, num_heads: int, implementation: str, *, key: PRNGKey) -> None:
         key_attention, key_in, key_out = jax.random.split(key, 3)
         self.attention = nn.MultiHeadAttention(
             dim,
@@ -46,7 +46,7 @@ class GPT(nn.Module):
     blocks: tuple[TransformerBlock, ...]
     norm: nn.LayerNorm
 
-    def __init__(self, config: ModelConfig, *, key: PRNGKeyArray) -> None:
+    def __init__(self, config: ModelConfig, *, key: PRNGKey) -> None:
         keys = jax.random.split(key, config.depth + 1)
         self.embedding = nn.Embedding(config.vocab_size, config.width, key=keys[0])
         self.position = nn.SinusoidalPositionalEmbedding()
@@ -66,6 +66,6 @@ class GPT(nn.Module):
         return self.norm(x) @ self.embedding.w.T
 
 
-def create_model(config: ModelConfig, *, key: PRNGKeyArray) -> GPT:
+def create_model(config: ModelConfig, *, key: PRNGKey) -> GPT:
     """Create the benchmark model."""
     return GPT(config, key=key)

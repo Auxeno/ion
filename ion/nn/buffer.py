@@ -14,7 +14,8 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 from jax.core import Tracer
-from jaxtyping import Array
+
+from ..typing import Array
 
 T = TypeVar("T", bound=Array)
 

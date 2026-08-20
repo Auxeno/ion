@@ -18,10 +18,10 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 from jax.nn.initializers import Initializer, glorot_uniform, zeros
-from jaxtyping import Array, Float, Int, PRNGKeyArray
 
 from ...nn.module import Module
 from ...nn.param import Param
+from ...typing import Array, Float, Int, PRNGKey
 from ..ops import degree, segment_max, segment_mean, segment_sum
 
 
@@ -43,7 +43,7 @@ class GCNConv(Module):
         use_bias: bool = True,
         w_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         key_w, key_b = jax.random.split(key)
@@ -99,7 +99,7 @@ class GraphConv(Module):
         use_bias: bool = True,
         w_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         in_src, in_dst = in_dim if isinstance(in_dim, tuple) else (in_dim, in_dim)
@@ -161,7 +161,7 @@ class SAGEConv(Module):
         use_bias: bool = True,
         w_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         in_src, in_dst = in_dim if isinstance(in_dim, tuple) else (in_dim, in_dim)

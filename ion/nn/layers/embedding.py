@@ -7,8 +7,8 @@ Fan-in variance scaling weight init (std 1/sqrt(dim)), independent of vocab size
 """
 
 from jax.nn.initializers import Initializer, variance_scaling
-from jaxtyping import Array, Float, Int, PRNGKeyArray
 
+from ...typing import Array, Float, Int, PRNGKey
 from ..module import Module
 from ..param import Param
 
@@ -28,7 +28,7 @@ class Embedding(Module):
         dim: int,
         *,
         w_init: Initializer = variance_scaling(1.0, "fan_in", "uniform", out_axis=0),
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         self.w = Param(w_init(shape=(num_embeddings, dim), key=key))

@@ -16,9 +16,9 @@ from typing import TYPE_CHECKING, Any, Generic, Self, TypeVar
 import jax
 import jax.tree_util as jtu
 import numpy as np
-from jaxtyping import PyTree
 
 from .. import tree
+from ..typing import PyTree
 from .buffer import Buffer
 from .param import Param
 

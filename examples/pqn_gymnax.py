@@ -8,11 +8,11 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 from tqdm import tqdm
 
 import ion
 from ion import nn
+from ion.typing import Array, Bool, Float, Int, PRNGKey
 
 
 class QNetwork(nn.Module):
@@ -28,7 +28,7 @@ class QNetwork(nn.Module):
         hidden_dim: int,
         num_hidden_layers: int,
         *,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
         keys = jax.random.split(key, num_hidden_layers + 1)
 
@@ -62,7 +62,7 @@ class QNetwork(nn.Module):
         observations: Float[Array, "... d"],
         epsilon: Float[Array, ""],
         *,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> tuple[Int[Array, "..."], Float[Array, "... a"]]:
         """Epsilon-greedy action selection with Q-values."""
         key_random, key_choice = jax.random.split(key)
@@ -89,7 +89,7 @@ class Transition(NamedTuple):
     q_values: Float[Array, "... a"]
 
 
-RolloutCarry = tuple[PRNGKeyArray, gymnax.EnvState, Float[Array, "n d"]]
+RolloutCarry = tuple[PRNGKey, gymnax.EnvState, Float[Array, "n d"]]
 
 
 @jax.jit
@@ -174,7 +174,7 @@ def learn(
     optimizer: ion.Optimizer,
     batch: Transition,
     *,
-    key: PRNGKeyArray,
+    key: PRNGKey,
 ) -> tuple[QNetwork, ion.Optimizer]:
     """Compute TD(lambda) targets then scan over minibatch updates."""
 

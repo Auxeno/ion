@@ -15,8 +15,8 @@ from collections.abc import Callable
 import jax
 import jax.numpy as jnp
 from jax.nn.initializers import Initializer, glorot_uniform, zeros
-from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
+from ...typing import Array, Bool, Float, PRNGKey
 from ..module import Module
 from ..param import Param
 
@@ -54,7 +54,7 @@ class MultiHeadAttention(Module):
         w_init: Initializer = glorot_uniform(),
         b_init: Initializer = zeros,
         attention_fn: Callable[..., Array] = jax.nn.dot_product_attention,
-        key: PRNGKeyArray,
+        key: PRNGKey,
     ) -> None:
 
         num_kv_heads = num_heads if num_kv_heads is None else num_kv_heads

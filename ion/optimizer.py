@@ -12,11 +12,11 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import optax
-from jaxtyping import PyTree
 
 from .nn.buffer import Buffer
 from .nn.param import Param
 from .tree import is_buffer, is_param
+from .typing import PyTree
 
 
 def _without_buffers(pytree: PyTree) -> PyTree:
