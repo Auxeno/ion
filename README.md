@@ -79,7 +79,7 @@ for _ in range(500):
 model
 ```
 
-![](https://raw.githubusercontent.com/auxeno/ion/main/assets/repr.svg)
+![](https://raw.githubusercontent.com/auxeno/ion/main/assets/repr.png)
 
 ## Documentation
 
