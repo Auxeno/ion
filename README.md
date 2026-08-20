@@ -79,7 +79,7 @@ for _ in range(500):
 model
 ```
 
-<img src="assets/repr.svg" alt="Model repr" width="535">
+<img src="https://raw.githubusercontent.com/auxeno/ion/main/assets/repr.svg" alt="Model repr" width="535">
 
 ## Documentation
 
