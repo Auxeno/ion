@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.18.1
+
+- **Tweaks to `__repr__`**: Tweaks to format and colour of `__repr__` for `Module` and `Cost`. Documentation and examples updated to match.
+
 ## 0.18.0
 
 - **`nn.DropPath`.** Stochastic depth as its own layer. It drops a residual branch for whole samples and scales the survivors by `1 / (1 - p)`, sharing one decision across every dimension after the batch dimension, whatever the input rank.
