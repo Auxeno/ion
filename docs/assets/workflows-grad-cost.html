@@ -4,9 +4,9 @@
 <span style="color:rgb(166,178,197)">64.5 MB total memory = (3 MB + 6.76 MB) input + 48 MB intermediate + 6.76 MB output</span>
 
 <span style="color:rgb(166,178,197)">layer                             FLOPs              share  ops  output</span>
-<span style="color:rgb(30,30,30);background-color:rgb(150,182,254)">TransformerBlock</span>                  11.6G  <span style="color:rgb(217,229,249)">██████████</span> 100.0%  215  ---
-  attention <span style="color:rgb(30,30,30);background-color:rgb(246,154,154)">MultiHeadAttention</span>        0  <span style="color:rgb(176,187,206)">          </span>   0.0%    0  ---
-  attention_norm <span style="color:rgb(30,30,30);background-color:rgb(79,205,205)">LayerNorm</span>            0  <span style="color:rgb(176,187,206)">          </span>   0.0%    0  ---
-  mlp_norm <span style="color:rgb(30,30,30);background-color:rgb(79,205,205)">LayerNorm</span>                  0  <span style="color:rgb(176,187,206)">          </span>   0.0%    0  ---
-  mlp_in <span style="color:rgb(30,30,30);background-color:rgb(91,199,234)">Linear</span>                       0  <span style="color:rgb(176,187,206)">          </span>   0.0%    0  ---
-  mlp_out <span style="color:rgb(30,30,30);background-color:rgb(91,199,234)">Linear</span>                      0  <span style="color:rgb(176,187,206)">          </span>   0.0%    0  ---</pre>
+<span style="color:rgb(30,30,30);background-color:rgb(150,182,254)">TransformerBlock</span>                  11.6G  <span style="color:rgb(217,229,249)">██████████</span> 100.0%  215  <span style="color:rgb(71,138,245)">float32</span>(8, 128, 384)
+  attention <span style="color:rgb(30,30,30);background-color:rgb(246,154,154)">MultiHeadAttention</span>    4.25G  <span style="color:rgb(176,187,206)">███▊      </span>  36.8%   87  <span style="color:rgb(71,138,245)">float32</span>(8, 128, 384)
+  attention_norm <span style="color:rgb(30,30,30);background-color:rgb(79,205,205)">LayerNorm</span>        2.76M  <span style="color:rgb(176,187,206)">          </span>   0.0%   23  <span style="color:rgb(71,138,245)">float32</span>(8, 128, 384)
+  mlp_norm <span style="color:rgb(30,30,30);background-color:rgb(79,205,205)">LayerNorm</span>               7.5M  <span style="color:rgb(176,187,206)">          </span>   0.1%   49  <span style="color:rgb(71,138,245)">float32</span>(8, 128, 384)
+  mlp_in <span style="color:rgb(30,30,30);background-color:rgb(91,199,234)">Linear</span>                   3.62G  <span style="color:rgb(176,187,206)">    ██▉   </span>  31.4%    4  <span style="color:rgb(71,138,245)">float32</span>(8, 128, 1536)
+  mlp_out <span style="color:rgb(30,30,30);background-color:rgb(91,199,234)">Linear</span>                  3.62G  <span style="color:rgb(176,187,206)">       ███</span>  31.4%    4  <span style="color:rgb(71,138,245)">float32</span>(8, 128, 384)</pre>

@@ -157,10 +157,12 @@ def _register_module_as_pytree(cls: type) -> Any:
             children.append((jtu.GetAttrKey(name), value))
 
         static_values = tuple(getattr(obj, name) for name in static_names)
-        return children, (child_info, static_names, static_values)
+        context = _cost_context.get()
+        scope = context.scopes.get(id(obj)) if context is not None else None
+        return children, (child_info, static_names, static_values, scope)
 
     def unflatten(aux: tuple, children: Iterable[Any]) -> Any:
-        child_info, static_names, static_values = aux
+        child_info, static_names, static_values, scope = aux
         new_instance = object.__new__(cls)
 
         # Restore dynamic children, unwrapping _Static in mixed containers
@@ -179,6 +181,9 @@ def _register_module_as_pytree(cls: type) -> Any:
 
         object.__setattr__(new_instance, "_flatten_info", (child_info, static_names))
         object.__setattr__(new_instance, "_frozen", True)
+        context = _cost_context.get()
+        if context is not None and scope is not None:
+            context.scopes[id(new_instance)] = scope
         return new_instance
 
     jtu.register_pytree_with_keys(cls, flatten_with_keys, unflatten)

@@ -97,12 +97,7 @@ Evaluating a model shows its structure, parameter counts, shapes, distributions,
 
 --8<-- "docs/assets/overview-model.html"
 
-The same model can describe the arithmetic and memory required by a representative call. `cost` traces and compiles the call without executing it, then attributes the work to each layer:
-
-```python
-x = jnp.ones((32, 4))
-model.cost(x)
-```
+The same model can describe the arithmetic and memory required by a representative call. `model.cost(jnp.ones((32, 4)))` traces and compiles the call without executing it, then attributes the work to each layer:
 
 --8<-- "docs/assets/overview-cost.html"
 

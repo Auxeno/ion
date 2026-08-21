@@ -192,13 +192,17 @@ class TestTargets:
         measured = ion.cost(lambda x, model: model(x), jnp.ones((2, 8)), model=model)
         assert measured.layers[""].output.shape == (2, 4)
 
-    def test_gradient_costs_more_than_forward(self):
-        """Gradient evaluation includes reverse-mode arithmetic."""
+    def test_gradient_attributes_reverse_work(self):
+        """Gradient evaluation attributes reverse-mode arithmetic to each layer."""
         model = nn.MLP([64, 128, 10], key=jax.random.key(0))
         loss = lambda m, x, y: ((m(x) - y) ** 2).mean()
-        forward = ion.cost(model, jnp.ones((8, 64))).flops
-        gradient = ion.cost(jax.grad(loss), model, jnp.ones((8, 64)), jnp.ones((8, 10))).flops
-        assert gradient > 1.5 * forward
+        x, y = jnp.ones((8, 64)), jnp.ones((8, 10))
+        forward = ion.cost(model, x)
+        gradient = ion.cost(jax.grad(loss), model, x, y)
+        assert gradient.flops > 1.5 * forward.flops
+        for path in ("layers[0]", "layers[1]"):
+            assert gradient.layers[path].flops > forward.layers[path].flops
+            assert gradient.layers[path].output == forward.layers[path].output
 
     def test_static_arguments(self):
         """Non-array positional and keyword configuration is compiled statically."""

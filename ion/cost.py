@@ -124,7 +124,8 @@ def _measure(jaxpr: Any, scale: int, totals: dict[str, dict[str, int]]) -> None:
                 if hasattr(body, "eqns"):
                     _measure(body, inner, totals)
 
-        path = str(eqn.source_info.name_stack).replace("/", ".")
+        stack = getattr(eqn.source_info.name_stack, "stack", ())
+        path = ".".join(frame.name for frame in stack if type(frame).__name__ == "Scope")
         entry = totals.setdefault(path, {"flops": 0, "ops": 0, "loop": 1})
         entry["ops"] += 1
         entry["loop"] = max(entry["loop"], scale)
