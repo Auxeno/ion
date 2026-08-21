@@ -113,7 +113,7 @@ _PALETTE = {
     "TransformerConv": (0.8, 0.12, 34),
     "HGTConv": (0.8, 0.12, 36),
     "RGCNConv": (0.8, 0.12, 36),
-    "Optimizer": (0.8, 0.12, 194),
+    "Optimizer": (0.8, 0.12, 80),
 }
 
 
