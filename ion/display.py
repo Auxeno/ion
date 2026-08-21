@@ -9,6 +9,9 @@ Functions:
     scaled      Format a quantity against a unit ladder.
     fields      Split a module's fields into config, params, buffers and children.
     summary     Describe a module's parameter count and size.
+    transforms  Fold an optax transform into the named optimizers that built it.
+    arguments   Render one stage's hyperparameters, resolving a scheduled rate.
+    state       Flatten an optax state into the entries worth naming.
     statistics  Describe every parameter's distribution in one device sync.
 
 Every `__repr__` and `__treescope_repr__` hook delegates here, to the matching `*_repr` or
@@ -29,6 +32,7 @@ from typing import TYPE_CHECKING, Any
 import jax
 import jax.numpy as jnp
 import numpy as np
+import optax
 from jax.core import Tracer
 
 from . import tree
@@ -46,6 +50,7 @@ _STRING = "\x1b[38;2;31;206;156m"
 _CONSTANT = "\x1b[38;2;142;81;255m"
 _SYMBOL = "\x1b[38;2;71;138;245m"
 _WARNING = "\x1b[38;2;239;83;80m"
+_TRANSFORM = "\x1b[48;2;255;255;255m\x1b[38;2;30;30;30m"
 _BYTES = (" B", " KB", " MB", " GB", " TB")
 _FLOPS = ("", "K", "M", "G", "T")
 _COUNTS = ("", "K", "M", "B", "T")
@@ -114,6 +119,38 @@ _PALETTE = {
     "HGTConv": (0.8, 0.12, 36),
     "RGCNConv": (0.8, 0.12, 36),
     "Optimizer": (0.8, 0.12, 80),
+}
+_OPTIMIZERS = {
+    "scale_by_belief scale": "AdaBelief",
+    "add_decayed_weights scale_by_adadelta scale": "AdaDelta",
+    "scale_by_factored_rms clip_by_block_rms scale scale_by_param_block_rms scale": "AdaFactor",
+    "scale_by_factored_rms clip_by_block_rms scale scale_by_param_block_rms ema scale": "AdaFactor",
+    "scale_by_rss scale": "AdaGrad",
+    "scale_by_adam scale": "Adam",
+    "scale_by_adamax scale": "AdaMax",
+    "scale_by_adamax add_decayed_weights scale": "AdaMaxW",
+    "scale_by_adam add_decayed_weights scale": "AdamW",
+    "scale_by_adan add_decayed_weights scale": "Adan",
+    "scale_by_amsgrad scale": "AMSGrad",
+    "scale_by_trust_ratio scale add_decayed_weights": "Fromage",
+    "scale_by_adam add_decayed_weights scale_by_trust_ratio scale": "LAMB",
+    "add_decayed_weights scale_by_trust_ratio scale trace": "LARS",
+    "scale_by_lbfgs scale scale_by_zoom_linesearch": "LBFGS",
+    "scale_by_lion add_decayed_weights scale": "Lion",
+    "add_noise scale": "NoisySGD",
+    "scale_by_novograd scale": "NovoGrad",
+    "scale_by_adam scale_by_optimistic_gradient scale": "OptimisticAdam",
+    "scale_by_optimistic_gradient scale": "OptimisticGradientDescent",
+    "scale_by_radam scale": "RAdam",
+    "scale_by_rms scale identity": "RMSProp",
+    "scale_by_rms scale trace": "RMSProp",
+    "scale_by_rprop scale": "Rprop",
+    "identity scale": "SGD",
+    "trace scale": "SGD",
+    "scale_by_sign scale": "SignSGD",
+    "ema scale_by_sign scale": "Signum",
+    "scale_by_sm3 scale": "SM3",
+    "scale_by_yogi scale": "Yogi",
 }
 
 
@@ -257,6 +294,129 @@ def statistics(self: Module) -> dict[int, str]:
     return described
 
 
+def transforms(tx: Any) -> list[tuple[str, dict[str, Any]]]:
+    """Fold an optax transform's closures into named optimizers and their hyperparameters."""
+
+    def walk(update: Any, found: list) -> list:
+        """Descend chains, wrappers and partitions until each primitive update is reached."""
+        cells = (cell.cell_contents for cell in update.__closure__ or ())
+        free = dict(zip(update.__code__.co_freevars, cells))
+        for wrapper in ("tx", "inner"):
+            if wrapper in free:
+                return walk(free[wrapper].update, found)
+        if "update_fns" in free:
+            for inner in free["update_fns"]:
+                walk(inner, found)
+            return found
+
+        # Ion labels its own auto-partition groups, so their zeroing machinery stays hidden
+        if "transforms" in free:
+            for label, inner in free["transforms"].items():
+                if label not in ("freeze", "__frozen__"):
+                    walk(inner.update, found)
+            return found
+
+        hypers = {k: v for k, v in free.items() if not callable(v) or k == "step_size_fn"}
+        found.append((update.__qualname__.split(".")[0], hypers))
+        return found
+
+    # Closures are optax internals rather than public API, so an unfamiliar layout just goes unnamed
+    try:
+        found = walk(tx.update, [])
+    except AttributeError:
+        return []
+
+    # A scheduled learning rate occupies the same slot as a fixed one, so both names match alike
+    names = ["scale" if name == "scale_by_schedule" else name for name, _ in found]
+
+    named, index = [], 0
+    while index < len(found):
+        # The longest run of stages naming a known optimizer collapses into a single entry
+        for end in range(len(found), index, -1):
+            name = _OPTIMIZERS.get(" ".join(names[index:end]))
+            if name is not None:
+                break
+        else:
+            # A primitive names itself in snake case, while a wrapper class already reads correctly
+            raw = found[index][0]
+            name = "".join(word.title() for word in raw.split("_")) if raw.islower() else raw
+            end = index + 1
+
+        hypers = {}
+        for _, stage in found[index:end]:
+            hypers.update(stage)
+
+        # Nesterov momentum is the sole difference between the Adam and NAdam families
+        if hypers.get("nesterov") and name in ("Adam", "AdamW"):
+            name, _ = f"N{name}", hypers.pop("nesterov")
+        named.append((name, hypers))
+        index = end
+
+    return named
+
+
+def arguments(name: str, hypers: dict[str, Any], step: Any) -> str:
+    """Render a stage's arguments, resolving a scheduled learning rate at the current step."""
+    scale = hypers.pop("step_size", None)
+    schedule = hypers.pop("step_size_fn", None)
+    if schedule is not None and step is not None:
+        # A schedule is a plain function of the step, so the rate in force beats its name
+        scale = schedule(step)
+        scale = scale.item() if hasattr(scale, "item") else scale
+
+    # An optimizer's own signature separates the arguments it takes from optax's internals
+    squashed = name.lower()
+    alias = getattr(optax, squashed, None)
+    if alias is None:
+        matches = (n for n in dir(optax) if n.replace("_", "") == squashed)
+        alias = getattr(optax, next(matches, ""), None)
+    if alias is not None:
+        accepted = inspect.signature(alias).parameters
+        if "momentum" in accepted and "decay" in hypers:
+            hypers["momentum"] = hypers.pop("decay")
+        hypers = {key: value for key, value in hypers.items() if key in accepted}
+
+    # Defaults left at zero, off or unset say nothing about how the optimizer was configured
+    shown = {"learning_rate": -scale} if scale is not None else {}
+    shown.update({key: value for key, value in hypers.items() if value})
+
+    # Low precision carries noise into a scheduled rate, which no configuration ever spelled out
+    described = [
+        f"{key}={float(f'{value:.4g}')!r}" if isinstance(value, float) else f"{key}={value!r}"
+        for key, value in shown.items()
+    ]
+    return ", ".join(described)
+
+
+def state(node: Any, step: Any = None) -> list[tuple[str, Any]]:
+    """Flatten an optax state into named entries, dropping empty slots and frozen groups."""
+    found: list[tuple[str, Any]] = []
+
+    def walk(node: Any, label: str) -> None:
+        """Descend states, partition groups and containers until a value worth naming appears."""
+        if isinstance(node, Module):
+            found.append((label, node))
+        elif isinstance(node, (jax.Array, np.ndarray)):
+            # A counter every stage repeats, or that only tracks the step, says nothing new
+            counter = node.ndim == 0 and not isinstance(node, Tracer)
+            seen = any(label == name for name, _ in found)
+            if not (counter and (seen or node.item() == step)):
+                found.append((label, node))
+        elif hasattr(node, "_fields"):
+            for name in node._fields:
+                walk(getattr(node, name), name)
+        elif isinstance(node, dict):
+            for name, value in node.items():
+                if name not in ("freeze", "__frozen__"):
+                    walk(value, label)
+        elif isinstance(node, (tuple, list)):
+            for item in node:
+                walk(item, label)
+
+    walk(node, "state")
+    return found
+
+
 def param_treescope(self: Param, path: str | None, subtree_renderer: Any) -> Any:
     """Render a `Param` as `Param(float32(64, 10))`, marking it frozen if it is."""
     from treescope import rendering_parts as parts
@@ -355,28 +515,57 @@ def module_treescope(self: Module, path: str | None, subtree_renderer: Any) -> A
 
 
 def optimizer_treescope(self: "Optimizer", path: str | None, subtree_renderer: Any) -> Any:
-    """Render an `Optimizer`, folding its state away behind a size summary."""
+    """Render an `Optimizer` as its transform chain over the state each stage carries."""
     from treescope import rendering_parts as parts
 
-    # State mirrors the model once per moment, so collapsed it shows only its size
-    leaves = jax.tree.leaves(self.state)
-    nbytes = sum(getattr(leaf, "nbytes", 0) for leaf in leaves)
-    state = parts.fold_condition(
-        collapsed=parts.abbreviation_color(
-            parts.text(f"<{len(leaves):,} leaves, {nbytes / 2**20:.2f} MB>")
-        ),
-        expanded=subtree_renderer(self.state, path=None).renderable,
-    )
-    selected = [parts.text(f"fields={list(self._fields)}")] if self._fields is not None else []
-    children = [parts.text(f"step={self.step}"), parts.siblings("state=", state), *selected]
+    step = None if isinstance(self.step, Tracer) else self.step.item()
+    lines = [parts.text(f"step={self.step.dtype.name}()" if step is None else f"step={step},")]
+    if self._fields is not None:
+        lines.append(parts.text(f"fields={list(self._fields)},"))
+
+    # Each stage names the optimizer it belongs to, so a chain reads as it was written
+    stages = transforms(self._transform)
+    if stages:
+        header = parts.comment_color(parts.text("# Transforms:"))
+        lines.append(parts.fold_condition(expanded=header))
+        for name, hypers in stages:
+            shown = arguments(name, hypers, step)
+            lines.append(parts.text(f"{name}({shown}),"))
+
+    # Moments mirror the model, so collapsed they show its name and expand to the real tree
+    entries = state(self.state, step)
+    if entries:
+        lines.append(parts.fold_condition(expanded=parts.comment_color(parts.text("# State:"))))
+    for label, value in entries:
+        if isinstance(value, Module):
+            described = f"{type(value).__name__}(...)"
+            total = summary(value)
+        else:
+            shape = f"{value.dtype.name}{value.shape}"
+            concrete = value.ndim == 0 and not isinstance(value, Tracer)
+            described = repr(value.item()) if concrete else shape
+            total = ""
+        rendered = parts.siblings(
+            parts.text(f"{label}="),
+            parts.fold_condition(
+                collapsed=parts.text(described),
+                expanded=subtree_renderer(value, path=None).renderable,
+            ),
+            parts.text(","),
+        )
+        annotation = parts.comment_color(parts.text(f"  # {total}")) if total else parts.text("")
+        lines.append(parts.siblings(rendered, parts.fold_condition(collapsed=annotation)))
+
+    # The head carries what the state costs, the one figure a chain of stages cannot show
+    nbytes = sum(getattr(leaf, "nbytes", 0) for leaf in jax.tree.leaves(self.state))
 
     return parts.build_foldable_tree_node_from_children(
         prefix=parts.siblings(parts.maybe_qualified_type_name(type(self)), "("),
-        children=children,
+        children=lines,
         suffix=")",
-        comma_separated=True,
         path=path,
         background_color="oklch({:.3f} {:.3f} {:.1f})".format(*palette("Optimizer")),
+        first_line_annotation=parts.comment_color(parts.text(f"  # {scaled(nbytes)} state")),
         expand_state=parts.ExpandState.WEAKLY_EXPANDED,
     )
 
@@ -448,17 +637,46 @@ def module_repr(self: Module, stats: dict[int, str] | None = None) -> str:
 
 
 def optimizer_repr(self: "Optimizer") -> str:
-    """Render an `Optimizer`, folding its state away behind a size summary."""
-    # State mirrors the model once per moment, so it shows only its size
-    leaves = jax.tree.leaves(self.state)
-    nbytes = sum(getattr(leaf, "nbytes", 0) for leaf in leaves)
-    state = color(f"<{len(leaves):,} leaves, {nbytes / 2**20:.2f} MB>", _COMMENT)
+    """Render an `Optimizer` as its transform chain over the state each stage carries."""
+    step = None if isinstance(self.step, Tracer) else self.step.item()
+    described = f"{self.step.dtype.name}()" if step is None else str(step)
+    selected = f", fields={highlight(repr(list(self._fields)))}" if self._fields is not None else ""
+    lines = [f"step={highlight(described)}{selected},"]
 
-    step = self.step.item() if hasattr(self.step, "item") else self.step
-    selected = f", fields={list(self._fields)}" if self._fields is not None else ""
-    head = color("Optimizer", chip("Optimizer"))
+    # Each stage names the optimizer it belongs to, so a chain reads as it was written
+    stages = transforms(self._transform)
+    if stages:
+        lines.append(color("# Transforms:", _COMMENT))
+        for name, hypers in stages:
+            shown = highlight(arguments(name, hypers, step))
+            lines.append(f"{color(name, _TRANSFORM)}({shown}),")
 
-    return f"{head}(step={step}, state={state}{selected})"
+    # Moments mirror the model, so they show its name over the size they cost to carry
+    entries = []
+    for label, value in state(self.state, step):
+        if isinstance(value, Module):
+            name = type(value).__name__
+            entries.append((f"{label}={color(f'{name}(...)', chip(name))},", summary(value)))
+        elif value.ndim == 0 and not isinstance(value, Tracer):
+            entries.append((f"{label}={highlight(repr(value.item()))},", ""))
+        else:
+            described = color(value.dtype.name, _SYMBOL) + highlight(str(value.shape))
+            entries.append((f"{label}={described},", ""))
+
+    # Sizes share one column, measured on visible text since escapes take no width
+    if entries:
+        lines.append(color("# State:", _COMMENT))
+        widths = [len(_ANSI.sub("", entry)) for entry, _ in entries]
+        for (entry, total), visible in zip(entries, widths):
+            padding = " " * (max(widths) - visible + 2)
+            lines.append(entry + (color(f"{padding}# {total}", _COMMENT) if total else ""))
+
+    # The head carries what the state costs, the one figure a chain of stages cannot show
+    nbytes = sum(getattr(leaf, "nbytes", 0) for leaf in jax.tree.leaves(self.state))
+    head, close = color("Optimizer(", chip("Optimizer")), color(")", chip("Optimizer"))
+    body = "\n".join(f"  {line}" for line in lines)
+
+    return head + color(f"  # {scaled(nbytes)} state", _COMMENT) + f"\n{body}\n{close}"
 
 
 def cost_repr(self: "Cost") -> str:

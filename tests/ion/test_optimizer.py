@@ -749,13 +749,81 @@ class TestFieldPartition:
 
 
 class TestOptimizerRepr:
-    def test_repr_includes_step_and_leaves(self):
-        """Repr string includes step count and state leaf count."""
+    def test_repr_includes_step_and_state(self):
+        """Repr string includes step count, state size and the moments it carries."""
         model = nn.Linear(4, 2, key=jax.random.key(0))
         optimizer = ion.Optimizer(optax.adam(1e-3), model)
         r = repr(optimizer)
         assert "step=0" in r
-        assert "leaves," in r
+        assert "state" in r
+        assert "mu=Linear(...)" in r
+
+    def test_repr_names_the_optimizer(self):
+        """A chain of optax primitives is folded back into the optimizers that built it."""
+        model = nn.Linear(4, 2, key=jax.random.key(0))
+        tx = optax.chain(optax.clip_by_global_norm(1.0), optax.adamw(3e-4, weight_decay=0.1))
+        r = repr(ion.Optimizer(tx, model))
+        assert "ClipByGlobalNorm(max_norm=1.0)" in r
+        assert "AdamW(learning_rate=0.0003" in r
+        assert "weight_decay=0.1" in r
+
+    def test_repr_resolves_scheduled_learning_rate(self):
+        """A scheduled rate is reported at the step the optimizer has reached."""
+        model = nn.Linear(4, 2, key=jax.random.key(0))
+        schedule = optax.linear_schedule(1e-3, 0.0, 100)
+        optimizer = ion.Optimizer(optax.adam(schedule), model)
+        assert "learning_rate=0.001" in repr(optimizer)
+
+        grads = jax.tree.map(jnp.zeros_like, model)
+        for _ in range(50):
+            model, optimizer = optimizer.update(model, grads)
+        assert "learning_rate=0.0005" in repr(optimizer)
+
+    def test_repr_survives_tracing(self):
+        """Under jit the step is abstract, so no value is read and no schedule is resolved."""
+        model = nn.Linear(4, 2, key=jax.random.key(0))
+
+        @jax.jit
+        def step(optimizer, x):
+            assert "step=uint32()" in repr(optimizer)
+            return x
+
+        step(ion.Optimizer(optax.adam(optax.linear_schedule(1e-3, 0.0, 100)), model), jnp.ones(3))
+
+    def test_repr_names_optimizer_families(self):
+        """Every optax optimizer family resolves to its own name."""
+        model = nn.Linear(4, 2, key=jax.random.key(0))
+        named = {
+            optax.sgd(0.1, momentum=0.9): "SGD(learning_rate=0.1, momentum=0.9)",
+            optax.nadamw(1e-3): "NAdamW(",
+            optax.lion(1e-4): "Lion(",
+            optax.rmsprop(1e-3): "RMSProp(",
+        }
+        for tx, expected in named.items():
+            assert expected in repr(ion.Optimizer(tx, model))
+
+    def test_repr_hides_a_counter_matching_the_step(self):
+        """A stage counter is shown only where it carries more than the optimizer's own step."""
+        model = nn.Linear(4, 2, key=jax.random.key(0))
+        grads = jax.tree.map(jnp.zeros_like, model)
+
+        optimizer = ion.Optimizer(optax.adam(1e-3), model)
+        accumulating = ion.Optimizer(
+            optax.MultiSteps(optax.adam(1e-3), 4).gradient_transformation(),
+            model,
+        )
+        for _ in range(10):
+            _, optimizer = optimizer.update(model, grads)
+            _, accumulating = accumulating.update(model, grads)
+
+        assert "count=" not in repr(optimizer)
+        assert "step=10" in repr(optimizer)
+        assert "count=2" in repr(accumulating)
+
+    def test_repr_falls_back_for_unknown_transforms(self):
+        """A bare optax primitive that names no optimizer still renders on its own."""
+        model = nn.Linear(4, 2, key=jax.random.key(0))
+        assert "ZeroNans()" in repr(ion.Optimizer(optax.zero_nans(), model))
 
 
 class TestMixedPrecision:

@@ -3,6 +3,7 @@
 ## 0.18.1
 
 - **Tweaks to `__repr__`**: Tweaks to format and colour of `__repr__` for `Module` and `Cost`. Documentation and examples updated to match.
+- **`Optimizer` `__repr__` shows its transforms and state.** Printing an optimizer now lists the optimizers it was built from, with their hyperparameters, over the state each stage carries.
 
 ## 0.18.0
 
