@@ -3,7 +3,8 @@ Analyse one call's arithmetic and memory, layer by layer.
 The call is traced and compiled without being executed. Concrete array inputs are replaced
 by shape/dtype placeholders, so an array and the equivalent `jax.ShapeDtypeStruct` produce
 the same analysis. Module scopes attribute traced operations and outputs to the layer that
-created them.
+created them. A layer that transforms its own submodules rebuilds them as it traces, so they
+are not named and do not appear in the report.
 
 Parameters
 ----------
@@ -15,7 +16,7 @@ Parameters
 Returns
 -------
 Cost
-    Call totals and a `LayerCost` for every module, keyed by tree path.
+    Call totals and a `LayerCost` for every layer the trace named, keyed by tree path.
 
 Example
 -------

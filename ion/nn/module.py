@@ -9,7 +9,6 @@ and immutability after `__init__`.
 
 import dataclasses
 import functools
-from contextvars import ContextVar
 from collections.abc import Iterable, Iterator
 from typing import TYPE_CHECKING, Any, Generic, Self, TypeVar
 
@@ -26,8 +25,6 @@ if TYPE_CHECKING:
     from ..cost import Cost
 
 M = TypeVar("M")
-
-_cost_context: ContextVar[Any | None] = ContextVar("ion_cost_context", default=None)
 
 
 @jtu.register_pytree_node_class
@@ -157,12 +154,10 @@ def _register_module_as_pytree(cls: type) -> Any:
             children.append((jtu.GetAttrKey(name), value))
 
         static_values = tuple(getattr(obj, name) for name in static_names)
-        context = _cost_context.get()
-        scope = context.scopes.get(id(obj)) if context is not None else None
-        return children, (child_info, static_names, static_values, scope)
+        return children, (child_info, static_names, static_values)
 
     def unflatten(aux: tuple, children: Iterable[Any]) -> Any:
-        child_info, static_names, static_values, scope = aux
+        child_info, static_names, static_values = aux
         new_instance = object.__new__(cls)
 
         # Restore dynamic children, unwrapping _Static in mixed containers
@@ -181,9 +176,6 @@ def _register_module_as_pytree(cls: type) -> Any:
 
         object.__setattr__(new_instance, "_flatten_info", (child_info, static_names))
         object.__setattr__(new_instance, "_frozen", True)
-        context = _cost_context.get()
-        if context is not None and scope is not None:
-            context.scopes[id(new_instance)] = scope
         return new_instance
 
     jtu.register_pytree_with_keys(cls, flatten_with_keys, unflatten)
@@ -241,31 +233,6 @@ class Module:
             object.__setattr__(self, "_frozen", True)
 
         cls.__init__ = _constructor_with_freeze
-
-        # Only a class defining its own forward pass is wrapped, so scopes never nest twice
-        if "__call__" in cls.__dict__:
-            original_call = cls.__call__
-
-            @functools.wraps(original_call)
-            def _call_with_scope(self: Any, *args: Any, **kwargs: Any) -> Any:
-                """Run the forward pass, naming its operations while a cost analysis traces."""
-                context = _cost_context.get()
-                if context is None:
-                    return original_call(self, *args, **kwargs)
-                scope = context.scopes.get(id(self))
-                if scope is None:
-                    return original_call(self, *args, **kwargs)
-
-                label, path = scope
-                if label:
-                    with jax.named_scope(label):
-                        output = original_call(self, *args, **kwargs)
-                else:
-                    output = original_call(self, *args, **kwargs)
-                context.record(path, output)
-                return output
-
-            cls.__call__ = _call_with_scope
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Allow attribute assignment only during initialization."""

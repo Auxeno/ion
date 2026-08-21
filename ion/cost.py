@@ -9,6 +9,7 @@ Classes:
 """
 
 import dataclasses
+import functools
 import re
 from collections.abc import Iterator
 from typing import Any
@@ -17,7 +18,7 @@ import jax
 import numpy as np
 
 from . import tree
-from .nn.module import Module, _cost_context
+from .nn.module import Module
 
 
 @dataclasses.dataclass(frozen=True)
@@ -63,24 +64,31 @@ class Cost:
         return display.cost_repr(self)
 
 
-class _Context:
-    """Names modules and records their abstract outputs during one trace."""
-
-    __slots__ = ("scopes", "outputs")
-
-    def __init__(self) -> None:
-        self.scopes: dict[int, tuple[str, str]] = {}
-        self.outputs: dict[str, Any] = {}
-
-    def record(self, path: str, value: Any) -> None:
-        """Store one module's output, keeping shapes and dtypes rather than tracers."""
-        self.outputs[path] = _abstract(value)
-
-
 def _abstract(value: Any) -> Any:
     """Replace array leaves with shape and dtype placeholders, allocating no data."""
     shaped = lambda x: hasattr(x, "shape") and hasattr(x, "dtype")
     return jax.tree.map(lambda x: jax.ShapeDtypeStruct(x.shape, x.dtype) if shaped(x) else x, value)
+
+
+def _scoped(original: Any, scopes: dict[int, Any], outputs: dict[str, Any]) -> Any:
+    """Wrap a forward pass so it names its operations and records its output while tracing."""
+
+    @functools.wraps(original)
+    def scoped_call(self: Any, *args: Any, **kwargs: Any) -> Any:
+        scope = scopes.get(id(self))
+        if scope is None:
+            return original(self, *args, **kwargs)
+
+        label, path = scope
+        if label:
+            with jax.named_scope(label):
+                output = original(self, *args, **kwargs)
+        else:
+            output = original(self, *args, **kwargs)
+        outputs[path] = _abstract(output)
+        return output
+
+    return scoped_call
 
 
 def _walk(
@@ -173,30 +181,44 @@ def cost(target: Any, *args: Any, **kwargs: Any) -> Cost:
     shown = [x for x in (*args, *kwargs.values()) if not isinstance(x, Module) and traceable(x)]
     inputs = _abstract(shown[0] if len(shown) == 1 else tuple(shown))
 
-    context = _Context()
+    scopes: dict[int, Any] = {}
+    outputs: dict[str, Any] = {}
 
     def traced(*positional: Any, **options: Any) -> Any:
         # A module names its own scope after the path it sits at, so the two match afterwards
-        context.scopes = {
-            id(module): (path.rsplit(".", 1)[-1], path)
+        scopes.update(
+            (id(module), (path.rsplit(".", 1)[-1], path))
             for value in (*positional, *options.values())
             if isinstance(value, Module)
             for module, path, _, _ in _walk(value)
-        }
-        token = _cost_context.set(context)
-        try:
-            return forward(*positional, **options)
-        finally:
-            _cost_context.reset(token)
+        )
+        return forward(*positional, **options)
 
     # Nothing is executed: the placeholders are traced, and configuration compiles in statically
     shapes = tuple(_abstract(value) for value in values)
     shaped_kwargs = {name: _abstract(value) for name, value in kwargs.items()}
-    lowered = jax.jit(
+    jitted = jax.jit(
         traced,
         static_argnums=tuple(i for i, value in enumerate(shapes) if not traceable(value)),
         static_argnames=tuple(n for n, value in shaped_kwargs.items() if not traceable(value)),
-    ).trace(*shapes, **shaped_kwargs)
+    )
+
+    # Only the trace runs Python, so forward passes carry their scope for exactly that long
+    owners = {
+        next(base for base in type(module).__mro__ if "__call__" in base.__dict__)
+        for value in (*values, *kwargs.values())
+        if isinstance(value, Module)
+        for module, *_ in _walk(value)
+    }
+    originals = {owner: owner.__call__ for owner in owners}
+    for owner, original in originals.items():
+        owner.__call__ = _scoped(original, scopes, outputs)
+    try:
+        lowered = jitted.trace(*shapes, **shaped_kwargs)
+    finally:
+        for owner, original in originals.items():
+            owner.__call__ = original
+
     compiled = lowered.lower().compile()
 
     memory = compiled.memory_analysis()
@@ -218,6 +240,10 @@ def cost(target: Any, *args: Any, **kwargs: Any) -> Cost:
 
     layers = {}
     for module, path, label, depth in _walk(root):
+        # A transform rebuilds the tree it is given, so a layer inside one never runs under its name
+        if path and path not in outputs:
+            continue
+
         # A layer owns its own scope and every scope nested inside it
         owned = [
             entry
@@ -232,7 +258,7 @@ def cost(target: Any, *args: Any, **kwargs: Any) -> Cost:
             flops=layer_flops,
             share=layer_flops / flops if flops else 1.0,
             ops=sum(entry["ops"] for entry in owned),
-            output=context.outputs.get(path),
+            output=outputs.get(path),
             loop=max((entry["loop"] for entry in owned), default=1),
         )
 

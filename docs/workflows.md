@@ -30,7 +30,7 @@ ion.cost(loss, model, x, y)
 ion.cost(jax.grad(loss), model, x, y)
 ```
 
-The gradient report includes both the forward and reverse-mode work:
+The gradient report totals both the forward and reverse-mode work. `jax.grad` rebuilds the model as it traces, so its layers are not named and the call is reported as a whole:
 
 --8<-- "docs/assets/workflows-grad-cost.html"
 

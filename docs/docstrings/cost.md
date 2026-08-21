@@ -2,7 +2,9 @@ Analyse one call's arithmetic and memory, layer by layer, for any function takin
 
 [`Module.cost`](core/module.md#ion.nn.Module.cost) covers a model's own forward pass. This
 function also accepts a callable, so a loss, a gradient, or a whole training step is
-analysed the same way, including the reverse work in a gradient evaluation.
+analysed the same way, including the reverse work in a gradient evaluation. A transform
+rebuilds the model as it traces, so layers inside one are not named and the call is totalled
+without a breakdown.
 
 Parameters
 ----------
@@ -16,7 +18,7 @@ target : Module | Callable
 Returns
 -------
 Cost
-    Call totals and a `LayerCost` for every module, keyed by tree path.
+    Call totals and a `LayerCost` for every layer the trace named, keyed by tree path.
 
 Example
 -------
