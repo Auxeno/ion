@@ -261,7 +261,7 @@ class TestReport:
         assert "memory\ntotal" in text and "\nintermediate" in text
         assert " params · " in text and "FLOP · " in text
         assert "ops" in text and "fused" in text and "output" in text
-        assert "float32(4, 16)" in text
+        assert "f32(4, 16)" in text
         assert "ceiling" not in text and "transfer" not in text
 
     def test_repr_colors_dtypes_alone(self, monkeypatch):
@@ -271,7 +271,7 @@ class TestReport:
         monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
         measured = ion.cost(nn.Linear(8, 16, key=jax.random.key(0)), jnp.ones((4, 8)))
         text = repr(measured)
-        shape = f"{display._SYMBOL}float32\x1b[0m(4, 16)"
+        shape = f"{display._SYMBOL}f32\x1b[0m(4, 16)"
         op_width = max(len("ops"), len(f"{measured.ops:,}"))
 
         assert f"{display.chip(measured.name)}{measured.name}\x1b[0m" in text

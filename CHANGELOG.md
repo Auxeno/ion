@@ -2,6 +2,7 @@
 
 ## 0.18.1
 
+- **Abbreviated dtypes in `__repr__`.** `Param`, `Buffer`, `Module`, `Optimizer` and `Cost` now render dtypes in their short form, so `float32` reads as `f32` and `bfloat16` as `bf16`.
 - **Tweaks to `__repr__`**: Tweaks to format and colour of `__repr__` for `Module` and `Cost`. Documentation and examples updated to match.
 - **`Optimizer` `__repr__` shows its transforms and state.** Printing an optimizer now lists the optimizers it was built from, with their hyperparameters, over the state each stage carries.
 

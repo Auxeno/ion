@@ -597,7 +597,7 @@ class TestRepr:
             def __init__(self):
                 self.x = jnp.zeros((3, 4), dtype=jnp.float32)
 
-        assert "x=float32(3, 4)," in repr(Model())
+        assert "x=f32(3, 4)," in repr(Model())
 
     def test_callable_field(self):
         """repr contains the function __name__ for callable fields."""
@@ -651,7 +651,7 @@ class TestRepr:
         r = repr(nn.Linear(4, 16, key=jax.random.key(0)).freeze())
 
         assert "80 frozen" in r
-        assert "w=Param(float32(4, 16), frozen)," in r
+        assert "w=Param(f32(4, 16), frozen)," in r
 
     def test_plain_off_terminal(self):
         """Output captured to a pipe or file carries no escape sequences."""
@@ -696,7 +696,7 @@ class TestRepr:
             for line in repr(nn.MLP([4, 16, 3], key=jax.random.key(0))).split("\n")
         ]
         assert plain[1] == "  activation=relu, final_activation=None,"
-        assert plain[5].startswith("    w=Param(float32(4, 16)),  ")
+        assert plain[5].startswith("    w=Param(f32(4, 16)),  ")
         assert plain[7] == "  ),"
         assert plain[-1] == ")"
 
@@ -1630,7 +1630,7 @@ class TestStatistics:
         jax.jit(render)(nn.Linear(8, 64, key=jax.random.key(0)))
 
         assert "\u03bc" not in rendered[0]
-        assert "Param(float32(8, 64))" in rendered[0]
+        assert "Param(f32(8, 64))" in rendered[0]
 
     def test_annotations_share_a_column(self):
         """Descriptions align down a group so distributions can be compared by eye."""

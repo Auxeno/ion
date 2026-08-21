@@ -7,6 +7,7 @@ Functions:
     color       Wrap text in an ANSI code where escape sequences will render.
     highlight   Color the literals inside a value's repr.
     scaled      Format a quantity against a unit ladder.
+    dtype       Abbreviate an array's dtype name.
     fields      Split a module's fields into config, params, buffers and children.
     summary     Describe a module's parameter count and size.
     transforms  Fold an optax transform into the named optimizers that built it.
@@ -52,6 +53,7 @@ _SYMBOL = "\x1b[38;2;71;138;245m"
 _WARNING = "\x1b[38;2;239;83;80m"
 _TRANSFORM = "\x1b[48;2;255;255;255m\x1b[38;2;30;30;30m"
 _BYTES = (" B", " KB", " MB", " GB", " TB")
+_DTYPES = {"bfloat": "bf", "float": "f", "uint": "u", "int": "i", "complex": "c"}
 _FLOPS = ("", "K", "M", "G", "T")
 _COUNTS = ("", "K", "M", "B", "T")
 _SAMPLE = 16_384
@@ -212,6 +214,14 @@ def scaled(value: float, base: float = 1024, units: tuple[str, ...] = _BYTES) ->
         value, exponent = value / base, exponent + 1
 
     return f"{value:.3g}{units[exponent]}"
+
+
+def dtype(value: Any) -> str:
+    """Abbreviate an array's dtype name, so `float32` reads as `f32` and `bfloat16` as `bf16`."""
+    name = value.dtype.name
+    prefix = next((full for full in _DTYPES if name.startswith(full)), None)
+
+    return name if prefix is None else _DTYPES[prefix] + name[len(prefix) :]
 
 
 def fields(self: Module) -> tuple[list, list, list, list]:
@@ -418,12 +428,12 @@ def state(node: Any, step: Any = None) -> list[tuple[str, Any]]:
 
 
 def param_treescope(self: Param, path: str | None, subtree_renderer: Any) -> Any:
-    """Render a `Param` as `Param(float32(64, 10))`, marking it frozen if it is."""
+    """Render a `Param` as `Param(f32(64, 10))`, marking it frozen if it is."""
     from treescope import rendering_parts as parts
 
     # Collapsed the array is described by shape, expanded it renders in full
     value = self._value
-    described = f"{value.dtype.name}{value.shape}" if hasattr(value, "dtype") else repr(value)
+    described = f"{dtype(value)}{value.shape}" if hasattr(value, "dtype") else repr(value)
     array = parts.fold_condition(
         collapsed=parts.text(described),
         expanded=subtree_renderer(value, path=None).renderable,
@@ -440,13 +450,13 @@ def param_treescope(self: Param, path: str | None, subtree_renderer: Any) -> Any
 
 
 def buffer_treescope(self: Buffer, path: str | None, subtree_renderer: Any) -> Any:
-    """Render a `Buffer` as `Buffer(float32(64,))`."""
+    """Render a `Buffer` as `Buffer(f32(64,))`."""
     from treescope import rendering_parts as parts
 
     # Collapsed the array is described by shape, expanded it renders in full
     value = self.value
     array = parts.fold_condition(
-        collapsed=parts.text(f"{value.dtype.name}{value.shape}"),
+        collapsed=parts.text(f"{dtype(value)}{value.shape}"),
         expanded=subtree_renderer(value, path=None).renderable,
     )
     return parts.build_foldable_tree_node_from_children(
@@ -471,7 +481,7 @@ def module_treescope(self: Module, path: str | None, subtree_renderer: Any) -> A
     for index, (label, value, name, _) in enumerate(ordered):
         # Plain arrays are described by shape rather than dumped in full
         rendered = (
-            parts.text(f"{value.dtype.name}{value.shape}")
+            parts.text(f"{dtype(value)}{value.shape}")
             if isinstance(value, (jax.Array, np.ndarray))
             else subtree_renderer(value, path=None if path is None else f"{path}.{name}")
         )
@@ -519,7 +529,7 @@ def optimizer_treescope(self: "Optimizer", path: str | None, subtree_renderer: A
     from treescope import rendering_parts as parts
 
     step = None if isinstance(self.step, Tracer) else self.step.item()
-    lines = [parts.text(f"step={self.step.dtype.name}()" if step is None else f"step={step},")]
+    lines = [parts.text(f"step={dtype(self.step)}()" if step is None else f"step={step},")]
     if self._fields is not None:
         lines.append(parts.text(f"fields={list(self._fields)},"))
 
@@ -541,7 +551,7 @@ def optimizer_treescope(self: "Optimizer", path: str | None, subtree_renderer: A
             described = f"{type(value).__name__}(...)"
             total = summary(value)
         else:
-            shape = f"{value.dtype.name}{value.shape}"
+            shape = f"{dtype(value)}{value.shape}"
             concrete = value.ndim == 0 and not isinstance(value, Tracer)
             described = repr(value.item()) if concrete else shape
             total = ""
@@ -571,20 +581,20 @@ def optimizer_treescope(self: "Optimizer", path: str | None, subtree_renderer: A
 
 
 def param_repr(self: Param) -> str:
-    """Render a `Param` as `Param(float32(64, 10))`, marking it frozen if it is."""
+    """Render a `Param` as `Param(f32(64, 10))`, marking it frozen if it is."""
     value = self._value
     frozen = "" if self.trainable else color(", frozen", _SYMBOL)
     if not hasattr(value, "dtype"):
         return f"Param({highlight(repr(value))}{frozen})"
 
-    return f"Param({color(value.dtype.name, _SYMBOL)}{highlight(str(value.shape))}{frozen})"
+    return f"Param({color(dtype(value), _SYMBOL)}{highlight(str(value.shape))}{frozen})"
 
 
 def buffer_repr(self: Buffer) -> str:
-    """Render a `Buffer` as `Buffer(float32(64,))`."""
+    """Render a `Buffer` as `Buffer(f32(64,))`."""
     value = self.value
 
-    return f"Buffer({color(value.dtype.name, _SYMBOL)}{highlight(str(value.shape))})"
+    return f"Buffer({color(dtype(value), _SYMBOL)}{highlight(str(value.shape))})"
 
 
 def module_repr(self: Module, stats: dict[int, str] | None = None) -> str:
@@ -597,8 +607,8 @@ def module_repr(self: Module, stats: dict[int, str] | None = None) -> str:
         shown = []
         for label, value, *_ in config:
             if isinstance(value, (jax.Array, np.ndarray)):
-                dtype = color(value.dtype.name, _SYMBOL)
-                shown.append(f"{label}{dtype}{highlight(str(value.shape))}")
+                described = color(dtype(value), _SYMBOL)
+                shown.append(f"{label}{described}{highlight(str(value.shape))}")
             elif callable(value) and hasattr(value, "__name__"):
                 shown.append(f"{label}{color(value.__name__, _SYMBOL)}")
             else:
@@ -639,7 +649,7 @@ def module_repr(self: Module, stats: dict[int, str] | None = None) -> str:
 def optimizer_repr(self: "Optimizer") -> str:
     """Render an `Optimizer` as its transform chain over the state each stage carries."""
     step = None if isinstance(self.step, Tracer) else self.step.item()
-    described = f"{self.step.dtype.name}()" if step is None else str(step)
+    described = f"{dtype(self.step)}()" if step is None else str(step)
     selected = f", fields={highlight(repr(list(self._fields)))}" if self._fields is not None else ""
     lines = [f"step={highlight(described)}{selected},"]
 
@@ -660,7 +670,7 @@ def optimizer_repr(self: "Optimizer") -> str:
         elif value.ndim == 0 and not isinstance(value, Tracer):
             entries.append((f"{label}={highlight(repr(value.item()))},", ""))
         else:
-            described = color(value.dtype.name, _SYMBOL) + highlight(str(value.shape))
+            described = color(dtype(value), _SYMBOL) + highlight(str(value.shape))
             entries.append((f"{label}={described},", ""))
 
     # Sizes share one column, measured on visible text since escapes take no width
@@ -683,7 +693,7 @@ def cost_repr(self: "Cost") -> str:
     """Render a `Cost` as a per-layer table, following the tree the module repr prints."""
     eighths = "▏▎▍▌▋▊▉█"  # left eighths, continuing a bar
     bar_width = 10  # cells in a layer share bar, so one cell is ten percent of the step
-    memory_width = 20
+    memory_width = 25
     guide = f"\x1b[38;2;{ansi(0.46, 0.02, 260)}m"
 
     def bar(start: float, share: float, width: int, code: str, fill: str = "█") -> str:
@@ -699,7 +709,7 @@ def cost_repr(self: "Cost") -> str:
     def shape(value: Any) -> str:
         """Describe a pytree by the dtype and shape of every array it holds."""
         if hasattr(value, "shape") and hasattr(value, "dtype"):
-            return f"{color(value.dtype.name, _SYMBOL)}{value.shape}"
+            return f"{color(dtype(value), _SYMBOL)}{value.shape}"
         if isinstance(value, tuple):
             items = ", ".join(shape(item) for item in value)
             return f"({items},)" if len(value) == 1 else f"({items})"

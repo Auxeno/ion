@@ -38,12 +38,12 @@ class TestTreescopeRepr:
         model = ion.nn.MLP([4, 8, 2], key=jax.random.key(0))
 
         rendering = treescope.render_to_text(model)
-        assert "Linear(w=Param(float32(4, 8)), b=Param(float32(8,)))" in rendering
+        assert "Linear(w=Param(f32(4, 8)), b=Param(f32(8,)))" in rendering
 
     def test_frozen_params_and_buffers_remain_identifiable(self):
         """Compact rendering distinguishes frozen parameters and mutable buffers."""
-        assert "float32(4,), frozen" in treescope.render_to_text(ion.nn.LayerNorm(4).freeze())
-        assert "Buffer(float32(4,))" in treescope.render_to_text(ion.nn.BatchNorm(4))
+        assert "f32(4,), frozen" in treescope.render_to_text(ion.nn.LayerNorm(4).freeze())
+        assert "Buffer(f32(4,))" in treescope.render_to_text(ion.nn.BatchNorm(4))
 
     def test_masked_optimizer_state_renders(self):
         """Partitioned state holds masked placeholders, which must not break rendering."""

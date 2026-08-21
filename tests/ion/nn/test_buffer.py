@@ -37,8 +37,8 @@ def test_buffers_are_discoverable_by_predicate():
 
 def test_repr():
     """A buffer reports its dtype and shape."""
-    assert repr(nn.Buffer(jnp.zeros(3))) == "Buffer(float32(3,))"
-    assert "running_mean=Buffer(float32(2,))" in repr(nn.BatchNorm(2))
+    assert repr(nn.Buffer(jnp.zeros(3))) == "Buffer(f32(3,))"
+    assert "running_mean=Buffer(f32(2,))" in repr(nn.BatchNorm(2))
 
 
 def test_value_and_set():

@@ -545,23 +545,24 @@ class TestRepr:
     def test_param_repr(self):
         """Repr shows dtype and shape, staying silent on the default trainable."""
         p = nn.Param(jnp.zeros((3, 4), dtype=jnp.float32))
-        assert repr(p) == "Param(float32(3, 4))"
+        assert repr(p) == "Param(f32(3, 4))"
 
     def test_frozen_param_repr(self):
         """Frozen Param repr is marked frozen."""
         p = nn.Param(jnp.zeros(5), trainable=False)
-        assert repr(p) == "Param(float32(5,), frozen)"
+        assert repr(p) == "Param(f32(5,), frozen)"
 
     def test_dtype_names(self):
-        """Repr spells dtypes out in full, matching the Treescope rendering."""
-        for dtype in (jnp.float16, jnp.bfloat16, jnp.int8, jnp.uint8, jnp.bool_):
-            p = nn.Param(jnp.zeros(2, dtype=dtype))
-            assert repr(p) == f"Param({jnp.zeros(2, dtype=dtype).dtype.name}(2,))"
+        """Repr abbreviates dtypes, matching the Treescope rendering."""
+        abbreviated = {jnp.float16: "f16", jnp.bfloat16: "bf16", jnp.int8: "i8"}
+        abbreviated |= {jnp.uint8: "u8", jnp.complex64: "c64", jnp.bool_: "bool"}
+        for dtype, name in abbreviated.items():
+            assert repr(nn.Param(jnp.zeros(2, dtype=dtype))) == f"Param({name}(2,))"
 
     def test_scalar_param_repr(self):
         """Scalar Param repr shows an empty shape."""
         p = nn.Param(jnp.array(1.0))
-        assert repr(p) == "Param(float32())"
+        assert repr(p) == "Param(f32())"
 
     def test_module_repr_with_param(self):
         """Module __repr__ displays Param wrapper."""

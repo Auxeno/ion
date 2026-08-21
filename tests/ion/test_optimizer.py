@@ -785,7 +785,7 @@ class TestOptimizerRepr:
 
         @jax.jit
         def step(optimizer, x):
-            assert "step=uint32()" in repr(optimizer)
+            assert "step=u32()" in repr(optimizer)
             return x
 
         step(ion.Optimizer(optax.adam(optax.linear_schedule(1e-3, 0.0, 100)), model), jnp.ones(3))
