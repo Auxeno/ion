@@ -304,7 +304,7 @@ class TestReport:
 
         reused = dataclasses.replace(measured, reused_bytes=measured.output_bytes)
         line = next(line for line in repr(reused).splitlines() if line.startswith("reused"))
-        assert "░" in line and f"−{display.scaled(reused.reused_bytes)}" in line
+        assert "░" in line and f"-{display.scaled(reused.reused_bytes)}" in line
 
     def test_forward_passes_are_restored(self):
         """The scope wrapper is installed for the trace alone and removed afterwards."""
