@@ -48,6 +48,7 @@ _SYMBOL = "\x1b[38;2;71;138;245m"
 _WARNING = "\x1b[38;2;239;83;80m"
 _BYTES = (" B", " KB", " MB", " GB", " TB")
 _FLOPS = ("", "K", "M", "G", "T")
+_COUNTS = ("", "K", "M", "B", "T")
 _SAMPLE = 16_384
 _BINS = 11
 _BLOCKS = "▁▂▃▄▅▆▇█"
@@ -464,7 +465,19 @@ def optimizer_repr(self: "Optimizer") -> str:
 def cost_repr(self: "Cost") -> str:
     """Render a `Cost` as a per-layer table, following the tree the module repr prints."""
     eighths = "▏▎▍▌▋▊▉█"  # left eighths, continuing a bar
-    bar_width = 10  # cells in a share bar, so one cell is ten percent of the step
+    bar_width = 10  # cells in a layer share bar, so one cell is ten percent of the step
+    memory_width = 20
+    guide = f"\x1b[38;2;{ansi(0.46, 0.02, 260)}m"
+
+    def bar(start: float, share: float, width: int, code: str, fill: str = "█") -> str:
+        """Draw one cumulative segment over a fine guide spanning the whole scale."""
+        offset = min(math.ceil(start * width), width)
+        cells = min(max((start + share) * width - offset, 0.0), width - offset)
+        segment = fill * int(cells)
+        if cells % 1:
+            segment += eighths[min(7, int(cells % 1 * 8))] if fill == "█" else fill
+        remaining = width - offset - len(segment)
+        return color("·" * offset, guide) + color(segment, code) + color("·" * remaining, guide)
 
     def shape(value: Any) -> str:
         """Describe a pytree by the dtype and shape of every array it holds."""
@@ -479,14 +492,6 @@ def cost_repr(self: "Cost") -> str:
             return "{" + ", ".join(f"{key}: {shape(item)}" for key, item in value.items()) + "}"
         return "---" if value is None else repr(value)
 
-    # Parameters share the argument buffer with the call's data, so the two are spelled out
-    inputs = (
-        f"({scaled(self.input_bytes - self.param_bytes)} + {scaled(self.param_bytes)}) input"
-        if 0 < self.param_bytes < self.input_bytes
-        else f"{scaled(self.input_bytes)} input"
-    )
-    reused = f" - {scaled(self.reused_bytes)} reused" if self.reused_bytes else ""
-
     # The tree is drawn exactly as the module repr indents it, class names and all
     labels = {}
     for path, layer in self.layers.items():
@@ -500,26 +505,70 @@ def cost_repr(self: "Cost") -> str:
     width = max(len("layer"), *(visible for _, visible in labels.values())) + 2
     op_width = max(len("ops"), len(f"{self.ops:,}"))
 
-    title = f"{self.name} · input {shape(self.inputs)} · {self.backend}"
-    totals = (
-        f"{scaled(self.flops, 1e3, _FLOPS)}FLOP · {self.params:,} params"
-        f" ({scaled(self.param_bytes)}) · {self.ops:,} ops → {self.fused:,} fused"
+    name = color(self.name, chip(self.name))
+    summary = color(
+        f" · {scaled(self.params, 1e3, _COUNTS)} params"
+        f" · {scaled(self.flops, 1e3, _FLOPS)}FLOP"
+        f" · {self.ops:,} ops → {self.fused:,} fused · {self.backend}",
+        _COMMENT,
     )
-    memory = (
-        f"{scaled(self.total_memory)} total memory = {inputs}"
-        f" + {scaled(self.intermediate_bytes)} intermediate"
-        f" + {scaled(self.output_bytes)} output{reused}"
-    )
+    title = name + summary
+    inputs = color("input ", _COMMENT) + shape(self.inputs)
+
+    # Memory components tile one shared scale; aliased output is shown as subtraction at its end
+    data_bytes = max(self.input_bytes - self.param_bytes, 0)
+    gross_memory = self.input_bytes + self.intermediate_bytes + self.output_bytes
+    memory_grey = f"\x1b[38;2;{ansi(0.92, 0.03, 260)}m"
+    memory_label_width = len("intermediate") + 2
+
+    def memory_row(label: str, start: int, size: int, value: str, fill: str = "█") -> str:
+        whole = gross_memory or 1
+        code = memory_grey if label == "total" else _COMMENT
+        meter = bar(start / whole, size / whole, memory_width, code, fill)
+        return (
+            color(f"{label:<{memory_label_width}}", _COMMENT)
+            + meter
+            + color(f"  {value}", _COMMENT)
+        )
+
+    memory = [
+        color("memory", _COMMENT),
+        memory_row("total", 0, self.total_memory, scaled(self.total_memory)),
+        memory_row("params", 0, self.param_bytes, scaled(self.param_bytes)),
+        memory_row("input", self.param_bytes, data_bytes, scaled(data_bytes)),
+        memory_row(
+            "intermediate",
+            self.input_bytes,
+            self.intermediate_bytes,
+            scaled(self.intermediate_bytes),
+        ),
+        memory_row(
+            "output",
+            self.input_bytes + self.intermediate_bytes,
+            self.output_bytes,
+            scaled(self.output_bytes),
+        ),
+    ]
+    if self.reused_bytes:
+        memory.append(
+            memory_row(
+                "reused",
+                gross_memory - self.reused_bytes,
+                self.reused_bytes,
+                f"-{scaled(self.reused_bytes)}",
+                "░",
+            )
+        )
     columns = (
         f"{'layer':<{width}}{'FLOPs':>7}  {'':<{bar_width}}"
         f"{'share':>7}  {'ops':>{op_width}}  output"
     )
 
     lines = [
-        color(title, _COMMENT),
+        title,
+        inputs,
         "",
-        color(totals, _COMMENT),
-        color(memory, _COMMENT),
+        *memory,
         "",
         color(columns, _COMMENT),
     ]
@@ -534,21 +583,15 @@ def cost_repr(self: "Cost") -> str:
         if path:
             filled[parent] = start + within
 
-        # A partial block occupies its whole terminal cell, so the next sibling starts after it
-        offset = math.ceil(start * bar_width)
-        cells = min(max((start + within) * bar_width - offset, 0.0), bar_width - offset)
-        bar = " " * offset + "█" * int(cells)
-        if cells % 1:
-            bar += eighths[min(7, int(cells % 1 * 8))]
-
         # Bars fade with depth, so a nested level never reads as louder than the one above it
         grey = f"\x1b[38;2;{ansi(max(0.92 - 0.13 * layer.depth, 0.40), 0.03, 260)}m"
+        meter = bar(start, within, bar_width, grey)
 
         # Only the dtypes carry color, so a row of figures reads as one measurement
         label, visible = labels[path]
         lines.append(
             f"{label}{' ' * (width - visible)}{scaled(layer.flops, 1e3, _FLOPS):>7}"
-            f"  {color(bar.ljust(bar_width), grey)}{layer.share * 100:6.1f}%"
+            f"  {meter}{layer.share * 100:6.1f}%"
             f"  {layer.ops:>{op_width},}  {shape(layer.output)}"
         )
 

@@ -69,8 +69,11 @@ class TestMemory:
         x = jnp.ones((2, 8))
         measured = ion.cost(model, x)
         assert measured.input_bytes == x.nbytes + measured.param_bytes
-        described = f"({display.scaled(x.nbytes)} + {display.scaled(measured.param_bytes)}) input"
-        assert described in repr(measured)
+        lines = repr(measured).splitlines()
+        params = next(line for line in lines if line.startswith("params"))
+        inputs = [line for line in lines if line.startswith("input ")][-1]
+        assert display.scaled(measured.param_bytes) in params
+        assert display.scaled(x.nbytes) in inputs
 
     def test_memory_grows_with_the_batch(self):
         """The compiler memory plan reflects larger call inputs and outputs."""
@@ -255,7 +258,8 @@ class TestReport:
         """The report prints totals, memory composition and the compact layer table."""
         model = nn.Sequential(nn.Linear(8, 16, key=jax.random.key(0)), nn.LayerNorm(16))
         text = repr(ion.cost(model, jnp.ones((4, 8))))
-        assert "total memory =" in text and " intermediate" in text
+        assert "memory\ntotal" in text and "\nintermediate" in text
+        assert " params · " in text and "FLOP · " in text
         assert "ops" in text and "fused" in text and "output" in text
         assert "float32(4, 16)" in text
         assert "ceiling" not in text and "transfer" not in text
@@ -270,6 +274,7 @@ class TestReport:
         shape = f"{display._SYMBOL}float32\x1b[0m(4, 16)"
         op_width = max(len("ops"), len(f"{measured.ops:,}"))
 
+        assert f"{display.chip(measured.name)}{measured.name}\x1b[0m" in text
         assert shape in text
         assert f"{measured.ops:>{op_width},}  {shape}" in text
         assert f"{display.scaled(measured.flops, 1e3, display._FLOPS):>7}" in text
@@ -285,11 +290,21 @@ class TestReport:
         bar_start = header.index("share") - 12
         first = next(line for line in lines if "(0) Linear" in line)[bar_start : bar_start + 10]
         second = next(line for line in lines if "(1) Linear" in line)[bar_start : bar_start + 10]
-        first_cells = {index for index, cell in enumerate(first) if not cell.isspace()}
-        second_cells = {index for index, cell in enumerate(second) if not cell.isspace()}
+        first_cells = {index for index, cell in enumerate(first) if cell not in " ·"}
+        second_cells = {index for index, cell in enumerate(second) if cell not in " ·"}
 
         assert first_cells and second_cells
         assert max(first_cells) < min(second_cells)
+
+    def test_reused_memory_is_conditional_and_subtractive(self, monkeypatch):
+        """Aliased memory appears only when present and uses a dotted subtraction bar."""
+        monkeypatch.setenv("NO_COLOR", "1")
+        measured = ion.cost(nn.Linear(8, 4, key=jax.random.key(0)), jnp.ones((2, 8)))
+        assert "\nreused" not in repr(measured)
+
+        reused = dataclasses.replace(measured, reused_bytes=measured.output_bytes)
+        line = next(line for line in repr(reused).splitlines() if line.startswith("reused"))
+        assert "░" in line and f"−{display.scaled(reused.reused_bytes)}" in line
 
     def test_forward_passes_are_restored(self):
         """The scope wrapper is installed for the trace alone and removed afterwards."""

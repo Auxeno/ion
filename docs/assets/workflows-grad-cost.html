@@ -1,7 +1,12 @@
-<pre class="ion-repr" role="img" aria-label="Coloured Ion TransformerBlock gradient cost report"><span style="color:rgb(166,178,197)">TransformerBlock · input (</span><span style="color:rgb(71,138,245)">float32</span>(8, 128, 384), <span style="color:rgb(71,138,245)">float32</span>(8, 128, 384)) · CPU/XLA
+<pre class="ion-repr" role="img" aria-label="Coloured Ion TransformerBlock gradient cost report"><span style="color:rgb(30,30,30);background-color:rgb(150,182,254)">TransformerBlock</span><span style="color:rgb(166,178,197)"> · 1.77M params · 11.6GFLOP · 215 ops → 95 fused · CPU/XLA</span>
+<span style="color:rgb(166,178,197)">input </span>(<span style="color:rgb(71,138,245)">float32</span>(8, 128, 384), <span style="color:rgb(71,138,245)">float32</span>(8, 128, 384))
 
-<span style="color:rgb(166,178,197)">11.6GFLOP · 1,771,008 params (6.76 MB) · 215 ops → 95 fused</span>
-<span style="color:rgb(166,178,197)">64.5 MB total memory = (3 MB + 6.76 MB) input + 48 MB intermediate + 6.76 MB output</span>
+<span style="color:rgb(166,178,197)">memory</span>
+<span style="color:rgb(166,178,197)">total         </span><span style="color:rgb(217,229,249)">████████████████████</span><span style="color:rgb(166,178,197)">  64.5 MB</span>
+<span style="color:rgb(166,178,197)">params        </span><span style="color:rgb(166,178,197)">██▏</span><span style="color:rgb(82,88,100)">·················</span><span style="color:rgb(166,178,197)">  6.76 MB</span>
+<span style="color:rgb(166,178,197)">input         </span><span style="color:rgb(82,88,100)">···</span><span style="color:rgb(166,178,197)">▏</span><span style="color:rgb(82,88,100)">················</span><span style="color:rgb(166,178,197)">  3 MB</span>
+<span style="color:rgb(166,178,197)">intermediate  </span><span style="color:rgb(82,88,100)">····</span><span style="color:rgb(166,178,197)">██████████████</span><span style="color:rgb(82,88,100)">··</span><span style="color:rgb(166,178,197)">  48 MB</span>
+<span style="color:rgb(166,178,197)">output        </span><span style="color:rgb(82,88,100)">··················</span><span style="color:rgb(166,178,197)">██</span><span style="color:rgb(166,178,197)">  6.76 MB</span>
 
 <span style="color:rgb(166,178,197)">layer               FLOPs              share  ops  output</span>
 <span style="color:rgb(30,30,30);background-color:rgb(150,182,254)">TransformerBlock</span>    11.6G  <span style="color:rgb(217,229,249)">██████████</span> 100.0%  215  ---</pre>
