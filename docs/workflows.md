@@ -174,34 +174,11 @@ optimizer = ion.Optimizer(optax.adam(3e-4), model)
 
 ## Inspecting models
 
-A model prints as a tree, grouped into config, parameters, buffers and child modules, with parameter counts and sizes on each line. Frozen params are marked `frozen`. In a color terminal each layer is highlighted with the same color Treescope gives it, carried on both of its brackets. Layers sharing a mechanism share a hue, so every convolution is one color and every normalization another, and numbers, strings, constants and dtypes take the colors the documentation gives them in code blocks. Output captured to a pipe or file drops the color, leaving plain text:
+A model prints as a tree, grouped into config, parameters, buffers and child modules, with parameter counts and sizes on each line. Frozen params are marked `frozen`. In a color terminal each layer is highlighted with the same color Treescope gives it, carried on both of its brackets. Layers sharing a mechanism share a hue, so every convolution is one color and every normalization another, and numbers, strings, constants and dtypes take the colors the documentation gives them in code blocks:
 
-```text
-MLP(  # 131 params, 524 B, 80 frozen
-  activation=relu, final_activation=None,
-  # Modules:
-  (0): Linear(  # 80 params, 320 B, 80 frozen
-    # Parameters:
-    w=Param(float32(4, 16), frozen),
-    b=Param(float32(16,), frozen),
-  ),
-  (1): Linear(  # 51 params, 204 B
-    # Parameters:
-    w=Param(float32(16, 3)),
-    b=Param(float32(3,)),
-  ),
-)
-```
+--8<-- "docs/assets/workflows-model.html"
 
-Printing or evaluating a model adds a distribution histogram and moments to each parameter, aligned in a column so layers can be compared by eye:
-
-```text
-Linear(  # 4,608 params, 18 KB
-  # Parameters:
-  w=Param(float32(8, 512)),  █▇▇▇▇▇▇▇▇▇█  μ=-0.00036 σ=0.062
-  b=Param(float32(512,)),    ▁▁▁▁▁█▁▁▁▁▁  μ=0 σ=0
-)
-```
+Printing or evaluating a model adds a distribution histogram and moments to each parameter, aligned in a column so layers can be compared by eye.
 
 Every summary comes from at most 16,384 evenly spaced values. A parameter no larger than that sample is described exactly; a larger one is described from the sample and marks both moments `≈` so no approximation reads as measured. The histogram bins between the 1st and 99th percentile of the sample, so a few outliers cannot flatten the bars. A constant parameter has no width, so its mass sits in the middle bucket with a zero deviation.
 
