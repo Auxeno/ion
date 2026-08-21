@@ -1687,16 +1687,14 @@ class TestPalette:
         exported = ((name, value) for m in (nn, gnn.layers) for name, value in vars(m).items())
         classes = {name for name, value in exported if isinstance(value, type)}
 
-        assert classes - {"Module", "Param", "Buffer"} <= set(display._HUES)
+        assert classes - {"Module", "Param", "Buffer"} <= set(display._PALETTE)
 
-    def test_every_color_stays_in_gamut(self):
-        """One lightness and chroma serves every hue, so no color is clipped on its way out."""
+    def test_every_layer_has_a_full_color(self):
+        """Each built-in layer specifies lightness and chroma as well as hue."""
 
-        lightness, chroma, _ = display.palette("Linear")
-        encoded = (display.ansi(lightness, chroma, hue) for hue in range(360))
-        channels = [int(channel) for color in encoded for channel in color.split(";")]
-
-        assert min(channels) > 0 and max(channels) < 255
+        assert all(len(color) == 3 for color in display._PALETTE.values())
+        assert {color[:2] for color in display._PALETTE.values()} == {(0.8, 0.12)}
+        assert display.palette("MultiHeadAttention") == (0.8, 0.12, 36)
 
     def test_unknown_class_is_stable(self):
         """A class from outside Ion hashes onto the same circle, so its color never shifts."""
@@ -1704,6 +1702,7 @@ class TestPalette:
         lightness, chroma, tone = display.palette("SomeUserBlock")
 
         assert display.palette("SomeUserBlock") == (lightness, chroma, tone)
+        assert (lightness, chroma) == (0.8, 0.12)
         assert 0 <= tone < 360
 
 
