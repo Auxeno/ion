@@ -28,13 +28,11 @@ The [documentation](https://auxeno.github.io/ion/) covers the core, layers, and 
 
 ## Example
 
-A model built from Ion's standard layers, trained with native JAX transforms:
+Build a model from Ion's standard layers:
 
 ```python
 import jax, jax.numpy as jnp, optax, typing
-
-import ion
-import ion.nn as nn
+import ion, ion.nn as nn
 
 
 class MLP(nn.Module):
@@ -52,34 +50,34 @@ class MLP(nn.Module):
         return self.layer_2(self.activation(self.layer_1(x)))
 
 
-def loss_fn(model, x, y):
-    logits = model(x)
-    return optax.softmax_cross_entropy_with_integer_labels(logits, y).mean()
-
-
-@jax.jit
-def train_step(model, optimizer, x, y):
-    grads = jax.grad(loss_fn)(model, x, y)
-    model, optimizer = optimizer.update(model, grads)
-    return model, optimizer
-
-
-keys = jax.random.split(jax.random.key(0), 3)
-
-model = MLP(key=keys[0])
-
-optimizer = ion.Optimizer(optax.adam(3e-4), model)
-
-x = jax.random.normal(keys[1], (512, 784))
-y = jnp.argmax(x @ jax.random.normal(keys[2], (784, 10)), axis=-1)
-
-for _ in range(500):
-    model, optimizer = train_step(model, optimizer, x, y)
-
+model = MLP(key=jax.random.key(0))
 model
 ```
 
 <img src="https://raw.githubusercontent.com/auxeno/ion/main/assets/repr.svg" alt="Model repr" width="535">
+
+Train it using native JAX transforms:
+
+```python
+x = jax.random.normal(jax.random.key(1), (512, 784))
+y = jnp.argmax(x[:, :10], axis=-1)
+optimizer = ion.Optimizer(optax.adam(3e-4), model)
+
+def loss(model, x, y):
+    logits = model(x)
+    return optax.softmax_cross_entropy_with_integer_labels(logits, y).mean()
+
+@jax.jit
+def train_step(model, optimizer, x, y):
+    grads = jax.grad(loss)(model, x, y)
+    return optimizer.update(model, grads)
+
+for _ in range(500):
+    model, optimizer = train_step(model, optimizer, x, y)
+```
+
+Models can also report their compute and memory requirements with `model.cost(x)` or
+`ion.cost(model, x)`.
 
 ## Documentation
 

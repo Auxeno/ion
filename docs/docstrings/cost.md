@@ -21,6 +21,5 @@ Cost
 Example
 -------
 ```python
-report = ion.cost(jax.grad(loss), model, x, y)
-print(report)
+ion.cost(jax.grad(loss), model, x, y)
 ```

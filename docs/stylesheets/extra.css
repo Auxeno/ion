@@ -177,6 +177,24 @@ body[data-md-color-scheme] .jupyter-wrapper {
   padding-inline: 0.15em;
 }
 
+/* Static ANSI renderings used by model and cost examples. */
+.md-typeset .ion-repr {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin: 1em 0;
+  padding: 0;
+  overflow-x: auto;
+  color: var(--md-default-fg-color);
+  background: transparent;
+  font-family: var(--md-code-font-family);
+  font-size: 0.85em;
+  font-variant-ligatures: none;
+  font-weight: 400;
+  line-height: 1.35;
+  white-space: pre;
+}
+
 /* Drop the table of contents before the primary navigation. */
 @media screen and (max-width: 87.49em) {
   .md-sidebar--secondary:not([hidden]) {

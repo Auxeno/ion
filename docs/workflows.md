@@ -2,10 +2,52 @@
 
 Common workflows that apply across models and layer families:
 
+- [Measuring cost](#measuring-cost)
 - [Checkpointing](#checkpointing)
 - [Mixed precision](#mixed-precision)
 - [Freezing](#freezing)
 - [Inspecting models](#inspecting-models)
+
+## Measuring cost
+
+`ion.cost` traces and compiles a call without executing it, then reports its static work and memory layer by layer:
+
+```python
+ion.cost(model, jnp.ones((8, 128, 384)))
+```
+
+--8<-- "docs/assets/workflows-cost.html"
+
+Parent FLOPs include their descendants; the bars show each sibling's share of the call. `ops` counts traced JAX operations, while `fused` counts operations left in the optimized top-level graph, not device kernel launches. Memory is the compiler's buffer plan for inputs, parameters, intermediates, and outputs rather than observed process memory.
+
+Pass a model directly to analyse its forward call, or pass any callable that takes a model, including losses, gradients, and complete training steps:
+
+```python
+def loss(model, x, y):
+    return jnp.mean((model(x) - y) ** 2)
+
+ion.cost(loss, model, x, y)
+ion.cost(jax.grad(loss), model, x, y)
+```
+
+The gradient report includes both the forward and reverse-mode work:
+
+--8<-- "docs/assets/workflows-grad-cost.html"
+
+Arrays are abstractified automatically. For large inputs, pass a `jax.ShapeDtypeStruct` to avoid allocating them:
+
+```python
+ion.cost(model, jax.ShapeDtypeStruct((8192, 256), jnp.float32))
+```
+
+FLOPs count a multiply-add as two operations. Matmul and convolution counts are precise under that convention; elementwise counts are indicative. Dynamic `cond` and unknown-trip `while` control flow have no single static cost and are not supported.
+
+The equivalent method interface is documented with [`Module.cost`](core/module.md#ion.nn.Module.cost).
+
+::: ion.cost.cost
+    options:
+      heading_level: 3
+      heading: ion.cost
 
 ## Checkpointing
 
@@ -184,57 +226,3 @@ treescope.basic_interactive_setup()
 ```
 
 Modules, params, buffers and optimizers then render as folding trees, collapsed down to shapes and expanding to array visualizations on click.
-
-## Measuring cost
-
-`Module.cost` traces and compiles a call without executing it, then explains its static work and memory layer by layer:
-
-```python
-report = model.cost(jnp.ones((8, 128), jnp.int32))
-print(report)
-```
-
-```text
-TransformerBlock · input float32(8, 128, 384) · GPU/XLA
-
-3.86GFLOP · 1,771,008 params (6.76 MB) · 85 ops → 34 fused
-21.8 MB total memory = (1.5 MB + 6.76 MB) input + 12 MB intermediate + 1.5 MB output
-
-layer                             FLOPs              share  ops  output
-TransformerBlock                  3.86G  ██████████ 100.0%   85  float32(8, 128, 384)
-  attention MultiHeadAttention    1.42G  ███▊        36.8%   30  float32(8, 128, 384)
-  attention_norm LayerNorm        2.37M               0.1%   16  float32(8, 128, 384)
-  mlp_norm LayerNorm              2.37M               0.1%   16  float32(8, 128, 384)
-  mlp_in Linear                   1.21G      ██▉     31.3%    1  float32(8, 128, 1536)
-  mlp_out Linear                  1.21G         ███  31.3%    1  float32(8, 128, 384)
-```
-
-The tree and colours match the model repr. FLOPs are inclusive: a parent's value contains its descendants. `share` is simply that value divided by the whole call's FLOPs. Sibling bars tile their parent, leaving any work done directly by the parent as an unfilled segment.
-
-`ops` counts traced JAX operations once in the static graph. A scan body therefore keeps the same op count at every sequence length and carries a `loop xT` suffix, while its FLOPs scale by `T`. `fused` counts executable operations left in the optimized top-level graph after fusion and other compiler simplification. It is not a count of device kernel launches.
-
-The output column records the logical shape and dtype produced by each module during the trace. Fusion may prevent that value from becoming a physical device buffer.
-
-`Module.cost` analyses a model's own call; `ion.cost` does the same for any callable taking a model, so a loss, gradient evaluation or whole step is analysed the same way:
-
-```python
-ion.cost(loss, model, x, y)
-ion.cost(jax.grad(loss), model, x, y)
-model.cost(jax.ShapeDtypeStruct((8192, 256), jnp.float32))
-```
-
-Concrete array pytrees are abstractified automatically, while a `jax.ShapeDtypeStruct` avoids allocating the input in the first place. Results are accessible directly by tree path:
-
-```python
-report.layers["layers[3]"].flops
-report.layers["layers[3]"].output
-report.total_memory
-```
-
-The memory line is the compiler's buffer plan. Input is all array arguments, including model parameters; the parentheses separate non-parameter inputs from parameter storage. Intermediate is temporary storage allocated for the call, and output is the returned buffers. Reused or donated storage is subtracted when the compiler reports aliases. This is not observed process or allocator memory.
-
-FLOPs use the conventional two operations for a multiply-add. Matmul and convolution counts are precise under that convention; elementwise counts are indicative. Dynamic `cond` and unknown-trip `while` control flow are rejected because they have no single factual static cost.
-
-::: ion.cost
-    options:
-      heading_level: 3

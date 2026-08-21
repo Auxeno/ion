@@ -47,7 +47,7 @@ The loss takes the model first so `jax.grad` differentiates with respect to it, 
 
 ## The core
 
-Three concepts describe a model; the fourth trains it:
+Three concepts describe a model, the fourth trains it:
 
 | Concept | Job |
 |---|---|
@@ -91,24 +91,22 @@ model = MLP(key=jax.random.key(0))
 
 Modules can contain other modules, so layers compose into one model tree. JAX arrays and parameters are dynamic leaves; Python values are compile-time constants, so changing one produces a new JIT specialization.
 
-```text
-MLP(  # 131 params, 524 B
-  activation=relu, final_activation=None,
-  # Modules:
-  (0): Linear(  # 80 params, 320 B
-    # Parameters:
-    w=Param(float32(4, 16)),
-    b=Param(float32(16,)),
-  ),
-  (1): Linear(  # 51 params, 204 B
-    # Parameters:
-    w=Param(float32(16, 3)),
-    b=Param(float32(3,)),
-  ),
-)
+## Inspecting a model
+
+Evaluating a model shows its structure, parameter counts, shapes, distributions, and moments:
+
+--8<-- "docs/assets/overview-model.html"
+
+The same model can describe the arithmetic and memory required by a representative call. `cost` traces and compiles the call without executing it, then attributes the work to each layer:
+
+```python
+x = jnp.ones((32, 4))
+model.cost(x)
 ```
 
-In a terminal, the same tree prints as text, colored per layer type. In IPython/Jupyter environments, models render interactively if [Treescope](https://github.com/google-deepmind/treescope) is installed and set up, covered in [Workflows](workflows.md).
+--8<-- "docs/assets/overview-cost.html"
+
+The repr is colored in a terminal. In IPython and Jupyter, models render interactively when [Treescope](https://github.com/google-deepmind/treescope) is installed and activated. See [Workflows](workflows.md#inspecting-models) for model inspection and [Measuring cost](workflows.md#measuring-cost) for analysing functions, gradients, and larger calls.
 
 ## Neural network layers
 
