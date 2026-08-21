@@ -101,7 +101,7 @@ The same model can describe the arithmetic and memory required by a representati
 
 --8<-- "docs/assets/overview-cost.html"
 
-The repr is colored in a terminal. In IPython and Jupyter, models render interactively when [Treescope](https://github.com/google-deepmind/treescope) is installed and activated. See [Workflows](workflows.md#inspecting-models) for model inspection and [Measuring cost](workflows.md#measuring-cost) for analysing functions, gradients, and larger calls.
+The repr is colored in a terminal. See [Workflows](workflows.md#inspecting-models) for model inspection and [Measuring cost](workflows.md#measuring-cost) for analysing functions, gradients, and larger calls.
 
 ## Neural network layers
 

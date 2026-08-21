@@ -174,7 +174,7 @@ optimizer = ion.Optimizer(optax.adam(3e-4), model)
 
 ## Inspecting models
 
-A model prints as a tree, grouped into config, parameters, buffers and child modules, with parameter counts and sizes on each line. Frozen params are marked `frozen`. In a color terminal each layer is highlighted with the same color Treescope gives it, carried on both of its brackets. Layers sharing a mechanism share a hue, so every convolution is one color and every normalization another, and numbers, strings, constants and dtypes take the colors the documentation gives them in code blocks:
+A model prints as a tree, grouped into config, parameters, buffers and child modules, with parameter counts and sizes on each line. Frozen params are marked `frozen`. In a color terminal each layer is highlighted in its own color, carried on both of its brackets. Layers sharing a mechanism share a hue, so every convolution is one color and every normalization another, and numbers, strings, constants and dtypes take the colors the documentation gives them in code blocks:
 
 --8<-- "docs/assets/workflows-model.html"
 
@@ -189,17 +189,3 @@ ion.statistics = False
 ```
 
 Inside `jax.jit` and friends parameters are tracers rather than concrete arrays, so a model printed there renders its structure with no descriptions either way.
-
-In IPython and Jupyter, [Treescope](https://github.com/google-deepmind/treescope) renders the same tree interactively, with collapsible nodes and array visualizations. Ion ships the rendering hooks but does not install or activate it, so pull it in and turn it on the usual way:
-
-```bash
-pip install treescope
-```
-
-```python
-import treescope
-
-treescope.basic_interactive_setup()
-```
-
-Modules, params, buffers and optimizers then render as folding trees, collapsed down to shapes and expanding to array visualizations on click.
