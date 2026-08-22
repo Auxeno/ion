@@ -95,13 +95,22 @@ Modules can contain other modules, so layers compose into one model tree. JAX ar
 
 Evaluating a model shows its structure, parameter counts, shapes, distributions, and moments:
 
+```python
+model
+```
+
 --8<-- "docs/assets/overview-model.html"
 
-The same model can describe the arithmetic and memory required by a representative call. `model.cost(jnp.ones((32, 4)))` traces and compiles the call without executing it, then attributes the work to each layer:
+The same model can describe the arithmetic and memory required by a representative call. `model.cost` traces and compiles the call without executing it, then attributes the work to each layer:
+
+```python
+x = jnp.ones((32, 4))
+model.cost(x)
+```
 
 --8<-- "docs/assets/overview-cost.html"
 
-The repr is colored in a terminal. See [Workflows](workflows.md#inspecting-models) for model inspection and [Measuring cost](workflows.md#measuring-cost) for analysing functions, gradients, and larger calls.
+See [Workflows](workflows.md#inspecting-models) for model inspection and [Measuring cost](workflows.md#measuring-cost) for analysing functions, gradients, and larger calls.
 
 ## Neural network layers
 
