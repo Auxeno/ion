@@ -1593,6 +1593,15 @@ class TestStatistics:
         assert any(block in described for block in "\u2581\u2588")
         assert "\u03bc=" in described and "\u03c3=" in described
 
+    def test_describes_buffers(self):
+        """Buffers are summarized like parameters, so running statistics can be read off."""
+
+        model = nn.BatchNorm(8)
+        described = display.statistics(model)[id(model.running_var)]
+
+        assert any(block in described for block in "\u2581\u2588")
+        assert "\u03bc=1 \u03c3=0" in described
+
     def test_constant_parameter(self):
         """A parameter with no width places its mass in the middle bucket, not the first."""
 

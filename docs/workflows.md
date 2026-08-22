@@ -178,11 +178,11 @@ A model prints as a tree, grouped into config, parameters, buffers and child mod
 
 --8<-- "docs/assets/workflows-model.html"
 
-Printing or evaluating a model adds a distribution histogram and moments to each parameter, aligned in a column so layers can be compared by eye.
+Printing or evaluating a model adds a distribution histogram and moments to each parameter and buffer, aligned in a column so layers can be compared by eye. Buffers are summarized from their current value, so a normalization layer's running statistics can be read off after a forward pass.
 
 Every summary comes from at most 16,384 evenly spaced values. A parameter no larger than that sample is described exactly; a larger one is described from the sample and marks both moments `≈` so no approximation reads as measured. The histogram bins between the 1st and 99th percentile of the sample, so a few outliers cannot flatten the bars. A constant parameter has no width, so its mass sits in the middle bucket with a zero deviation.
 
-The whole tree costs one device synchronization, and a large parameter costs no more than a small one. Where a model is printed often enough for that to matter, in logs or an exception handler, turn the descriptions off and `repr` renders structure alone:
+The whole tree costs one device synchronization, and a large parameter or buffer costs no more than a small one. Where a model is printed often enough for that to matter, in logs or an exception handler, turn the descriptions off and `repr` renders structure alone:
 
 ```python
 ion.statistics = False

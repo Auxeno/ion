@@ -13,7 +13,7 @@ Functions:
     transforms  Fold an optax transform into the named optimizers that built it.
     arguments   Render one stage's hyperparameters, resolving a scheduled rate.
     state       Flatten an optax state into the entries worth naming.
-    statistics  Describe every parameter's distribution in one device sync.
+    statistics  Describe every parameter and buffer distribution in one device sync.
 
 Every `__repr__` and `__treescope_repr__` hook delegates here, to the matching `*_repr` or
 `*_treescope` function. Both layouts share `palette`, `fields` and `summary`, so the two
@@ -261,17 +261,23 @@ def summary(self: Module) -> str:
 
 
 def statistics(self: Module) -> dict[int, str]:
-    """Describe every parameter as `▁▂▃█  μ=0.01 σ=0.1`, in one device synchronization."""
+    """Describe each parameter and buffer as `▁▂▃█  μ=0.01 σ=0.1`, in one device sync."""
     import ion
 
-    leaves = [x for x in jax.tree.leaves(self, is_leaf=tree.is_param) if tree.is_param(x)]
-    if not ion.statistics or any(isinstance(leaf._value, Tracer) for leaf in leaves):
+    if not ion.statistics:
+        return {}
+
+    # A buffer reads through its reference, so the flag is checked before any value is touched
+    held = lambda x: isinstance(x, (Param, Buffer))
+    leaves = [x for x in jax.tree.leaves(self, is_leaf=held) if held(x)]
+    stored = [leaf._value if isinstance(leaf, Param) else leaf.value for leaf in leaves]
+    if any(isinstance(value, Tracer) for value in stored):
         return {}
 
     samples = []
-    for leaf in leaves:
+    for value in stored:
         # Low precision accumulates poorly and cannot be formatted, so summaries use float32
-        values = jnp.asarray(leaf._value).ravel()
+        values = jnp.asarray(value).ravel()
         values = jnp.abs(values) if jnp.iscomplexobj(values) else values.astype(jnp.float32)
 
         # Summaries come from a bounded sample, so a large parameter costs no more than a small one
