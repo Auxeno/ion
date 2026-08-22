@@ -2,6 +2,8 @@
 
 ## 0.18.1
 
+- **`Optimizer` repr handles an abstract step.** Costing a training step abstracts the optimizer it is given, leaving `step` as a shape placeholder that both renderers tried to read a value from. An abstract step now prints as its dtype, the way a traced one already did.
+- **`ion.cost` analyses methods other than the forward pass.** `model.cost(x, method="critic")` and `ion.cost(model.critic, x)` scope a named method the way `__call__` is scoped, so a model with several heads reports only the layers that call reaches. The report names the call it analysed, as `ActorCritic.critic`.
 - **`ion.cost` keeps its breakdown under JAX transforms.** A transform rebuilds the model as it traces, which used to leave every layer unnamed and reduce the report to a single whole-call total. The rebuilt tree now reclaims its paths, so `jax.grad`, `jax.jit`, `jax.checkpoint` and `jax.vmap` report layer by layer, with reverse-mode work charged to the layer whose forward pass produced it. Layer outputs under `jax.vmap` restore the mapped axis, so shapes agree with the FLOPs and memory beside them.
 - **Buffer distributions in `__repr__`.** Buffers are now described by the same histogram and moments as parameters, so running statistics can be read off a printed model.
 - **Abbreviated dtypes in `__repr__`.** `Param`, `Buffer`, `Module`, `Optimizer` and `Cost` now render dtypes in their short form, so `float32` reads as `f32` and `bfloat16` as `bf16`.

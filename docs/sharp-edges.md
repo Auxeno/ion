@@ -129,3 +129,32 @@ The inner `grad` returns its gradient wrapped as a `Param`, and abstractifying t
 ## `Module.params` preserves static fields
 
 `model.params` replaces plain array and `Buffer` fields with `None`, while non-array fields (ints, floats, strings, callables) remain unchanged. This is by design: static fields are structural metadata stored in the treedef, not pytree leaves, so they are naturally unaffected when dynamic values are replaced.
+
+## `ion.cost` only breaks down what it scopes
+
+The layer table comes from scopes `cost` opens around each `__call__`, so work running outside one is folded into the whole-call total. The totals stay correct; only the per-layer attribution is lost, and the report prints a single row.
+
+A transform rebuilds the model as it traces, and the rebuilt copy reclaims its layer paths from whichever call entered it. That call is `__call__`, so a loss or training step written against the forward pass breaks down normally. A model entered through some other method has nothing to reclaim from:
+
+```python
+ion.cost(jax.grad(loss), model, x)      # loss calls model(x): full breakdown
+ion.cost(train_step, model, opt, x, y)  # loss calls model.actor(x): one row
+```
+
+Analyse that branch on its own with `model.cost(x, method="actor")` and read the gradient total from the transform report. The same limit applies one level down: a layer that transforms its own submodules, such as a `lax.scan` over stacked blocks, rebuilds them where no scope reaches, so they do not appear.
+
+## `jax.checkpoint` under `jax.vmap` reports per-lane shapes
+
+`ion.cost` records each layer's output shape as the layer traces, restoring the axis `vmap` maps over. A `jax.checkpoint` region traces its body before that axis is added, so layers inside one report a single lane while layers outside keep the mapped axis, and a report carries both:
+
+```python
+class Net(nn.Module):
+    def __call__(self, x):
+        return self.head(jax.checkpoint(self.block)(x))
+
+ion.cost(lambda m, x: jax.vmap(m)(x), net, jnp.ones((8, 16)))
+# block  f32(16,)   one lane
+# head   f32(8, 4)  all eight
+```
+
+Only the shape column is affected: FLOPs, memory and operation counts describe the whole mapped call throughout. Passing the batch to the model directly, rather than mapping over single examples, avoids it.

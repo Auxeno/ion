@@ -534,7 +534,7 @@ def optimizer_treescope(self: "Optimizer", path: str | None, subtree_renderer: A
     """Render an `Optimizer` as its transform chain over the state each stage carries."""
     from treescope import rendering_parts as parts
 
-    step = None if isinstance(self.step, Tracer) else self.step.item()
+    step = None if isinstance(self.step, (Tracer, jax.ShapeDtypeStruct)) else self.step.item()
     lines = [parts.text(f"step={dtype(self.step)}()" if step is None else f"step={step},")]
     if self._fields is not None:
         lines.append(parts.text(f"fields={list(self._fields)},"))
@@ -654,7 +654,7 @@ def module_repr(self: Module, stats: dict[int, str] | None = None) -> str:
 
 def optimizer_repr(self: "Optimizer") -> str:
     """Render an `Optimizer` as its transform chain over the state each stage carries."""
-    step = None if isinstance(self.step, Tracer) else self.step.item()
+    step = None if isinstance(self.step, (Tracer, jax.ShapeDtypeStruct)) else self.step.item()
     described = f"{dtype(self.step)}()" if step is None else str(step)
     selected = f", fields={highlight(repr(list(self._fields)))}" if self._fields is not None else ""
     lines = [f"step={highlight(described)}{selected},"]
@@ -738,7 +738,8 @@ def cost_repr(self: "Cost") -> str:
     width = max(len("layer"), *(visible for _, visible in labels.values())) + 2
     op_width = max(len("ops"), len(f"{self.ops:,}"))
 
-    name = color(self.name, chip(self.name))
+    # A method report names the call after its class, which still owns the color
+    name = color(self.name, chip(self.name.split(".")[0]))
     summary = color(
         f" · {scaled(self.params, 1e3, _COUNTS)} params"
         f" · {scaled(self.flops, 1e3, _FLOPS)}FLOP"

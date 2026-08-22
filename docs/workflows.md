@@ -34,13 +34,20 @@ The gradient report totals both the forward and reverse-mode work, charging the 
 
 --8<-- "docs/assets/workflows-grad-cost.html"
 
+A model whose useful calls are not all `__call__`, such as an actor-critic sharing one torso, is analysed a method at a time, and each report covers only the layers that call reaches. Name the method, or pass the bound method itself:
+
+```python
+model.cost(x, method="actor")
+ion.cost(model.critic, x)
+```
+
 Arrays are abstractified automatically. For large inputs, pass a `jax.ShapeDtypeStruct` to avoid allocating them:
 
 ```python
 ion.cost(model, jax.ShapeDtypeStruct((8192, 256), jnp.float32))
 ```
 
-Under `jax.vmap` the FLOPs, memory and output shapes all describe the whole mapped call. The one exception is a `jax.checkpoint` nested inside a `vmap`, whose layer outputs are reported per lane, because the mapped axis does not exist yet where those layers trace.
+Under `jax.vmap` the FLOPs, memory and output shapes all describe the whole mapped call, with one [exception](sharp-edges.md#jaxcheckpoint-under-jaxvmap-reports-per-lane-shapes) inside `jax.checkpoint`.
 
 FLOPs count a multiply-add as two operations. Matmul and convolution counts are precise under that convention; elementwise counts are indicative. Dynamic `cond` and unknown-trip `while` control flow have no single static cost and are not supported.
 

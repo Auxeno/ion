@@ -305,14 +305,16 @@ class Module:
         """
         return tree.astype(self, dtype, params_only=params_only)
 
-    def cost(self, *args: Any, **kwargs: Any) -> "Cost":
+    def cost(self, *args: Any, method: str = "__call__", **kwargs: Any) -> "Cost":
         """Analyse one call's arithmetic and memory, layer by layer. Wraps `ion.cost`.
 
         >>> model.cost(x)
+        >>> model.cost(x, training=False)
+        >>> model.cost(x, method="critic")
         """
         from ..cost import cost
 
-        return cost(self, *args, **kwargs)
+        return cost(getattr(self, method), *args, **kwargs)
 
     @property
     def params(self) -> PyTree:

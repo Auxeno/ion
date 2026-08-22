@@ -176,11 +176,18 @@ def _measure(jaxpr: Any, scale: int, totals: dict[str, dict[str, int]]) -> None:
 def cost(target: Any, *args: Any, **kwargs: Any) -> Cost:
     """Describe a call's arithmetic, memory and outputs, broken down by layer.
 
-    >>> ion.cost(model, x)  # doctest: +SKIP
+    >>> ion.cost(model, x)
+    >>> ion.cost(model.critic, x)
     """
+    # A bound method names both the model it belongs to and the call to analyse
+    bound = getattr(target, "__self__", None)
+    method = target.__name__ if isinstance(bound, Module) else "__call__"
+    target = bound if isinstance(bound, Module) else target
+
     # A module is called directly, any other target takes the model among its arguments
     wrapped = isinstance(target, Module)
-    forward = (lambda model, *rest, **options: model(*rest, **options)) if wrapped else target
+    call = lambda model, *rest, **options: getattr(model, method)(*rest, **options)
+    forward = call if wrapped else target
     values = (target, *args) if wrapped else args
 
     root = next((value for value in (*values, *kwargs.values()) if isinstance(value, Module)), None)
@@ -225,14 +232,18 @@ def cost(target: Any, *args: Any, **kwargs: Any) -> Cost:
         if isinstance(value, Module)
         for module, *_ in _walk(value)
     }
-    originals = {owner: owner.__call__ for owner in owners}
-    for owner, original in originals.items():
-        owner.__call__ = _scoped(original, scopes, outputs, root)
+    originals = {(owner, "__call__"): owner.__call__ for owner in owners}
+    if method != "__call__":
+        # The named method opens the root scope that __call__ would otherwise have opened
+        base = next(base for base in type(root).__mro__ if method in base.__dict__)
+        originals[(base, method)] = getattr(base, method)
+    for (owner, name), original in originals.items():
+        setattr(owner, name, _scoped(original, scopes, outputs, root))
     try:
         lowered = jitted.trace(*shapes, **shaped_kwargs)
     finally:
-        for owner, original in originals.items():
-            owner.__call__ = original
+        for (owner, name), original in originals.items():
+            setattr(owner, name, original)
 
     compiled = lowered.lower().compile()
 
@@ -280,7 +291,7 @@ def cost(target: Any, *args: Any, **kwargs: Any) -> Cost:
     leaves = jax.tree.leaves(root, is_leaf=tree.is_param)
 
     return Cost(
-        name=type(root).__name__,
+        name=type(root).__name__ + ("" if method == "__call__" else f".{method}"),
         inputs=inputs,
         backend=f"{jax.default_backend().upper()}/XLA",
         flops=flops,

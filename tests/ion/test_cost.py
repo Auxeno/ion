@@ -4,6 +4,7 @@ import sys
 import jax
 import jax.numpy as jnp
 import numpy.testing as npt
+import optax
 import pytest
 
 import ion
@@ -18,6 +19,29 @@ def analysis(model, *args, **kwargs):
     assert reported is not None
     reported = reported[0] if isinstance(reported, list) else reported
     return reported.get("flops", 0.0)
+
+
+class _TwoHead(nn.Module):
+    """Two heads over a shared torso, so each method reaches a different branch."""
+
+    torso: nn.MLP
+    policy: nn.Linear
+    value: nn.Linear
+
+    def __init__(self, *, key):
+        keys = jax.random.split(key, 3)
+        self.torso = nn.MLP([16, 32], key=keys[0])
+        self.policy = nn.Linear(32, 4, key=keys[1])
+        self.value = nn.Linear(32, 1, key=keys[2])
+
+    def actor(self, x):
+        return self.policy(self.torso(x))
+
+    def critic(self, x):
+        return self.value(self.torso(x))
+
+    def __call__(self, x):
+        return self.actor(x), self.critic(x)
 
 
 class TestTotals:
@@ -248,6 +272,58 @@ class TestTargets:
         x = jnp.ones((8, 64))
         direct = ion.cost(model, x)
         assert list(ion.cost(transform(lambda m, x: m(x)), model, x).layers) == list(direct.layers)
+
+    def test_bound_method_target(self):
+        """A bound method names both its model and the call, so it stands alone as the target."""
+        model = _TwoHead(key=jax.random.key(0))
+        critic = ion.cost(model.critic, jnp.ones((8, 16)))
+        assert list(critic.layers) == ["", "torso", "torso.layers[0]", "value"]
+        assert critic.layers[""].output == jax.ShapeDtypeStruct((8, 1), jnp.float32)
+        assert critic.name == "_TwoHead.critic"
+
+    def test_named_method_on_the_model(self):
+        """The method interface names a call the model does not expose as its forward pass."""
+        model = _TwoHead(key=jax.random.key(0))
+        x = jnp.ones((8, 16))
+        named = model.cost(x, method="critic")
+        assert named.flops == ion.cost(model.critic, x).flops
+        assert list(named.layers) == ["", "torso", "torso.layers[0]", "value"]
+        assert named.name == "_TwoHead.critic"
+
+    def test_rejects_an_unknown_method(self):
+        """A method the model does not define fails on attribute access."""
+        model = _TwoHead(key=jax.random.key(0))
+        with pytest.raises(AttributeError, match="critc"):
+            model.cost(jnp.ones((8, 16)), method="critc")
+
+    def test_forward_pass_is_the_default_call(self):
+        """Naming the forward pass explicitly matches passing the model itself."""
+        model = _TwoHead(key=jax.random.key(0))
+        x = jnp.ones((8, 16))
+        assert ion.cost(model.__call__, x).flops == ion.cost(model, x).flops
+        assert ion.cost(model, x).name == "_TwoHead"
+
+    def test_sibling_methods_measure_their_own_branch(self):
+        """Each method reports only the layers its own call reaches."""
+        model = _TwoHead(key=jax.random.key(0))
+        x = jnp.ones((8, 16))
+        assert "policy" in ion.cost(model.actor, x).layers
+        assert "value" not in ion.cost(model.actor, x).layers
+        assert "policy" not in ion.cost(model.critic, x).layers
+        assert ion.cost(model, x).flops > ion.cost(model.critic, x).flops
+
+    def test_report_renders_with_an_optimizer_argument(self):
+        """A training step carries optimizer state, whose abstract step has no concrete value."""
+        model = nn.MLP([16, 8], key=jax.random.key(0))
+        optimizer = ion.Optimizer(optax.adam(1e-3), model)
+        x, y = jnp.ones((4, 16)), jnp.ones((4, 8))
+
+        def step(m, opt, inputs, targets):
+            loss, grads = jax.value_and_grad(lambda t: jnp.mean((t(inputs) - targets) ** 2))(m)
+            m, opt = opt.update(m, grads)
+            return m, opt, loss
+
+        assert "step=" in repr(ion.cost(step, model, optimizer, x, y))
 
     def test_static_arguments(self):
         """Non-array positional and keyword configuration is compiled statically."""
