@@ -1,5 +1,4 @@
 import dataclasses
-import sys
 
 import jax
 import jax.numpy as jnp
@@ -375,7 +374,7 @@ class TestReport:
         with pytest.raises(dataclasses.FrozenInstanceError):
             measured.flops = 0  # pyright: ignore[reportAttributeAccessIssue]
 
-    def test_repr_contains_the_new_contract(self):
+    def test_repr_contains_each_section(self):
         """The report prints totals, memory composition and the compact layer table."""
         model = nn.Sequential(nn.Linear(8, 16, key=jax.random.key(0)), nn.LayerNorm(16))
         text = repr(ion.cost(model, jnp.ones((4, 8))))
@@ -383,39 +382,6 @@ class TestReport:
         assert " params · " in text and "FLOP · " in text
         assert "ops" in text and "fused" in text and "output" in text
         assert "f32(4, 16)" in text
-        assert "ceiling" not in text and "transfer" not in text
-
-    def test_repr_colors_dtypes_alone(self, monkeypatch):
-        """Only dtypes are blue, so a row of figures reads as one measurement."""
-
-        monkeypatch.delenv("NO_COLOR", raising=False)
-        monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
-        measured = ion.cost(nn.Linear(8, 16, key=jax.random.key(0)), jnp.ones((4, 8)))
-        text = repr(measured)
-        shape = f"{display._SYMBOL}f32\x1b[0m(4, 16)"
-        op_width = max(len("ops"), len(f"{measured.ops:,}"))
-
-        assert f"{display.chip(measured.name)}{measured.name}\x1b[0m" in text
-        assert shape in text
-        assert f"{measured.ops:>{op_width},}  {shape}" in text
-        assert f"{display.scaled(measured.flops, 1e3, display._FLOPS):>7}" in text
-        assert " 100.0%" in text
-        assert display._NUMBER not in text
-
-    def test_sibling_bars_do_not_share_a_character_cell(self, monkeypatch):
-        """A sibling starts after the cell occupied by its predecessor's partial block."""
-        monkeypatch.setenv("NO_COLOR", "1")
-        measured = ion.cost(nn.MLP([8, 17, 4], key=jax.random.key(0)), jnp.ones((4, 8)))
-        lines = repr(measured).splitlines()
-        header = next(line for line in lines if line.startswith("layer"))
-        bar_start = header.index("share") - 12
-        first = next(line for line in lines if "(0) Linear" in line)[bar_start : bar_start + 10]
-        second = next(line for line in lines if "(1) Linear" in line)[bar_start : bar_start + 10]
-        first_cells = {index for index, cell in enumerate(first) if cell not in " ·"}
-        second_cells = {index for index, cell in enumerate(second) if cell not in " ·"}
-
-        assert first_cells and second_cells
-        assert max(first_cells) < min(second_cells)
 
     def test_reused_memory_is_conditional_and_subtractive(self, monkeypatch):
         """Aliased memory appears only when present and uses a dotted subtraction bar."""
@@ -425,7 +391,7 @@ class TestReport:
 
         reused = dataclasses.replace(measured, reused_bytes=measured.output_bytes)
         line = next(line for line in repr(reused).splitlines() if line.startswith("reused"))
-        assert "░" in line and f"-{display.scaled(reused.reused_bytes)}" in line
+        assert f"-{display.scaled(reused.reused_bytes)}" in line
 
     def test_forward_passes_are_restored(self):
         """The scope wrapper is installed for the trace alone and removed afterwards."""

@@ -715,7 +715,7 @@ def cost_repr(self: "Cost") -> str:
     def shape(value: Any) -> str:
         """Describe a pytree by the dtype and shape of every array it holds."""
         if hasattr(value, "shape") and hasattr(value, "dtype"):
-            return f"{color(dtype(value), _SYMBOL)}{value.shape}"
+            return f"{color(dtype(value), _SYMBOL)}{highlight(str(value.shape))}"
         if isinstance(value, tuple):
             items = ", ".join(shape(item) for item in value)
             return f"({items},)" if len(value) == 1 else f"({items})"
@@ -822,7 +822,7 @@ def cost_repr(self: "Cost") -> str:
         grey = f"\x1b[38;2;{ansi(max(0.92 - 0.13 * layer.depth, 0.40), 0.03, 260)}m"
         meter = bar(start, within, bar_width, grey)
 
-        # Only the dtypes carry color, so a row of figures reads as one measurement
+        # Only the output column carries color, so a row of figures reads as one measurement
         label, visible = labels[path]
         lines.append(
             f"{label}{' ' * (width - visible)}{scaled(layer.flops, 1e3, _FLOPS):>7}"

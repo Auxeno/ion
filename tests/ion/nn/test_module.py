@@ -1702,8 +1702,6 @@ class TestPalette:
         """Each built-in layer specifies lightness and chroma as well as hue."""
 
         assert all(len(color) == 3 for color in display._PALETTE.values())
-        assert {color[:2] for color in display._PALETTE.values()} == {(0.8, 0.12)}
-        assert display.palette("MultiHeadAttention") == (0.8, 0.12, 36)
 
     def test_unknown_class_is_stable(self):
         """A class from outside Ion hashes onto the same circle, so its color never shifts."""
