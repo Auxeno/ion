@@ -753,11 +753,12 @@ def cost_repr(self: "Cost") -> str:
     data_bytes = max(self.input_bytes - self.param_bytes, 0)
     gross_memory = self.input_bytes + self.intermediate_bytes + self.output_bytes
     memory_grey = f"\x1b[38;2;{ansi(0.92, 0.03, 260)}m"
+    component_grey = f"\x1b[38;2;{ansi(0.66, 0.03, 260)}m"
     memory_label_width = len("intermediate") + 2
 
     def memory_row(label: str, start: int, size: int, value: str, fill: str = "█") -> str:
         whole = gross_memory or 1
-        code = memory_grey if label == "total" else _COMMENT
+        code = memory_grey if label == "total" else component_grey
         meter = bar(start / whole, size / whole, memory_width, code, fill)
         return (
             color(f"{label:<{memory_label_width}}", _COMMENT)
