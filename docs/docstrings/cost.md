@@ -2,9 +2,9 @@ Analyse one call's arithmetic and memory, layer by layer, for any function takin
 
 [`Module.cost`](core/module.md#ion.nn.Module.cost) covers a model's own forward pass. This
 function also accepts a callable, so a loss, a gradient, or a whole training step is
-analysed the same way, including the reverse work in a gradient evaluation. A transform
-rebuilds the model as it traces, so layers inside one are not named and the call is totalled
-without a breakdown.
+analysed the same way, including the reverse work in a gradient evaluation, which is charged
+to the layer whose forward pass produced it. A transform rebuilds the model as it traces, and
+the rebuilt tree reclaims its paths, so layers inside one keep their breakdown.
 
 Parameters
 ----------

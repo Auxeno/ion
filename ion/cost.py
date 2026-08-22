@@ -70,12 +70,16 @@ def _abstract(value: Any) -> Any:
     return jax.tree.map(lambda x: jax.ShapeDtypeStruct(x.shape, x.dtype) if shaped(x) else x, value)
 
 
-def _scoped(original: Any, scopes: dict[int, Any], outputs: dict[str, Any]) -> Any:
+def _scoped(original: Any, scopes: dict[int, Any], outputs: dict[str, Any], root: Module) -> Any:
     """Wrap a forward pass so it names its operations and records its output while tracing."""
 
     @functools.wraps(original)
     def scoped_call(self: Any, *args: Any, **kwargs: Any) -> Any:
         scope = scopes.get(id(self))
+        if scope is None and type(self) is type(root):
+            # A transform rebuilds the tree it is handed, so the copy reclaims the paths it lost
+            scopes.update((id(m), (p.rsplit(".", 1)[-1], p)) for m, p, _, _ in _walk(self))
+            scope = scopes[id(self)]
         if scope is None:
             return original(self, *args, **kwargs)
 
@@ -212,7 +216,7 @@ def cost(target: Any, *args: Any, **kwargs: Any) -> Cost:
     }
     originals = {owner: owner.__call__ for owner in owners}
     for owner, original in originals.items():
-        owner.__call__ = _scoped(original, scopes, outputs)
+        owner.__call__ = _scoped(original, scopes, outputs, root)
     try:
         lowered = jitted.trace(*shapes, **shaped_kwargs)
     finally:
@@ -240,7 +244,7 @@ def cost(target: Any, *args: Any, **kwargs: Any) -> Cost:
 
     layers = {}
     for module, path, label, depth in _walk(root):
-        # A transform rebuilds the tree it is given, so a layer inside one never runs under its name
+        # A layer the call never reaches has no output of its own to report
         if path and path not in outputs:
             continue
 

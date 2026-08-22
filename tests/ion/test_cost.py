@@ -194,15 +194,31 @@ class TestTargets:
         measured = ion.cost(lambda x, model: model(x), jnp.ones((2, 8)), model=model)
         assert measured.layers[""].output.shape == (2, 4)
 
-    def test_gradient_reports_the_call_as_a_whole(self):
-        """A transform rebuilds the tree, so reverse-mode work is totalled without a breakdown."""
+    def test_gradient_breaks_down_by_layer(self):
+        """Reverse-mode work is charged to the layer whose forward pass produced it."""
         model = nn.MLP([64, 128, 10], key=jax.random.key(0))
         loss = lambda m, x, y: ((m(x) - y) ** 2).mean()
         x, y = jnp.ones((8, 64)), jnp.ones((8, 10))
         forward = ion.cost(model, x)
         gradient = ion.cost(jax.grad(loss), model, x, y)
         assert gradient.flops > 1.5 * forward.flops
-        assert list(gradient.layers) == [""] and list(forward.layers) != [""]
+        assert list(gradient.layers) == list(forward.layers)
+        assert all(gradient.layers[p].flops > forward.layers[p].flops for p in forward.layers)
+
+    @pytest.mark.parametrize(
+        "transform",
+        [
+            lambda call: jax.jit(call),
+            lambda call: jax.checkpoint(call),
+            lambda call: lambda m, x: jax.vmap(call, in_axes=(None, 0))(m, x),
+        ],
+    )
+    def test_transforms_that_rebuild_the_tree_keep_their_layers(self, transform):
+        """Flattening a model into a transform rebuilds it, and the copy reclaims its paths."""
+        model = nn.MLP([64, 128, 10], key=jax.random.key(0))
+        x = jnp.ones((8, 64))
+        direct = ion.cost(model, x)
+        assert list(ion.cost(transform(lambda m, x: m(x)), model, x).layers) == list(direct.layers)
 
     def test_static_arguments(self):
         """Non-array positional and keyword configuration is compiled statically."""
