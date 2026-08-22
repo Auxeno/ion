@@ -2,6 +2,7 @@
 
 ## 0.18.1
 
+- **`ion.cost` keeps its breakdown under JAX transforms.** A transform rebuilds the model as it traces, which used to leave every layer unnamed and reduce the report to a single whole-call total. The rebuilt tree now reclaims its paths, so `jax.grad`, `jax.jit`, `jax.checkpoint` and `jax.vmap` report layer by layer, with reverse-mode work charged to the layer whose forward pass produced it. Layer outputs under `jax.vmap` restore the mapped axis, so shapes agree with the FLOPs and memory beside them.
 - **Buffer distributions in `__repr__`.** Buffers are now described by the same histogram and moments as parameters, so running statistics can be read off a printed model.
 - **Abbreviated dtypes in `__repr__`.** `Param`, `Buffer`, `Module`, `Optimizer` and `Cost` now render dtypes in their short form, so `float32` reads as `f32` and `bfloat16` as `bf16`.
 - **Tweaks to `__repr__`**: Tweaks to format and colour of `__repr__` for `Module` and `Cost`. Documentation and examples updated to match.

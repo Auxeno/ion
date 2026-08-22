@@ -127,6 +127,35 @@ class TestStructure:
         assert layers["layers[0]"].output == jax.ShapeDtypeStruct((2, 16), jnp.float32)
         assert layers["layers[1]"].output == jax.ShapeDtypeStruct((2, 4), jnp.float32)
 
+    def test_mapped_outputs_carry_the_axis_vmap_adds(self):
+        """A batch tracer hides the mapped axis, so outputs report the shape XLA materializes."""
+        model = nn.MLP([64, 128, 10], key=jax.random.key(0))
+        x = jnp.ones((32, 64))
+        call = lambda m, z: jax.vmap(lambda module, row: module(row), in_axes=(None, 0))(m, z)
+        mapped = ion.cost(call, model, x)
+        direct = ion.cost(model, x)
+        assert [layer.output for layer in mapped.layers.values()] == [
+            layer.output for layer in direct.layers.values()
+        ]
+
+    def test_mapped_outputs_compose_with_other_transforms(self):
+        """Nesting and reverse mode stack their axes, so every mapped axis is restored."""
+        model = nn.MLP([8, 16, 4], key=jax.random.key(0))
+        row = lambda module, value: module(value)
+        nested = ion.cost(
+            lambda m, z: jax.vmap(jax.vmap(row, in_axes=(None, 0)), in_axes=(None, 0))(m, z),
+            model,
+            jnp.ones((3, 5, 8)),
+        )
+        assert nested.layers["layers[0]"].output.shape == (3, 5, 16)
+
+        gradient = ion.cost(
+            lambda m, z: jax.vmap(jax.grad(lambda module, value: jnp.sum(module(value))))(m, z),
+            jax.tree.map(lambda *leaves: jnp.stack(leaves), model, model),
+            jnp.ones((2, 8)),
+        )
+        assert gradient.layers["layers[0]"].output.shape == (2, 16)
+
     def test_structured_output_keeps_its_pytree(self):
         """Multiple outputs retain their original structure."""
 

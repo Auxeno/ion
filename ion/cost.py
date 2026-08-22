@@ -66,8 +66,19 @@ class Cost:
 
 def _abstract(value: Any) -> Any:
     """Replace array leaves with shape and dtype placeholders, allocating no data."""
-    shaped = lambda x: hasattr(x, "shape") and hasattr(x, "dtype")
-    return jax.tree.map(lambda x: jax.ShapeDtypeStruct(x.shape, x.dtype) if shaped(x) else x, value)
+
+    def placeholder(x: Any) -> Any:
+        if not (hasattr(x, "shape") and hasattr(x, "dtype")):
+            return x
+
+        # A mapped tracer hides the axis vmap adds, so descend to the value holding the full shape
+        full = x
+        while getattr(full, "batch_dim", None) is not None or hasattr(full, "primal"):
+            full = full.val if getattr(full, "batch_dim", None) is not None else full.primal
+
+        return jax.ShapeDtypeStruct(full.shape, x.dtype)
+
+    return jax.tree.map(placeholder, value)
 
 
 def _scoped(original: Any, scopes: dict[int, Any], outputs: dict[str, Any], root: Module) -> Any:

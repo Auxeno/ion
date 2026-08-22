@@ -40,6 +40,8 @@ Arrays are abstractified automatically. For large inputs, pass a `jax.ShapeDtype
 ion.cost(model, jax.ShapeDtypeStruct((8192, 256), jnp.float32))
 ```
 
+Under `jax.vmap` the FLOPs, memory and output shapes all describe the whole mapped call. The one exception is a `jax.checkpoint` nested inside a `vmap`, whose layer outputs are reported per lane, because the mapped axis does not exist yet where those layers trace.
+
 FLOPs count a multiply-add as two operations. Matmul and convolution counts are precise under that convention; elementwise counts are indicative. Dynamic `cond` and unknown-trip `while` control flow have no single static cost and are not supported.
 
 The equivalent method interface is documented with [`Module.cost`](core/module.md#ion.nn.Module.cost).
