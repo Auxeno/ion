@@ -1,6 +1,6 @@
 # Overview
 
-Ion introduces four core concepts for building and training neural networks in JAX. Its neural and graph network layers are built on top of them.
+Ion is a simple neural network library for JAX. It introduces four core concepts for building and training models: [`Module`](core/module.md), [`Param`](core/param.md), [`Buffer`](core/buffers.md), and [`Optimizer`](core/optimizer.md). Models are [pytrees](https://docs.jax.dev/en/latest/pytrees.html) that work directly with native JAX transforms. Ion's neural and graph network layers are built on the same core.
 
 ## Quickstart
 
@@ -87,30 +87,12 @@ class MLP(nn.Module):
 
 
 model = MLP(key=jax.random.key(0))
-```
-
-Modules can contain other modules, so layers compose into one model tree. JAX arrays and parameters are dynamic leaves; Python values are compile-time constants, so changing one produces a new JIT specialization.
-
-## Inspecting a model
-
-Evaluating a model shows its structure, parameter counts, shapes, distributions, and moments:
-
-```python
 model
 ```
 
 --8<-- "docs/assets/overview-model.html"
 
-The same model can describe the arithmetic and memory required by a representative call. `model.cost` traces and compiles the call without executing it, then attributes the work to each layer:
-
-```python
-x = jnp.ones((32, 4))
-model.cost(x)
-```
-
---8<-- "docs/assets/overview-cost.html"
-
-See [Workflows](workflows.md#inspecting-models) for model inspection and [Measuring cost](workflows.md#measuring-cost) for analysing functions, gradients, and larger calls.
+Modules can contain other modules, so layers compose into one model tree. JAX arrays and parameters are dynamic leaves; Python values are compile-time constants, so changing one produces a new JIT specialization.
 
 ## Neural network layers
 
@@ -246,6 +228,26 @@ model, optimizer = ion.load("checkpoint.ion", (model, optimizer))
 
 See [Checkpointing](workflows.md#checkpointing) for the format and edge cases.
 
+## Costing a model
+
+`model.cost` traces and compiles a representative call without executing it, then reports FLOPs, compiler memory, graph operations, and outputs against the same tree shown in the repr:
+
+```python
+import jax
+import jax.numpy as jnp
+
+import ion
+from ion import nn
+
+model = nn.MLP([4, 16, 3], key=jax.random.key(0))
+x = jnp.ones((32, 4))
+model.cost(x)
+```
+
+--8<-- "docs/assets/overview-cost.html"
+
+See [Measuring cost](workflows.md#measuring-cost) for more information.
+
 ## Module helpers
 
 A `Module` is a plain pytree, but it carries a few conveniences for commonly used operations. Since modules are immutable, anything that transforms the model returns a new one:
@@ -284,29 +286,6 @@ model.params  # Param leaves; array data and buffers become None
 ```
 
 Casting is how Ion does [mixed precision](workflows.md#mixed-precision); see [Freezing](workflows.md#freezing) for working with trainability.
-
-`model.cost` analyses a call rather than the model, reporting FLOPs, compiler memory, graph operations and logical outputs against the same tree the repr prints. `ion.cost` does the same for any callable taking a model, so a loss or gradient evaluation is measured the same way:
-
-```python
-import jax
-import jax.numpy as jnp
-
-import ion
-from ion import nn
-
-model = nn.MLP([4, 16, 3], key=jax.random.key(0))
-x, y = jnp.ones((8, 4)), jnp.ones((8, 3))
-
-
-def loss(model, x, y):
-    return ((model(x) - y) ** 2).mean()
-
-
-model.cost(x)                          # a forward pass
-ion.cost(jax.grad(loss), model, x, y)  # forward and reverse work
-```
-
-See [Measuring cost](workflows.md#measuring-cost) for how to read the table.
 
 ## Benchmarks
 
