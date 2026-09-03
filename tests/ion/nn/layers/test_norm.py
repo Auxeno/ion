@@ -223,7 +223,7 @@ class TestLayerNorm:
 class TestGroupNorm:
     def test_zero_mean_per_group(self):
         """Output has approximately zero mean within each group."""
-        layer = nn.GroupNorm(8, 2, num_spatial_dims=0)
+        layer = nn.GroupNorm(8, num_groups=2, num_spatial_dims=0)
         x = jax.random.normal(jax.random.key(0), (4, 8))
         y = layer(x)
         y_groups = y.reshape(4, 2, 4)
@@ -232,7 +232,7 @@ class TestGroupNorm:
 
     def test_unit_variance_per_group(self):
         """Output has approximately unit variance within each group."""
-        layer = nn.GroupNorm(8, 2, num_spatial_dims=0)
+        layer = nn.GroupNorm(8, num_groups=2, num_spatial_dims=0)
         x = jax.random.normal(jax.random.key(0), (4, 8))
         y = layer(x)
         y_groups = y.reshape(4, 2, 4)
@@ -241,29 +241,30 @@ class TestGroupNorm:
 
     def test_scale_init(self):
         """Scale is initialized to all ones."""
-        layer = nn.GroupNorm(8, 2, num_spatial_dims=0)
+        layer = nn.GroupNorm(8, num_groups=2, num_spatial_dims=0)
         npt.assert_allclose(layer.scale._value, jnp.ones(8))
 
     def test_bias_init(self):
         """Bias is initialized to all zeros."""
-        layer = nn.GroupNorm(8, 2, num_spatial_dims=0)
+        layer = nn.GroupNorm(8, num_groups=2, num_spatial_dims=0)
+        assert layer.b is not None
         npt.assert_allclose(layer.b._value, jnp.zeros(8))
 
     def test_indivisible_dim_errors(self):
         """dim not divisible by num_groups raises ValueError."""
         with pytest.raises(ValueError, match="divisible"):
-            nn.GroupNorm(8, 3, num_spatial_dims=0)
+            nn.GroupNorm(8, num_groups=3, num_spatial_dims=0)
 
     def test_single_group_matches_layer_norm(self):
         """With num_groups=1, GroupNorm behaves like LayerNorm."""
         x = jax.random.normal(jax.random.key(0), (4, 8))
-        gn = nn.GroupNorm(8, 1, num_spatial_dims=0)
+        gn = nn.GroupNorm(8, num_groups=1, num_spatial_dims=0)
         ln = nn.LayerNorm(8)
         npt.assert_allclose(gn(x), ln(x), atol=1e-6)
 
     def test_spatial_zero_mean_per_group(self):
         """With num_spatial_dims=2, output has zero mean over spatial + group channels."""
-        layer = nn.GroupNorm(8, 2, num_spatial_dims=2)
+        layer = nn.GroupNorm(8, num_groups=2, num_spatial_dims=2)
         x = jax.random.normal(jax.random.key(0), (1, 6, 6, 8))
         y = layer(x)
         y_groups = y.reshape(1, 6, 6, 2, 4)
@@ -272,7 +273,7 @@ class TestGroupNorm:
 
     def test_spatial_unit_variance_per_group(self):
         """With num_spatial_dims=2, output has unit variance over spatial + group channels."""
-        layer = nn.GroupNorm(8, 2, num_spatial_dims=2)
+        layer = nn.GroupNorm(8, num_groups=2, num_spatial_dims=2)
         x = jax.random.normal(jax.random.key(0), (1, 6, 6, 8))
         y = layer(x)
         y_groups = y.reshape(1, 6, 6, 2, 4)
@@ -282,25 +283,25 @@ class TestGroupNorm:
 
     def test_spatial_unbatched_matches_batched(self):
         """A spatial input without a batch dim matches the batched result."""
-        layer = nn.GroupNorm(8, 2, num_spatial_dims=2)
+        layer = nn.GroupNorm(8, num_groups=2, num_spatial_dims=2)
         x = jax.random.normal(jax.random.key(0), (6, 6, 8))
         npt.assert_allclose(layer(x), layer(x[None])[0], atol=1e-6)
 
     def test_extra_leading_dims(self):
         """Arbitrary leading dims are normalized independently."""
-        layer = nn.GroupNorm(8, 2, num_spatial_dims=2)
+        layer = nn.GroupNorm(8, num_groups=2, num_spatial_dims=2)
         x = jax.random.normal(jax.random.key(0), (2, 3, 6, 6, 8))
         y = layer(x)
         assert y.shape == x.shape
         npt.assert_allclose(y[1, 2], layer(x[1, 2]), atol=1e-6)
 
-        layer = nn.GroupNorm(8, 2, num_spatial_dims=0)
+        layer = nn.GroupNorm(8, num_groups=2, num_spatial_dims=0)
         x = jax.random.normal(jax.random.key(1), (2, 5, 8))
         npt.assert_allclose(layer(x)[0], layer(x[0]), atol=1e-6)
 
     def test_spatial_vmap_batch(self):
         """jax.vmap adds an extra batch dimension with num_spatial_dims."""
-        layer = nn.GroupNorm(8, 2, num_spatial_dims=2)
+        layer = nn.GroupNorm(8, num_groups=2, num_spatial_dims=2)
         x = jax.random.normal(jax.random.key(0), (3, 6, 6, 8))
         y = layer(x)
         assert y.shape == (3, 6, 6, 8)
@@ -311,20 +312,34 @@ class TestGroupNorm:
 
     def test_instance_norm_via_group_norm(self):
         """GroupNorm with num_groups=dim and num_spatial_dims gives instance norm."""
-        layer = nn.GroupNorm(3, 3, num_spatial_dims=2)
+        layer = nn.GroupNorm(3, num_groups=3, num_spatial_dims=2)
         x = jax.random.normal(jax.random.key(0), (1, 8, 8, 3))
         y = layer(x)
         means = jnp.mean(y, axis=(1, 2))
         npt.assert_allclose(means, 0.0, atol=1e-5)
 
+    def test_no_bias(self):
+        """use_bias=False drops the bias parameter."""
+        layer = nn.GroupNorm(8, num_groups=2, num_spatial_dims=0, use_bias=False)
+        assert layer.b is None
+        assert layer.num_params == 8
+
+    def test_no_bias_matches_zero_bias(self):
+        """A zero bias is equivalent to no bias."""
+        x = jax.random.normal(jax.random.key(0), (4, 8))
+        without = nn.GroupNorm(8, num_groups=2, num_spatial_dims=0, use_bias=False)
+        with_zero = nn.GroupNorm(8, num_groups=2, num_spatial_dims=0)
+        npt.assert_allclose(without(x), with_zero(x), rtol=1e-6)
+
     @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
     def test_mixed_precision(self, dtype):
         """Normalization uses float32 while preserving the input dtype."""
-        layer = nn.GroupNorm(8, 2, num_spatial_dims=2).astype(dtype)
+        layer = nn.GroupNorm(8, num_groups=2, num_spatial_dims=2).astype(dtype)
         x = (100 * jax.random.normal(jax.random.key(0), (2, 32, 32, 8))).astype(dtype)
 
         y = layer(x)
-        expected = nn.GroupNorm(8, 2, num_spatial_dims=2)(x.astype(jnp.float32)).astype(dtype)
+        reference = nn.GroupNorm(8, num_groups=2, num_spatial_dims=2)
+        expected = reference(x.astype(jnp.float32)).astype(dtype)
 
         assert y.dtype == dtype
         npt.assert_allclose(y, expected, rtol=1e-2, atol=1e-2)

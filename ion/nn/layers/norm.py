@@ -169,7 +169,7 @@ class GroupNorm(Module):
     """
 
     scale: Param[Float[Array, " d"]]
-    b: Param[Float[Array, " d"]]
+    b: Param[Float[Array, " d"]] | None
     num_groups: int
     num_spatial_dims: int
     eps: float
@@ -177,17 +177,18 @@ class GroupNorm(Module):
     def __init__(
         self,
         dim: int,
+        *,
         num_groups: int,
         num_spatial_dims: int,
-        *,
         eps: float = 1e-5,
+        use_bias: bool = True,
     ) -> None:
 
         if dim % num_groups != 0:
             raise ValueError(f"dim ({dim}) must be divisible by num_groups ({num_groups})")
 
         self.scale = Param(jnp.ones(dim))
-        self.b = Param(jnp.zeros(dim))
+        self.b = Param(jnp.zeros(dim)) if use_bias else None
 
         self.num_groups = num_groups
         self.num_spatial_dims = num_spatial_dims
@@ -214,7 +215,12 @@ class GroupNorm(Module):
         # Merge groups back
         x = x.reshape(*x.shape[:-2], -1)
 
-        return (x * self.scale + self.b).astype(dtype)
+        x = x * self.scale
+
+        if self.b is not None:
+            x = x + self.b
+
+        return x.astype(dtype)
 
 
 class SpectralNorm(Module):

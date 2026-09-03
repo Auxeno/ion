@@ -2,6 +2,8 @@
 
 ## 0.18.2
 
+- **Breaking: `nn.GroupNorm` takes `num_groups` and `num_spatial_dims` as keywords.** Both were positional, while every other normalization layer is keyword-only past `dim`. The layer also gains `use_bias`, which the others already had.
+- **`gnn.SAGEConv` rejects an unknown `aggregate`.** An unrecognized string raised `KeyError` from the lookup table instead of the `ValueError` naming the accepted values that its neighbours raise.
 - **`nn.MaxPool` reduces in the input dtype.** Pooling cast to `float32` first, which rounded integer inputs and doubled the bytes moved for `bfloat16`. A maximum is exact in any precision, so the cast is gone. `AvgPool` still accumulates in `float32`.
 - **`nn.BatchNorm` NaN running variance fix.** Bessel's correction divided by zero for a batch of one with no spatial axes, so the running variance became NaN. The denominator is now floored at one, leaving larger batches unchanged.
 - **`gnn.HGTConv` NaN gradient fix.** Masked edges kept their logits while their receivers were redirected past the last node, so the softmax subtracted an unrelated node's maximum from them. A large enough gap overflowed `exp`, which the forward pass discarded but the backward pass turned into NaN. Masked logits are now set to `-inf` before the softmax, as the attention layers already do, leaving the forward pass unchanged.

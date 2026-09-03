@@ -167,6 +167,9 @@ class SAGEConv(Module):
         in_src, in_dst = in_dim if isinstance(in_dim, tuple) else (in_dim, in_dim)
         root_shape = (in_dst, out_dim)
 
+        if aggregate not in ("mean", "max", "sum"):
+            raise ValueError(f"unknown aggregate {aggregate!r}; expected 'mean', 'max', or 'sum'")
+
         key_neigh, key_root, key_b = jax.random.split(key, 3)
         self.w_neigh = Param(w_init(shape=(in_src, out_dim), key=key_neigh))
         self.w_root = Param(w_init(shape=root_shape, key=key_root)) if use_root_weight else None

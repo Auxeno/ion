@@ -12,6 +12,7 @@ import math
 from typing import Literal
 
 import jax.numpy as jnp
+import numpy as np
 from jax import lax
 
 from ...typing import Array, Float
@@ -73,7 +74,7 @@ class MaxPool(Module):
 
         x = lax.reduce_window(
             operand=x,
-            init_value=jnp.array(identity, x.dtype),
+            init_value=np.array(identity, x.dtype),
             computation=lax.max,
             window_dimensions=(1, *self.kernel_shape, 1),
             window_strides=(1, *self.stride, 1),

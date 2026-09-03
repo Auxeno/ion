@@ -264,6 +264,11 @@ class TestSAGEConv:
         y = sage(x, senders, receivers)
         assert y.shape == (5, 16)
 
+    def test_unknown_aggregate_raises(self):
+        """An unrecognized aggregate names the ones the layer accepts."""
+        with pytest.raises(ValueError, match="unknown aggregate"):
+            gnn.SAGEConv(2, 3, aggregate="median", key=jax.random.key(0))  # type: ignore[arg-type]
+
     @pytest.mark.parametrize("aggregate", ["mean", "max", "sum"])
     def test_output_manual(self, aggregate, triangle_graph_no_self_loops):
         """Output matches manual aggregation plus root transform and bias."""

@@ -15,13 +15,15 @@ num_spatial_dims : int
     `0` normalizes each position over its channel groups only.
 eps : float, default=1e-5
     Positive constant added to the variance for numerical stability.
+use_bias : bool, default=True
+    Whether to learn a per-channel shift.
 
 Attributes
 ----------
 scale : Param
     Per-channel scale of shape `(dim,)`, initialized to ones.
-b : Param
-    Per-channel bias of shape `(dim,)`, initialized to zeros.
+b : Param | None
+    Per-channel bias of shape `(dim,)`, initialized to zeros. `None` when `use_bias=False`.
 
 Example
 -------
@@ -36,7 +38,8 @@ x = jnp.ones((batch, channels))
 y = norm(x)  # (8, 64) -> (8, 64), per-position over channel groups
 
 x_batched = jnp.ones((5, batch, height, width, channels))  # extra batch dim
-y_batched = jax.vmap(nn.GroupNorm(channels, 8, 2))(x_batched)  # (5, 8, 32, 32, 64) -> (5, 8, 32, 32, 64)
+grouped = nn.GroupNorm(channels, num_groups=8, num_spatial_dims=2)
+y_batched = jax.vmap(grouped)(x_batched)  # (5, 8, 32, 32, 64) -> (5, 8, 32, 32, 64)
 ```
 
 Note
