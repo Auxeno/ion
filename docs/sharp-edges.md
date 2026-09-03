@@ -103,7 +103,7 @@ y = model(x.astype(jnp.bfloat16))
 
 ## Numerically sensitive reductions use `float32`
 
-Normalization layers, pooling layers, and floating-point segment reductions compute in `float32`, even when JAX's 64-bit mode is enabled, and cast results back to the input dtype. Write a custom operation if a reduction itself must use `float64`.
+Normalization layers, `AvgPool`, and floating-point segment reductions compute in `float32`, even when JAX's 64-bit mode is enabled, and cast results back to the input dtype. Write a custom operation if a reduction itself must use `float64`.
 
 ## Module immutability is shallow
 

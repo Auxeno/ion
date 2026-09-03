@@ -55,12 +55,22 @@ class TestMaxPool:
 
     @pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
     def test_mixed_precision(self, dtype):
-        """Pooling uses float32 while preserving the input dtype."""
+        """Pooling reduces in the input dtype and preserves it."""
         x = jnp.arange(16, dtype=dtype).reshape(1, 4, 4, 1)
         y = nn.MaxPool(kernel_shape=(2, 2))(x)
 
         assert y.dtype == dtype
         npt.assert_array_equal(y, jnp.array([[[[5], [7]], [[13], [15]]]], dtype=dtype))
+
+    @pytest.mark.parametrize("dtype", [jnp.int32, jnp.int8, jnp.uint8])
+    def test_integer_input_is_exact(self, dtype):
+        """Integer inputs pool exactly, with no rounding through a float dtype."""
+        x = jnp.array([[16_777_217, 16_777_219], [16_777_218, 16_777_216]], dtype=jnp.int32)
+        x = jnp.asarray(x % (jnp.iinfo(dtype).max // 2), dtype=dtype).reshape(1, 2, 2, 1)
+        y = nn.MaxPool(kernel_shape=(2, 2))(x)
+
+        assert y.dtype == dtype
+        npt.assert_array_equal(y, jnp.max(x).reshape(1, 1, 1, 1))
 
 
 class TestMaxPoolConstructor:

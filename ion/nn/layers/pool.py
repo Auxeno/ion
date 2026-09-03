@@ -67,21 +67,20 @@ class MaxPool(Module):
         self.padding = resolved_padding
 
     def __call__(self, x: Float[Array, "b ... c"]) -> Float[Array, "b ... c"]:
-        dtype = x.dtype
-        x = x.astype(jnp.float32)
-
         padding = self.padding if isinstance(self.padding, str) else ((0, 0), *self.padding, (0, 0))
+
+        identity = -jnp.inf if jnp.issubdtype(x.dtype, jnp.inexact) else jnp.iinfo(x.dtype).min
 
         x = lax.reduce_window(
             operand=x,
-            init_value=-jnp.inf,
+            init_value=jnp.array(identity, x.dtype),
             computation=lax.max,
             window_dimensions=(1, *self.kernel_shape, 1),
             window_strides=(1, *self.stride, 1),
             padding=padding,
         )
 
-        return x.astype(dtype)
+        return x
 
 
 class AvgPool(Module):
