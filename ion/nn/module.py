@@ -205,8 +205,9 @@ class Module:
         """Automatically convert subclasses into dataclasses and register them as PyTrees."""
         super().__init_subclass__(**kwargs)
 
-        # Apply dataclass decorator, only generate __init__ if one doesn't exist
-        dataclasses.dataclass(init="__init__" not in cls.__dict__, repr=False, eq=False)(cls)
+        # Apply dataclass decorator, only generate __init__ if neither the class nor a base has one
+        defined = any("__init__" in base.__dict__ for base in cls.__mro__[:-1])
+        dataclasses.dataclass(init=not defined, repr=False, eq=False)(cls)
 
         # Register as pytree first so _classify is available to the constructor
         _classify = _register_module_as_pytree(cls)

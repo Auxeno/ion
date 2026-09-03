@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.18.2
+
+- **Subclassing a layer keeps its constructor.** A subclass generated a dataclass `__init__` from its fields unless it defined one itself, so `class MyLinear(nn.Linear): pass` shadowed the inherited constructor and `MyLinear(3, 16, key=key)` raised a `TypeError`. Generation now also stands aside for a constructor inherited from a base.
+
 ## 0.18.1
 
 - **`Optimizer` repr handles an abstract step.** Costing a training step abstracts the optimizer it is given, leaving `step` as a shape placeholder that both renderers tried to read a value from. An abstract step now prints as its dtype, the way a traced one already did.

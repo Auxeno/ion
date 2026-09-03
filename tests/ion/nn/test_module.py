@@ -72,6 +72,33 @@ class TestSubclassTransformation:
         assert p.x == 1
         assert p.y == 2
 
+    def test_inherited_init_preserved(self):
+        """Subclass of a layer keeps the constructor it inherits."""
+
+        class Scaled(nn.Linear):
+            pass
+
+        m = Scaled(3, 4, key=jax.random.key(0))
+        assert m.w.shape == (3, 4)
+        assert len(jax.tree.leaves(m)) == 2
+        npt.assert_allclose(m(jnp.ones((2, 3))), nn.Linear.__call__(m, jnp.ones((2, 3))))
+
+    def test_inherited_init_extended(self):
+        """Subclass calling super().__init__ adds its own fields and stays frozen."""
+
+        class Scaled(nn.Linear):
+            gain: float
+
+            def __init__(self, *args, gain: float = 2.0, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.gain = gain
+
+        m = Scaled(3, 4, gain=3.0, key=jax.random.key(0))
+        assert m.gain == 3.0
+        assert m.w.shape == (3, 4)
+        with pytest.raises(AttributeError, match="frozen"):
+            m.gain = 1.0
+
     def test_unannotated_field_raises(self):
         """Assigning an unannotated attribute in __init__ raises AttributeError."""
 
