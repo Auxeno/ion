@@ -134,11 +134,14 @@ class BatchNorm(Module):
             var = jnp.mean(jnp.square(x - mean), axis=reduce_axes)
             n = x.size // x.shape[-1]
 
+            # Correction on the stored estimate for single samples
+            correction = n / max(n - 1, 1)
+
             self.running_mean.set(
                 (1.0 - self.momentum) * self.running_mean.value + self.momentum * mean
             )
             self.running_var.set(
-                (1.0 - self.momentum) * self.running_var.value + self.momentum * var * n / (n - 1)
+                (1.0 - self.momentum) * self.running_var.value + self.momentum * var * correction
             )
         else:
             mean = self.running_mean.value

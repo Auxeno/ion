@@ -31,6 +31,16 @@ class TestBatchNorm:
         npt.assert_allclose(layer.running_mean.value, 0.25 * batch_mean)
         npt.assert_allclose(layer.running_var.value, 0.75 + 0.25 * batch_var)
 
+    def test_single_sample_keeps_running_stats_finite(self):
+        """A batch of one has no correction to apply, so the running variance stays finite."""
+        layer = nn.BatchNorm(2, momentum=0.25)
+        x = jnp.array([[1.0, 2.0]])
+
+        layer(x, training=True)
+
+        npt.assert_allclose(layer.running_mean.value, 0.25 * x[0])
+        npt.assert_allclose(layer.running_var.value, jnp.array([0.75, 0.75]))
+
     def test_running_variance_counts_all_reduction_axes(self):
         """The variance correction includes batch and spatial positions."""
         layer = nn.BatchNorm(2, momentum=1.0)
