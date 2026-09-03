@@ -2,6 +2,7 @@
 
 ## 0.18.2
 
+- **`gnn.HGTConv` NaN gradient fix.** Masked edges kept their logits while their receivers were redirected past the last node, so the softmax subtracted an unrelated node's maximum from them. A large enough gap overflowed `exp`, which the forward pass discarded but the backward pass turned into NaN. Masked logits are now set to `-inf` before the softmax, as the attention layers already do, leaving the forward pass unchanged.
 - **Subclassing a layer keeps its constructor.** A subclass generated a dataclass `__init__` from its fields unless it defined one itself, so `class MyLinear(nn.Linear): pass` shadowed the inherited constructor and `MyLinear(3, 16, key=key)` raised a `TypeError`. Generation now also stands aside for a constructor inherited from a base.
 
 ## 0.18.1

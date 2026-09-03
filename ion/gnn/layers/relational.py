@@ -185,7 +185,7 @@ class HGTConv(Module):
         logits = (q[receivers] * edge_k).sum(axis=-1) * self.mu[edge_type] / math.sqrt(head_dim)
 
         if edge_mask is not None:
-            receivers = jnp.where(edge_mask, receivers, n)
+            logits = jnp.where(edge_mask[:, None], logits, -jnp.inf)
 
         # Softmax over each receiver's incoming edges, across every relation at once
         attention = segment_softmax(logits, receivers, n)

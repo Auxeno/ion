@@ -334,6 +334,22 @@ class TestHGTConv:
 
         npt.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
 
+    def test_large_masked_logits_give_finite_grads(self):
+        """A masked edge whose logit is far from its segment max does not overflow the softmax."""
+        conv = gnn.HGTConv(6, 6, 2, 2, num_heads=2, key=jax.random.key(0))
+        x, node_type, senders, receivers, edge_type = _graph()
+        x = x * 50.0
+        mask = jnp.ones(senders.shape, dtype=bool).at[2].set(False)
+
+        arguments = dict(node_type=node_type, edge_type=edge_type, edge_mask=mask)
+        y = conv(x, senders, receivers, **arguments)
+        grads = jax.grad(lambda m, x: m(x, senders, receivers, **arguments).sum(), argnums=(0, 1))(
+            conv, x
+        )
+
+        assert jnp.all(jnp.isfinite(y))
+        assert all(jnp.all(jnp.isfinite(leaf)) for leaf in jax.tree.leaves(grads))
+
     def test_all_edges_masked_is_finite_under_jit_and_grad(self):
         """Empty masked attention stays finite when traced and differentiated."""
         conv = gnn.HGTConv(6, 6, 2, 2, num_heads=2, key=jax.random.key(0))
