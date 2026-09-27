@@ -10,8 +10,8 @@ x_kv : jax.Array["b t c", float] | None, default=None
 mask : jax.Array["...", bool] | None, default=None
     Optional boolean mask over query-key pairs, where `True` means attend and
     `False` means ignore. Accepts `(s, t)`, `(b, s, t)`, or `(b, h, s, t)`.
-    Composes with `causal` and `window`. Fully masked query heads contribute
-    zeros.
+    Composes with `causal` and `window`. Query heads left with no key once all
+    three combine contribute zeros.
 
 Returns
 -------

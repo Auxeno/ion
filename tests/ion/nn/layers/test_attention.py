@@ -186,6 +186,24 @@ class TestMultiHeadAttention:
         y = layer(x, mask=mask)
         npt.assert_array_equal(y[0, 2], 0.0)
 
+    def test_row_closed_by_causal_and_mask_is_zero(self):
+        """A row the mask leaves open but causality closes (left padding) ignores future keys."""
+        layer = nn.MultiHeadAttention(8, num_heads=2, causal=True, key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (1, 4, 8))
+        mask = jnp.ones((4, 4), dtype=bool).at[:, 0].set(False)
+        jac = jax.jacobian(lambda x: layer(x, mask=mask)[0, 0])(x)
+        npt.assert_array_equal(layer(x, mask=mask)[0, 0], 0.0)
+        npt.assert_array_equal(jac, 0.0)
+
+    def test_row_closed_by_window_and_mask_is_zero(self):
+        """A row the mask leaves open but the window closes ignores keys outside the window."""
+        layer = nn.MultiHeadAttention(8, num_heads=2, window=(1, 0), key=jax.random.key(0))
+        x = jax.random.normal(jax.random.key(1), (1, 4, 8))
+        mask = jnp.ones((4, 4), dtype=bool).at[:, 1:3].set(False)
+        jac = jax.jacobian(lambda x: layer(x, mask=mask)[0, 2])(x)
+        npt.assert_array_equal(layer(x, mask=mask)[0, 2], 0.0)
+        npt.assert_array_equal(jac, 0.0)
+
     def test_fully_masked_row_gradients_finite(self):
         """A fully masked query row has zero input gradient."""
         layer = nn.MultiHeadAttention(8, num_heads=2, key=jax.random.key(0))

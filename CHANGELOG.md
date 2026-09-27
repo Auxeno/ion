@@ -3,6 +3,7 @@
 ## 0.18.3
 
 - **`gnn.segment_softmax` NaN gradient fix for padding.** An out-of-range segment id gathered the last real segment's maximum, since JAX gathers clamp where segment reductions drop. A padded logit far enough above that maximum overflowed `exp`, which the forward pass discarded but the backward pass turned into NaN across every parameter. Padded ids now gather `+inf`, so their weights are exactly zero and every attention layer and pool respects the padding convention.
+- **`nn.MultiHeadAttention` no longer leaks future tokens into rows closed by `causal` or `window`.** Rows were zeroed only when `mask` alone blocked every key, so a row that the mask left open but causality closed, as under left padding, softmaxed over uniform logits and averaged the values of every key, future ones included. The causal and window constraints now count towards a fully masked row.
 
 ## 0.18.2
 

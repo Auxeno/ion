@@ -38,7 +38,7 @@ class MultiHeadAttention(Module):
     num_heads: int
     num_kv_heads: int
     causal: bool
-    window: int | tuple[int, int] | None
+    window: tuple[int, int] | None
     attention_fn: Callable[..., Array]
 
     def __init__(
@@ -59,6 +59,7 @@ class MultiHeadAttention(Module):
 
         num_kv_heads = num_heads if num_kv_heads is None else num_kv_heads
         kv_dim = dim if kv_dim is None else kv_dim
+        window = (window, window) if isinstance(window, int) else window
         head_dim = dim // num_heads
 
         if dim % num_heads != 0:
@@ -103,8 +104,12 @@ class MultiHeadAttention(Module):
             q, k, v, mask=mask, is_causal=self.causal, local_window_size=self.window
         )
 
-        # Zero out fully masked query rows
+        # Zero out query rows left with no keys once causal and window constraints also apply
         if mask is not None:
+            if self.causal:
+                mask = jnp.tril(mask)
+            if self.window is not None:
+                mask = jnp.triu(jnp.tril(mask, self.window[1]), -self.window[0])
             valid = mask.any(axis=-1).swapaxes(-1, -2)[..., None]
             x = jnp.where(valid, x, 0.0)
 
