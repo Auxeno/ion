@@ -160,7 +160,7 @@ class TestUnbatchGraphs:
         senders_list = [jnp.array([0, 2]), jnp.array([], dtype=jnp.int32), jnp.array([1])]
         receivers_list = [jnp.array([1, 3]), jnp.array([], dtype=jnp.int32), jnp.array([0])]
         batched = gnn.batch_graphs(xs, senders_list, receivers_list)
-        out_xs, out_senders, out_receivers = gnn.unbatch_graphs(*batched)
+        out_xs, out_senders, out_receivers = gnn.unbatch_graphs(*batched, 3)
 
         for original, restored in zip(xs, out_xs):
             npt.assert_array_equal(restored, original)
@@ -169,13 +169,41 @@ class TestUnbatchGraphs:
         for original, restored in zip(receivers_list, out_receivers):
             npt.assert_array_equal(restored, original)
 
+    def test_padded_round_trip(self):
+        """Unbatching a padded batch drops padded nodes and edges."""
+        xs = [jnp.ones((2, 3)), 2 * jnp.ones((1, 3))]
+        senders_list = [jnp.array([0]), jnp.array([0])]
+        receivers_list = [jnp.array([1]), jnp.array([0])]
+        batched = gnn.pad_graphs(*gnn.batch_graphs(xs, senders_list, receivers_list), 5, 4, 2)
+        out_xs, out_senders, out_receivers = gnn.unbatch_graphs(*batched, 2)
+
+        assert len(out_xs) == 2
+        for original, restored in zip(xs, out_xs):
+            npt.assert_array_equal(restored, original)
+        for original, restored in zip(senders_list, out_senders):
+            npt.assert_array_equal(restored, original)
+        for original, restored in zip(receivers_list, out_receivers):
+            npt.assert_array_equal(restored, original)
+
+    def test_trailing_empty_graph_kept(self):
+        """A graph with no nodes at the end of the batch still comes back."""
+        xs = [jnp.ones((2, 3)), jnp.ones((0, 3))]
+        senders_list = [jnp.array([0]), jnp.array([], dtype=jnp.int32)]
+        receivers_list = [jnp.array([1]), jnp.array([], dtype=jnp.int32)]
+        batched = gnn.batch_graphs(xs, senders_list, receivers_list)
+        out_xs, out_senders, out_receivers = gnn.unbatch_graphs(*batched, 2)
+
+        assert [x.shape for x in out_xs] == [(2, 3), (0, 3)]
+        assert [s.shape for s in out_senders] == [(1,), (0,)]
+        assert [r.shape for r in out_receivers] == [(1,), (0,)]
+
     def test_edge_offsets_removed(self):
         """Edge indices are shifted back to be local to each graph."""
         x = jnp.ones((5, 2))
         senders = jnp.array([0, 1, 3, 4])
         receivers = jnp.array([1, 2, 4, 3])
         graph_ids = jnp.array([0, 0, 0, 1, 1])
-        _, out_senders, out_receivers = gnn.unbatch_graphs(x, senders, receivers, graph_ids)
+        _, out_senders, out_receivers = gnn.unbatch_graphs(x, senders, receivers, graph_ids, 2)
         npt.assert_array_equal(out_senders[1], jnp.array([0, 1]))
         npt.assert_array_equal(out_receivers[1], jnp.array([1, 0]))
 
@@ -185,7 +213,7 @@ class TestUnbatchGraphs:
         senders = jnp.array([0, 1, 2])
         receivers = jnp.array([1, 2, 3])
         out_xs, out_senders, out_receivers = gnn.unbatch_graphs(
-            x, senders, receivers, jnp.zeros(4, dtype=jnp.int32)
+            x, senders, receivers, jnp.zeros(4, dtype=jnp.int32), 1
         )
         assert len(out_xs) == 1
         npt.assert_array_equal(out_xs[0], x)

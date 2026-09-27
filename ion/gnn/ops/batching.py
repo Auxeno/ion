@@ -72,6 +72,7 @@ def unbatch_graphs(
     senders: Int[Array, " e"] | np.ndarray,
     receivers: Int[Array, " e"] | np.ndarray,
     graph_ids: Int[Array, " n"] | np.ndarray,
+    num_graphs: int,
 ) -> tuple[
     list[Float[Array, "n d"]],
     list[Int[Array, " e"]],
@@ -79,17 +80,17 @@ def unbatch_graphs(
 ]:
     """Split a batched graph back into its component graphs.
 
-    >>> xs, senders_list, receivers_list = unbatch_graphs(x, senders, receivers, graph_ids)
+    >>> xs, senders_list, receivers_list = unbatch_graphs(x, senders, receivers, graph_ids, 32)
     """
     x = np.asarray(x)
     senders = np.asarray(senders)
     receivers = np.asarray(receivers)
     graph_ids = np.asarray(graph_ids)
 
-    node_counts = np.bincount(graph_ids)
+    # Padded nodes carry id num_graphs and padded edges index past the last node, so both drop out
+    node_counts = np.bincount(graph_ids, minlength=num_graphs)[:num_graphs]
     node_offsets = np.cumsum(node_counts) - node_counts
-    edge_graph_ids = graph_ids[senders]
-    num_graphs = node_counts.shape[0]
+    edge_graph_ids = np.append(graph_ids, num_graphs)[senders]
     return (
         [jnp.asarray(x[graph_ids == graph_id]) for graph_id in range(num_graphs)],
         [
