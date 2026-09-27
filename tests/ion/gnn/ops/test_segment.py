@@ -74,6 +74,16 @@ class TestSegmentSoftmax:
         result = gnn.segment_softmax(data, segment_ids, num_segments=2)
         npt.assert_allclose(result, jnp.array([0.0, 0.0, 1.0]), atol=2e-7)
 
+    def test_padded_ids_give_zero_weight_and_finite_grads(self):
+        """A padded entry far above the last segment's max neither overflows nor poisons grads."""
+        data = jnp.array([0.0, 1.0, -5.0, 100.0])
+        segment_ids = jnp.array([0, 0, 1, 2])
+        loss = lambda d: gnn.segment_sum(gnn.segment_softmax(d, segment_ids, 2), segment_ids, 2)
+        result = gnn.segment_softmax(data, segment_ids, num_segments=2)
+        grads = jax.grad(lambda d: loss(d).sum())(data)
+        npt.assert_allclose(result, jnp.array([0.268941, 0.731059, 1.0, 0.0]), atol=1e-6)
+        assert jnp.all(jnp.isfinite(grads))
+
     def test_jit_compatible(self):
         """segment_softmax works under jax.jit."""
         data = jnp.array([1.0, 2.0, 3.0])

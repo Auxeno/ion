@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.18.3
+
+- **`gnn.segment_softmax` NaN gradient fix for padding.** An out-of-range segment id gathered the last real segment's maximum, since JAX gathers clamp where segment reductions drop. A padded logit far enough above that maximum overflowed `exp`, which the forward pass discarded but the backward pass turned into NaN across every parameter. Padded ids now gather `+inf`, so their weights are exactly zero and every attention layer and pool respects the padding convention.
+
 ## 0.18.2
 
 - **Breaking: `nn.GroupNorm` takes `num_groups` and `num_spatial_dims` as keywords.** Both were positional, while every other normalization layer is keyword-only past `dim`. The layer also gains `use_bias`, which the others already had.

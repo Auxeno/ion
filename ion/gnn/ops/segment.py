@@ -76,7 +76,9 @@ def segment_softmax(
     # Subtract per-segment max for numerical stability
     maxes = segment_max(data, segment_ids, num_segments)
     maxes = jnp.where(jnp.isinf(maxes), 0.0, maxes)
-    data = jnp.exp(data - maxes[segment_ids])
+
+    # Padded ids gather +inf rather than clamping to the last segment, so their weights are zero
+    data = jnp.exp(data - maxes.at[segment_ids].get(mode="fill", fill_value=jnp.inf))
 
     # Normalize by per-segment sum
     sums = segment_sum(data, segment_ids, num_segments)
