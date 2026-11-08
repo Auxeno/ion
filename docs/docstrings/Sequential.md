@@ -17,14 +17,27 @@ layers : tuple[Callable, ...]
 Example
 -------
 ```python
-batch, in_dim, hidden_dim, out_dim = 32, 3, 16, 1
-key_1, key_2, key_dropout = jax.random.split(key, 3)
-
+keys = jax.random.split(key, 2)
 model = nn.Sequential(
-    nn.Linear(in_dim, hidden_dim, key=key_1),
-    nn.Dropout(0.1),
-    nn.Linear(hidden_dim, out_dim, key=key_2),
+    nn.Linear(3, 16, key=keys[0]),
+    jax.nn.relu,
+    nn.Linear(16, 1, key=keys[1]),
 )
-x = jnp.ones((batch, in_dim))
-y = model(x, training=True, key=key_dropout)  # (32, 3) -> (32, 1)
+x = jnp.ones((32, 3))
+y = model(x)  # (32, 3) -> (32, 1)
+```
+
+Layers that need a training mode or a random key receive them through the call:
+
+```python
+keys = jax.random.split(key, 3)
+model = nn.Sequential(
+    nn.Conv(3, 16, kernel_shape=(3, 3), padding=1, key=keys[0]),
+    jax.nn.leaky_relu,
+    nn.Dropout(0.1),
+    lambda x: x.mean(axis=(1, 2)),
+    nn.Linear(16, 10, key=keys[1]),
+)
+x = jnp.ones((8, 28, 28, 3))
+y = model(x, training=True, key=keys[2])  # (8, 28, 28, 3) -> (8, 10)
 ```

@@ -21,8 +21,21 @@ from ..module import Module
 class Sequential(Module):
     """Chain layers, routing optional training mode and random keys.
 
-    >>> model = Sequential(Linear(3, 16, key=keys[0]), Dropout(0.1), Linear(16, 1, key=keys[1]))
-    >>> model(x, training=True, key=key)  # (*, 3) -> (*, 1)
+    >>> model = nn.Sequential(
+    ...     nn.Linear(3, 16, key=keys[0]),
+    ...     jax.nn.relu,
+    ...     nn.Linear(16, 1, key=keys[1]),
+    ... )
+    >>> model(x)  # (*, 3) -> (*, 1)
+
+    >>> model = nn.Sequential(
+    ...     nn.Conv(3, 16, kernel_shape=(3, 3), padding=1, key=keys[0]),
+    ...     jax.nn.leaky_relu,
+    ...     nn.Dropout(0.1),
+    ...     lambda x: x.mean(axis=(1, 2)),
+    ...     nn.Linear(16, 10, key=keys[1]),
+    ... )
+    >>> model(x, training=True, key=key)  # (b, h, w, 3) -> (b, 10)
     """
 
     layers: tuple[Callable, ...]

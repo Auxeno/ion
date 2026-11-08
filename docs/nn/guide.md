@@ -158,6 +158,8 @@ model = nn.Sequential(
 )
 ```
 
+Activations and initializers come straight from `jax.nn`, Ion does not re-export them.
+
 `MLP` is the same idea specialized to alternating linear layers and one activation, so `nn.MLP([3, 64, 1], key=key)` replaces the above.
 
 `Residual` adds a shape-preserving layer's output to its input. `Bidirectional` runs sequence layers in both time directions, while `Ensemble` builds independent copies of one model and evaluates them over a leading member axis. All three route through nested blocks normally.
