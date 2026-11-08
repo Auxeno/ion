@@ -28,6 +28,7 @@ from typing import (
 )
 
 from jax import Array
+from jax.typing import DTypeLike
 
 __all__ = [
     "Array",
@@ -36,6 +37,7 @@ __all__ = [
     "Complex",
     "Complex64",
     "Complex128",
+    "DTypeLike",
     "Float",
     "Float8E4M3",
     "Float8E5M2",

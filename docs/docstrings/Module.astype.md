@@ -2,7 +2,7 @@ Return a copy with matching array leaves cast to a dtype.
 
 Parameters
 ----------
-dtype : jnp.dtype
+dtype : DTypeLike
     Target dtype. Only leaves in the same dtype family are cast.
 params_only : bool, default=False
     If `True`, cast only `Param` leaves. Keyword-only.

@@ -21,7 +21,7 @@ import jax.numpy as jnp
 
 from .nn.buffer import Buffer
 from .nn.param import Param
-from .typing import PyTree
+from .typing import DTypeLike, PyTree
 
 
 def is_param(x: Any) -> bool:
@@ -44,7 +44,7 @@ def _is_param_or_buffer(x: Any) -> bool:
     return isinstance(x, (Param, Buffer))
 
 
-def astype(pytree: PyTree, dtype: jnp.dtype, *, params_only: bool = False) -> PyTree:
+def astype(pytree: PyTree, dtype: DTypeLike, *, params_only: bool = False) -> PyTree:
     """Cast all leaves in a pytree whose dtype matches the target's family.
 
     If a float dtype is given, only float leaves are cast; likewise for
@@ -54,7 +54,7 @@ def astype(pytree: PyTree, dtype: jnp.dtype, *, params_only: bool = False) -> Py
     ----------
     pytree : PyTree
         Pytree containing `Param` wrappers, plain arrays, or both.
-    dtype : jnp.dtype
+    dtype : DTypeLike
         Target dtype; its family controls which leaves are cast.
     params_only : bool, optional
         If `True`, only `Param` leaves are cast. Default `False`.

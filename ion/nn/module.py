@@ -17,7 +17,7 @@ import jax.tree_util as jtu
 import numpy as np
 
 from .. import tree
-from ..typing import PyTree
+from ..typing import DTypeLike, PyTree
 from .buffer import Buffer
 from .param import Param
 
@@ -295,7 +295,7 @@ class Module:
         """
         return tree.unfreeze(self)
 
-    def astype(self, dtype: jax.numpy.dtype, *, params_only: bool = False) -> Self:
+    def astype(self, dtype: DTypeLike, *, params_only: bool = False) -> Self:
         """Return a copy with matching leaves cast to *dtype*. Wraps `ion.astype`.
 
         >>> bf16_model = model.astype(jnp.bfloat16)
