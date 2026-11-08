@@ -160,15 +160,16 @@ def load(path: str | os.PathLike[str], reference_pytree: PyTree) -> PyTree:
     path = os.fspath(path)
     if not path.endswith(".ion"):
         path += ".ion"
+    # Only the header is read here, so tensors can be read one at a time without the whole file
     with open(path, "rb") as f:
-        data = f.read()
-    if len(data) < 8:
-        raise ValueError(f"Not a valid .ion file: '{path}'")
-    header_size = struct.unpack("<Q", data[:8])[0]
-    if header_size > _MAX_HEADER_BYTES or 8 + header_size > len(data):
-        raise ValueError(f"Header size ({header_size}) is invalid for '{path}'")
-    header: dict[str, Any] = json.loads(data[8 : 8 + header_size])
-    buffer = memoryview(data)[8 + header_size :]
+        size = os.fstat(f.fileno()).st_size
+        if size < 8:
+            raise ValueError(f"Not a valid .ion file: '{path}'")
+        header_size = struct.unpack("<Q", f.read(8))[0]
+        if header_size > _MAX_HEADER_BYTES or 8 + header_size > size:
+            raise ValueError(f"Header size ({header_size}) is invalid for '{path}'")
+        header: dict[str, Any] = json.loads(f.read(header_size))
+    data_start = 8 + header_size
 
     # Ion metadata: format version and scalar leaves
     metadata: dict[str, str] = header.pop("__metadata__", {})
@@ -191,8 +192,10 @@ def load(path: str | os.PathLike[str], reference_pytree: PyTree) -> PyTree:
         if begin != offset or end - begin != nbytes:
             raise ValueError(f"Corrupt tensor offsets for '{key}'")
         offset = end
-    if offset != len(buffer):
-        raise ValueError(f"Data section ({len(buffer)} bytes) does not match header ({offset})")
+    if offset != size - data_start:
+        raise ValueError(
+            f"Data section ({size - data_start} bytes) does not match header ({offset})"
+        )
 
     # Rebuild leaves from the reference, taking arrays and scalars from the file
     expected_keys: set[str] = set()
@@ -227,14 +230,16 @@ def load(path: str | os.PathLike[str], reference_pytree: PyTree) -> PyTree:
             missing_keys.append(key)
             continue
         entry = header[key]
-        begin, end = entry["data_offsets"]
-        arr = np.frombuffer(buffer[begin:end], dtype=_DTYPES[entry["dtype"]])
-        arr = arr.reshape(entry["shape"])
-        if arr.shape != ref.shape:
+        shape = tuple(entry["shape"])
+        if shape != ref.shape:
             shape_problems.append(
-                f"Shape mismatch for '{key}': saved {arr.shape}, reference {ref.shape}."
+                f"Shape mismatch for '{key}': saved {shape}, reference {ref.shape}."
             )
             continue
+        # Each tensor is read on its own, so the extra host memory is one tensor, not the file
+        dtype = _DTYPES[entry["dtype"]]
+        offset = data_start + entry["data_offsets"][0]
+        arr = np.fromfile(path, dtype=dtype, count=math.prod(shape), offset=offset).reshape(shape)
         if arr.dtype != ref.dtype:
             warnings.warn(
                 f"Dtype mismatch for '{key}': saved {arr.dtype} vs {ref.dtype}, using saved",

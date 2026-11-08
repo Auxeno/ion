@@ -496,6 +496,12 @@ class TestFileFormat:
             with pytest.raises(ValueError, match="Not a valid"):
                 checkpoint.load(f.name, {})
 
+    def test_empty_file_raises(self):
+        """An empty file raises ValueError."""
+        with tempfile.NamedTemporaryFile(suffix=".ion") as f:
+            with pytest.raises(ValueError, match="Not a valid"):
+                checkpoint.load(f.name, {})
+
     def test_oversized_header_raises(self):
         """A header size larger than the file raises ValueError."""
         with tempfile.NamedTemporaryFile(suffix=".ion") as f:
