@@ -704,3 +704,26 @@ def test_cell_bf16_finiteness(cell_and_input):
     for leaf in jax.tree.leaves(result):
         if jnp.issubdtype(leaf.dtype, jnp.floating):
             assert jnp.all(jnp.isfinite(leaf))
+
+
+@pytest.mark.parametrize(
+    "name, jax_name",
+    [
+        ("relu", "relu"),
+        ("ReLU", "relu"),
+        ("LeakyReLU", "leaky_relu"),
+        ("initializers", "initializers"),
+    ],
+)
+def test_jax_name_points_to_jax(name, jax_name):
+    """Names that JAX provides raise with a pointer to jax.nn."""
+    message = rf"^{name} is provided by JAX, use jax\.nn\.{jax_name}$"
+    with pytest.raises(AttributeError, match=message):
+        getattr(nn, name)
+    assert not hasattr(nn, name)
+
+
+def test_unknown_name_raises():
+    """Names JAX does not provide raise the standard AttributeError."""
+    with pytest.raises(AttributeError, match="has no attribute 'Lineer'"):
+        nn.Lineer  # pyright: ignore[reportAttributeAccessIssue]

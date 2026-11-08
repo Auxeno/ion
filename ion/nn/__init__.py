@@ -1,5 +1,7 @@
 """Neural network modules: base classes, layers, and blocks."""
 
+from typing import TYPE_CHECKING
+
 from .layers.linear import Linear, Identity
 from .layers.recurrent import GRU, GRUCell, LSTM, LSTMCell, RNN, RNNCell
 from .layers.conv import Conv, ConvTranspose
@@ -57,3 +59,15 @@ __all__ = [
     "SinusoidalPositionalEmbedding",
     "SpectralNorm",
 ]
+
+# Hidden from type checkers so unknown names stay static errors
+if not TYPE_CHECKING:
+
+    def __getattr__(name):
+        import jax.nn
+
+        jax_names = {n.replace("_", "").lower(): n for n in dir(jax.nn) if not n.startswith("_")}
+        jax_name = jax_names.get(name.replace("_", "").lower())
+        if jax_name is None:
+            raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+        raise AttributeError(f"{name} is provided by JAX, use jax.nn.{jax_name}")
