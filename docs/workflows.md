@@ -83,7 +83,7 @@ reference = MyModel(key=jax.random.key(0))
 model = ion.load("model.ion", reference)
 ```
 
-Checkpoint tensor names use the same tree paths as `Module.at`, such as `blocks[2].attn.w_q`. Shape or structure mismatches raise `ValueError`; dtype mismatches warn and preserve the saved dtype. See [Sharp edges](sharp-edges.md) for how static configuration is handled.
+Checkpoint tensor names use the same tree paths as `Module.at`, such as `blocks[2].attn.w_q`. Shape and structure mismatches raise one `ValueError` that lists every mismatch. Dtype mismatches warn and preserve the saved dtype. See [Sharp edges](sharp-edges.md) for how static configuration is handled.
 
 ::: ion.save
     options:

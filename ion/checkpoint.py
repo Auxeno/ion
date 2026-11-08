@@ -185,6 +185,8 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
 
     # Rebuild leaves from the reference tree, taking arrays and trainable flags from the file
     expected_keys: set[str] = set()
+    missing_keys: list[str] = []
+    shape_problems: list[str] = []
     loaded_leaves: list[Any] = []
     for key_path, leaf in leaves_with_paths:
         if not isinstance(leaf, (Param, Buffer, jax.Array, np.ndarray)):
@@ -199,13 +201,17 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
             ref = leaf
         expected_keys.add(key)
         if key not in header:
-            raise ValueError(f"Structure mismatch: reference key '{key}' not found in file")
+            missing_keys.append(key)
+            continue
         entry = header[key]
         begin, end = entry["data_offsets"]
         arr = np.frombuffer(buffer[begin:end], dtype=_DTYPES[entry["dtype"]])
         arr = arr.reshape(entry["shape"])
         if arr.shape != ref.shape:
-            raise ValueError(f"Shape mismatch for '{key}': saved {arr.shape} vs {ref.shape}")
+            shape_problems.append(
+                f"Shape mismatch for '{key}': saved {arr.shape}, reference {ref.shape}."
+            )
+            continue
         if arr.dtype != ref.dtype:
             warnings.warn(
                 f"Dtype mismatch for '{key}': saved {arr.dtype} vs {ref.dtype}, using saved",
@@ -219,10 +225,16 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
         else:
             loaded_leaves.append(jnp.array(arr))
 
-    extra_keys = set(header) - expected_keys
+    # Report every mismatch at once, so a single failed load shows the whole difference
+    extra_keys = [key for key in header if key not in expected_keys]
+    problems = []
+    if missing_keys:
+        problems.append(f"Structure mismatch: reference keys not in file: {missing_keys}.")
     if extra_keys:
-        raise ValueError(
-            f"Structure mismatch: file contains keys not in reference tree: {sorted(extra_keys)}"
-        )
+        problems.append(f"Structure mismatch: file keys not in reference: {extra_keys}.")
+    problems += shape_problems
+    if problems:
+        fix = "Build the reference with the same structure and sizes as the saved pytree."
+        raise ValueError("\n".join([f"Cannot hydrate a reference from '{path}':", *problems, fix]))
 
     return tree_def.unflatten(loaded_leaves)

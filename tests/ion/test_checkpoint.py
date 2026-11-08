@@ -581,6 +581,35 @@ class TestSaveLoadStructureMismatch:
             with pytest.raises(ValueError, match="Shape mismatch"):
                 checkpoint.load(f.name, reference)
 
+    def test_load_reports_every_mismatch(self):
+        """Missing keys, extra keys and shape mismatches are reported together in one error."""
+
+        class SavedModel(nn.Module):
+            w: nn.Param
+            c: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.zeros(8))
+                self.c = nn.Param(jnp.zeros(4))
+
+        class Reference(nn.Module):
+            w: nn.Param
+            b: nn.Param
+
+            def __init__(self):
+                self.w = nn.Param(jnp.zeros(4))
+                self.b = nn.Param(jnp.zeros(4))
+
+        with tempfile.NamedTemporaryFile(suffix=".ion") as f:
+            checkpoint.save(f.name, SavedModel())
+            with pytest.raises(ValueError) as error:
+                checkpoint.load(f.name, Reference())
+
+        message = str(error.value)
+        assert "reference keys not in file: ['b']" in message
+        assert "file keys not in reference: ['c']" in message
+        assert "Shape mismatch for 'w': saved (8,), reference (4,)" in message
+
     def test_load_dtype_mismatch_warns_and_keeps_saved_dtype(self):
         """Loading arrays with mismatched dtypes warns and keeps the saved dtype."""
 
