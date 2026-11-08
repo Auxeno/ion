@@ -9,7 +9,7 @@ and immutability after `__init__`.
 
 import dataclasses
 import functools
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Generic, Self, TypeVar
 
 import jax
@@ -248,10 +248,6 @@ class Module:
     def __delattr__(self, name: str) -> None:
         """Prevent attribute deletion to maintain a consistent PyTree structure."""
         raise AttributeError(f"Cannot delete attribute '{name}', {type(self).__name__} is frozen")
-
-    def __iter__(self) -> Iterator[Any]:
-        """Iterate over dataclass field values."""
-        return (getattr(self, f.name) for f in dataclasses.fields(self))  # type: ignore[arg-type]
 
     def __repr__(self) -> str:
         """Render the model and its parameter statistics for the terminal."""
