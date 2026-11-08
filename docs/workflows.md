@@ -76,7 +76,7 @@ model, optimizer = ion.load("checkpoint.ion", (model, optimizer))
 
 A stateful model needs nothing extra. Buffers live in the model, so running statistics are written and restored along with the parameters.
 
-`load` takes a reference pytree that supplies the structure and non-array fields. Array values and `Param.trainable` flags come from the checkpoint:
+`load` takes a reference pytree that supplies the structure, including every module field. Array values, Python scalar leaves such as a step count, and `Param.trainable` flags come from the checkpoint:
 
 ```python
 reference = MyModel(key=jax.random.key(0))

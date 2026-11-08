@@ -5,7 +5,8 @@ Parameters
 path : str | os.PathLike
     Destination file path (`.ion` appended if missing).
 pytree : PyTree
-    Pytree to serialize. Only array leaves and `Param` trainable flags are written.
+    Pytree to serialize. Array leaves, Python scalar leaves and `Param` trainable flags
+    are written.
 
 Example
 -------

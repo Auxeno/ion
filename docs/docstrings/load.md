@@ -5,12 +5,12 @@ Parameters
 path : str | os.PathLike
     Path to a `.ion` file created by `save` (`.ion` appended if missing).
 reference_pytree : PyTree
-    Provides tree structure and non-array leaves; array leaves are replaced.
+    Provides the tree structure. Its array and Python scalar leaves are replaced.
 
 Returns
 -------
 PyTree
-    Pytree with arrays and `Param` trainable flags restored from file.
+    Pytree with arrays, scalars and `Param` trainable flags restored from file.
 
 Example
 -------

@@ -161,6 +161,33 @@ class TestSaveLoad:
         npt.assert_array_equal(loaded.w._value, model.w._value)
         npt.assert_array_equal(loaded.buf, model.buf)
 
+    def test_python_scalar_leaves_roundtrip(self):
+        """Python scalar leaves roundtrip with their values and types."""
+        model = nn.Linear(2, 3, key=jax.random.key(0))
+        state = {"step": 100, "lr": 3e-4, "done": True, "run": "baseline", "model": model}
+        reference = {"step": 0, "lr": 0.0, "done": False, "run": "", "model": model}
+        with tempfile.NamedTemporaryFile(suffix=".ion") as f:
+            checkpoint.save(f.name, state)
+            loaded = checkpoint.load(f.name, reference)
+        assert loaded["step"] == 100 and type(loaded["step"]) is int
+        assert loaded["lr"] == 3e-4 and type(loaded["lr"]) is float
+        assert loaded["done"] is True
+        assert loaded["run"] == "baseline"
+
+    def test_module_scalar_fields_come_from_reference(self):
+        """Scalar fields on a Module are structure, so the reference keeps its own values."""
+        with tempfile.NamedTemporaryFile(suffix=".ion") as f:
+            checkpoint.save(f.name, nn.Dropout(0.5))
+            loaded = checkpoint.load(f.name, nn.Dropout(0.1))
+        assert loaded.p == 0.1
+
+    def test_missing_scalar_leaf_raises(self):
+        """A scalar leaf the file does not hold is reported as a structure mismatch."""
+        with tempfile.NamedTemporaryFile(suffix=".ion") as f:
+            checkpoint.save(f.name, {"w": jnp.zeros(2)})
+            with pytest.raises(ValueError, match=r"reference keys not in file: \[\"\['step'\]\"\]"):
+                checkpoint.load(f.name, {"w": jnp.zeros(2), "step": 0})
+
     def test_typed_prng_key_roundtrip(self):
         """Typed PRNG keys roundtrip with their data, shape and implementation."""
         state = {"key": jax.random.split(jax.random.key(0, impl="rbg"), 3)}
@@ -537,6 +564,19 @@ class TestFileFormat:
             loaded = checkpoint.load(f.name, model)
         npt.assert_array_equal(loaded.w._value, target)
         assert loaded.w.trainable is True
+
+    def test_file_without_scalars_keeps_reference_scalars(self):
+        """A file written without scalar leaves leaves them to the reference."""
+        target = np.arange(4, dtype=np.float32)
+        entry = {"dtype": "F32", "shape": [4], "data_offsets": [0, 16]}
+        header = json.dumps({"['w']": entry}).encode()
+        header += b" " * (-(8 + len(header)) % 8)
+        with tempfile.NamedTemporaryFile(suffix=".ion") as f:
+            f.write(struct.pack("<Q", len(header)) + header + target.tobytes())
+            f.flush()
+            loaded = checkpoint.load(f.name, {"w": jnp.zeros(4), "step": 7})
+        npt.assert_array_equal(loaded["w"], target)
+        assert loaded["step"] == 7
 
 
 class TestSaveLoadStructureMismatch:

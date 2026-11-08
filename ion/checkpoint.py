@@ -6,8 +6,9 @@ Functions:
 
 The .ion format is safetensors-style (length-prefixed JSON header, then raw
 tensor bytes) with native support for JAX dtypes such as bfloat16, float8 and
-complex64. Array leaves and Param trainable flags are saved; non-array leaves
-(ints, floats, callables) come from the reference tree on load.
+complex64. Array leaves, Python scalar leaves and Param trainable flags are saved.
+The tree structure, including module fields such as sizes and activations, comes
+from the reference tree on load.
 """
 
 import contextlib
@@ -65,8 +66,8 @@ def save(path: str | os.PathLike[str], pytree: PyTree) -> None:
     path : str | os.PathLike
         Destination file path (`.ion` appended if missing).
     pytree : PyTree
-        Pytree to serialize. Only array leaves, `Buffer` values, and `Param` trainable
-        flags are written.
+        Pytree to serialize. Array leaves, `Buffer` values, Python scalar leaves and
+        `Param` trainable flags are written.
 
     Examples
     --------
@@ -74,8 +75,9 @@ def save(path: str | os.PathLike[str], pytree: PyTree) -> None:
     """
     leaves_with_paths = jax.tree.flatten_with_path(pytree, is_leaf=_is_param_or_buffer)[0]
 
-    # Collect array leaves and Param trainable flags, keyed by tree path
+    # Collect array leaves, scalar leaves and Param trainable flags, keyed by tree path
     arrays: dict[str, np.ndarray] = {}
+    scalars: dict[str, bool | int | float | str] = {}
     trainable_flags: dict[str, bool] = {}
     for key_path, leaf in leaves_with_paths:
         key = _path_key(key_path)
@@ -89,9 +91,15 @@ def save(path: str | os.PathLike[str], pytree: PyTree) -> None:
             if jnp.issubdtype(leaf.dtype, jax.dtypes.prng_key):
                 leaf = jax.random.key_data(leaf)
             arrays[key] = np.asarray(leaf)
+        elif isinstance(leaf, (bool, int, float, str)):
+            scalars[key] = leaf
 
     # Build the JSON header: dtype, shape and byte offsets per tensor, plus ion metadata
-    metadata = {"format_version": str(_FORMAT_VERSION), "trainable": json.dumps(trainable_flags)}
+    metadata = {
+        "format_version": str(_FORMAT_VERSION),
+        "trainable": json.dumps(trainable_flags),
+        "scalars": json.dumps(scalars),
+    }
     header: dict[str, Any] = {"__metadata__": metadata}
     offset = 0
     for key, array in arrays.items():
@@ -135,12 +143,12 @@ def load(path: str | os.PathLike[str], reference_pytree: PyTree) -> PyTree:
     path : str | os.PathLike
         Path to a `.ion` file created by `save` (`.ion` appended if missing).
     reference_pytree : PyTree
-        Provides tree structure and non-array leaves; array leaves are replaced.
+        Provides the tree structure. Its array and Python scalar leaves are replaced.
 
     Returns
     -------
     PyTree
-        Pytree with arrays and `Param` trainable flags restored from file.
+        Pytree with arrays, scalars and `Param` trainable flags restored from file.
 
     Notes
     -----
@@ -168,12 +176,17 @@ def load(path: str | os.PathLike[str], reference_pytree: PyTree) -> PyTree:
     header: dict[str, Any] = json.loads(data[8 : 8 + header_size])
     buffer = memoryview(data)[8 + header_size :]
 
-    # Ion metadata: format version and Param trainable flags
+    # Ion metadata: format version, Param trainable flags and scalar leaves
     metadata: dict[str, str] = header.pop("__metadata__", {})
     version = int(metadata.get("format_version", 0))
     if version > _FORMAT_VERSION:
         raise ValueError(f"Format version ({version}) is newer than supported ({_FORMAT_VERSION})")
     trainable_flags: dict[str, bool] = json.loads(metadata.get("trainable", "{}"))
+
+    # Files saved before scalar leaves were written leave them to the reference
+    scalars: dict[str, Any] | None = None
+    if "scalars" in metadata:
+        scalars = json.loads(metadata["scalars"])
 
     # Tensor entries must tile the data section exactly, with no gaps, overlaps or overruns
     offset = 0
@@ -188,17 +201,24 @@ def load(path: str | os.PathLike[str], reference_pytree: PyTree) -> PyTree:
     if offset != len(buffer):
         raise ValueError(f"Data section ({len(buffer)} bytes) does not match header ({offset})")
 
-    # Rebuild leaves from the reference tree, taking arrays and trainable flags from the file
+    # Rebuild leaves from the reference, taking arrays, scalars and trainable flags from the file
     expected_keys: set[str] = set()
     missing_keys: list[str] = []
     shape_problems: list[str] = []
     loaded_leaves: list[Any] = []
     for key_path, leaf in leaves_with_paths:
+        key = _path_key(key_path)
+        if isinstance(leaf, (bool, int, float, str)) and scalars is not None:
+            expected_keys.add(key)
+            if key in scalars:
+                loaded_leaves.append(scalars[key])
+            else:
+                missing_keys.append(key)
+            continue
         # A reference built with jax.eval_shape holds ShapeDtypeStructs in place of arrays
         if not isinstance(leaf, (Param, Buffer, jax.Array, np.ndarray, jax.ShapeDtypeStruct)):
             loaded_leaves.append(leaf)
             continue
-        key = _path_key(key_path)
         if isinstance(leaf, Param):
             ref = leaf._value
         elif isinstance(leaf, Buffer):
@@ -240,7 +260,7 @@ def load(path: str | os.PathLike[str], reference_pytree: PyTree) -> PyTree:
             loaded_leaves.append(jnp.array(arr))
 
     # Report every mismatch at once, so a single failed load shows the whole difference
-    extra_keys = [key for key in header if key not in expected_keys]
+    extra_keys = [key for key in (*header, *(scalars or ())) if key not in expected_keys]
     problems = []
     if missing_keys:
         problems.append(f"Structure mismatch: reference keys not in file: {missing_keys}.")
