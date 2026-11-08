@@ -2,7 +2,7 @@ Wraps an optax transformation with `Param`-aware, pytree-native updates.
 
 Parameters
 ----------
-tx : optax.GradientTransformation or dict
+tx : optax.GradientTransformation | dict
     A single optax transform, or a dictionary mapping top-level model field
     names (or tuples of names) to per-field transforms.
 model : PyTree

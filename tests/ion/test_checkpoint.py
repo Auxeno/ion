@@ -213,6 +213,14 @@ class TestSaveLoad:
             loaded = checkpoint.load(os.path.join(d, "model"), model)
         npt.assert_array_equal(loaded.w._value, model.w._value)
 
+    def test_pathlib_path(self, tmp_path):
+        """Save and load accept a pathlib.Path, appending .ion when it is missing."""
+        model = nn.Linear(2, 3, key=jax.random.key(0))
+        checkpoint.save(tmp_path / "model", model)
+        assert (tmp_path / "model.ion").exists()
+        loaded = checkpoint.load(tmp_path / "model", model)
+        npt.assert_array_equal(loaded.w._value, model.w._value)
+
 
 class TestSaveLoadCallable:
     def test_callable_comes_from_reference_not_file(self):

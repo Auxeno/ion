@@ -118,7 +118,7 @@ class Optimizer:
 
     Parameters
     ----------
-    tx : optax.GradientTransformation or dict
+    tx : optax.GradientTransformation | dict
         Optax optimizer or dict mapping field names to per-field transforms.
     model : PyTree
         Model to optimize. Frozen and non-Param leaves are auto-partitioned out.

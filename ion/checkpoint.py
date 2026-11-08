@@ -57,12 +57,12 @@ def _path_key(key_path: tuple) -> str:
     return "".join(str(k) for k in key_path).lstrip(".")
 
 
-def save(path: str, pytree: PyTree) -> None:
+def save(path: str | os.PathLike[str], pytree: PyTree) -> None:
     """Serialize a pytree's array leaves and metadata to a `.ion` file.
 
     Parameters
     ----------
-    path : str
+    path : str | os.PathLike
         Destination file path (`.ion` appended if missing).
     pytree : PyTree
         Pytree to serialize. Only array leaves, `Buffer` values, and `Param` trainable
@@ -109,6 +109,7 @@ def save(path: str, pytree: PyTree) -> None:
     header_bytes += b" " * (-(8 + len(header_bytes)) % 8)
 
     # Write beside the destination, then atomically replace it
+    path = os.fspath(path)
     if not path.endswith(".ion"):
         path += ".ion"
     fd, temporary_path = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)))
@@ -126,12 +127,12 @@ def save(path: str, pytree: PyTree) -> None:
             os.unlink(temporary_path)
 
 
-def load(path: str, reference_pytree: PyTree) -> PyTree:
+def load(path: str | os.PathLike[str], reference_pytree: PyTree) -> PyTree:
     """Load array leaves and metadata from a `.ion` file into a reference pytree.
 
     Parameters
     ----------
-    path : str
+    path : str | os.PathLike
         Path to a `.ion` file created by `save` (`.ion` appended if missing).
     reference_pytree : PyTree
         Provides tree structure and non-array leaves; array leaves are replaced.
@@ -154,6 +155,7 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
     )
 
     # Parse the 8-byte length prefix and JSON header
+    path = os.fspath(path)
     if not path.endswith(".ion"):
         path += ".ion"
     with open(path, "rb") as f:
