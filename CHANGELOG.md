@@ -2,119 +2,119 @@
 
 ## 0.18.3
 
-- **`gnn.segment_softmax` NaN gradient fix for padding.** An out-of-range segment id gathered the last real segment's maximum, since JAX gathers clamp where segment reductions drop. A padded logit far enough above that maximum overflowed `exp`, which the forward pass discarded but the backward pass turned into NaN across every parameter. Padded ids now gather `+inf`, so their weights are exactly zero and every attention layer and pool respects the padding convention.
-- **`nn.MultiHeadAttention` no longer leaks future tokens into rows closed by `causal` or `window`.** Rows were zeroed only when `mask` alone blocked every key, so a row that the mask left open but causality closed, as under left padding, softmaxed over uniform logits and averaged the values of every key, future ones included. The causal and window constraints now count towards a fully masked row.
-- **Breaking: `gnn.unbatch_graphs` takes `num_graphs`.** The graph count was inferred as `graph_ids.max() + 1`, which dropped empty graphs at the end of a batch and read the padding id from `pad_graphs` as one more graph, while padded edges indexed past the last node and raised `IndexError`. With the count given, trailing empty graphs come back and padded nodes and edges are dropped, so a padded batch round-trips.
+- **`gnn.segment_softmax` NaN gradient fix for padding.** Padded segment ids could turn every gradient into NaN. They now get exactly zero weight.
+- **`nn.MultiHeadAttention` no longer leaks future tokens.** A row left with no valid keys by `mask` together with `causal` or `window`, as under left padding, averaged every value, future ones included. Such rows now output zeros.
+- **Breaking: `gnn.unbatch_graphs` takes `num_graphs`.** Inferring the count dropped trailing empty graphs and failed on padded batches. Padded batches now round-trip.
 
 ## 0.18.2
 
-- **Breaking: `nn.GroupNorm` takes `num_groups` and `num_spatial_dims` as keywords.** Both were positional, while every other normalization layer is keyword-only past `dim`. The layer also gains `use_bias`, which the others already had.
-- **`gnn.SAGEConv` rejects an unknown `aggregate`.** An unrecognized string raised `KeyError` from the lookup table instead of the `ValueError` naming the accepted values that its neighbours raise.
-- **`nn.MaxPool` reduces in the input dtype.** Pooling cast to `float32` first, which rounded integer inputs and doubled the bytes moved for `bfloat16`. A maximum is exact in any precision, so the cast is gone. `AvgPool` still accumulates in `float32`.
-- **`nn.BatchNorm` NaN running variance fix.** Bessel's correction divided by zero for a batch of one with no spatial axes, so the running variance became NaN. The denominator is now floored at one, leaving larger batches unchanged.
-- **`gnn.HGTConv` NaN gradient fix.** Masked edges kept their logits while their receivers were redirected past the last node, so the softmax subtracted an unrelated node's maximum from them. A large enough gap overflowed `exp`, which the forward pass discarded but the backward pass turned into NaN. Masked logits are now set to `-inf` before the softmax, as the attention layers already do, leaving the forward pass unchanged.
-- **Subclassing a layer keeps its constructor.** A subclass generated a dataclass `__init__` from its fields unless it defined one itself, so `class MyLinear(nn.Linear): pass` shadowed the inherited constructor and `MyLinear(3, 16, key=key)` raised a `TypeError`. Generation now also stands aside for a constructor inherited from a base.
+- **Breaking: `nn.GroupNorm` takes `num_groups` and `num_spatial_dims` as keywords**, matching the other normalization layers. It also gains `use_bias`.
+- **`gnn.SAGEConv` rejects an unknown `aggregate`** with a `ValueError` instead of a `KeyError`.
+- **`nn.MaxPool` reduces in the input dtype.** It no longer casts to `float32`, which rounded integer inputs.
+- **`nn.BatchNorm` NaN running variance fix.** A batch of one no longer makes the running variance NaN.
+- **`gnn.HGTConv` NaN gradient fix.** Masked edges could produce NaN gradients. Their logits are now set to `-inf` before the softmax.
+- **Subclassing a layer keeps its constructor.** `class MyLinear(nn.Linear): pass` no longer replaces the inherited `__init__`.
 
 ## 0.18.1
 
-- **`Optimizer` repr handles an abstract step.** Costing a training step abstracts the optimizer it is given, leaving `step` as a shape placeholder that both renderers tried to read a value from. An abstract step now prints as its dtype, the way a traced one already did.
-- **`ion.cost` analyses methods other than the forward pass.** `model.cost(x, method="critic")` and `ion.cost(model.critic, x)` scope a named method the way `__call__` is scoped, so a model with several heads reports only the layers that call reaches. The report names the call it analysed, as `ActorCritic.critic`.
-- **`ion.cost` keeps its breakdown under JAX transforms.** A transform rebuilds the model as it traces, which used to leave every layer unnamed and reduce the report to a single whole-call total. The rebuilt tree now reclaims its paths, so `jax.grad`, `jax.jit`, `jax.checkpoint` and `jax.vmap` report layer by layer, with reverse-mode work charged to the layer whose forward pass produced it. Layer outputs under `jax.vmap` restore the mapped axis, so shapes agree with the FLOPs and memory beside them.
-- **Buffer distributions in `__repr__`.** Buffers are now described by the same histogram and moments as parameters, so running statistics can be read off a printed model.
-- **Abbreviated dtypes in `__repr__`.** `Param`, `Buffer`, `Module`, `Optimizer` and `Cost` now render dtypes in their short form, so `float32` reads as `f32` and `bfloat16` as `bf16`.
-- **Tweaks to `__repr__`**: Tweaks to format and colour of `__repr__` for `Module` and `Cost`. Documentation and examples updated to match.
-- **`Optimizer` `__repr__` shows its transforms and state.** Printing an optimizer now lists the optimizers it was built from, with their hyperparameters, over the state each stage carries.
+- **`Optimizer` repr handles an abstract step.** It no longer fails when `step` is a shape placeholder, as when costing a training step.
+- **`ion.cost` analyses methods other than `__call__`.** Use `model.cost(x, method="critic")` or `ion.cost(model.critic, x)`.
+- **`ion.cost` keeps its per-layer breakdown under JAX transforms.** `jax.grad`, `jax.jit`, `jax.checkpoint` and `jax.vmap` now report layer by layer instead of one total.
+- **Buffer distributions in `__repr__`.** Buffers show the same histogram and moments as parameters.
+- **Abbreviated dtypes in `__repr__`.** `float32` prints as `f32` and `bfloat16` as `bf16`.
+- **`__repr__` formatting tweaks** for `Module` and `Cost`.
+- **`Optimizer` `__repr__` shows its transforms and state**, with the hyperparameters of each stage.
 
 ## 0.18.0
 
-- **`nn.DropPath`.** Stochastic depth as its own layer. It drops a residual branch for whole samples and scales the survivors by `1 / (1 - p)`, sharing one decision across every dimension after the batch dimension, whatever the input rank.
-- **Breaking: `Dropout.broadcast_dims` removed.** Shared masks existed almost entirely to express stochastic depth, which `DropPath` now does.
-- **Native typing module.** Array, dtype, `PRNGKey`, and `PyTree` annotations now come from `ion.typing`, removing the `jaxtyping` dependency.
-- **Improved Treescope colors**. Color modules by import order.
-- **Parameter statistics in every model repr.** Printing or evaluating a model now describes each parameter's distribution and moments in any Python terminal, with no IPython formatter integration. Set `ion.statistics = False` to render structure alone.
-- **`model.cost`.** Traces and compiles a call without executing it, then reports its FLOPs, compiler memory, graph operations, and per-layer outputs in a table that mirrors the model repr. `ion.cost` does the same for any callable taking a model, so a loss, a gradient evaluation, or a whole training step is analysed the same way. Scan bodies are scaled by their static length, so recurrent layers report the full figure rather than the flat count XLA's own `cost_analysis` gives.
-- **Flatter repr palette.** Every layer class takes a fixed hue rather than a position computed along a family arc, so all layers share one lightness and chroma and no color is clipped on its way to the terminal.
-- **Breaking: Treescope is optional and no longer activated on import.** `ion.enable_treescope` and `ion.disable_treescope` are gone. Install it with `pip install treescope` and activate it with `treescope.basic_interactive_setup()`. The rendering hooks no longer depend on Treescope's abbreviation threshold, so collapsed parameters and buffers describe their shape with no configuration at all.
+- **`nn.DropPath`.** Stochastic depth, dropping a whole residual branch per sample.
+- **Breaking: `Dropout.broadcast_dims` removed.** Use `DropPath` instead.
+- **Native typing module.** Annotations now come from `ion.typing`, removing the `jaxtyping` dependency.
+- **Improved Treescope colors.** Modules are colored by import order.
+- **Parameter statistics in every model repr.** Printing a model shows each parameter's histogram, mean and std in any terminal. Set `ion.statistics = False` to hide them.
+- **`model.cost`.** Compiles a call without running it, then reports FLOPs, memory and per-layer outputs. `ion.cost` does the same for any function that takes a model, such as a loss or a training step.
+- **Flatter repr palette.** Each layer class has a fixed color, all at the same lightness.
+- **Breaking: Treescope is optional and no longer activated on import.** `ion.enable_treescope` and `ion.disable_treescope` are gone. Install `treescope` and call `treescope.basic_interactive_setup()`.
 
 ## 0.17.1
 
-- **Edge masking for edge-aware and relational layers.** Message-passing layers that accept `x_edge`, plus `RGCNConv` and `HGTConv`, accept an optional boolean `edge_mask` that excludes masked edges from node aggregation and normalization counts. `RGCNConv` per-relation counts and `GatedGCNConv` gate sums match the retained edges. `GraphNetwork` and `GatedGCNConv` still update and return every edge representation, so masking controls routing without destroying edge state. `EdgeUpdate` takes no mask, because it updates edges without aggregating them.
-- **`gnn.RGCNConv` NaN gradient fix.** Receivers indexing past the last node, which both padded batches and masked edges produce, divided messages by a clamped per-relation count that could be zero. The forward pass discarded the resulting infinities but `w_neigh` gradients came back NaN. The count is now floored at one, which leaves real edges untouched.
+- **Edge masking for edge-aware and relational layers.** Layers that take `x_edge`, plus `RGCNConv` and `HGTConv`, accept an `edge_mask` that leaves edges out of aggregation. Masked edges are still updated and returned.
+- **`gnn.RGCNConv` NaN gradient fix.** Padded or masked edges could produce NaN gradients for `w_neigh`.
 
 ## 0.17.0
 
-- **Neural network blocks.** `nn.Residual` adds a shape-preserving layer's output to its input, and `nn.Bidirectional` runs independent sequence layers in both time directions, summing their outputs by default.
-- **`nn.Ensemble`.** Builds independently initialized copies of one model and evaluates them with `vmap`, retaining the leading member axis by default with optional mean and sum reductions.
-- **Nested call routing.** `nn.Sequential`, `nn.Residual`, and `nn.Ensemble` consistently forward training mode and random keys through nested blocks.
-- **Breaking: consistent GNN vocabulary.** Separate central transforms are named `w_root`; `SAGEConv` takes `aggregate`; relational layers take `num_edge_types`; `GATConv.w` is `w_sender`; and fixed topology sizes use `node_capacity` and `edge_capacity`.
-- **`gnn.remove_self_loops` returns retained indices.** Its third result selects aligned edge features, matching `coalesce`, `to_undirected`, and the subgraph operations.
-- **GNN robustness and configuration.** `GraphNorm` gains `use_bias`, GAT masks safely discard non-finite edge features, and caller-supplied GIN, GINE, and global-attention transformations accept any array callable.
-- **Subgraph extraction.** `gnn.induced_subgraph` builds the node-induced graph over selected nodes, while `gnn.k_hop_subgraph` discovers complete neighbourhoods along incoming, outgoing, or both edge directions. Both relabel nodes and return the original node and edge indices for slicing features.
-- **`gnn.GraphNorm`.** Normalizes node features independently within each graph, with a learnable scale on the graph mean.
-- **Documentation fixes.** Several documentation GNN layer `__call__` docstrings that support bipartite message passing are now annotated that they do so.
+- **Neural network blocks.** `nn.Residual` adds a layer's output to its input. `nn.Bidirectional` runs sequence layers in both directions.
+- **`nn.Ensemble`.** Builds independently initialized copies of a model and evaluates them with `vmap`.
+- **Nested call routing.** `Sequential`, `Residual` and `Ensemble` pass `training` and `key` through nested blocks.
+- **Breaking: consistent GNN naming.** Root transforms are `w_root`, `SAGEConv` takes `aggregate`, relational layers take `num_edge_types`, `GATConv.w` is `w_sender`, and fixed sizes use `node_capacity` and `edge_capacity`.
+- **`gnn.remove_self_loops` returns retained indices**, for slicing edge features to match.
+- **GNN fixes and options.** `GraphNorm` gains `use_bias`, GAT masks handle non-finite edge features, and GIN, GINE and global attention accept any callable.
+- **Subgraph extraction.** `gnn.induced_subgraph` takes the graph over selected nodes, and `gnn.k_hop_subgraph` takes a node's k-hop neighbourhood. Both return the original indices for slicing features.
+- **`gnn.GraphNorm`.** Normalizes node features within each graph.
+- **Documentation fixes.** GNN layers that accept bipartite inputs now say so in their docstrings.
 
 ## 0.16.0
 
-- **Breaking: GNN layer modules grouped by family.** `ion.gnn.layers` now names its modules after the mechanism rather than the model, matching `ion.nn.layers`: `conv` (`GCNConv`, `GraphConv`, `SAGEConv`), `attention` (`GATConv`, `GATv2Conv`, `TransformerConv`), `isomorphism`, `composite` (`GraphNetwork`, `EdgeUpdate`, `NodeUpdate`), `relational` (`RGCNConv`, `HGTConv`), `gated`, and `pool`. `ion.gnn.ops.readout` became `ion.gnn.ops.pool`. The flat `ion.gnn` API is unchanged, but direct imports from the old modules such as `ion.gnn.layers.gcn` no longer work, and the documentation pages moved with them.
-- **`gnn.min_pool`.** Elementwise minimum of node features within each graph, completing the fixed readouts alongside `mean_pool`, `sum_pool`, and `max_pool`. Empty graphs give zeros rather than the `+inf` fill `segment_min` leaves behind.
-- **`gnn.GraphNetwork`.** Composes caller-supplied edge and node models around a configurable edge-to-node reduction. Updated edges serve as messages and are returned alongside the updated destination nodes; input edge features are optional.
-- **`gnn.NodeUpdate`.** Aggregates caller-supplied edge features at their receivers, concatenates them with current destination nodes, and applies a caller-supplied node model.
-- **`gnn.EdgeUpdate` edge features are optional.** Omitting `x_edge` builds edge representations from the incident nodes alone, so `GraphNetwork` decomposes into `EdgeUpdate` and `NodeUpdate` for graphs that carry no input edge features as well as for those that do.
-- **`gnn.HGTConv`.** Heterogeneous graph transformer. Key, query, value, and output projections follow a per-node `node_type` array while attention matrices, message matrices, and a learned prior follow a per-edge `edge_type` array. Attention is normalized over all of a node's incoming edges at once, so relations compete rather than being combined after separate softmaxes.
-- **`gnn.RGCNConv`.** Gives each edge type its own neighbour transform, selected by a per-edge `edge_type` index array so one edge list carries every relation. `num_bases` builds each relation's transform from shared matrices, holding the parameter count flat as relations grow.
-- **Bipartite message passing.** Message-passing layers can accept `(x_src, x_dst)` node features and return one row per destination node where noted in their API documentation. Layers with learned input projections accept `in_dim` as a `(src_dim, dst_dim)` tuple to give each partition its own input projection.
-- **`gnn.pad_graphs`.** Pads a batched graph to fixed node, edge, and graph capacity so minibatches share one set of shapes and a compiled step is traced once. Spare edges index `num_nodes` and spare nodes carry the graph id `num_graphs`, one past the last real entry, and segment reductions drop both. Layers need no changes, pooling returns one row per real graph, and gradients match the unpadded batch exactly.
-- **`batch_graphs`, `pad_graphs`, and `unbatch_graphs` assemble batches with NumPy.** Signatures and returned JAX arrays are unchanged. All three shuffle host-side data of varying size, where `jnp` costs a device dispatch per graph and, for padding, an XLA compilation per distinct width. Packing a 64-graph batch went from 276ms to 0.8ms, splitting one from 29ms to 4ms, and a streaming epoch over 41k molecular graphs from 187s to 1.4s.
+- **Breaking: GNN layer modules named by mechanism.** Modules are now `conv`, `attention`, `isomorphism`, `composite`, `relational`, `gated` and `pool`, and `ion.gnn.ops.readout` is `ion.gnn.ops.pool`. The flat `ion.gnn` API is unchanged, but imports such as `ion.gnn.layers.gcn` no longer work.
+- **`gnn.min_pool`.** Per-graph minimum of node features, alongside `mean_pool`, `sum_pool` and `max_pool`.
+- **`gnn.GraphNetwork`.** Combines user-supplied edge and node models into one Graph Network layer.
+- **`gnn.NodeUpdate`.** Aggregates edge features at each receiver, then applies a user-supplied node model.
+- **`gnn.EdgeUpdate` edge features are optional.** Without `x_edge`, edges are built from their two nodes alone.
+- **`gnn.HGTConv`.** Heterogeneous graph transformer, with projections per node type and attention per edge type.
+- **`gnn.RGCNConv`.** Relational graph convolution with a separate transform per edge type. `num_bases` shares weights across types.
+- **Bipartite message passing.** Layers that support it accept `(x_src, x_dst)` node features and `in_dim` as a `(src_dim, dst_dim)` tuple.
+- **`gnn.pad_graphs`.** Pads a batch to fixed node, edge and graph counts, so a compiled step traces once. Layers need no changes.
+- **Faster graph batching.** `batch_graphs`, `pad_graphs` and `unbatch_graphs` now use NumPy internally. A streaming epoch over 41k graphs went from 187s to 1.4s.
 
 ## 0.15.1
 
 - **`nn.Identity` restored.** Parameterless pass-through module.
-- **`gnn.GatedGCNConv`.** Jointly updates node and edge features, using the new edge representations as normalized feature-wise gates on incoming node messages. Activation, normalization, and residual connections remain explicit compositions outside the layer.
-- **`gnn.EdgeUpdate`.** Learns an edge representation from the concatenated sender, receiver, and current edge features with a caller-supplied module, following the Graph Network edge update.
-- **`gnn.GINEConv`.** `GINConv` with edge features added to each message before the ReLU, following Hu et al., 2020. Edge features are added to sender features rather than projected, so `x_edge` shares the node dimension and the layer keeps `GINConv`'s property of creating no weights of its own.
-- **`gnn.unbatch_graphs`.** Splits a batched graph back into per-graph node features and edge indices, undoing `batch_graphs`. It returns Python lists of variable-length arrays, so it is a data preparation step rather than something to call inside `jax.jit`.
-- **Fix LaTeX in demo notebooks**. LaTeX in demo notebooks was formatted incorrectly.
+- **`gnn.GatedGCNConv`.** Updates node and edge features together, using edges as gates on node messages.
+- **`gnn.EdgeUpdate`.** Learns edge features from the sender, receiver and current edge features with a user-supplied module.
+- **`gnn.GINEConv`.** `GINConv` with edge features added to each message (Hu et al., 2020).
+- **`gnn.unbatch_graphs`.** Splits a batched graph back into individual graphs. Call it outside `jax.jit`.
+- **Fixed LaTeX in demo notebooks.**
 
 ## 0.15.0
 
-- **Breaking: `Identity` removed.** Ion accepts ordinary callables wherever a pass-through operation might be used, so a dedicated layer added API surface without adding capability.
-- **Breaking: `LRU` and `LRUCell` removed.** Their shared-state MIMO recurrence substantially overlapped `S5`; keeping `S4D` and `S5` leaves a clearer SISO/MIMO pair.
-- **`gnn.GlobalAttentionPool`.** Learns a softmax-normalized node score and takes an attention-weighted sum within each graph. The caller supplies the score and optional value modules, which decide how much each node contributes and what features it contributes.
-- **Refactor `__treescope_repr__` code to `_treescope.py`**. Slim down `module.py`, `param.py`, `optimizer.py` and `buffer.py` by porting `__treescope_repr__` logic to a separate file.
-- **Dropout supports broadcast masks.** Pass `broadcast_dims` to express structured dropout and stochastic depth; its source and docs now live under `stochastic`.
-- **Breaking: GNN source modules reorganized.** Layer implementations now live under `ion.gnn.layers`, matching `ion.nn.layers` and the documentation structure. Operations are grouped under `ion.gnn.ops.segment`, `readout`, `graph`, and `batching`. The flat `ion.gnn` API is unchanged, but direct imports from the old layer modules such as `ion.gnn.gcn` no longer work.
+- **Breaking: `Identity` removed.** Use any plain callable instead.
+- **Breaking: `LRU` and `LRUCell` removed.** They overlapped heavily with `S5`.
+- **`gnn.GlobalAttentionPool`.** Pools each graph with a learned, attention-weighted sum of its nodes.
+- **Treescope rendering moved to `_treescope.py`.** No user-facing change.
+- **Dropout supports broadcast masks.** Pass `broadcast_dims` for structured dropout and stochastic depth.
+- **Breaking: GNN source modules reorganized.** Layers live under `ion.gnn.layers` and operations under `ion.gnn.ops`. The flat `ion.gnn` API is unchanged, but imports such as `ion.gnn.gcn` no longer work.
 
 ## 0.14.1
 
-- **`gnn.segment_var` and `gnn.segment_std`.** Population variance and standard deviation within each segment, dividing by the segment size to match `jnp.var` and `jnp.std` at their default `ddof=0`. Both take the mean squared deviation from the segment mean rather than `E[x^2] - E[x]^2`, so they stay accurate when values are large relative to their spread, and empty or single-element segments return zero rather than `NaN`.
+- **`gnn.segment_var` and `gnn.segment_std`.** Per-segment variance and standard deviation, matching `jnp.var` and `jnp.std`. Empty segments return zero.
 
 ## 0.14.0
 
-- **Breaking: `LoRALinear` removed.** Low-rank adaptation is a fine-tuning protocol rather than a layer, and it wrapped `Linear` alone, so it never reached the attention projections real LoRA targets. Build it from `Param` and `freeze`: a frozen base plus trainable `a` and `b`, returning `base(x) + (x @ a @ b) * (alpha / rank)`.
-- **Breaking: `dot_product_attention_with_rope` removed.** The helper saved one composition and did not earn a slot in the public API.
-- **`gnn.line_graph`.** Rebuilds a graph with its edges as nodes, joined where one edge ends and another begins. Line-graph nodes are the rows of the input edge arrays, so `x_edge` becomes the node features unchanged and any existing convolution updates edge representations. `non_backtracking` drops the pairs that walk straight back down the reverse edge, and the returned pivot node is where angle features attach.
-- **`gnn.to_undirected`.** Appends the reverse of every edge and coalesces, so an undirected graph is stored with both directions present. Coalescing makes it idempotent, and the returned indices address the original edges concatenated with the reversed ones, so direction-dependent edge features can be negated rather than copied.
-- **`gnn.coalesce`.** Sorts edges by `(sender, receiver)` and drops duplicates, putting an edge list into the canonical form that sparse COO layouts use. It also returns the index of the row kept for each surviving edge, so edge features can be filtered to match.
-- **`gnn.degree`.** Counts how many edges reference each node. It counts a single index array, so `degree(senders, n)` gives out-degree and `degree(receivers, n)` gives in-degree.
-- **`gnn.remove_self_loops`.** Drops every `i -> i` edge, pairing with `add_self_loops` for datasets that ship with self-loops already present. The number of edges removed depends on the data, so it is a data preparation step rather than something to call inside `jax.jit`.
-- **Treescope rendering reworked.** Modules put configuration on one line, then group parameters, buffers, and child modules under headings, and annotate themselves with a parameter count and size. Arrays show dtype and shape until a `Param` is expanded.
-- **`Module.disk_usage`.** Size of the arrays a checkpoint would hold, as a string such as `'75 KB'`.
+- **Breaking: `LoRALinear` removed.** Build LoRA from a frozen base plus trainable `a` and `b`: `base(x) + (x @ a @ b) * (alpha / rank)`.
+- **Breaking: `dot_product_attention_with_rope` removed.** Compose `RoPE` with attention directly.
+- **`gnn.line_graph`.** Builds the line graph, where edges become nodes. `non_backtracking` drops pairs that walk straight back along the reverse edge.
+- **`gnn.to_undirected`.** Adds the reverse of every edge and removes duplicates.
+- **`gnn.coalesce`.** Sorts edges and removes duplicates. It also returns the indices of kept edges, for filtering edge features.
+- **`gnn.degree`.** Counts the edges at each node. Pass `senders` for out-degree or `receivers` for in-degree.
+- **`gnn.remove_self_loops`.** Drops every `i -> i` edge. Call it outside `jax.jit`.
+- **Treescope rendering reworked.** Modules group parameters, buffers and child modules under headings, with a parameter count and size.
+- **`Module.disk_usage`.** Size of the model's arrays as a string, such as `'75 KB'`.
 
 ## 0.13.0
 
-- **Breaking: optional constructor arguments are keyword-only.** Every layer now places `*` immediately after its last required argument, so the arguments that define a layer's shape stay positional and everything that configures its behaviour is passed by name. `Linear(3, 16)` and `Conv(3, 64, (3, 3))` are unchanged, while `MultiHeadAttention(64, 8)` becomes `MultiHeadAttention(64, num_heads=8)` and `Conv(3, 64, (3, 3), 2, 1)` becomes `Conv(3, 64, (3, 3), stride=2, padding=1)`.
-- **Breaking: `GATConv` and `GATv2Conv` rename `b` to `b_out`.** The output bias now matches `MultiHeadAttention` and `TransformerConv`, and moves after the edge projections so it is declared last among the parameters. Checkpoints holding a GAT bias no longer load, since tensor names follow attribute paths.
-- **Breaking: booleans that toggle a component take a `use_` prefix.** `bias` becomes `use_bias` (19 layers), `root_weight` becomes `use_root_weight`, and `beta` becomes `use_beta`, matching `flax.nnx`, `flax.linen`, and `equinox`. Booleans that describe behaviour rather than switch a component on keep their names: `causal`, `normalize`, `count_include_pad`, and `train_eps` are unchanged.
-- **Constructors assign fields in declaration order.** Every layer now builds its pytree children (sub-modules, params, buffers) before its static configuration, matching the order the fields are declared in the class body. Argument defaulting and derived values come first, then validation, then the assignments. Behaviour is unchanged.
-- **Breaking: `SelfAttention` and `CrossAttention` merged into `MultiHeadAttention`.** One layer covers both. `attn(x)` draws keys and values from `x`; `attn(x, x_kv)` draws them from a context sequence. `SelfAttention(dim, num_heads)` becomes `MultiHeadAttention(dim, num_heads=num_heads)`, and `CrossAttention(dim, num_heads, context_dim=c)` becomes `MultiHeadAttention(dim, num_heads=num_heads, kv_dim=c)`. Cross-attention gains grouped-query and multi-query attention, sliding windows, causal masking, and `attention_fn`, none of which it previously supported. Parameter names are unchanged, so existing checkpoints still load.
-- **`MultiHeadAttention` accepts a custom `attention_fn`.** Use a partial to select JAX's cuDNN backend, or wrap `jax.nn.dot_product_attention` to rotate query and key with `RoPE` first.
-- **Breaking: `RoPE` takes the sequence `axis` as constructor config, defaulting to `-3`.** The default matches the `(batch, sequence, heads, head_dim)` queries and keys that `MultiHeadAttention` builds and `jax.nn.dot_product_attention` consumes, so composing the two through `attention_fn` needs no override. Under the old default of `-2`, that layout silently rotated across heads rather than positions. Pass `RoPE(axis=-2)` for a head-first layout or a single unbatched head shaped `(sequence, head_dim)`.
-- **Breaking: `sinusoidal` is now the `SinusoidalPositionalEmbedding` layer.** The function returned a table for the caller to add; the layer adds it, matching `LearnedPositionalEmbedding` so the two are interchangeable at a call site. Sequence length and feature dimension come from the input, so the layer takes only `theta`, and `dtype` is gone in favour of following the input. `x + nn.sinusoidal(s, d)` becomes `nn.SinusoidalPositionalEmbedding()(x)`.
-- **Breaking: `alibi` removed.** The ALiBi position bias was the one positional feature that could not be composed through `attention_fn`, and materializing its `(heads, seq, seq)` bias defeats fused attention kernels. Use `RoPE`, or build the bias inline and pass it to `jax.nn.dot_product_attention` through its `bias` argument.
-- **Benchmark ResNets use BatchNorm.** Ion's `nn.BatchNorm` and its buffers replace the `GroupNorm` stand-in that existed only because the suite could not carry mutable running statistics, and Equinox, Flax NNX, and PyTorch follow. Parameter counts are unchanged, so the cross-framework parity checks are unaffected, but every stored ResNet result needs re-running.
-- **Benchmark GPT can select cuDNN flash attention.** `use_flash` threads `implementation="cudnn"` into Ion's `attention_fn` and NNX's, and is set for the small and medium GPT so each framework uses the fastest kernel available for that shape, as PyTorch's `scaled_dot_product_attention` already does automatically. JAX's default of `None` resolves to `xla`, so the JAX frameworks were previously measured against PyTorch's fused kernels. The tiny GPT stays on XLA, and Ion and NNX fall back to it when no GPU is present.
-- **Benchmark first-step metric is removed.** Compile time already reports first-step latency minus the median warmed step, so the raw first-step number added a column and a figure without adding information. Compile-time plots now use seconds rather than milliseconds.
-- **RoPE handles N-dimensional positions.** Pass `shape` to lay positions on a lattice instead of a flat sequence, splitting the head dimension evenly across its axes, as axial RoPE does for images. `num_prefix_tokens` holds leading CLS or register tokens at position 0, where the rotation is the identity. `head_dim` must be divisible by `2 * len(shape)`. Breaking: `theta` moves to the end of the constructor, so pass it by keyword.
+- **Breaking: optional constructor arguments are keyword-only.** `MultiHeadAttention(64, 8)` becomes `MultiHeadAttention(64, num_heads=8)`. Shape arguments, as in `Linear(3, 16)`, stay positional.
+- **Breaking: `GATConv` and `GATv2Conv` rename `b` to `b_out`**, matching `MultiHeadAttention`. Old GAT checkpoints with a bias no longer load.
+- **Breaking: component toggles take a `use_` prefix.** `bias` becomes `use_bias`, `root_weight` becomes `use_root_weight` and `beta` becomes `use_beta`.
+- **Constructors assign fields in declaration order.** No behaviour change.
+- **Breaking: `SelfAttention` and `CrossAttention` merged into `MultiHeadAttention`.** Use `attn(x)` for self-attention and `attn(x, x_kv)` for cross-attention, with `kv_dim` replacing `context_dim`. Checkpoints still load.
+- **`MultiHeadAttention` accepts a custom `attention_fn`**, for example to use cuDNN or apply `RoPE`.
+- **Breaking: `RoPE` takes the sequence `axis`, defaulting to `-3`.** This matches the `(batch, seq, heads, head_dim)` layout `MultiHeadAttention` uses. Pass `axis=-2` for the old behaviour.
+- **Breaking: `sinusoidal` is now the `SinusoidalPositionalEmbedding` layer.** `x + nn.sinusoidal(s, d)` becomes `nn.SinusoidalPositionalEmbedding()(x)`.
+- **Breaking: `alibi` removed.** Use `RoPE`, or pass an ALiBi bias to `jax.nn.dot_product_attention` yourself.
+- **Benchmark ResNets use BatchNorm** instead of GroupNorm. Stored ResNet results need re-running.
+- **Benchmark GPT can use cuDNN flash attention** through `use_flash`, matching PyTorch's fused kernels.
+- **Benchmark first-step metric removed.** Compile time already covers it.
+- **RoPE handles N-dimensional positions.** Pass `shape` for axial RoPE on images, and `num_prefix_tokens` for CLS or register tokens. Breaking: pass `theta` by keyword.
 
 ## 0.12.1
 
@@ -126,36 +126,36 @@
 
 ## 0.12.0
 
-- **New `Param.value` property.** Reads the parameter as autodiff sees it, applying `stop_gradient` when frozen, and matches `Buffer.value`. Use it instead of `jnp.asarray(param)` where a plain array is needed. The private `_value` field is unchanged and still holds the raw stored array.
-- **New `nn.Buffer` for stateful layers.** Buffers hold mutable, non-trainable values directly in a model. Read them with `.value` and update them with `.set`, which applies `stop_gradient`. They contribute no pytree leaves, so `jax.grad`, `ion.Optimizer` and `Module.astype` leave them alone.
-- **New `BatchNorm` and `SpectralNorm` layers.** They use buffers for running statistics and power-iteration vectors, and are called normally with `y = norm(x, training=True)`, including in `Sequential`. `SpectralNorm` takes a constructor `key` to initialize its vectors, requires real floating parameters, and initializes its power-iteration vectors with JAX's default floating dtype. Both layers preserve their input dtype at the output boundary.
-- **Breaking: `Dropout` uses explicit training mode.** The `deterministic` constructor and call arguments are removed. Pass `training=True` with a key to sample a mask, or `training=False` for the evaluation identity.
-- **Checkpoints include buffers.** `ion.save(path, model)` writes running statistics as ordinary named tensors. `ion.load` returns a model with its own buffers, leaving the reference model's state untouched. The format version is unchanged.
-- **New `ion.clone` and `Module.clone`.** Returns a copy whose buffers are independent of the original, as do `freeze`, `unfreeze` and `load`. `astype` is the exception and shares them so mixed-precision copies update the model's state; `Optimizer.update` and plain `jax.tree.map` copies share them too. See [Sharp edges](docs/sharp-edges.md).
-- **New `ion.is_buffer` predicate.** Companion to `ion.is_param`, for tree code that needs to find buffers.
-- **Optimizers exclude buffers from optax state.** This keeps mutable references out of optimizer checkpoints, so a saved `(model, optimizer)` pair resumes normally with the loaded model's independent buffers.
+- **New `Param.value` property.** Reads the parameter as autodiff sees it, with `stop_gradient` when frozen. Use it instead of `jnp.asarray(param)`.
+- **New `nn.Buffer` for stateful layers.** Holds mutable, non-trainable values in a model. Read with `.value` and write with `.set`.
+- **New `BatchNorm` and `SpectralNorm` layers.** Both use buffers and are called as `norm(x, training=True)`.
+- **Breaking: `Dropout` uses explicit training mode.** `deterministic` is gone. Pass `training=True` with a key, or `training=False`.
+- **Checkpoints include buffers.** `ion.save` writes running statistics, and `ion.load` returns a model with its own buffers.
+- **New `ion.clone` and `Module.clone`.** Copies a model with independent buffers. See [Sharp edges](docs/sharp-edges.md) for which operations share them.
+- **New `ion.is_buffer` predicate.** Companion to `ion.is_param`.
+- **Optimizers exclude buffers from optax state**, so a saved `(model, optimizer)` pair resumes normally.
 - **Requires JAX 0.7.2 or newer**, up from 0.5.0. Buffers are built on `jax.new_ref`.
 
 ## 0.11.2
 
-- **`AvgPool` gains a `count_include_pad` flag.** Controls whether padded positions count towards the window size. Defaults to `True`, matching `torch.nn.AvgPool2d` and `flax.linen.avg_pool`. This changes existing behaviour: `AvgPool` previously always divided by the real element count. Pass `count_include_pad=False` to restore it. Only affects padded pooling; results without padding are unchanged.
-- **`LayerNorm` gains a `bias` flag.** Pass `bias=False` to drop the learnable shift, as used in LLaMA-style transformers. Note that a bias-less `LayerNorm` still subtracts the mean, so it is not equivalent to `RMSNorm`.
-- **New benchmark suite.** Compares Ion with Equinox, Flax NNX, and PyTorch eager and compiled across MLP, ResNet, and GPT workloads, measuring forward, backward, full-step, compilation, first-step, throughput, and peak-memory performance. Includes reproducible JSON results and interactive Plotly reports.
+- **`AvgPool` gains `count_include_pad`.** Defaults to `True`, matching PyTorch and Flax, which changes padded pooling. Pass `count_include_pad=False` for the old behaviour.
+- **`LayerNorm` gains a `bias` flag.** Pass `bias=False` to drop the learned shift. It still subtracts the mean, unlike `RMSNorm`.
+- **New benchmark suite.** Compares Ion with Equinox, Flax NNX and PyTorch on MLP, ResNet and GPT workloads.
 
 ## 0.11.1
 
-- **New `gnn.GraphConv` layer.** Graph convolution from Morris et al. (2019) with independently learned neighbour and root transforms, unnormalized sum aggregation, and optional scalar edge weights.
-- **New `gnn.TransformerConv` layer.** Sparse scaled dot-product graph attention from Shi et al. (2020), with multi-head Q/K/V projections, optional edge features, a root transform, edge masking, and optional gated residuals.
-- **GAT projection weights are now stored as 2D matrices.** `GATConv` and `GATv2Conv` add head axes to activations in the forward pass, matching the attention layers in `ion.nn`. Existing GAT checkpoints are incompatible.
+- **New `gnn.GraphConv` layer.** Graph convolution from Morris et al. (2019) with separate neighbour and root transforms.
+- **New `gnn.TransformerConv` layer.** Graph attention from Shi et al. (2020), with optional edge features and gated residuals.
+- **GAT projection weights are stored as 2D matrices.** Old `GATConv` and `GATv2Conv` checkpoints don't load.
 
 ## 0.11.0
 
-- **New MkDocs documentation site.** Adds guides, API reference, examples, workflows, and sharp-edge documentation under `docs/`.
-- **New `gnn.SAGEConv` layer.** GraphSAGE (Hamilton et al., 2017) with `mean`, `max`, or `sum` neighbour aggregation, an optional `root_weight` term for the central node, and optional L2 `normalize`.
-- **`padding` typed as `Literal["SAME", "VALID"]`.** `Conv`, `ConvTranspose`, `MaxPool`, and `AvgPool` now type the string form of `padding` as a literal instead of `str`, so type checkers catch invalid modes at the call site.
-- **Layer weight inits now default to uniform variance scaling, matched to the following activation.** `Linear`, `Conv`, `ConvTranspose`, `GCNConv`, `SelfAttention`/`CrossAttention`, and the SSM layers (`S4D`, `S5`, `LRU`) default to `glorot_uniform` (gain 1) instead of `he_normal`/`truncated_normal(0.02)`; `MLP` uses `he_uniform`, since it applies ReLU between its layers. He assumes a ReLU that a bare projection or attention does not have, so gain-1 Glorot is the safer default and matches PyTorch and Flax. Pass an explicit `w_init` to restore the old behaviour.
-- **`Embedding` and `LearnedPositionalEmbedding` init scales with dimension.** The default is now `variance_scaling(1.0, "fan_in", "uniform", out_axis=0)`, giving std `1/sqrt(dim)` so each row starts near unit norm regardless of `dim` and independent of vocabulary or sequence length. Replaces the dimension-blind `truncated_normal(0.02)` constant, matching Flax's `Embed`.
-- **`Sequential.__call__` accepts and returns `Any`.** The annotation now reflects that chained callables may pass non-array values.
+- **New MkDocs documentation site.** Guides, API reference, examples and workflows under `docs/`.
+- **New `gnn.SAGEConv` layer.** GraphSAGE (Hamilton et al., 2017) with `mean`, `max` or `sum` aggregation.
+- **`padding` typed as `Literal["SAME", "VALID"]`**, so type checkers catch invalid modes.
+- **Weight inits default to `glorot_uniform`.** This covers `Linear`, `Conv`, `ConvTranspose`, `GCNConv`, attention and the SSM layers. `MLP` uses `he_uniform`, since it applies ReLU. Pass `w_init` for the old behaviour.
+- **`Embedding` and `LearnedPositionalEmbedding` init scales with dimension**, giving std `1/sqrt(dim)` as in Flax.
+- **`Sequential.__call__` accepts and returns `Any`**, since chained callables may pass non-array values.
 
 ## 0.10.2
 
