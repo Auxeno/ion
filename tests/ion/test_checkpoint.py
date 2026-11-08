@@ -9,9 +9,10 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
+import optax
 import pytest
 
-from ion import checkpoint, nn, tree
+from ion import Optimizer, checkpoint, nn, tree
 
 
 def read_header(path):
@@ -159,6 +160,42 @@ class TestSaveLoad:
             loaded = checkpoint.load(f.name, model)
         npt.assert_array_equal(loaded.w._value, model.w._value)
         npt.assert_array_equal(loaded.buf, model.buf)
+
+    def test_typed_prng_key_roundtrip(self):
+        """Typed PRNG keys roundtrip with their data, shape and implementation."""
+        state = {"key": jax.random.split(jax.random.key(0, impl="rbg"), 3)}
+        reference = {"key": jax.random.split(jax.random.key(1, impl="rbg"), 3)}
+        with tempfile.NamedTemporaryFile(suffix=".ion") as f:
+            checkpoint.save(f.name, state)
+            loaded = checkpoint.load(f.name, reference)
+        key_data = jax.random.key_data
+        assert jax.random.key_impl(loaded["key"]) == jax.random.key_impl(state["key"])
+        npt.assert_array_equal(key_data(loaded["key"]), key_data(state["key"]))
+
+    def test_load_into_eval_shape_reference(self):
+        """A reference built with jax.eval_shape hydrates Params, plain arrays and keys."""
+
+        class Model(nn.Module):
+            w: nn.Param
+            buf: jax.Array
+            key: jax.Array
+
+            def __init__(self, key):
+                self.w = nn.Param(jax.random.normal(key, (2,)))
+                self.buf = jnp.array([10.0, 20.0])
+                self.key = key
+
+        model = Model(key=jax.random.key(0))
+        optimizer = Optimizer(optax.adam(1e-3), model)
+        abstract = jax.eval_shape(lambda: (model, optimizer))
+        with tempfile.NamedTemporaryFile(suffix=".ion") as f:
+            checkpoint.save(f.name, (model, optimizer))
+            loaded_model, loaded_optimizer = checkpoint.load(f.name, abstract)
+        npt.assert_array_equal(loaded_model.w._value, model.w._value)
+        npt.assert_array_equal(loaded_model.buf, model.buf)
+        key_data = jax.random.key_data
+        npt.assert_array_equal(key_data(loaded_model.key), key_data(model.key))
+        assert isinstance(loaded_optimizer.step, jax.Array)
 
     def test_path_without_extension(self):
         """Both save and load append .ion when the path lacks it."""

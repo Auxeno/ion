@@ -85,6 +85,9 @@ def save(path: str, pytree: PyTree) -> None:
         elif isinstance(leaf, Buffer):
             arrays[key] = np.asarray(leaf.value)
         elif isinstance(leaf, (jax.Array, np.ndarray)):
+            # A PRNG key has no NumPy equivalent, so its raw key data is written instead
+            if jnp.issubdtype(leaf.dtype, jax.dtypes.prng_key):
+                leaf = jax.random.key_data(leaf)
             arrays[key] = np.asarray(leaf)
 
     # Build the JSON header: dtype, shape and byte offsets per tensor, plus ion metadata
@@ -189,7 +192,8 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
     shape_problems: list[str] = []
     loaded_leaves: list[Any] = []
     for key_path, leaf in leaves_with_paths:
-        if not isinstance(leaf, (Param, Buffer, jax.Array, np.ndarray)):
+        # A reference built with jax.eval_shape holds ShapeDtypeStructs in place of arrays
+        if not isinstance(leaf, (Param, Buffer, jax.Array, np.ndarray, jax.ShapeDtypeStruct)):
             loaded_leaves.append(leaf)
             continue
         key = _path_key(key_path)
@@ -199,6 +203,10 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
             ref = leaf.value
         else:
             ref = leaf
+        is_key = jnp.issubdtype(ref.dtype, jax.dtypes.prng_key)
+        if is_key:
+            # A typed PRNG key is stored as its raw data, so the reference is compared through it
+            ref = jax.eval_shape(jax.random.key_data, ref)
         expected_keys.add(key)
         if key not in header:
             missing_keys.append(key)
@@ -222,6 +230,10 @@ def load(path: str, reference_pytree: PyTree) -> PyTree:
             loaded_leaves.append(Param(jnp.array(arr), trainable=trainable))
         elif isinstance(leaf, Buffer):
             loaded_leaves.append(Buffer(jnp.array(arr)))
+        elif is_key:
+            # An abstract key cannot report its impl, but a placeholder key of the same dtype can
+            impl = jax.random.key_impl(jnp.zeros((), leaf.dtype))
+            loaded_leaves.append(jax.random.wrap_key_data(jnp.array(arr), impl=impl))
         else:
             loaded_leaves.append(jnp.array(arr))
 
