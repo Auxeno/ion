@@ -1,10 +1,22 @@
 # Changelog
 
-## 0.18.3
+## 0.19.0
 
 - **`gnn.segment_softmax` NaN gradient fix for padding.** Padded segment ids could turn every gradient into NaN. They now get exactly zero weight.
 - **`nn.MultiHeadAttention` no longer leaks future tokens.** A row left with no valid keys by `mask` together with `causal` or `window`, as under left padding, averaged every value, future ones included. Such rows now output zeros.
 - **Breaking: `gnn.unbatch_graphs` takes `num_graphs`.** Inferring the count dropped trailing empty graphs and failed on padded batches. Padded batches now round-trip.
+- **Breaking: modules are no longer iterable.** `for x in model` yielded field values, which read like iterating layers. `Sequential` still iterates over its layers.
+- **`ion.nn` points to JAX for activations.** A lookup such as `nn.relu` raises an error naming `jax.nn.relu`.
+- **`astype` accepts any dtype-like value** under type checking, and `ion.typing` exports `DTypeLike`.
+- **Requires JAX 0.8.2 or newer**, up from 0.7.2. Older releases give incorrect sliding-window attention.
+- **`ion.load` reports every mismatch at once.** Missing keys, extra keys and shape mismatches come in one error.
+- **Typed PRNG keys save and load.**
+- **`jax.eval_shape` references load fully**, including plain arrays and optimizer state.
+- **`save` and `load` accept `pathlib.Path`.**
+- **Python scalar leaves are saved**, such as a step count in a dict.
+- **Breaking: `trainable` flags come from the reference on load.** Freeze the reference before loading to keep parameters frozen. Checkpoints no longer store them.
+- **`ion.load` reads one tensor at a time**, roughly halving peak host memory.
+- **Dtype mismatches warn once** per load, instead of once per array.
 
 ## 0.18.2
 
