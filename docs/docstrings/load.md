@@ -10,7 +10,7 @@ reference_pytree : PyTree
 Returns
 -------
 PyTree
-    Pytree with arrays, scalars and `Param` trainable flags restored from file.
+    Pytree with arrays and scalars restored from file.
 
 Example
 -------

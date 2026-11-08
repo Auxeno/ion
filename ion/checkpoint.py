@@ -6,9 +6,9 @@ Functions:
 
 The .ion format is safetensors-style (length-prefixed JSON header, then raw
 tensor bytes) with native support for JAX dtypes such as bfloat16, float8 and
-complex64. Array leaves, Python scalar leaves and Param trainable flags are saved.
-The tree structure, including module fields such as sizes and activations, comes
-from the reference tree on load.
+complex64. Array leaves and Python scalar leaves are saved. The tree structure,
+including module fields such as activations and Param trainable flags, comes from
+the reference tree on load.
 """
 
 import contextlib
@@ -66,8 +66,8 @@ def save(path: str | os.PathLike[str], pytree: PyTree) -> None:
     path : str | os.PathLike
         Destination file path (`.ion` appended if missing).
     pytree : PyTree
-        Pytree to serialize. Array leaves, `Buffer` values, Python scalar leaves and
-        `Param` trainable flags are written.
+        Pytree to serialize. Array leaves, `Buffer` values and Python scalar leaves are
+        written.
 
     Examples
     --------
@@ -75,15 +75,13 @@ def save(path: str | os.PathLike[str], pytree: PyTree) -> None:
     """
     leaves_with_paths = jax.tree.flatten_with_path(pytree, is_leaf=_is_param_or_buffer)[0]
 
-    # Collect array leaves, scalar leaves and Param trainable flags, keyed by tree path
+    # Collect array and scalar leaves, keyed by tree path
     arrays: dict[str, np.ndarray] = {}
     scalars: dict[str, bool | int | float | str] = {}
-    trainable_flags: dict[str, bool] = {}
     for key_path, leaf in leaves_with_paths:
         key = _path_key(key_path)
         if isinstance(leaf, Param):
             arrays[key] = np.asarray(leaf._value)
-            trainable_flags[key] = leaf.trainable
         elif isinstance(leaf, Buffer):
             arrays[key] = np.asarray(leaf.value)
         elif isinstance(leaf, (jax.Array, np.ndarray)):
@@ -95,11 +93,7 @@ def save(path: str | os.PathLike[str], pytree: PyTree) -> None:
             scalars[key] = leaf
 
     # Build the JSON header: dtype, shape and byte offsets per tensor, plus ion metadata
-    metadata = {
-        "format_version": str(_FORMAT_VERSION),
-        "trainable": json.dumps(trainable_flags),
-        "scalars": json.dumps(scalars),
-    }
+    metadata = {"format_version": str(_FORMAT_VERSION), "scalars": json.dumps(scalars)}
     header: dict[str, Any] = {"__metadata__": metadata}
     offset = 0
     for key, array in arrays.items():
@@ -148,7 +142,7 @@ def load(path: str | os.PathLike[str], reference_pytree: PyTree) -> PyTree:
     Returns
     -------
     PyTree
-        Pytree with arrays, scalars and `Param` trainable flags restored from file.
+        Pytree with arrays and scalars restored from file.
 
     Notes
     -----
@@ -176,12 +170,11 @@ def load(path: str | os.PathLike[str], reference_pytree: PyTree) -> PyTree:
     header: dict[str, Any] = json.loads(data[8 : 8 + header_size])
     buffer = memoryview(data)[8 + header_size :]
 
-    # Ion metadata: format version, Param trainable flags and scalar leaves
+    # Ion metadata: format version and scalar leaves
     metadata: dict[str, str] = header.pop("__metadata__", {})
     version = int(metadata.get("format_version", 0))
     if version > _FORMAT_VERSION:
         raise ValueError(f"Format version ({version}) is newer than supported ({_FORMAT_VERSION})")
-    trainable_flags: dict[str, bool] = json.loads(metadata.get("trainable", "{}"))
 
     # Files saved before scalar leaves were written leave them to the reference
     scalars: dict[str, Any] | None = None
@@ -201,7 +194,7 @@ def load(path: str | os.PathLike[str], reference_pytree: PyTree) -> PyTree:
     if offset != len(buffer):
         raise ValueError(f"Data section ({len(buffer)} bytes) does not match header ({offset})")
 
-    # Rebuild leaves from the reference, taking arrays, scalars and trainable flags from the file
+    # Rebuild leaves from the reference, taking arrays and scalars from the file
     expected_keys: set[str] = set()
     missing_keys: list[str] = []
     shape_problems: list[str] = []
@@ -248,8 +241,7 @@ def load(path: str | os.PathLike[str], reference_pytree: PyTree) -> PyTree:
                 stacklevel=2,
             )
         if isinstance(leaf, Param):
-            trainable = trainable_flags.get(key, leaf.trainable)
-            loaded_leaves.append(Param(jnp.array(arr), trainable=trainable))
+            loaded_leaves.append(Param(jnp.array(arr), trainable=leaf.trainable))
         elif isinstance(leaf, Buffer):
             loaded_leaves.append(Buffer(jnp.array(arr)))
         elif is_key:

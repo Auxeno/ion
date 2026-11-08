@@ -63,7 +63,7 @@ logits = x @ self.embed.w.T
 
 ## `save`/`load` doesn't store callables or static config
 
-Non-array module fields (ints, strings, activation functions) come from the reference tree passed to `load`, not from the file. If you change an activation in code and load an old checkpoint, you get the new activation with the old weights, with no warning. Array data, Python scalar leaves such as `{"step": 100}` and `trainable` flags do round-trip exactly, including `bfloat16`, `float8` and `complex64`; shape mismatches raise `ValueError`.
+Non-array module fields (ints, strings, activation functions) and `trainable` flags come from the reference tree passed to `load`, not from the file. If you change an activation in code and load an old checkpoint, you get the new activation with the old weights, with no warning. Array data and Python scalar leaves such as `{"step": 100}` do round-trip exactly, including `bfloat16`, `float8` and `complex64`; shape mismatches raise `ValueError`.
 
 ## `at` can change pytree structure
 

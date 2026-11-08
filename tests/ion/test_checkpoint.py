@@ -275,8 +275,8 @@ class TestSaveLoadCallable:
 
 
 class TestSaveLoadTrainable:
-    def test_trainable_flag_roundtrip(self):
-        """Trainable flags are saved and restored from the file."""
+    def test_trainable_flags_come_from_reference(self):
+        """Trainable flags come from the reference, while array values come from the file."""
 
         class Model(nn.Module):
             w: nn.Param
@@ -297,15 +297,13 @@ class TestSaveLoadTrainable:
             checkpoint.save(f.name, model)
             loaded = checkpoint.load(f.name, reference)
 
-        # Trainable flags come from the file, not the reference
-        assert loaded.w.trainable is True
-        assert loaded.b.trainable is False
-        # Array values come from the file
+        assert loaded.w.trainable is False
+        assert loaded.b.trainable is True
         npt.assert_array_equal(loaded.w._value, model.w._value)
         npt.assert_array_equal(loaded.b._value, model.b._value)
 
-    def test_frozen_model_save_restore(self):
-        """A fully frozen model roundtrips with correct trainable=False flags."""
+    def test_freeze_then_load_stays_frozen(self):
+        """Loading trainable weights into a frozen reference keeps it frozen."""
 
         class Model(nn.Module):
             w: nn.Param
@@ -313,23 +311,18 @@ class TestSaveLoadTrainable:
             def __init__(self, key):
                 self.w = nn.Param(jax.random.normal(key, (4,)))
 
-        model = tree.freeze(Model(key=jax.random.key(0)))
-        assert model.w.trainable is False
-
-        # Reference is trainable (different from saved)
-        reference = Model(key=jax.random.key(1))
-        assert reference.w.trainable is True
+        model = Model(key=jax.random.key(0))
+        reference = tree.freeze(Model(key=jax.random.key(1)))
 
         with tempfile.NamedTemporaryFile(suffix=".ion") as f:
             checkpoint.save(f.name, model)
             loaded = checkpoint.load(f.name, reference)
 
-        # Saved trainable=False wins over reference trainable=True
         assert loaded.w.trainable is False
         npt.assert_array_equal(loaded.w._value, model.w._value)
 
     def test_metadata_in_header(self):
-        """Saved file header contains __metadata__ with version and trainable flags."""
+        """Saved file header holds the format version and no trainable flags."""
 
         class Model(nn.Module):
             w: nn.Param
@@ -342,13 +335,12 @@ class TestSaveLoadTrainable:
             checkpoint.save(f.name, model)
             header = read_header(f.name)
 
-        # Safetensors metadata values must be strings, so trainable flags are JSON-encoded
         metadata = header["__metadata__"]
         assert metadata["format_version"] == "2"
-        assert json.loads(metadata["trainable"])["w"] is False
+        assert "trainable" not in metadata
 
     def test_nested_module_trainable_flags(self):
-        """Trainable flags roundtrip through nested modules."""
+        """Trainable flags of nested modules come from the reference."""
 
         class Inner(nn.Module):
             w: nn.Param
@@ -365,15 +357,15 @@ class TestSaveLoadTrainable:
                 self.inner = Inner(key=keys[0], trainable=inner_trainable)
                 self.b = nn.Param(jax.random.normal(keys[1], (3,)), trainable=b_trainable)
 
-        model = Outer(key=jax.random.key(0), inner_trainable=False, b_trainable=True)
-        reference = Outer(key=jax.random.key(1), inner_trainable=True, b_trainable=True)
+        model = Outer(key=jax.random.key(0), inner_trainable=True, b_trainable=False)
+        reference = Outer(key=jax.random.key(1), inner_trainable=False, b_trainable=True)
 
         with tempfile.NamedTemporaryFile(suffix=".ion") as f:
             checkpoint.save(f.name, model)
             loaded = checkpoint.load(f.name, reference)
 
-        assert loaded.inner.w.trainable is False  # from file
-        assert loaded.b.trainable is True  # from file
+        assert loaded.inner.w.trainable is False
+        assert loaded.b.trainable is True
         npt.assert_array_equal(loaded.inner.w._value, model.inner.w._value)
         npt.assert_array_equal(loaded.b._value, model.b._value)
 
