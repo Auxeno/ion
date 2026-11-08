@@ -730,6 +730,17 @@ class TestSaveLoadStructureMismatch:
                 loaded = checkpoint.load(f.name, reference)
             assert loaded.buf.dtype == jnp.float32
 
+    def test_dtype_mismatches_warn_once(self):
+        """Every dtype mismatch is reported in a single warning."""
+        model = nn.MLP([2, 4, 4, 1], key=jax.random.key(0))
+        with tempfile.NamedTemporaryFile(suffix=".ion") as f:
+            checkpoint.save(f.name, model)
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                checkpoint.load(f.name, model.astype(jnp.bfloat16))
+        assert len(caught) == 1
+        assert "Dtype mismatch for 6 arrays" in str(caught[0].message)
+
     def test_load_matching_dtype_no_warning(self):
         """Loading with matching dtypes produces no warning."""
 

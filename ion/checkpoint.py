@@ -201,6 +201,7 @@ def load(path: str | os.PathLike[str], reference_pytree: PyTree) -> PyTree:
     expected_keys: set[str] = set()
     missing_keys: list[str] = []
     shape_problems: list[str] = []
+    dtype_mismatches: list[str] = []
     loaded_leaves: list[Any] = []
     for key_path, leaf in leaves_with_paths:
         key = _path_key(key_path)
@@ -241,10 +242,7 @@ def load(path: str | os.PathLike[str], reference_pytree: PyTree) -> PyTree:
         offset = data_start + entry["data_offsets"][0]
         arr = np.fromfile(path, dtype=dtype, count=math.prod(shape), offset=offset).reshape(shape)
         if arr.dtype != ref.dtype:
-            warnings.warn(
-                f"Dtype mismatch for '{key}': saved {arr.dtype} vs {ref.dtype}, using saved",
-                stacklevel=2,
-            )
+            dtype_mismatches.append(f"'{key}' saved {arr.dtype} vs {ref.dtype}")
         if isinstance(leaf, Param):
             loaded_leaves.append(Param(jnp.array(arr), trainable=leaf.trainable))
         elif isinstance(leaf, Buffer):
@@ -267,5 +265,11 @@ def load(path: str | os.PathLike[str], reference_pytree: PyTree) -> PyTree:
     if problems:
         fix = "Build the reference with the same structure and sizes as the saved pytree."
         raise ValueError("\n".join([f"Cannot hydrate a reference from '{path}':", *problems, fix]))
+
+    # One warning covers all dtype mismatches, so a cast model does not warn once per array
+    if dtype_mismatches:
+        shown = ", ".join(dtype_mismatches[:3]) + (", ..." if len(dtype_mismatches) > 3 else "")
+        message = f"Dtype mismatch for {len(dtype_mismatches)} arrays, using saved dtypes: {shown}"
+        warnings.warn(message, stacklevel=2)
 
     return tree_def.unflatten(loaded_leaves)
